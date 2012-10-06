@@ -19,9 +19,9 @@ However, the straightforward implementation is generally
 not very fast.
 %
 This article contributes a step by step process for going from a naive
-abstract$^2$ machine to an efficient program analyzer that is two
-orders of magnitude faster than the starting point, yet just as
-precise.
+abstract$^2$ machine to an efficient program analyzer that is (nearly)
+three orders of magnitude faster than the starting point, yet just as
+precise (and purely functional).
 \end{abstract}
 %
 \section{Introduction}
@@ -30,15 +30,42 @@ precise.
 \subsection{An abstract$^2$ machine for PCF}
 \subsection{An example: Analyzing Church number computations}
 \subsection{Store widening}
+
 \subsection{Baseline evaluation}
 
+Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
+
 \section{Precision preserving recipe}
-\subsection{Fixed-point specialization}
+
 \subsection{Lazy non-determinism}
+
+Lazy:
+   cpu time: 32481 real time: 32881 gc time: 547
+
 \subsection{Abstract compilation}
+
+Compile:
+   cpu time: 255397 real time: 261532 gc time: 2947
+
+\noindent
+Compile + Lazy:
+   cpu time: 31173 real time: 31642 gc time: 739
+
+\subsection{Fixed-point specialization}
+
+%% Should be commutted to beginning
+
+Special + Compile + Lazy:
+   cpu time: 14212 real time: 14681 gc time: 823
+
 \subsection{Computing with store changes}
 
+Delta Store + Special + Compile + Lazy:
+   cpu time: 668 real time: 686 gc time: 41
+
 \section{Evaluation}
+
+Other benchmarks
 
 \section{Related work}
 
