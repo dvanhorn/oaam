@@ -192,40 +192,6 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Concrete semantics
-#;#;#;
-(define (widen b)
-  (cond [(number? b) b]
-        [else (error "Unknown base value" b)]))
-
-(define (bind s)
-  (match s
-    [(ap σ (clos l x e ρ) v k)
-     (define a
-       (add1 (for/fold ([i 0])
-               ([k (in-hash-keys σ)])
-               (max i k))))
-     (values (extend ρ x a)
-             (join σ a (set v)))]
-    [(ap σ (rlos l f x e ρ) v k)
-     (define a
-       (add1 (for/fold ([i 0])
-               ([k (in-hash-keys σ)])
-               (max i k))))
-     (define b (add1 a))
-     (values (extend (extend ρ x a) f b)
-             (join (join σ a (set v)) b (set (rlos l f x e ρ))))]))
-
-(define (push σ l ρ k)
-  (define a
-    (add1 (for/fold ([i 0])
-            ([k (in-hash-keys σ)])
-            (max i k))))
-  (values (join σ a (set k))
-          a))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 0CFA-style Abstract semantics
 (define (widen b)
   (cond [(number? b) 'number]
@@ -240,10 +206,6 @@
      (values (extend (extend ρ x x) f f)
              (list (cons f (set (rlos l f x e ρ)))
                    (cons x (get-val σ v))))]))
-
-(define (push σ l ρ k)  
-  (values (join-one σ l k)
-          l))
 
 (define (push∆ ∆ l ρ k)
   (values (cons (cons l (set k)) ∆)
@@ -281,14 +243,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Widening State to State^
-
-;; Store Store -> Store
-(define (join-store σ1 σ2)
-  (for/fold ([σ σ1])
-    ([k×v (in-hash-pairs σ2)])
-    (hash-set σ (car k×v)
-              (set-union (cdr k×v)
-                         (hash-ref σ (car k×v) (set))))))
 
 ;; State^ -> State^
 ;; Specialized from wide-step : State^ -> { State^ } ≈ State^ -> State^
