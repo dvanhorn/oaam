@@ -1,0 +1,51 @@
+\documentclass{llncs}
+%
+\begin{document}
+\title{Optimizing Abstract$^2$ Machines}
+%
+\frontmatter          % for the preliminaries
+%
+\author{J.~Ian Johnson\inst{1} \and Matthew Might\inst{2} \and David Van Horn\inst{1}}
+\institute{Northeastern University \and University of Utah}
+
+\maketitle              % typeset the title of the contribution
+
+\begin{abstract}
+The abstracting abstract machines approach to program analysis makes
+it easy to design and implement sound and computable abstract
+interpretations of higher-order programs.
+%
+However, the straightforward implementation is generally
+not very fast.
+%
+This article contributes a step by step process for going from a naive
+abstract$^2$ machine to an efficient program analyzer that is two
+orders of magnitude faster than the starting point, yet just as
+precise.
+\end{abstract}
+%
+\section{Introduction}
+
+\section{Starting point}
+\subsection{An abstract$^2$ machine for PCF}
+\subsection{An example: Analyzing Church number computations}
+\subsection{Store widening}
+\subsection{Baseline evaluation}
+
+\section{Precision preserving recipe}
+\subsection{Fixed-point specialization}
+\subsection{Lazy non-determinism}
+\subsection{Abstract compilation}
+\subsection{Computing with store changes}
+
+\section{Evaluation}
+
+\section{Related work}
+
+\section{Conclusion}
+
+Abstract machines are not only a good model for rapid analysis
+development, they also can be systematically developed into efficient
+algorithms.
+
+\end{document}
