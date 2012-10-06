@@ -1,5 +1,5 @@
 #lang racket
-(provide aval^)
+(provide aval^ eval)
 (require "ast.rkt")
 
 ;; 0CFA in the AAM style on some hairy Church numeral churning
@@ -73,87 +73,89 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Machine
 
-;; State -> Set State
-(define (step state) 
-  ;(printf "~a~n" state)
-  (match state
-    [(ev σ e ρ k)
-     (match e
-       [(var l x)           (do v <- (lookup ρ σ x)
-                              (co σ k v))]
-       [(num l n)           (set (co σ k n))]
-       [(bln l b)           (set (co σ k b))]
-       [(lam l x e)         (set (co σ k (clos l x e ρ)))]
-       [(rec f (lam l x e)) (set (co σ k (rlos l f x e ρ)))]
-       [(app l f e)
-        (define-values (σ* a) (push state))
-        (set (ev σ* f ρ (ar e ρ a)))]
-       [(ife l e0 e1 e2)
-        (define-values (σ* a) (push state))
-        (set (ev σ* e0 ρ (ifk e1 e2 ρ a)))]
-       [(1op l o e)
-        (define-values (σ* a) (push state))
-        (set (ev σ* e ρ (1opk o a)))]
-       [(2op l o e f)
-        (define-values (σ* a) (push state))
-        (set (ev σ* e ρ (2opak o f ρ a)))])]
-
-    [(co σ k v)
-     (match k
-       ['mt (set (ans σ v))]
-       [(ar e ρ l) (set (ev σ e ρ (fn v l)))]
-       [(fn f l)   (do k <- (get-cont σ l)
-                     (ap σ f v k))]
-       [(ifk c a ρ l)
-        (do k <- (get-cont σ l)
-          (ev σ (if v c a) ρ k))]
-       [(1opk o l)
-        (do k <- (get-cont σ l)
-          (ap-op σ o (list v) k))]
-       [(2opak o e ρ l)
-        (set (ev σ e ρ (2opfk o v l)))]
-       [(2opfk o u l)
-        (do k <- (get-cont σ l)
-          (ap-op σ o (list v u) k))])]
- 
-    [(ap σ fun a k)
-     (match fun
-       [(clos l x e ρ)
-        (define-values (ρ* σ*) (bind state))
-        (set (ev σ* e ρ* k))]
-       [(rlos l f x e ρ)
-        (define-values (ρ* σ*) (bind state))
-        (set (ev σ* e ρ* k))]
-       [_ (set state)])]
-
-    [(ap-op σ o vs k)
-     (match* (o vs)
-       [('zero? (list (? number? n))) (set (co σ k (zero? n)))]
-       [('sub1 (list (? number? n)))  (set (co σ k (widen (sub1 n))))]
-       [('add1 (list (? number? n)))  (set (co σ k (widen (add1 n))))]
-       [('zero? (list 'number))
-        (set (co σ k #t)
-             (co σ k #f))]
-       [('sub1 (list 'number)) (set (co σ k 'number))]
-       [('* (list (? number? n) (? number? m)))
-        (set (co σ k (widen (* m n))))]
-       [('* (list (? number? n) 'number))
-        (set (co σ k 'number))]
-       [('* (list 'number 'number))
-        (set (co σ k 'number))]
-       [(_ _) (set state)])]
-
-    [_ (set state)]))
-
+(define (mk-step push bind widen)
+  ;; State -> Set State
+  (define (step state) 
+    ;(printf "~a~n" state)
+    (match state
+      [(ev σ e ρ k)
+       (match e
+         [(var l x)           (do v <- (lookup ρ σ x)
+                                (co σ k v))]
+         [(num l n)           (set (co σ k n))]
+         [(bln l b)           (set (co σ k b))]
+         [(lam l x e)         (set (co σ k (clos l x e ρ)))]
+         [(rec f (lam l x e)) (set (co σ k (rlos l f x e ρ)))]
+         [(app l f e)
+          (define-values (σ* a) (push state))
+          (set (ev σ* f ρ (ar e ρ a)))]
+         [(ife l e0 e1 e2)
+          (define-values (σ* a) (push state))
+          (set (ev σ* e0 ρ (ifk e1 e2 ρ a)))]
+         [(1op l o e)
+          (define-values (σ* a) (push state))
+          (set (ev σ* e ρ (1opk o a)))]
+         [(2op l o e f)
+          (define-values (σ* a) (push state))
+          (set (ev σ* e ρ (2opak o f ρ a)))])]
+      
+      [(co σ k v)
+       (match k
+         ['mt (set (ans σ v))]
+         [(ar e ρ l) (set (ev σ e ρ (fn v l)))]
+         [(fn f l)   (do k <- (get-cont σ l)
+                       (ap σ f v k))]
+         [(ifk c a ρ l)
+          (do k <- (get-cont σ l)
+            (ev σ (if v c a) ρ k))]
+         [(1opk o l)
+          (do k <- (get-cont σ l)
+            (ap-op σ o (list v) k))]
+         [(2opak o e ρ l)
+          (set (ev σ e ρ (2opfk o v l)))]
+         [(2opfk o u l)
+          (do k <- (get-cont σ l)
+            (ap-op σ o (list v u) k))])]
+      
+      [(ap σ fun a k)
+       (match fun
+         [(clos l x e ρ)
+          (define-values (ρ* σ*) (bind state))
+          (set (ev σ* e ρ* k))]
+         [(rlos l f x e ρ)
+          (define-values (ρ* σ*) (bind state))
+          (set (ev σ* e ρ* k))]
+         [_ (set)])]
+      
+      [(ap-op σ o vs k)
+       (match* (o vs)
+         [('zero? (list (? number? n))) (set (co σ k (zero? n)))]
+         [('sub1 (list (? number? n)))  (set (co σ k (widen (sub1 n))))]
+         [('add1 (list (? number? n)))  (set (co σ k (widen (add1 n))))]
+         [('zero? (list 'number))
+          (set (co σ k #t)
+               (co σ k #f))]
+         [('sub1 (list 'number)) (set (co σ k 'number))]
+         [('* (list (? number? n) (? number? m)))
+          (set (co σ k (widen (* m n))))]
+         [('* (list (? number? n) 'number))
+          (set (co σ k 'number))]
+         [('* (list 'number 'number))
+          (set (co σ k 'number))]
+         [(_ _) (set)])]
+      
+      [_ (set)]))
+  
+  step)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Concrete semantics
-#;#;#;
-(define (widen b)
+
+(define (eval-widen b)
   (cond [(number? b) b]
         [else (error "Unknown base value" b)]))
 
-(define (bind s)
+(define (eval-bind s)
   (match s
     [(ap σ (clos l x e ρ) v k)
      (define a
@@ -171,7 +173,7 @@
      (values (extend (extend ρ x a) f b)
              (join (join σ a (set v)) b (set (rlos l f x e ρ))))]))
 
-(define (push s)
+(define (eval-push s)
   (match s
     [(ev σ e ρ k)
      (define a
@@ -205,6 +207,8 @@
      (values (join σ a (set k))
              a)]))
 
+(define step (mk-step push bind widen))
+(define eval-step (mk-step eval-push eval-bind eval-widen))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -215,7 +219,7 @@
             #:when (ans? s))
            (ans-v s)))
 
-;; Exp -> Set Vlal
+;; Exp -> Set Val
 ;; 0CFA with store widening
 (define (aval^ e)
   (for/fold ([vs (set)])
@@ -226,6 +230,13 @@
                   (for/set ([c cs]
                             #:when (ans^? c))
                            (ans^-v c))]))))
+
+;; Exp -> { Val }
+;; Eval with infinite store
+(define (eval e)
+  (for/set ([s (fix eval-step (inj e))]
+            #:when (ans? s))
+           (ans-v s)))
 
 ;; Exp -> Set State
 (define (inj e)
