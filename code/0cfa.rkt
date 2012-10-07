@@ -20,9 +20,13 @@
          [(var l x)           (for/set ((v (lookup ρ σ x)))
                                 (co σ k v))]
          [(num l n)           (set (co σ k n))]
-         [(bln l b)           (set (co σ k b))]
-         [(lam l x e)         (set (co σ k (clos l x e ρ)))]
+         [(bln l b)           (set (co σ k b))]         
+         [(lam l x e)         (set (co σ k (clos l x e ρ)))]         
          [(rec f (lam l x e)) (set (co σ k (rlos l f x e ρ)))]
+         [(lrc l xs es b)
+          (define-values (σ0 a) (push state))
+          (define-values (ρ* σ*) (bind (ev σ0 e ρ k)))
+          (set (ev σ* (first es) ρ* (lrk (first xs) (rest xs) (rest es) b ρ* a)))]
          [(app l f e)
           (define-values (σ* a) (push state))
           (set (ev σ* f ρ (ar e ρ a)))]
@@ -52,7 +56,15 @@
           (set (ev σ e ρ (2opfk o v l)))]
          [(2opfk o u l)
           (for/set ((k (get-cont σ l)))
-            (ap-op σ o (list v u) k))])]
+            (ap-op σ o (list v u) k))]
+         [(lrk x '() '() e ρ l)
+          (define-values (_ σ*) (bind state))
+          (for/set ((k (get-cont σ l)))
+            (ev σ* e ρ k))]
+         [(lrk x (cons y xs) (cons e es) b ρ a)
+          (define-values (_ σ*) (bind state))          
+          (set (ev σ* e ρ (lrk y xs es b ρ a)))])]
+          
 
       [(ap σ fun a k)
        (match fun
@@ -95,19 +107,28 @@
         [else (error "Unknown base value" b)]))
 
 (define (eval-bind s)
+  (define (next-addr σ)
+    (add1 (for/fold ([i 0])
+            ([k (in-hash-keys σ)])
+            (max i k))))
   (match s
+    [(co σ (lrk x xs es e ρ k) v)
+     (define a (lookup-env ρ x))
+     (values ρ (join-one σ a v))]
+    
+    [(ev σ (lrc l xs es b) ρ k)
+     (define a (next-addr σ))
+     (define as (for/list ([i (in-range (length xs))])
+                  (+ a i)))
+     (values (extend* ρ xs as)
+             (join* σ as (map (λ _ (set)) xs)))]
+    
     [(ap σ (clos l x e ρ) v k)
-     (define a
-       (add1 (for/fold ([i 0])
-               ([k (in-hash-keys σ)])
-               (max i k))))
+     (define a (next-addr σ)) 
      (values (extend ρ x a)
              (extend σ a (set v)))]
     [(ap σ (rlos l f x e ρ) v k)
-     (define a
-       (add1 (for/fold ([i 0])
-               ([k (in-hash-keys σ)])
-               (max i k))))
+     (define a (next-addr σ))
      (define b (add1 a))
      (values (extend (extend ρ x a) f b)
              (join (join σ a (set v)) b (set (rlos l f x e ρ))))]))
@@ -132,12 +153,17 @@
 
 (define (bind s)
   (match s
+    [(co σ (lrk x xs es e ρ a) v)
+     (values ρ (join-one σ x v))]
+    [(ev σ (lrc l xs es b) ρ k)
+     (values (extend* ρ xs xs)
+             (join* σ xs (map (λ _ (set)) xs)))]
     [(ap σ (clos l x e ρ) v k)
      (values (extend ρ x x)
-             (join σ x (set v)))]
+             (join-one σ x v))]
     [(ap σ (rlos l f x e ρ) v k)
      (values (extend (extend ρ x x) f f)
-             (join (join σ x (set v)) f (set (rlos l f x e ρ))))]))
+             (join-one (join-one σ x v) f (rlos l f x e ρ)))]))
 
 (define (push s)
   (match s

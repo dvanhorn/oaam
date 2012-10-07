@@ -17,12 +17,13 @@
 ;; - (1opk Opr Cont)
 ;; - (2opak Opr Exp Env Cont)
 ;; - (2opfk Opr Val Cont)
-(struct ar (e ρ k)      #:transparent)
-(struct fn (v k)        #:transparent)
-(struct ifk (c a ρ k)   #:transparent)
-(struct 1opk (o k)      #:transparent)
-(struct 2opak (o e ρ k) #:transparent)
-(struct 2opfk (o v k)   #:transparent)
+(struct ar (e ρ k)          #:transparent)
+(struct fn (v k)            #:transparent)
+(struct ifk (c a ρ k)       #:transparent)
+(struct 1opk (o k)          #:transparent)
+(struct 2opak (o e ρ k)     #:transparent)
+(struct 2opfk (o v k)       #:transparent)
+(struct lrk (x xs es e ρ k) #:transparent)
 
 ;; State
 (struct state (σ)            #:transparent)
@@ -65,9 +66,19 @@
   (hash-ref σ l))
 (define (extend ρ x v)
   (hash-set ρ x v))
+(define (extend* ρ xs vs)
+  (cond [(empty? xs) ρ]
+        [else (extend* (extend ρ (first xs) (first vs))
+                       (rest xs)
+                       (rest vs))]))
 (define (join σ a s)
   (hash-set σ a
             (set-union s (hash-ref σ a (set)))))
+(define (join* σ as ss)
+  (cond [(empty? as) σ]
+        [else (join* (join σ (first as) (first ss))
+                     (rest as)
+                     (rest ss))]))
 (define (join-one σ a x)
   (hash-set σ a
             (set-add (hash-ref σ a (set)) x)))

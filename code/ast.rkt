@@ -13,6 +13,7 @@
 (struct var exp (name)       #:transparent)
 (struct num exp (val)        #:transparent)
 (struct bln exp (b)          #:transparent)
+(struct lrc exp (xs es e)    #:transparent)
 (struct lam exp (var exp)    #:transparent)
 (struct app exp (rator rand) #:transparent)
 (struct rec (name fun)       #:transparent)
@@ -36,6 +37,12 @@
      (app (gensym)
           (lam (gensym) x (parse `(let* ,r ,b)))
           (parse e))]
+    [`(letrec () ,e) (parse e)]
+    [`(letrec ((,xs ,es) ...) ,e)
+     (lrc (gensym) xs (map parse es) (parse e))]
+    [`(letrec* () ,e) (parse e)] ;; our letrec is letrec*
+    [`(letrec* ((,xs ,es) ...) ,e)
+     (lrc (gensym) xs es e)]
     [`(lambda (,x) ,e)
      (lam (gensym) x (parse e))]
     [`(cond ((else ,a1))) (parse a1)]
