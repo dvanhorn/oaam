@@ -28,7 +28,6 @@
           (church2 (lambda (f2) (lambda (x2) (f2 (f2 x2)))))
           (church3 (lambda (f3) (lambda (x3) (f3 (f3 (f3 x3))))))
           (church0? (lambda (z) ((z (lambda (zx) #f)) #t)))
-          (c->n (lambda (cn) ((cn (lambda (u) (add1 u))) 0)))
           (church=? (rec c=?
                       (lambda (e1)
                         (lambda (e2)
