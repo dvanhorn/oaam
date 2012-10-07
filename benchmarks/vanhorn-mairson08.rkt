@@ -1,0 +1,11 @@
+#lang racket
+((lambda (f1)
+   (begin (f1 #t) (f1 #f))
+ (lambda (x1)
+   ((lambda (f2)
+      (begin (f2 #t) (f2 #f)))
+    (lambda (x2)
+      ((lambda (f3)
+         (begin (f3 #t) (f3 #t)))
+       (lambda (x3)
+         (lambda (z) (((z x1) x2) x3)))))))))
