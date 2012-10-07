@@ -6,8 +6,8 @@
 (define (exp=/lab e0 e1)
   (match* (e0 e1)
     [((var _ x) (var _ x)) #t]
-    [((num _ n) (num _ n)) #t]
-    [((bln _ b) (bln _ b)) #t]
+    [((num _ n) (num _ n)) #t]     
+    [((bln _ b) (bln _ b)) #t]     
     [((lrc _ xs es e)
       (lrc _ xs fs f))
      (and (exp=/lab e f)
@@ -38,3 +38,17 @@
 (check exp=/lab (parse '(let* () x)) (var '_ 'x))
 (check exp=/lab (parse '(lambda (x) x)) (lam '_ 'x (var '_ 'x)))
 (check exp=/lab (parse '(f x)) (app '_ (var '_ 'f) (var '_ 'x)))
+
+(check exp=/lab
+       (parse-prog
+        '[(define (fact n)
+            (if (zero? n)
+                1
+                (* n (fact (sub1 n)))))
+          (fact 5)])              
+       (parse 
+        '(letrec ((fact (lambda (n)
+                          (if (zero? n)
+                              1
+                              (* n (fact (sub1 n)))))))
+           (fact 5))))

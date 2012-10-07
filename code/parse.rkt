@@ -1,9 +1,31 @@
 #lang racket
-(provide parse)
+(provide parse parse-prog)
 (require "ast.rkt")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser
+
+(define (parse-prog los)
+  (match los
+    [(list e) (parse e)]
+    [(list ds ... e)
+     (define bs (parse-defns ds))
+     (parse `(letrec ,bs ,e))]))
+
+(define (parse-defns ds)
+  (match ds
+    ['() '()]
+    [`((define (,f ,x) . ,b) . ,ds)
+     (parse-defns `((define ,f (lambda (,x) . ,b)) . ,ds))]
+    [`((define ,f ,e) . ,ds)
+     (cons (list f e)
+           (parse-defns ds))]))
+       
+(define (op1-name? x)
+  (memq x '(add1 sub1 zero? not)))
+
+(define (op2-name? x)
+  (memq x '(*)))
 
 (define (parse sexp)
   (match sexp
@@ -34,18 +56,12 @@
     [`(cond) (parse 0)] ;; FIXME
     [`(if ,e0 ,e1 ,e2)
      (ife (gensym) (parse e0) (parse e1) (parse e2))]
-    [`(rec ,f ,e)
+    [`(rec ,f ,e) ;; KILLME
      (rec f (parse e))]
-    [`(sub1 ,e)
-     (1op (gensym) 'sub1 (parse e))]
-    [`(add1 ,e)
-     (1op (gensym) 'add1 (parse e))]
-    [`(not ,e)
-     (1op (gensym) 'not (parse e))]
-    [`(zero? ,e)
-     (1op (gensym) 'zero? (parse e))]
-    [`(* ,e0 ,e1)
-     (2op (gensym) '* (parse e0) (parse e1))]
+    [`(,(? op1-name? o) ,e)
+     (1op (gensym) o (parse e))]    
+    [`(,(? op2-name? o) ,e0 ,e1)
+     (2op (gensym) o (parse e0) (parse e1))]
     [`(,e0 ,e1)
      (app (gensym)
           (parse e0)

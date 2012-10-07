@@ -1,9 +1,17 @@
 #lang racket
 (provide (all-defined-out))
+(require racket/runtime-path)
 
+(define (read-all)
+  (define o (read))
+  (if (eof-object? o) 
+      '()
+      (cons o (read-all))))
+
+(define-runtime-path |.| ".")
 (define (read-prog f)
-  (with-input-from-file f
-    read)) ;; FIXME : need to handle series of defs+exp
+  (with-input-from-file (build-path |.| f)
+    read-all))
 
 (define church
   (read-prog "church.sch"))
