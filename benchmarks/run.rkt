@@ -1,5 +1,5 @@
 #lang racket
-(require (prefix-in church: "church-example.rkt")
+(require "progs.rkt"
 	 "../code/ast.rkt")
 
 (require (prefix-in wide: "../code/0cfa.rkt")
@@ -39,6 +39,10 @@
 	 (prefix-in mj09: "midtgaard-jensen09.rkt")
 	 (prefix-in blur: "blur.rkt"))
 
-(enchilada eta:P)
-(enchilada mj09:P)
-(enchilada blur:P)
+;;(enchilada eta:P)
+;;(enchilada mj09:P)
+;;(enchilada blur:P)
+
+(collect-garbage)
+(collect-garbage)
+(time (void (delta:aval^ (parse church))))
