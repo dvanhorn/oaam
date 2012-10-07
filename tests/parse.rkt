@@ -27,7 +27,8 @@
      (exp=/lab e f)]
     [((2op _ o e0 e1) (2op _ o f0 f1))
      (and (exp=/lab e0 f0)
-          (exp=/lab e1 f1))]))
+          (exp=/lab e1 f1))]
+    [(_ _) #f]))
        
 
 (check exp=/lab (parse '5) (num '_ '5))
