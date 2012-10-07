@@ -69,6 +69,8 @@
          [('zero? (list (? number? n))) (set (co σ k (zero? n)))]
          [('sub1 (list (? number? n)))  (set (co σ k (widen (sub1 n))))]
          [('add1 (list (? number? n)))  (set (co σ k (widen (add1 n))))]
+         [('not (list #t))  (set (co σ k #f))]
+         [('not (list #f))  (set (co σ k #t))]
          [('zero? (list 'number))
           (set (co σ k #t)
                (co σ k #f))]
