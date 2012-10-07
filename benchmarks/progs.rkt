@@ -1,11 +1,24 @@
 #lang racket
 (provide (all-defined-out))
 
-(define (read-prog)
-  (read)) ;; FIXME : need to handle series of defs+exp
+(define (read-prog f)
+  (with-input-from-file f
+    read)) ;; FIXME : need to handle series of defs+exp
 
 (define church
-  (with-input-from-file "church.sch" read-prog))
+  (read-prog "church.sch"))
 
 (define blur
-  (with-input-from-file "blur.sch" read-prog))
+  (read-prog "blur.sch"))
+
+(define vhm08
+  (read-prog "vanhorn-mairson08.sch"))
+
+(define sat
+  (read-prog "sat.sch"))
+
+(define mj09
+  (read-prog "midtgaard-jensen09.sch"))
+
+(define eta
+  (read-prog "eta.sch"))

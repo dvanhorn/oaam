@@ -1,6 +1,6 @@
 #lang racket
 (require "progs.rkt"
-	 "../code/ast.rkt")
+	 "../code/parse.rkt")
 
 (require (prefix-in wide: "../code/0cfa.rkt")
 	 (prefix-in compile: "../code/0cfa-compile.rkt")
@@ -35,14 +35,11 @@
 
   (bench "Eval" wide:eval))
 
-(require (prefix-in eta: "eta.rkt")
-	 (prefix-in mj09: "midtgaard-jensen09.rkt")
-	 (prefix-in blur: "blur.rkt"))
 
-;;(enchilada eta:P)
-;;(enchilada mj09:P)
-;;(enchilada blur:P)
+;;(enchilada eta)
+;;(enchilada mj09)
+;;(enchilada blur)
 
 (collect-garbage)
 (collect-garbage)
-(time (void (delta:aval^ (parse church))))
+(time (void (delta:aval^ (parse blur))))

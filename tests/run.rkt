@@ -1,7 +1,7 @@
 #lang racket
 (require rackunit)
 
-(require "../code/ast.rkt")
+(require "../code/parse.rkt")
 (require (prefix-in mj09: "../benchmarks/midtgaard-jensen09.rkt")
 	 (prefix-in church: "../benchmarks/church-example.rkt")
 	 (prefix-in blur: "../benchmarks/church-example.rkt"))

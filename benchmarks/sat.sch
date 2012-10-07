@@ -1,5 +1,3 @@
-#lang racket
-
 (let* ((phi
 	(lambda (x1)
 	  (lambda (x2)

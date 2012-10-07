@@ -1,12 +1,13 @@
 #lang racket
 (require rackunit)
-(require "../code/ast.rkt")
+(require "../code/ast.rkt"
+         "../code/parse.rkt")
 
 (define (exp=/lab e0 e1)
   (match* (e0 e1)
     [((var _ x) (var _ x)) #t]
-    [((num _ n) (num _ n)) #t]     
-    [((bln _ b) (bln _ b)) #t]     
+    [((num _ n) (num _ n)) #t]
+    [((bln _ b) (bln _ b)) #t]
     [((lrc _ xs es e)
       (lrc _ xs fs f))
      (and (exp=/lab e f)

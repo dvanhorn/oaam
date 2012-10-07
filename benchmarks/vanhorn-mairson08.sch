@@ -1,4 +1,3 @@
-#lang racket
 ((lambda (f1)
    (begin (f1 #t) (f1 #f))
  (lambda (x1)
