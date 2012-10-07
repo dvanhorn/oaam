@@ -1,86 +1,23 @@
 #lang racket
 (provide aval^ eval)
-(require "ast.rkt")
+(require "ast.rkt" "fix.rkt" "data.rkt")
 
 ;; 0CFA in the AAM style on some hairy Church numeral churning
 
 ;; Moral: per machine-state store polyvariance is not viable,
 ;; but with widening it's not so bad.
 
-;; (X -> Set X) -> (Set X) -> (Set X)
-(define ((appl f) s)
-  (for/fold ([i (set)])
-    ([x (in-set s)])
-    (set-union i (f x))))
-
-;; (X -> Set X) (Set X) -> (Set X)
-;; Calculate fixpoint of (appl f).
-(define (fix f s)
-  (let loop ((accum (set)) (front s))
-    (if (set-empty? front)
-        accum
-        (let ((new-front ((appl f) front)))
-          (loop (set-union accum front)
-                (set-subtract new-front accum))))))
-
-;; A Val is one of:
-;; - Number
-;; - Boolean
-;; - (clos Lab Sym Exp Env)
-;; - (rlos Lab Sym Sym Exp Env)
-(struct clos (l x e ρ)   #:transparent)
-(struct rlos (l f x e ρ) #:transparent)
-
-;; A Cont is one of:
-;; - 'mt
-;; - (ar Exp Env Cont)
-;; - (fn Val Cont)
-;; - (ifk Exp Exp Env Cont)
-;; - (1opk Opr Cont)
-;; - (2opak Opr Exp Env Cont)
-;; - (2opfk Opr Val Cont)
-(struct ar (e ρ k)      #:transparent)
-(struct fn (v k)        #:transparent)
-(struct ifk (c a ρ k)   #:transparent)
-(struct 1opk (o k)      #:transparent)
-(struct 2opak (o e ρ k) #:transparent)
-(struct 2opfk (o v k)   #:transparent)
-
-;; State
-(struct state (σ)            #:transparent)
-(struct ev state (e ρ k)     #:transparent)
-(struct co state (k v)       #:transparent)
-(struct ap state (f a k)     #:transparent)
-(struct ap-op state (o vs k) #:transparent)
-(struct ans state (v)        #:transparent)
-
-(define (lookup ρ σ x)
-  (hash-ref σ (hash-ref ρ x)))
-(define (get-cont σ l)
-  (hash-ref σ l))
-(define (extend ρ x v)
-  (hash-set ρ x v))
-(define (join σ a s)
-  (hash-set σ a
-            (set-union s (hash-ref σ a (set)))))
-
-(define-syntax-rule
-  (do x <- se e)
-  (for/set ([x se])
-           e))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Machine
 
 (define (mk-step push bind widen)
-  ;; State -> Set State
-  (define (step state) 
-    ;(printf "~a~n" state)
+  ;; [Relation State State]
+  (define (step state)
     (match state
       [(ev σ e ρ k)
        (match e
-         [(var l x)           (do v <- (lookup ρ σ x)
+         [(var l x)           (for/set ((v (lookup ρ σ x)))
                                 (co σ k v))]
          [(num l n)           (set (co σ k n))]
          [(bln l b)           (set (co σ k b))]
@@ -98,25 +35,25 @@
          [(2op l o e f)
           (define-values (σ* a) (push state))
           (set (ev σ* e ρ (2opak o f ρ a)))])]
-      
+
       [(co σ k v)
        (match k
          ['mt (set (ans σ v))]
          [(ar e ρ l) (set (ev σ e ρ (fn v l)))]
-         [(fn f l)   (do k <- (get-cont σ l)
+         [(fn f l)   (for/set ((k (get-cont σ l)))
                        (ap σ f v k))]
          [(ifk c a ρ l)
-          (do k <- (get-cont σ l)
+          (for/set ((k (get-cont σ l)))
             (ev σ (if v c a) ρ k))]
          [(1opk o l)
-          (do k <- (get-cont σ l)
+          (for/set ((k (get-cont σ l)))
             (ap-op σ o (list v) k))]
          [(2opak o e ρ l)
           (set (ev σ e ρ (2opfk o v l)))]
          [(2opfk o u l)
-          (do k <- (get-cont σ l)
+          (for/set ((k (get-cont σ l)))
             (ap-op σ o (list v u) k))])]
-      
+
       [(ap σ fun a k)
        (match fun
          [(clos l x e ρ)
@@ -126,7 +63,7 @@
           (define-values (ρ* σ*) (bind state))
           (set (ev σ* e ρ* k))]
          [_ (set)])]
-      
+
       [(ap-op σ o vs k)
        (match* (o vs)
          [('zero? (list (? number? n))) (set (co σ k (zero? n)))]
@@ -143,9 +80,9 @@
          [('* (list 'number 'number))
           (set (co σ k 'number))]
          [(_ _) (set)])]
-      
+
       [_ (set)]))
-  
+
   step)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -251,31 +188,6 @@
 ;; Widening State to State^
 
 ;; State^ = (cons (Set Conf) Store)
-
-;; Conf
-(struct ev^ (e ρ k)     #:transparent)
-(struct co^ (k v)       #:transparent)
-(struct ap^ (f a k)     #:transparent)
-(struct ap-op^ (o vs k) #:transparent)
-(struct ans^ (v)        #:transparent)
-
-;; Conf Store -> State
-(define (c->s c σ)
-  (match c
-    [(ev^ e ρ k) (ev σ e ρ k)]
-    [(co^ k v)   (co σ k v)]
-    [(ap^ f a k) (ap σ f a k)]
-    [(ap-op^ o vs k) (ap-op σ o vs k)]
-    [(ans^ v) (ans σ v)]))
-
-;; State -> Conf
-(define (s->c s)
-  (match s
-    [(ev _ e ρ k) (ev^ e ρ k)]
-    [(co _ k v)   (co^ k v)]
-    [(ap _ f a k) (ap^ f a k)]
-    [(ap-op _ o vs k) (ap-op^ o vs k)]
-    [(ans _ v) (ans^ v)]))
 
 ;; Store Store -> Store
 (define (join-store σ1 σ2)

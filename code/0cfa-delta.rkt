@@ -1,6 +1,7 @@
 #lang racket
 (provide aval^)
-(require "ast.rkt")
+(require "ast.rkt"
+	 "data.rkt")
 
 ;; 0CFA in the AAM style on some hairy Church numeral churning
 
@@ -9,22 +10,8 @@
 ;; + specialized step & iterator 0m34.248s vs 0m16.339s
 ;; + compute store ∆s 0m16.339s vs 0m1.065s (!!!)
 
-;; A Val is one of:
-;; - Number
-;; - Boolean
-;; - (clos Lab Sym Exp Env)
-;; - (rlos Lab Sym Sym Exp Env)
-(struct clos (l x e ρ)   #:transparent)
-(struct rlos (l f x e ρ) #:transparent)
-
 ;; State  = (cons Conf Store)
 ;; State^ = (cons (Set Conf) Store)
-
-;; Conf
-(struct co^ (k v)       #:transparent)
-(struct ap^ (f a k)     #:transparent)
-(struct ap-op^ (o vs k) #:transparent)
-(struct ans^ (v)        #:transparent)
 
 ;; Comp = Store Env Cont -> State^
 
@@ -36,30 +23,6 @@
 ;; - (1opk Opr Cont)
 ;; - (2opak Opr Comp Env Cont)
 ;; - (2opfk Opr Val Cont)
-(struct ar (e ρ k)      #:transparent)
-(struct fn (v k)        #:transparent)
-(struct ifk (c a ρ k)   #:transparent)
-(struct 1opk (o k)      #:transparent)
-(struct 2opak (o e ρ k) #:transparent)
-(struct 2opfk (o v k)   #:transparent)
-
-(define (lookup ρ σ x)
-  (hash-ref σ (hash-ref ρ x)))
-(define (lookup-env ρ x)
-  (hash-ref ρ x))
-(define (get-cont σ l)
-  (hash-ref σ l))
-(define (extend ρ x v)
-  (hash-set ρ x v))
-(define (join σ a s)
-  (hash-set σ a
-            (set-union s (hash-ref σ a (set)))))
-
-(define (join-one σ a x)
-  (hash-set σ a
-            (set-add (hash-ref σ a (set)) x)))
-
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; "Compiled" Machine
@@ -69,12 +32,12 @@
 ;; Expr -> Comp
 (define (compile e)
   (match e
-    [(var l x)     
+    [(var l x)
      (λ (∆ ρ k)
        (cons ∆ (set (co^ k (addr (lookup-env ρ x))))))]
     [(num l n)   (λ (∆ ρ k) (cons ∆ (set (co^ k n))))]
     [(bln l b)   (λ (∆ ρ k) (cons ∆ (set (co^ k b))))]
-    [(lam l x e) 
+    [(lam l x e)
      (define c (compile e))
      (λ (∆ ρ k) (cons ∆ (set (co^ k (clos l x c ρ)))))]
     [(rec f (lam l x e))
@@ -90,7 +53,7 @@
      (define c0 (compile e0))
      (define c1 (compile e1))
      (define c2 (compile e2))
-     (λ (∆ ρ k)       
+     (λ (∆ ρ k)
        (define-values (∆* a) (push∆ ∆ l ρ k))
        (c0 ∆* ρ (ifk c1 c2 ρ a)))]
     [(1op l o e)
@@ -127,14 +90,14 @@
        [(fn f l)
         (cons '()
               (for*/set ([k (get-cont σ l)]
-                         [f (get-val σ f)])        
+                         [f (get-val σ f)])
                         (ap^ f v k)))]
-       [(ifk c a ρ l)        
+       [(ifk c a ρ l)
         (define res^
           (for*/set ([k (get-cont σ l)]
                      [v (get-val σ v)])
                     ((if v c a) '() ρ k)))
-        
+
         (define-values (∆* cs*)
           (for/fold ([∆ '()] [cs (set)])
             ([s res^])
@@ -143,7 +106,7 @@
                (values (append ∆* ∆)
                        (set-union cs* cs))])))
         (cons ∆* cs*)]
-       
+
        [(1opk o l)
         (cons '()
               (for*/set ([k (get-cont σ l)]
@@ -157,7 +120,7 @@
                          [v (get-val σ v)]
                          [u (get-val σ u)])
                         (ap-op^ o (list v u) k)))])]
-    
+
     [(cons σ (ap^ fun a k))
      (match fun
        [(clos l x c ρ)
@@ -186,7 +149,7 @@
         (cons '() (set (co^ k 'number)))]
        ;; Anything else is stuck
        [(_ _) (cons '() (set))])]
-    
+
     [(cons σ c)
      (cons '() (set))]))
 
