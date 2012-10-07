@@ -1,0 +1,57 @@
+\newcommand{\superscript}[1]{\ensuremath{^{#1}}}
+\newcommand{\tuple}[2]{{\tt #1\ }({#2})}
+
+% Values
+\newcommand{\clos}[1]{\tuple{clos}{#1}}
+\newcommand{\rlos}[1]{\tuple{rlos}{#1}}
+
+% States
+\newcommand{\ev}[1]{\tuple{ev}{#1}}
+\newcommand{\co}[1]{\tuple{co}{#1}}
+\newcommand{\ap}[1]{\tuple{ap}{#1}}
+\newcommand{\ans}[1]{\tuple{ans}{#1}}
+
+% Continuations
+\newcommand{\kmt}{\tt mt}
+\newcommand{\kar}[1]{\tuple{ar}{#1}}
+\newcommand{\kfn}[1]{\tuple{fn}{#1}}
+\newcommand{\kif}[1]{\tuple{fi}{#1}}
+\newcommand{\kuop}[1]{\tuple{oa}{#1}}
+\newcommand{\kbopa}[1]{\tuple{oa1}{#1}}
+\newcommand{\kbopb}[1]{\tuple{oa2}{#1}}
+
+% Syntax
+\newcommand{\syntax}[1]{{\tt #1}}
+\newcommand{\sapp}[2]{\tuple{app}{#1,#2}}
+\newcommand{\slam}[2]{\tuple{lam}{#1,#2}}
+\newcommand{\srec}[3]{\tuple{rec}{#1,#2,#3}}
+\newcommand{\svar}[1]{\tuple{var}{#1}}
+\newcommand{\snum}[1]{\tuple{num}{#1}}
+\newcommand{\sif}[3]{\tuple{if}{#1,#2,#3}}
+\newcommand{\sopu}[2]{\tuple{op}{#1,#2}}
+\newcommand{\sopb}[3]{\tuple{op2}{#1,#2,#3}}
+\newcommand{\strue}{{\tt tt}}
+\newcommand{\sfalse}{{\tt ff}}
+\newcommand{\saddone}{{\tt add1}}
+\newcommand{\ssubone}{{\tt sub1}}
+\newcommand{\szerohuh}{\syntax{zero?}}
+\newcommand{\szero}{\syntax{0}}
+
+\newcommand{\sNum}{\syntax{Z}}
+
+% Metavariables
+\newcommand{\maddr}{a}
+\newcommand{\mvar}{x}
+\newcommand{\mvarf}{f}
+\newcommand{\mexp}{e}
+\newcommand{\mexpi}[1]{e_{#1}}
+\newcommand{\mexpf}{f}
+\newcommand{\menv}{\rho}
+\newcommand{\mkont}{\kappa}
+\newcommand{\msto}{\sigma}
+\newcommand{\mop}{o}
+\newcommand{\mval}{v}
+\newcommand{\mnum}{z}
+\newcommand{\mvalx}[1]{#1}
+
+\newcommand\machstep{\longmapsto}

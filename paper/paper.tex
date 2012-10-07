@@ -1,5 +1,11 @@
 \documentclass{llncs}
+\usepackage{alltt}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{xltxtra}
+\setmonofont[Scale=MatchLowercase]{DejaVu Sans Mono}
 %
+\input{preamble}
 \begin{document}
 \title{Optimizing Abstract$^2$ Machines}
 %
@@ -26,9 +32,195 @@ precise (and purely functional).
 %
 \section{Introduction}
 
+\subsection{Notation and prerequisites}
+
+Prereqs: Semantics Engineering, AAM.
+
+Notation: concrete examples of programs under analysis is given in
+(monochrome) Scheme notation.  Code is given in (syntax colored)
+Racket.
+
+\newpage
 \section{Starting point}
-\subsection{An abstract$^2$ machine for PCF}
+\subsection{An abstract$^2$ machine for ISWIM}
+
+\begin{figure}
+\begin{align*}
+\ev{\svar{x},\rho,\kappa,\sigma} &\machstep
+\co{\kappa,v,\sigma}
+\text{ where }v \in \msto(\menv(x))
+\\
+\ev{\snum{n},\menv,\mkont,\msto} &\machstep
+\co{\mkont,n,\msto}
+\\
+\ev{\slam\mvar\mexp,\menv,\mkont,\msto} &\machstep
+\co{\mkont,\clos{\mvar,\mexp,\menv}}
+\\
+%% \ev{\srec\mvarf\mvar\mexp,\menv,\mkont,\msto} &\machstep
+%% \co{\mkont,\rlos{\mvarf,\mvar,\mexp,\menv}}
+%% \\
+\ev{\sapp{\mexpi0}{\mexpi1},\menv,\mkont,\msto} &\machstep
+\ev{\mexpi{0},\menv,\kar{\mexpi{1},\menv,a},\msto'}
+\text{ where }a,\msto' = \mathit{push}(l,\msto,\mkont)
+\\
+\ev{\sif{\mexpi0}{\mexpi1}{\mexpi2},\menv,\mkont,\msto} &\machstep
+\ev{\mexpi0,\menv,\kif{\mexpi1,\mexpi2,\menv,\maddr},\msto'}
+\text{ where }a,\msto' = \mathit{push}(l,\msto,\mkont)
+\\
+\ev{\sopu\mop\mexp,\menv,\mkont,\msto} &\machstep
+\ev{\mexp,\menv,\kuop{\mop,\maddr},\msto'}
+\text{ where }a,\msto' = \mathit{push}(l,\msto,\mkont)
+%%\\
+%% \ev{\sopb\mop{\mexpi0}{\mexpi1},\menv,\mkont,\msto} &\machstep
+%% \ev{\mexpi0,\menv,\kbopa{\mexpi1,\menv,\maddr},\msto'}
+%% \text{ where }a,\msto' = \mathit{push}(l,\msto,\mkont)
+\\[2mm]
+\co{\kmt,\mval,\msto} &\machstep
+\ans{\msto,\mval}
+\\
+\co{\kar{\mexp,\menv,\maddr},\mval,\msto} & \machstep
+\ev{\mexp,\menv,\kfn{\mval,\maddr},\msto}
+\\
+\co{\kfn{{\mvalx{u}},\maddr},\mval,\msto} & \machstep
+\ap{\mval,\mvalx{u},\mkont,\msto}
+\text{ where }\mkont \in \msto(\maddr)
+\\
+\co{\kif{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto} & \machstep
+\ev{\mexpi0,\menv,\mkont,\msto}
+\text{ where }\mkont\in\msto(\maddr)
+\\
+\co{\kif{\mexpi0,\mexpi1,\menv,\maddr},\sfalse,\msto} & \machstep
+\ev{\mexpi1,\menv,\mkont,\msto}
+\text{ where }\mkont\in\msto(\maddr)
+\\
+\co{\kuop{\mop,\maddr},\mval,\msto} & \machstep
+\co{\mkont,\mval',\msto}
+\text{ where }\mkont\in\msto(\maddr)
+\text{ and } \mval'\in\delta(\mop,\mval)
+%% \\
+%% \co{\kbopa{\mop,\mexp,\menv,\maddr},\mval,\msto} & \machstep
+%% \ev{\mexp,\menv,\kbopb{\mop,\mval,\maddr},\msto}
+%% \\
+%% \co{\kbopb{\mop,\mvalx{u},\maddr},\mval,\msto} & \machstep
+%% \co{\mkont,\mval',\msto}
+%% \text{ where }\mkont=\msto(\maddr)
+%% \text{ and } \mval'=\delta(\mop,\mval,\mvalx{u})
+\\[2mm]
+\ap{\clos{\mvar,\mexp,\menv},\mval,\mkont} & \machstep
+\ev{\mexp,\menv',\mkont,\msto'}
+\text{ where }\menv',\msto' = \mathit{bind}(\msto,\mvar,\mval)
+\\
+%% \ap{\rlos{\mvarf,\mvar,\mexp,\menv},\mval,\mkont} & \machstep
+%% \ev{\mexp,\menv',\mkont,\msto'}
+%% \text{ where }\menv',\msto' = \mathit{bind}(\msto,\langle\mvar,\mval\rangle,\langle\mvarf,
+%% \rlos{\mvarf,\mvar,\mexp,\menv}\rangle)
+\end{align*}
+\caption{Abstract$^2$ machine for ISWIM}
+\label{fig:aam}
+\end{figure}
+
+\paragraph{Concrete interpretation:}
+
+To obtain a concrete interpreter from the relation given in
+Figure~\ref{fig:aam}, set the implicit parameters as follows:
+\begin{gather}
+\begin{align*}
+\mathit{push}(l,\msto,\mkont) &= \maddr,\sigma[\maddr\mapsto\{\mkont\}]
+\mbox{ where }\maddr \notin\msto
+\\
+\mathit{bind}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\sigma[\maddr\mapsto\{\mval\}]
+\end{align*}
+\\[2mm]
+\begin{align*}
+\mnum+1 &\in \delta(\saddone,\mnum) &
+\mnum-1 &\in \delta(\ssubone,\mnum)\\
+\strue &\in \delta(\szerohuh,\szero) &
+\sfalse &\in \delta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
+\end{align*}
+\end{gather}
+
+\paragraph{Abstract interpretation:}
+
+To obtain an abstract interpreter from the relation given in
+Figure~\ref{fig:aam}, set the implicit parameters as follows:
+\begin{gather}
+\begin{align*}
+\widehat{\mathit{push}}(l,\msto,\mkont) &= l,\sigma\sqcup[l\mapsto\{\mkont\}]
+\mbox{ where }\maddr \notin\msto
+\\
+\widehat{\mathit{bind}}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\mvar],\msto\sqcup[\mvar\mapsto\{\mval\}]
+\end{align*}
+\\[2mm]
+\begin{align*}
+\sNum &\in \hat\delta(\saddone,\mnum) &
+\sNum &\in \hat\delta(\ssubone,\mnum)\\
+\strue &\in \hat\delta(\szerohuh,\sNum) &
+\sfalse &\in \hat\delta(\szerohuh,\sNum)\\
+\strue &\in \hat\delta(\szerohuh,\szero) &
+\sfalse &\in \hat\delta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
+\end{align*}
+\end{gather}
+
+
+\begin{figure}
+\begin{alltt}
+  ;; State \(\rightarrow\) Setof State
+  (define (step state)
+    (match state
+      [(ev σ e ρ k)
+       (match e
+         [(var l x)           (for/set ((v (lookup ρ σ x))) (co σ k v))]
+         [(num l n)           (set (co σ k n))]
+         [(bln l b)           (set (co σ k b))]
+         [(lam l x e)         (set (co σ k (clos l x e ρ)))]
+         [(rec f (lam l x e)) (set (co σ k (rlos l f x e ρ)))]
+         [(app l f e)
+          (define-values (σ* a) (push state))
+          (set (ev σ* f ρ (ar e ρ a)))]
+         [(ife l e0 e1 e2)
+          (define-values (σ* a) (push state))
+          (set (ev σ* e0 ρ (ifk e1 e2 ρ a)))]
+         [(1op l o e)
+          (define-values (σ* a) (push state))
+          (set (ev σ* e ρ (1opk o a)))])]
+      [(co σ k v)
+       (match k
+         ['mt (set (ans σ v))]
+         [(ar e ρ l) (set (ev σ e ρ (fn v l)))]
+         [(fn f l)   (for/set ((k (get-cont σ l))) (ap σ f v k))]
+         [(fi c a ρ l)
+          (for/set ((k (get-cont σ l)))
+            (ev σ (if v c a) ρ k))]
+         [(oa o l)
+          (for*/set ((k (get-cont σ l))
+                     (v (delta o (list v))))
+            (co σ k v))]
+      [(ap σ fun a k)
+       (match fun
+         [(clos l x e ρ)
+          (define-values (ρ* σ*) (bind state))
+          (set (ev σ* e ρ* k))]
+         [_ (set)])]
+\end{alltt}
+\caption{Implementation of machine transition relation.}
+\end{figure}
+
 \subsection{An example: Analyzing Church number computations}
+
+\newcommand{\church}[1]{\(\ulcorner{\tt #1}\urcorner\)}
+
+\begin{alltt}
+;; multiplication distributes over addition
+((church=? ((mult \church2) ((plus \church1) \church3)))
+ ((plus ((mult \church2) \church1)) ((mult \church2) \church3)))))
+\end{alltt}
+
+Where \syntax{church=?} is an equality function for Church numerals
+written in terms of recursion and an iterative \syntax{pred} function.
+The \syntax{plus} and \syntax{mult} functions are written as usual.
+
+This program reaches $N$ states under concrete interpretation.
+
 \subsection{Store widening}
 
 \subsection{Baseline evaluation}
