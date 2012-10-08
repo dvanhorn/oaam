@@ -79,26 +79,52 @@
       [(ap-op σ o vs k)
        (match* (o vs)
          [('zero? (list (? number? n))) (set (co σ k (zero? n)))]
-         [('sub1 (list (? number? n)))  (set (co σ k (widen (sub1 n))))]
-         [('add1 (list (? number? n)))  (set (co σ k (widen (add1 n))))]
-         [('not (list #t))  (set (co σ k #f))]
-         [('not (list #f))  (set (co σ k #t))]
          [('zero? (list 'number))
           (set (co σ k #t)
                (co σ k #f))]
-         [('sub1 (list 'number)) (set (co σ k 'number))]
-         [('* (list (? number? n) (? number? m)))
-          (set (co σ k (widen (* m n))))]
-         [('* (list (? number? n) 'number))
-          (set (co σ k 'number))]
-         [('* (list 'number 'number))
-          (set (co σ k 'number))]
+         [('not (list #t))  (set (co σ k #f))]
+         [('not (list #f))  (set (co σ k #t))]
+         [('= (list (? number? n) (? number? m)))
+          (set (co σ k (= n m)))]
+         [((? z->z? o) (list x))
+          (for/set ((v (z->z o x)))
+                   (co σ k (widen v)))]         
+         [((? z-z->z? o) (list x y))
+          (for/set ((v (z-z->z o x y)))
+                   (co σ k (widen v)))]
          [(_ _) (set)])]
 
       [_ (set)]))
 
   step)
 
+(define (z->z? o)
+  (memq o '(add1 sub1)))
+
+(define (z->z o x)
+  (match* (o x)
+    [(o 'number) (set 'number)]
+    [(o (? number? n))
+     (set (case o
+            [(add1) (add1 n)]
+            [(sub1) (sub1 n)]))]            
+    [(o _) (set)]))
+
+(define (z-z->z? o)
+  (memq o '(+ - *)))
+
+(define (z-z->z o x y)
+  (match* (o x y)
+    [(o 'number 'number) (set 'number)]
+    [(o 'number (? number?)) (set 'number)]
+    [(o (? number?) 'number) (set 'number)]
+    [(o (? number? n) (? number? m))
+     (set (case o
+            [(+) (+ n m)]
+            [(-) (- n m)]
+            [(*) (* n m)]))]
+    [(o _ _) (set)]))
+          
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Concrete semantics
 

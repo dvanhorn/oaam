@@ -25,7 +25,7 @@
   (memq x '(add1 sub1 zero? not)))
 
 (define (op2-name? x)
-  (memq x '(*)))
+  (memq x '(* + - =)))
 
 (define (parse-seq s)
   (parse (cons 'begin s)))

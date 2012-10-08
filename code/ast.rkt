@@ -20,5 +20,3 @@
 (struct ife exp (t c a)      #:transparent)
 (struct 1op exp (o a)        #:transparent)
 (struct 2op exp (o a b)      #:transparent)
-
-
