@@ -16,17 +16,25 @@
 (define church
   (read-prog "church.sch"))
 
-(define blur
-  (read-prog "blur.sch"))
-
 (define vhm08
   (read-prog "vanhorn-mairson08.sch"))
 
-(define sat
-  (read-prog "sat.sch"))
-
 (define mj09
-  (read-prog "midtgaard-jensen09.sch"))
+  (read-prog "sergey/mj09.sch"))
 
 (define eta
-  (read-prog "eta.sch"))
+  (read-prog "sergey/eta.sch"))
+
+;(define kcfa2 ...)
+;(define kcfa3 ...)
+
+(define blur
+  (read-prog "sergey/blur.sch"))
+
+;(define loop2 ...)
+
+(define sat
+  (read-prog "sergey/sat.sch"))
+
+
+

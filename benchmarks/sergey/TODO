@@ -1,0 +1,3 @@
+Some of the benchmarks have been rewritten (e.g. curried) in order
+to be acceptable to the analysis.  Revert to Ilya's original benchmarks
+once analyzer is up to snuff.
