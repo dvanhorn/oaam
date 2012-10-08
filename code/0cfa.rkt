@@ -1,5 +1,5 @@
 #lang racket
-(provide aval^ eval)
+(provide aval^ eval widen)
 (require "ast.rkt" "fix.rkt" "data.rkt")
 
 ;; 0CFA in the AAM style on some hairy Church numeral churning
@@ -86,9 +86,18 @@
          [('not (list #f))  (set (co σ k #t))]
          [('= (list (? number? n) (? number? m)))
           (set (co σ k (= n m)))]
+         [('= (list (? number? n) 'number))
+          (set (co σ k #t)
+               (co σ k #f))]
+         [('= (list 'number (? number? n)))
+          (set (co σ k #t)
+               (co σ k #f))]
+         [('= (list 'number 'number))
+          (set (co σ k #t)
+               (co σ k #f))]
          [((? z->z? o) (list x))
           (for/set ((v (z->z o x)))
-                   (co σ k (widen v)))]         
+                   (co σ k (widen v)))]
          [((? z-z->z? o) (list x y))
           (for/set ((v (z-z->z o x y)))
                    (co σ k (widen v)))]
@@ -130,6 +139,7 @@
 
 (define (eval-widen b)
   (cond [(number? b) b]
+        [(boolean? b) b]
         [else (error "Unknown base value" b)]))
 
 (define (eval-bind s)
@@ -174,8 +184,11 @@
 ;; 0CFA-style Abstract semantics
 
 (define (widen b)
-  (cond [(number? b) 'number]
-        [else (error "Unknown base value" b)]))
+  (match b
+    [(? number?) 'number]
+    [(? boolean?) b]
+    ['number 'number]
+    [else (error "Unknown base value" b)]))
 
 (define (bind s)
   (match s
