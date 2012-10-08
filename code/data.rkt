@@ -35,6 +35,8 @@
 (struct ap-op state (o vs k) #:transparent)
 (struct ans state (v)        #:transparent)
 
+(struct addr (a) #:transparent)
+
 ;; Conf
 (struct ev^ (e ρ k)     #:transparent)
 (struct co^ (k v)       #:transparent)
@@ -64,6 +66,8 @@
   (hash-ref σ (hash-ref ρ x)))
 (define (lookup-env ρ x)
   (hash-ref ρ x))
+(define (lookup-sto σ x)
+  (hash-ref σ x))
 (define (get-cont σ l)
   (hash-ref σ l))
 (define (extend ρ x v)

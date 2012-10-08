@@ -1,5 +1,7 @@
 #lang racket
-(provide aval^ eval widen)
+(provide eval aval aval^
+         lazy-eval lazy-aval lazy-aval^
+         widen)
 (require "ast.rkt" "fix.rkt" "data.rkt")
 
 ;; 0CFA in the AAM style on some hairy Church numeral churning
@@ -7,25 +9,16 @@
 ;; Moral: per machine-state store polyvariance is not viable,
 ;; but with widening it's not so bad.
 
-;; (ev σ (app l e0 e1 ...) ρ k)
-;; (ev σ e0 ρ (evls (list e1 ...) (list) ρ k))
-
-;; (co σ (evls (list) (list vn-1 .. v0) ρ k) vn)
-;; (ap v0 (list v0 .. vn-1 vn) k)
-
-;; (co σ (evls (list e0 e1 ...) (list vi ...) ρ k) vi+1)
-;; (ev σ e0 ρ (evls (list e1 ...) (list vi+1 vi ...) ρ k))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Machine
 
-(define (mk-step push bind widen)
+(define (mk-step push bind widen force delay)
   ;; [Relation State State]
   (define (step state)
     (match state
       [(ev σ e ρ k)
        (match e
-         [(var l x)           (for/set ((v (lookup ρ σ x)))
+         [(var l x)           (for/set ((v (delay σ (lookup-env ρ x))))
                                 (co σ k v))]
          [(num l n)           (set (co σ k n))]
          [(bln l b)           (set (co σ k b))]         
@@ -52,23 +45,28 @@
 
       [(co σ k v)
        (match k
-         ['mt (set (ans σ v))]
+         ['mt (for*/set ([v (force σ v)])
+                        (ans σ v))]
          [(ls '() vs ρ l) 
           (define as (reverse (cons v vs)))
           (for/set ((k (get-cont σ l)))
                    (ap σ (first as) (rest as) k))]
          [(ls (list-rest e es) vs ρ l)
-         (set (ev σ e ρ (ls es (cons v vs) ρ l)))]
+          (set (ev σ e ρ (ls es (cons v vs) ρ l)))]
          [(ifk c a ρ l)
-          (for/set ((k (get-cont σ l)))
+          (for*/set [(k (get-cont σ l))
+                     (v (force σ v))]
             (ev σ (if v c a) ρ k))]
          [(1opk o l)
-          (for/set ((k (get-cont σ l)))
+          (for*/set [(k (get-cont σ l))
+                     (v (force σ v))]
             (ap-op σ o (list v) k))]
          [(2opak o e ρ l)
           (set (ev σ e ρ (2opfk o v l)))]
          [(2opfk o u l)
-          (for/set ((k (get-cont σ l)))
+          (for*/set [(k (get-cont σ l))
+                     (v (force σ v))
+                     (u (force σ u))]                        
             (ap-op σ o (list v u) k))]
          [(lrk x '() '() e ρ l)
           (define-values (_ σ*) (bind state))
@@ -223,23 +221,61 @@
      (values (join σ a (set k))
              a)]))
 
-(define step (mk-step push bind widen))
-(define eval-step (mk-step eval-push eval-bind eval-widen))
+(define (force σ x)
+  (match x
+    [(addr a) (lookup-sto σ a)]
+    [v v]))
+
+(define (delay σ x)
+  (set (addr x)))
+
+(define 0cfa-step
+  (mk-step push
+           bind 
+           widen 
+           (lambda (σ x) (set x)) 
+           lookup-sto))
+
+(define eval-step 
+  (mk-step eval-push 
+           eval-bind 
+           eval-widen 
+           (lambda (σ x) (set x)) 
+           lookup-sto))
+
+(define lazy-eval-step 
+  (mk-step eval-push
+           eval-bind
+           eval-widen
+           force
+           delay))
+
+(define lazy-0cfa-step
+  (mk-step push
+           bind
+           widen
+           force
+           delay))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; Exp -> Set Val
+;; (State -> Setof State) -> Exp -> Set Val
 ;; 0CFA without store widening
-(define (aval e)
+(define ((mk-aval step) e)
   (for/set ([s (fix step (inj e))]
             #:when (ans? s))
            (ans-v s)))
 
-;; Exp -> Set Val
+(define eval (mk-aval eval-step))
+(define lazy-eval (mk-aval lazy-eval-step))
+(define aval (mk-aval 0cfa-step))
+(define lazy-aval (mk-aval lazy-0cfa-step))
+
+;; (State^ -> Setof State^) -> Exp -> Set Val
 ;; 0CFA with store widening
-(define (aval^ e)
+(define ((mk-aval^ step) e)
   (for/fold ([vs (set)])
-    ([s (fix wide-step (inj-wide e))])
+    ([s (fix (wide-step step) (inj-wide e))])
     (set-union vs
                (match s
                  [(cons cs σ)
@@ -247,12 +283,8 @@
                             #:when (ans^? c))
                            (ans^-v c))]))))
 
-;; Exp -> { Val }
-;; Eval with infinite store
-(define (eval e)
-  (for/set ([s (fix eval-step (inj e))]
-            #:when (ans? s))
-           (ans-v s)))
+(define aval^ (mk-aval^ 0cfa-step))
+(define lazy-aval^ (mk-aval^ lazy-0cfa-step))
 
 ;; Exp -> Set State
 (define (inj e)
@@ -282,8 +314,8 @@
     ([s ss])
     (join-store σ (state-σ s))))
 
-;; State^ -> { State^ }
-(define (wide-step state)
+;; (State -> Setof State) -> State^ -> { State^ }
+(define ((wide-step step) state)
   (match state
     [(cons cs σ)
      (define ss (for/set ([c cs]) (c->s c σ)))
