@@ -29,6 +29,13 @@
 (check-in #t (0cfa:eval (parse-prog sat)))
 (check-in #f (0cfa:eval (parse-prog vhm08)))
 
+(check-in #f (0cfa:aval^ (parse-prog blur)))
+;(check-in #t (0cfa:aval^ (parse-prog church))) ; expensive
+(check-in #f (0cfa:aval^ (parse-prog eta)))
+(check-in  2 (0cfa:aval^ (parse-prog mj09)))
+(check-in #t (0cfa:aval^ (parse-prog sat)))
+(check-in #f (0cfa:aval^ (parse-prog vhm08)))
+
 ;; mutually recursive top-level functions
 (check-in #t 
           (0cfa:eval
