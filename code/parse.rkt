@@ -35,8 +35,10 @@
     [`(begin ,e) (parse e)]
     [`(begin ,e . ,r)
      (parse `((lambda (,(gensym)) (begin . ,r)) ,e))]
-    [`(let ((,xs ,es) ...) ,b)
-     (parse `((lambda ,xs ,b) . ,es))]
+    [`(let () . ,b)
+     (parse `(begin . ,b))]
+    [`(let ((,xs ,es) ...) . ,b)
+     (parse `((lambda ,xs . ,b) . ,es))]
     [`(let* () . ,s) (parse-seq s)]
     [`(let* ((,x ,e) . ,r) . ,b)
      (app (gensym)

@@ -36,7 +36,7 @@
 
 (check exp=/lab (parse '5) (num '_ '5))
 (check exp=/lab (parse 'x) (var '_ 'x))
-;(check exp=/lab (parse '(let () 5)) (num '_ 5))   ;; DONT HAVE LET YET
+(check exp=/lab (parse '(let () 5)) (num '_ 5))
 (check exp=/lab (parse '(let* () x)) (var '_ 'x))
 (check exp=/lab (parse '(lambda (x) x)) (lam '_ '(x) (var '_ 'x)))
 (check exp=/lab (parse '(f x)) (app '_ (var '_ 'f) (list (var '_ 'x))))
@@ -45,6 +45,12 @@
 (check exp=/lab
        (parse '(let ((x 1) (y 2)) x))
        (parse '((lambda (x y) x) 1 2)))
+
+;; Can't write this test because of the stupid fresh name thing.
+#;
+(check exp=/lab
+       (parse '(let () 1 2))
+       (parse '(begin 1 2)))
 
 (check exp=/lab
        (parse-prog
