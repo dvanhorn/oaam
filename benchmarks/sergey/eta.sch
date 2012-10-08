@@ -1,9 +1,9 @@
 ;; https://github.com/ilyasergey/reachability/blob/master/benchmarks/gcfa2/eta.scm
-(define (do-something _) ;; FIXME should be nullary
+(define (do-something)
   10)
 
 (define (id y)
-  (do-something #f) ;; FIXME nullary
+  (do-something)
   y)
 
 ((id (lambda (a) a)) #t)
