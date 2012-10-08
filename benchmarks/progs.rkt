@@ -25,13 +25,17 @@
 (define eta
   (read-prog "sergey/eta.sch"))
 
-;(define kcfa2 ...)
-;(define kcfa3 ...)
+(define kcfa2
+  (read-prog "sergey/kcfa2.sch"))
+
+(define kcfa3
+  (read-prog "sergey/kcfa3.sch"))
 
 (define blur
   (read-prog "sergey/blur.sch"))
 
-;(define loop2 ...)
+(define loop2
+  (read-prog "sergey/loop2.sch"))
 
 (define sat
   (read-prog "sergey/sat.sch"))
