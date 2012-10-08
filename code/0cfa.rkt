@@ -21,8 +21,8 @@
          [(var l x)           (for/set ((v (delay σ (lookup-env ρ x))))
                                 (co σ k v))]
          [(num l n)           (set (co σ k n))]
-         [(bln l b)           (set (co σ k b))]         
-         [(lam l x e)         (set (co σ k (clos l x e ρ)))]         
+         [(bln l b)           (set (co σ k b))]
+         [(lam l x e)         (set (co σ k (clos l x e ρ)))]
          [(lrc l xs es b)
           (define-values (σ0 a) (push state))
           (define-values (ρ* σ*) (bind (ev σ0 e ρ k)))
@@ -47,7 +47,7 @@
        (match k
          ['mt (for*/set ([v (force σ v)])
                         (ans σ v))]
-         [(ls '() vs ρ l) 
+         [(ls '() vs ρ l)
           (define as (reverse (cons v vs)))
           (for/set ((k (get-cont σ l)))
                    (ap σ (first as) (rest as) k))]
@@ -66,20 +66,19 @@
          [(2opfk o u l)
           (for*/set [(k (get-cont σ l))
                      (v (force σ v))
-                     (u (force σ u))]                        
+                     (u (force σ u))]
             (ap-op σ o (list v u) k))]
          [(lrk x '() '() e ρ l)
           (define-values (_ σ*) (bind state))
           (for/set ((k (get-cont σ l)))
             (ev σ* e ρ k))]
          [(lrk x (cons y xs) (cons e es) b ρ a)
-          (define-values (_ σ*) (bind state))          
+          (define-values (_ σ*) (bind state))
           (set (ev σ* e ρ (lrk y xs es b ρ a)))]
          [(sk! l a)
           (define-values (_ σ*) (bind state))
           (for/set ((k (get-cont σ a)))
             (co σ* k (void)))])]
-          
 
       [(ap σ fun as k)
        (match fun
@@ -94,8 +93,17 @@
          [('zero? (list 'number))
           (set (co σ k #t)
                (co σ k #f))]
+         [('symbol? 'symbol)  (set (co σ k #t))]
+         [('string? (list v)) (set (co σ k (symbol? v)))]
+         [('string? 'string)  (set (co σ k #t))]
+         [('string? (list v)) (set (co σ k (string? v)))]
          [('not (list #t))  (set (co σ k #f))]
          [('not (list #f))  (set (co σ k #t))]
+	 [('string=? (list (? string? s1) (? string? s2)))
+          (set (co σ k (string=? s1 s2)))]
+         [('string=? (list (? stringish? s1) (? stringish? s2)))
+          (set (co σ k #t)
+               (co σ k #t))]
          [('= (list (? number? n) (? number? m)))
           (set (co σ k (= n m)))]
          [('= (list (? number? n) 'number))
@@ -119,6 +127,10 @@
 
   step)
 
+(define (stringish? x)
+  (or (string? x)
+      (eq? 'string x)))  
+  
 (define (z->z? o)
   (memq o '(add1 sub1)))
 
@@ -128,7 +140,7 @@
     [(o (? number? n))
      (set (case o
             [(add1) (add1 n)]
-            [(sub1) (sub1 n)]))]            
+            [(sub1) (sub1 n)]))]
     [(o _) (set)]))
 
 (define (z-z->z? o)
@@ -145,7 +157,7 @@
             [(-) (- n m)]
             [(*) (* n m)]))]
     [(o _ _) (set)]))
-          
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Concrete semantics
 
@@ -165,14 +177,12 @@
     [(co σ (lrk x xs es e ρ k) v)
      (define a (lookup-env ρ x))
      (values ρ (join-one σ a v))]
-    
     [(ev σ (lrc l xs es b) ρ k)
      (define a (next-addr σ))
      (define as (for/list ([i (in-range (length xs))])
                   (+ a i)))
      (values (extend* ρ xs as)
              (join* σ as (map (λ _ (set)) xs)))]
-    
     [(ap σ (clos l xs e ρ) vs k)
      (define a (next-addr σ))
      (define as (for/list ([i (in-range (length xs))])
@@ -204,7 +214,8 @@
 (define (bind s)
   (match s
     [(co σ (sk! l a) v)
-     (values (hash) (join-one σ l v))] ;; empty env says this is the wrong place for this.    
+     ;; empty env says this is the wrong place for this.
+     (values (hash) (join-one σ l v))]
     [(co σ (lrk x xs es e ρ a) v)
      (values ρ (join-one σ x v))]
     [(ev σ (lrc l xs es b) ρ k)
@@ -231,19 +242,19 @@
 
 (define 0cfa-step
   (mk-step push
-           bind 
-           widen 
-           (lambda (σ x) (set x)) 
+           bind
+           widen
+           (lambda (σ x) (set x))
            lookup-sto))
 
-(define eval-step 
-  (mk-step eval-push 
-           eval-bind 
-           eval-widen 
-           (lambda (σ x) (set x)) 
+(define eval-step
+  (mk-step eval-push
+           eval-bind
+           eval-widen
+           (lambda (σ x) (set x))
            lookup-sto))
 
-(define lazy-eval-step 
+(define lazy-eval-step
   (mk-step eval-push
            eval-bind
            eval-widen
