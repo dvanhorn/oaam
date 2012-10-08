@@ -21,6 +21,14 @@
                     (* n (fact (sub1 n)))))
               (fact 5)])))
 
+
+(check-in #f (0cfa:eval (parse-prog blur)))
+;(check-in #t (0cfa:eval (parse-prog church))) ; expensive
+(check-in #f (0cfa:eval (parse-prog eta)))
+(check-in  2 (0cfa:eval (parse-prog mj09)))
+(check-in #t (0cfa:eval (parse-prog sat)))
+(check-in #f (0cfa:eval (parse-prog vhm08)))
+
 ;; mutually recursive top-level functions
 (check-in #t 
           (0cfa:eval
@@ -38,6 +46,7 @@
 (check-in 3 (0cfa:aval^ (parse '(letrec ((f (lambda (z) x)) (x 3)) (f 1)))))
 (check-in 3 (0cfa:aval^ (parse '(letrec ((x 3) (f (lambda (z) x))) (f 1)))))
 
+#|
 ;; Check result of evaluation against analysis
 
 (check-in 2 (delta:aval^ (parse-prog mj09)))
@@ -47,6 +56,6 @@
 (check-in 2 (lazy:aval^ (parse-prog mj09)))
 (check-in #f (lazy:aval^ (parse-prog blur)))
 (check-in #f (delta:aval^ (parse-prog blur)))
-
+|#
 ;; run parser tests
 (require "parse.rkt")

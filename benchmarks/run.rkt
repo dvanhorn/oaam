@@ -42,4 +42,5 @@
 
 (collect-garbage)
 (collect-garbage)
-(time (void (delta:aval^ (parse blur))))
+(time (void (wide:eval (parse-prog blur))))
+
