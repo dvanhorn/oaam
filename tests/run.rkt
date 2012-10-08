@@ -9,35 +9,56 @@
 	 (prefix-in delta: "../code/0cfa-delta.rkt"))
 
 
-(define (check-in x xs) (check set-member? xs x))
+(define (check-∈ x xs) (check set-member? xs x))
+(define (check-⊑ x xs)
+  (check (λ (xs x) 
+           (or (set-member? xs x)
+               (set-member? xs (0cfa:widen x))))
+         xs
+         x))
 
-(check-in 3 (0cfa:eval  (parse '(letrec ((f (lambda (z) x)) (x 3)) (f 1)))))
-(check-in 120
-          (0cfa:eval
-           (parse-prog
-            '[(define (fact n)
+(define (overlap? s1 s2)
+  (not (set-empty? (set-intersect s1 s2))))
+
+(define (simple-tests ev widen)
+  (define (check->> p x) (check overlap? 
+                                (set x (widen x)) 
+                                (ev (parse-prog p))))
+  
+  (check->> '[#t] #t)
+  (check->> '[(or #t)] #t)
+  (check->> '[(or #f)] #f)
+  (check->> '[(= 4 4)] #t)
+  (check->> '[(= 4 3)] #f)
+  (check->> '[(letrec ((f (lambda (z) x)) (x 3)) (f 1))]
+            3)
+  (check->> '[(define (fact n)
                 (if (zero? n)
                     1
                     (* n (fact (sub1 n)))))
-              (fact 5)])))
+              (fact 5)]
+            120))
 
+(simple-tests 0cfa:eval (λ (x) x))
+(simple-tests 0cfa:aval^ 0cfa:widen)
+  
 
-(check-in #f (0cfa:eval (parse-prog blur)))
+(check-∈ #f (0cfa:eval (parse-prog blur)))
 ;(check-in #t (0cfa:eval (parse-prog church))) ; expensive
-(check-in #f (0cfa:eval (parse-prog eta)))
-(check-in  2 (0cfa:eval (parse-prog mj09)))
-(check-in #t (0cfa:eval (parse-prog sat)))
-(check-in #f (0cfa:eval (parse-prog vhm08)))
-
-(check-in #f (0cfa:aval^ (parse-prog blur)))
+(check-∈ #f (0cfa:eval (parse-prog eta)))
+(check-∈  2 (0cfa:eval (parse-prog mj09)))
+(check-∈ #t (0cfa:eval (parse-prog sat)))
+(check-∈ #f (0cfa:eval (parse-prog vhm08)))
+          
+(check-∈ #f (0cfa:aval^ (parse-prog blur)))
 ;(check-in #t (0cfa:aval^ (parse-prog church))) ; expensive
-(check-in #f (0cfa:aval^ (parse-prog eta)))
-(check-in  2 (0cfa:aval^ (parse-prog mj09)))
-(check-in #t (0cfa:aval^ (parse-prog sat)))
-(check-in #f (0cfa:aval^ (parse-prog vhm08)))
+(check-∈ #f (0cfa:aval^ (parse-prog eta)))
+(check-∈  2 (0cfa:aval^ (parse-prog mj09)))
+(check-∈ #t (0cfa:aval^ (parse-prog sat)))
+(check-∈ #f (0cfa:aval^ (parse-prog vhm08)))
 
 ;; mutually recursive top-level functions
-(check-in #t 
+(check-∈ #t 
           (0cfa:eval
            (parse-prog
             '[(define (even? x)
@@ -50,8 +71,8 @@
                     (not (even? (sub1 y)))))
               (even? 2)])))
 
-(check-in 3 (0cfa:aval^ (parse '(letrec ((f (lambda (z) x)) (x 3)) (f 1)))))
-(check-in 3 (0cfa:aval^ (parse '(letrec ((x 3) (f (lambda (z) x))) (f 1)))))
+(check-∈ 3 (0cfa:aval^ (parse '(letrec ((f (lambda (z) x)) (x 3)) (f 1)))))
+(check-∈ 3 (0cfa:aval^ (parse '(letrec ((x 3) (f (lambda (z) x))) (f 1)))))
 
 #|
 ;; Check result of evaluation against analysis
