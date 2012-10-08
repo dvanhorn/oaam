@@ -29,6 +29,8 @@
     [((2op _ o e0 e1) (2op _ o f0 f1))
      (and (exp=/lab e0 f0)
           (exp=/lab e1 f1))]
+    [((st! _ x e) (st! _ x f))
+     (exp=/lab e f)]      
     [(_ _) #f]))
        
 
@@ -38,6 +40,7 @@
 (check exp=/lab (parse '(let* () x)) (var '_ 'x))
 (check exp=/lab (parse '(lambda (x) x)) (lam '_ 'x (var '_ 'x)))
 (check exp=/lab (parse '(f x)) (app '_ (var '_ 'f) (var '_ 'x)))
+(check exp=/lab (parse '(set! x 1)) (st! '_ 'x (num '_ 1)))
 
 (check exp=/lab
        (parse-prog
@@ -52,3 +55,9 @@
                               1
                               (* n (fact (sub1 n)))))))
            (fact 5))))
+
+;; parse really shouln't pick fresh names
+#;
+(check exp=/lab
+       (parse-prog '[1 2])
+       (parse '(begin 1 2)))

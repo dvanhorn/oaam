@@ -32,6 +32,10 @@
   (check->> '[(= 4 3)] #f)
   (check->> '[(letrec ((f (lambda (z) x)) (x 3)) (f 1))]
             3)
+  (check->> '[(define x 1)
+              (set! x 2)
+              x]
+            2)
   (check->> '[(define (fact n)
                 (if (zero? n)
                     1

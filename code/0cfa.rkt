@@ -38,7 +38,10 @@
           (set (ev σ* e ρ (1opk o a)))]
          [(2op l o e f)
           (define-values (σ* a) (push state))
-          (set (ev σ* e ρ (2opak o f ρ a)))])]
+          (set (ev σ* e ρ (2opak o f ρ a)))]
+         [(st! l x e)
+          (define-values (σ* a) (push state))
+          (set (ev σ* e ρ (sk! (lookup-env ρ x) a)))])]
 
       [(co σ k v)
        (match k
@@ -63,7 +66,11 @@
             (ev σ* e ρ k))]
          [(lrk x (cons y xs) (cons e es) b ρ a)
           (define-values (_ σ*) (bind state))          
-          (set (ev σ* e ρ (lrk y xs es b ρ a)))])]
+          (set (ev σ* e ρ (lrk y xs es b ρ a)))]
+         [(sk! l a)
+          (define-values (_ σ*) (bind state))
+          (for/set ((k (get-cont σ a)))
+            (co σ* k (void)))])]
           
 
       [(ap σ fun a k)
@@ -148,6 +155,8 @@
             ([k (in-hash-keys σ)])
             (max i k))))
   (match s
+    [(co σ (sk! l a) v)
+     (values (hash) (extend σ l (set v)))] ;; empty env says this is the wrong place for this.
     [(co σ (lrk x xs es e ρ k) v)
      (define a (lookup-env ρ x))
      (values ρ (join-one σ a v))]
@@ -192,6 +201,8 @@
 
 (define (bind s)
   (match s
+    [(co σ (sk! l a) v)
+     (values (hash) (join-one σ l v))] ;; empty env says this is the wrong place for this.    
     [(co σ (lrk x xs es e ρ a) v)
      (values ρ (join-one σ x v))]
     [(ev σ (lrc l xs es b) ρ k)

@@ -43,6 +43,7 @@
      (app (gensym)
           (lam (gensym) x (parse `(let* ,r ,@b)))
           (parse e))]
+    [`(set! ,x ,e) (st! (gensym) x (parse e))]
     [`(letrec () . ,s) (parse-seq s)]
     [`(letrec ((,xs ,es) ...) . ,s)
      (lrc (gensym) xs (map parse es) (parse-seq s))]

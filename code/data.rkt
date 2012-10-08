@@ -4,6 +4,7 @@
 ;; A Val is one of:
 ;; - Number
 ;; - Boolean
+;; - Void
 ;; - (clos Lab Sym Exp Env)
 ;; - (rlos Lab Sym Sym Exp Env)
 (struct clos (l x e ρ)   #:transparent)
@@ -24,6 +25,7 @@
 (struct 2opak (o e ρ k)     #:transparent)
 (struct 2opfk (o v k)       #:transparent)
 (struct lrk (x xs es e ρ k) #:transparent)
+(struct sk! (x k)           #:transparent)
 
 ;; State
 (struct state (σ)            #:transparent)
