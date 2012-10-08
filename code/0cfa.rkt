@@ -7,6 +7,14 @@
 ;; Moral: per machine-state store polyvariance is not viable,
 ;; but with widening it's not so bad.
 
+;; (ev σ (app l e0 e1 ...) ρ k)
+;; (ev σ e0 ρ (evls (list e1 ...) (list) ρ k))
+
+;; (co σ (evls (list) (list vn-1 .. v0) ρ k) vn)
+;; (ap v0 (list v0 .. vn-1 vn) k)
+
+;; (co σ (evls (list e0 e1 ...) (list vi ...) ρ k) vi+1)
+;; (ev σ e0 ρ (evls (list e1 ...) (list vi+1 vi ...) ρ k))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Machine
@@ -22,14 +30,13 @@
          [(num l n)           (set (co σ k n))]
          [(bln l b)           (set (co σ k b))]         
          [(lam l x e)         (set (co σ k (clos l x e ρ)))]         
-         [(rec f (lam l x e)) (set (co σ k (rlos l f x e ρ)))]
          [(lrc l xs es b)
           (define-values (σ0 a) (push state))
           (define-values (ρ* σ*) (bind (ev σ0 e ρ k)))
           (set (ev σ* (first es) ρ* (lrk (first xs) (rest xs) (rest es) b ρ* a)))]
-         [(app l f e)
+         [(app l e es)
           (define-values (σ* a) (push state))
-          (set (ev σ* f ρ (ar e ρ a)))]
+          (set (ev σ* e ρ (ls es '() ρ a)))]
          [(ife l e0 e1 e2)
           (define-values (σ* a) (push state))
           (set (ev σ* e0 ρ (ifk e1 e2 ρ a)))]
@@ -46,9 +53,12 @@
       [(co σ k v)
        (match k
          ['mt (set (ans σ v))]
-         [(ar e ρ l) (set (ev σ e ρ (fn v l)))]
-         [(fn f l)   (for/set ((k (get-cont σ l)))
-                       (ap σ f v k))]
+         [(ls '() vs ρ l) 
+          (define as (reverse (cons v vs)))
+          (for/set ((k (get-cont σ l)))
+                   (ap σ (first as) (rest as) k))]
+         [(ls (list-rest e es) vs ρ l)
+         (set (ev σ e ρ (ls es (cons v vs) ρ l)))]
          [(ifk c a ρ l)
           (for/set ((k (get-cont σ l)))
             (ev σ (if v c a) ρ k))]
@@ -73,12 +83,9 @@
             (co σ* k (void)))])]
           
 
-      [(ap σ fun a k)
+      [(ap σ fun as k)
        (match fun
-         [(clos l x e ρ)
-          (define-values (ρ* σ*) (bind state))
-          (set (ev σ* e ρ* k))]
-         [(rlos l f x e ρ)
+         [(clos l xs e ρ)
           (define-values (ρ* σ*) (bind state))
           (set (ev σ* e ρ* k))]
          [_ (set)])]
@@ -168,15 +175,12 @@
      (values (extend* ρ xs as)
              (join* σ as (map (λ _ (set)) xs)))]
     
-    [(ap σ (clos l x e ρ) v k)
-     (define a (next-addr σ)) 
-     (values (extend ρ x a)
-             (extend σ a (set v)))]
-    [(ap σ (rlos l f x e ρ) v k)
+    [(ap σ (clos l xs e ρ) vs k)
      (define a (next-addr σ))
-     (define b (add1 a))
-     (values (extend (extend ρ x a) f b)
-             (join (join σ a (set v)) b (set (rlos l f x e ρ))))]))
+     (define as (for/list ([i (in-range (length xs))])
+                  (+ a i)))
+     (values (extend* ρ xs as)
+             (extend* σ as (map set vs)))]))
 
 (define (eval-push s)
   (match s
@@ -208,12 +212,9 @@
     [(ev σ (lrc l xs es b) ρ k)
      (values (extend* ρ xs xs)
              (join* σ xs (map (λ _ (set)) xs)))]
-    [(ap σ (clos l x e ρ) v k)
-     (values (extend ρ x x)
-             (join-one σ x v))]
-    [(ap σ (rlos l f x e ρ) v k)
-     (values (extend (extend ρ x x) f f)
-             (join-one (join-one σ x v) f (rlos l f x e ρ)))]))
+    [(ap σ (clos l xs e ρ) vs k)
+     (values (extend* ρ xs xs)
+             (join-one* σ xs vs))]))
 
 (define (push s)
   (match s

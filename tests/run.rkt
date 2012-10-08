@@ -5,8 +5,8 @@
 (require "../benchmarks/progs.rkt")
 
 (require (prefix-in 0cfa: "../code/0cfa.rkt")
-	 (prefix-in lazy: "../code/0cfa-lazy.rkt")
-	 (prefix-in delta: "../code/0cfa-delta.rkt"))
+	 #;(prefix-in lazy: "../code/0cfa-lazy.rkt")
+	 #;(prefix-in delta: "../code/0cfa-delta.rkt"))
 
 
 (define (check-∈ x xs) (check set-member? xs x))
@@ -46,20 +46,28 @@
 (simple-tests 0cfa:eval (λ (x) x))
 (simple-tests 0cfa:aval^ 0cfa:widen)
   
-
-(check-∈ #f (0cfa:eval (parse-prog blur)))
 ;(check-in #t (0cfa:eval (parse-prog church))) ; expensive
-(check-∈ #f (0cfa:eval (parse-prog eta)))
-(check-∈  2 (0cfa:eval (parse-prog mj09)))
-(check-∈ #t (0cfa:eval (parse-prog sat)))
 (check-∈ #f (0cfa:eval (parse-prog vhm08)))
-          
-(check-∈ #f (0cfa:aval^ (parse-prog blur)))
+
+(check-∈  2 (0cfa:eval (parse-prog mj09)))
+(check-∈ #f (0cfa:eval (parse-prog eta)))
+(check-∈ #f (0cfa:eval (parse-prog kcfa2)))
+(check-∈ #f (0cfa:eval (parse-prog kcfa3)))
+(check-∈ #f (0cfa:eval (parse-prog blur)))
+;(check-∈ 550 (0cfa:eval (parse-prog loop2))) ; too expensive
+(check-∈ #t (0cfa:eval (parse-prog sat)))          
+
 ;(check-in #t (0cfa:aval^ (parse-prog church))) ; expensive
-(check-∈ #f (0cfa:aval^ (parse-prog eta)))
-(check-∈  2 (0cfa:aval^ (parse-prog mj09)))
-(check-∈ #t (0cfa:aval^ (parse-prog sat)))
-(check-∈ #f (0cfa:aval^ (parse-prog vhm08)))
+(check-∈ #f  (0cfa:aval^ (parse-prog vhm08)))
+
+(check-∈  2  (0cfa:aval^ (parse-prog mj09)))
+(check-∈ #f  (0cfa:aval^ (parse-prog eta)))
+(check-∈ #f  (0cfa:aval^ (parse-prog kcfa2)))
+(check-∈ #f  (0cfa:aval^ (parse-prog kcfa3)))
+(check-∈ #f  (0cfa:aval^ (parse-prog blur)))
+;(check-∈ 550 (0cfa:aval^ (parse-prog loop2))) ; too expensive
+(check-∈ #t  (0cfa:aval^ (parse-prog sat)))
+
 
 ;; mutually recursive top-level functions
 (check-∈ #t 

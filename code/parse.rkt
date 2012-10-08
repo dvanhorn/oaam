@@ -15,8 +15,8 @@
 (define (parse-defns ds)
   (match ds
     ['() '()]
-    [`((define (,f ,x) . ,b) . ,ds)
-     (parse-defns `((define ,f (lambda (,x) . ,b)) . ,ds))]
+    [`((define (,f . ,xs) . ,b) . ,ds)
+     (parse-defns `((define ,f (lambda ,xs . ,b)) . ,ds))]
     [`((define ,f ,e) . ,ds)
      (cons (list f e)
            (parse-defns ds))]))
@@ -35,14 +35,13 @@
     [`(begin ,e) (parse e)]
     [`(begin ,e . ,r)
      (parse `((lambda (,(gensym)) (begin . ,r)) ,e))]
-    ;; only handle single let
-    [`(let ((,x ,e)) ,b)
-     (parse `((lambda (,x) ,b) ,e))]
+    [`(let ((,xs ,es) ...) ,b)
+     (parse `((lambda ,xs ,b) . ,es))]
     [`(let* () . ,s) (parse-seq s)]
     [`(let* ((,x ,e) . ,r) . ,b)
      (app (gensym)
-          (lam (gensym) x (parse `(let* ,r ,@b)))
-          (parse e))]
+          (lam (gensym) (list x) (parse `(let* ,r ,@b)))
+          (list (parse e)))]
     [`(set! ,x ,e) (st! (gensym) x (parse e))]
     [`(letrec () . ,s) (parse-seq s)]
     [`(letrec ((,xs ,es) ...) . ,s)
@@ -50,8 +49,8 @@
     [`(letrec* () . ,s) (parse s)] ;; our letrec is letrec*
     [`(letrec* ((,xs ,es) ...) . ,s)
      (lrc (gensym) xs (map parse es) (parse-seq s))]
-    [`(lambda (,x) . ,s)
-     (lam (gensym) x (parse-seq s))]
+    [`(lambda ,xs . ,s)
+     (lam (gensym) xs (parse-seq s))]
     [`(cond ((else ,a1))) (parse a1)]
     [`(cond ((,q1 ,a1) . ,r))
      (parse `(if ,q1 ,a1 (cond . ,r)))]
@@ -76,10 +75,10 @@
      (1op (gensym) o (parse e))]    
     [`(,(? op2-name? o) ,e0 ,e1)
      (2op (gensym) o (parse e0) (parse e1))]
-    [`(,e0 ,e1)
+    [`(,e . ,es)
      (app (gensym)
-          (parse e0)
-          (parse e1))]
+          (parse e)
+          (map parse es))]
     [(? boolean? b) (bln (gensym) b)]
     [(? number? n) (num (gensym) n)]
     [(? symbol? s) (var (gensym) s)]))

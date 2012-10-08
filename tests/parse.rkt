@@ -14,10 +14,10 @@
           (andmap exp=/lab es fs))]
     [((lam _ x e) (lam _ x f))
      (exp=/lab e f)]
-    [((app _ e0 e1)
-      (app _ f0 f1))
-     (and (exp=/lab e0 f0)
-          (exp=/lab e1 f1))]
+    [((app _ e es)
+      (app _ f fs))
+     (and (exp=/lab e f)
+          (andmap exp=/lab es fs))]
     ;rec -- should go away
     [((ife _ e0 e1 e2)
       (ife _ f0 f1 f2))
@@ -38,9 +38,13 @@
 (check exp=/lab (parse 'x) (var '_ 'x))
 ;(check exp=/lab (parse '(let () 5)) (num '_ 5))   ;; DONT HAVE LET YET
 (check exp=/lab (parse '(let* () x)) (var '_ 'x))
-(check exp=/lab (parse '(lambda (x) x)) (lam '_ 'x (var '_ 'x)))
-(check exp=/lab (parse '(f x)) (app '_ (var '_ 'f) (var '_ 'x)))
+(check exp=/lab (parse '(lambda (x) x)) (lam '_ '(x) (var '_ 'x)))
+(check exp=/lab (parse '(f x)) (app '_ (var '_ 'f) (list (var '_ 'x))))
 (check exp=/lab (parse '(set! x 1)) (st! '_ 'x (num '_ 1)))
+
+(check exp=/lab
+       (parse '(let ((x 1) (y 2)) x))
+       (parse '((lambda (x y) x) 1 2)))
 
 (check exp=/lab
        (parse-prog

@@ -12,20 +12,20 @@
 
 ;; A Cont is one of:
 ;; - 'mt
-;; - (ar Exp Env Cont)
-;; - (fn Val Cont)
 ;; - (ifk Exp Exp Env Cont)
 ;; - (1opk Opr Cont)
 ;; - (2opak Opr Exp Env Cont)
 ;; - (2opfk Opr Val Cont)
-(struct ar (e ρ k)          #:transparent)
-(struct fn (v k)            #:transparent)
+;; - (lrk Sym [Listof Sym] [Listof Exp] Exp Env Cont)
+;; - (sk! Sym Cont)
+;; - (ls [Listof Exp] [Listof Val] Env Cont)
 (struct ifk (c a ρ k)       #:transparent)
 (struct 1opk (o k)          #:transparent)
 (struct 2opak (o e ρ k)     #:transparent)
 (struct 2opfk (o v k)       #:transparent)
 (struct lrk (x xs es e ρ k) #:transparent)
 (struct sk! (x k)           #:transparent)
+(struct ls (es vs ρ k)      #:transparent)
 
 ;; State
 (struct state (σ)            #:transparent)
@@ -84,3 +84,8 @@
 (define (join-one σ a x)
   (hash-set σ a
             (set-add (hash-ref σ a (set)) x)))
+(define (join-one* σ as xs)
+  (cond [(empty? as) σ]
+        [else (join-one* (join-one σ (first as) (first xs))
+                         (rest as)
+                         (rest xs))]))
