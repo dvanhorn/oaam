@@ -182,7 +182,7 @@
      (values (hash) (extend σ l (force σ v)))]
     [(co σ (lrk x xs es e ρ k) v)
      (define a (lookup-env ρ x))
-     (values ρ (join-one σ a v))]
+     (values ρ (join σ a (force σ v)))]
     [(ev σ (lrc l xs es b) ρ k)
      (define a (next-addr σ))
      (define as (for/list ([i (in-range (length xs))])
@@ -194,7 +194,12 @@
      (define as (for/list ([i (in-range (length xs))])
                   (+ a i)))
      (values (extend* ρ xs as)
-             (extend* σ as (map set vs)))]))
+             (extend* σ as (map (λ (v) (force σ v)) vs)))]))
+
+(define (force σ x)
+  (match x
+    [(addr a) (lookup-sto σ a)]
+    [v (set v)]))
 
 (define strict-eval-bind (mk-eval-bind (λ (_ v) (set v))))
 (define lazy-eval-bind   (mk-eval-bind force))
@@ -241,11 +246,6 @@
      (values (join σ a (set k))
              a)]))
 
-(define (force σ x)
-  (match x
-    [(addr a) (lookup-sto σ a)]
-    [v (set v)]))
-
 (define (delay σ x)
   (set (addr x)))
 
@@ -272,7 +272,7 @@
 
 (define lazy-eval-step
   (mk-step eval-push
-           lazy-0cfa-bind
+           lazy-eval-bind
            eval-widen
            force
            delay))
