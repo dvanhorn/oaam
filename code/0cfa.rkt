@@ -196,6 +196,11 @@
      (values (extend* ρ xs as)
              (extend* σ as (map set vs)))]))
 
+(define (force σ x)
+  (match x
+    [(addr a) (lookup-sto σ a)]
+    [v (set v)]))
+
 (define strict-eval-bind (mk-eval-bind (λ (_ v) (set v))))
 (define lazy-eval-bind   (mk-eval-bind force))
 
@@ -240,11 +245,6 @@
      (define a (exp-lab e))
      (values (join σ a (set k))
              a)]))
-
-(define (force σ x)
-  (match x
-    [(addr a) (lookup-sto σ a)]
-    [v (set v)]))
 
 (define (delay σ x)
   (set (addr x)))
