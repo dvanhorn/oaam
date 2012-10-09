@@ -1,7 +1,8 @@
 #lang racket
 (provide aval^ widen)
-(require "ast.rkt"
-         (except-in "data.rkt" get-cont)
+(require "old-ast.rkt"
+         (except-in "old-data.rkt" get-cont)
+         "old-progs.rkt"
          (for-syntax syntax/parse))
 
 (define-syntax-rule (for/union guards body1 body ...)
@@ -189,13 +190,14 @@
   (define fst (inj e))
   (define seen (make-hash (for/list ([c (in-set fst)])
                             (cons c unions))))
-  (let loop ([todo fst])
-    (cond [(set-empty? todo)
-           (for*/set ([(c at-unions) (in-hash seen)]
-                      #:when (ans^? c))
-             (ans^-v c))]
-          [else
-           (loop (wide-step-specialized todo seen))])))
+  (time ;; ignore preprocessing
+   (let loop ([todo fst])
+     (cond [(set-empty? todo)
+            (for*/set ([(c at-unions) (in-hash seen)]
+                       #:when (ans^? c))
+              (ans^-v c))]
+           [else
+            (loop (wide-step-specialized todo seen))]))))
 
 ;; Sexp -> Set State
 (define (inj sexp)
@@ -214,5 +216,8 @@
       ([c (in-set cs)]
        [s (in-set (step-compiled^ c))]
        #:unless (= unions (hash-ref seen s -1)))
+    (when (set? s) (error 'wide-step-specialized "Bad step ~a" c))
     (hash-set! seen s unions)
     (set-add cs* s)))
+
+(aval^ church)
