@@ -137,8 +137,8 @@
        [('zero? (list (? number? n))) (cons '() (set (co^ k (zero? n))))]
        [('sub1 (list (? number? n)))  (cons '() (set (co^ k (widen (sub1 n)))))]
        [('add1 (list (? number? n)))  (cons '() (set (co^ k (widen (add1 n)))))]
-       [('not (list #t))  (set (co σ k #f))]
-       [('not (list #f))  (set (co σ k #t))]
+       [('not (list #t)) (cons '() (set (co σ k #f)))]
+       [('not (list #f)) (cons '() (set (co σ k #t)))]
        [('zero? (list 'number))
         (cons '() (set (co^ k #t)
                        (co^ k #f)))]
