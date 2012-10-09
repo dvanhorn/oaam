@@ -48,7 +48,7 @@
 ;(simple-tests lazy-eval (λ (x) x)) ; laziness not working yet
 (simple-tests aval widen)
 (simple-tests aval^ widen)
-;(simple-tests lazy-aval^ widen) 
+(simple-tests lazy-aval^ widen) 
   
 ;(check-in #t (eval (parse-prog church))) ; expensive
 (check-∈ #f (eval (parse-prog vhm08)))
