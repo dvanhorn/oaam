@@ -45,7 +45,7 @@
             120))
 
 (simple-tests eval (λ (x) x))
-;(simple-tests lazy-eval (λ (x) x)) ; laziness not working yet
+(simple-tests lazy-eval (λ (x) x)) ; laziness not working yet
 (simple-tests aval widen)
 (simple-tests aval^ widen)
 (simple-tests lazy-aval^ widen) 
