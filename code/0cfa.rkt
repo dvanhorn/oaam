@@ -2,18 +2,21 @@
 (provide eval aval aval^
          lazy-eval lazy-aval lazy-aval^
          widen)
-(require "ast.rkt" "fix.rkt" "data.rkt")
+(require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt")
 
-;; 0CFA in the AAM style on some hairy Church numeral churning
-
-;; Moral: per machine-state store polyvariance is not viable,
-;; but with widening it's not so bad.
+;; A [Rel X ... Y] is a (X -> ... -> (Setof Y))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Machine
+;; Machine maker
+
+;; push  : State -> Sto Addr
+;; bind  : State -> Env Sto
+;; widen : Val -> Val
+;; force : [Rel Sto Val Val]
+;; delay : [Rel Sto Addr Val]
 
 (define (mk-step push bind widen force delay)
-  ;; [Relation State State]
+  ;; [Rel State State]
   (define (step state)
     (match state
       [(ev σ e ρ k)
@@ -49,8 +52,9 @@
                         (ans σ v))]
          [(ls '() vs ρ l)
           (define as (reverse (cons v vs)))
-          (for/set ((k (get-cont σ l)))
-                   (ap σ (first as) (rest as) k))]
+          (for*/set ((k (get-cont σ l))
+                     (f (force σ (first as))))
+                    (ap σ f (rest as) k))]
          [(ls (list-rest e es) vs ρ l)
           (set (ev σ e ρ (ls es (cons v vs) ρ l)))]
          [(ifk c a ρ l)
@@ -130,7 +134,7 @@
 (define (stringish? x)
   (or (string? x)
       (eq? 'string x)))  
-  
+
 (define (z->z? o)
   (memq o '(add1 sub1)))
 
@@ -166,14 +170,16 @@
         [(boolean? b) b]
         [else (error "Unknown base value" b)]))
 
-(define (eval-bind s)
+
+(define ((mk-eval-bind force) s)
   (define (next-addr σ)
     (add1 (for/fold ([i 0])
             ([k (in-hash-keys σ)])
             (max i k))))
   (match s
     [(co σ (sk! l a) v)
-     (values (hash) (extend σ l (set v)))] ;; empty env says this is the wrong place for this.
+     ;; empty env says this is the wrong place for this.
+     (values (hash) (extend σ l (force σ v)))]
     [(co σ (lrk x xs es e ρ k) v)
      (define a (lookup-env ρ x))
      (values ρ (join-one σ a v))]
@@ -189,6 +195,9 @@
                   (+ a i)))
      (values (extend* ρ xs as)
              (extend* σ as (map set vs)))]))
+
+(define strict-eval-bind (mk-eval-bind (λ (_ v) (set v))))
+(define lazy-eval-bind   (mk-eval-bind force))
 
 (define (eval-push s)
   (match s
@@ -211,19 +220,19 @@
     ['number 'number]
     [else (error "Unknown base value" b)]))
 
-(define (bind s)
+(define ((mk-0cfa-bind force) s)
   (match s
     [(co σ (sk! l a) v)
      ;; empty env says this is the wrong place for this.
-     (values (hash) (join-one σ l v))]
+     (values (hash) (join σ l (force σ v)))]
     [(co σ (lrk x xs es e ρ a) v)
-     (values ρ (join-one σ x v))]
+     (values ρ (join σ x (force σ v)))]
     [(ev σ (lrc l xs es b) ρ k)
      (values (extend* ρ xs xs)
              (join* σ xs (map (λ _ (set)) xs)))]
     [(ap σ (clos l xs e ρ) vs k)
      (values (extend* ρ xs xs)
-             (join-one* σ xs vs))]))
+             (join* σ xs (map (λ (v) (force σ v)) vs)))]))
 
 (define (push s)
   (match s
@@ -235,40 +244,49 @@
 (define (force σ x)
   (match x
     [(addr a) (lookup-sto σ a)]
-    [v v]))
+    [v (set v)]))
 
 (define (delay σ x)
   (set (addr x)))
 
+(define strict-0cfa-bind (mk-0cfa-bind (λ (_ v) (set v))))
+(define lazy-0cfa-bind   (mk-0cfa-bind force))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Potpourris of transition relations
+
 (define 0cfa-step
   (mk-step push
-           bind
+           strict-0cfa-bind
            widen
            (lambda (σ x) (set x))
            lookup-sto))
 
 (define eval-step
   (mk-step eval-push
-           eval-bind
+           strict-eval-bind
            eval-widen
            (lambda (σ x) (set x))
            lookup-sto))
 
 (define lazy-eval-step
   (mk-step eval-push
-           eval-bind
+           lazy-0cfa-bind
            eval-widen
            force
            delay))
 
 (define lazy-0cfa-step
   (mk-step push
-           bind
+           lazy-0cfa-bind
            widen
            force
            delay))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Potpourris of evaluators
 
 ;; (State -> Setof State) -> Exp -> Set Val
 ;; 0CFA without store widening
@@ -276,11 +294,6 @@
   (for/set ([s (fix step (inj e))]
             #:when (ans? s))
            (ans-v s)))
-
-(define eval (mk-aval eval-step))
-(define lazy-eval (mk-aval lazy-eval-step))
-(define aval (mk-aval 0cfa-step))
-(define lazy-aval (mk-aval lazy-0cfa-step))
 
 ;; (State^ -> Setof State^) -> Exp -> Set Val
 ;; 0CFA with store widening
@@ -294,8 +307,14 @@
                             #:when (ans^? c))
                            (ans^-v c))]))))
 
-(define aval^ (mk-aval^ 0cfa-step))
+(define eval       (mk-aval  eval-step))
+(define eval^      (mk-aval^ eval-step))
+(define lazy-eval  (mk-aval  lazy-eval-step))
+(define aval       (mk-aval  0cfa-step))
+(define aval^      (mk-aval^ 0cfa-step))
 (define lazy-aval^ (mk-aval^ lazy-0cfa-step))
+(define lazy-aval  (mk-aval  lazy-0cfa-step))
+
 
 ;; Exp -> Set State
 (define (inj e)
@@ -311,26 +330,12 @@
 
 ;; State^ = (cons (Set Conf) Store)
 
-;; Store Store -> Store
-(define (join-store σ1 σ2)
-  (for/fold ([σ σ1])
-    ([k×v (in-hash-pairs σ2)])
-    (hash-set σ (car k×v)
-              (set-union (cdr k×v)
-                         (hash-ref σ (car k×v) (set))))))
-
-;; Set State -> Store
-(define (join-stores ss)
-  (for/fold ([σ (hash)])
-    ([s ss])
-    (join-store σ (state-σ s))))
-
 ;; (State -> Setof State) -> State^ -> { State^ }
 (define ((wide-step step) state)
   (match state
     [(cons cs σ)
-     (define ss (for/set ([c cs]) (c->s c σ)))
-     (define ss* ((appl step) ss))
-     (set (cons (for/set ([s ss*]) (s->c s))
-                (join-stores ss*)))]))
+     (define ss ((appl step)
+                 (for/set ([c cs]) (c->s c σ))))
+     (set (cons (for/set ([s ss]) (s->c s))
+                (join-stores ss)))]))
 

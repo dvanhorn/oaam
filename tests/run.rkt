@@ -30,6 +30,7 @@
   (check->> '[(or #f)] #f)
   (check->> '[(= 4 4)] #t)
   (check->> '[(= 4 3)] #f)
+  (check->> '[((lambda (x) x) 3)] 3)
   (check->> '[(letrec ((f (lambda (z) x)) (x 3)) (f 1))]
             3)
   (check->> '[(define x 1)
