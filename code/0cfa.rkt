@@ -15,6 +15,8 @@
 ;; force : [Rel Sto Val Val]
 ;; delay : [Rel Sto Addr Val]
 
+;; Invariant?  δ is the address of the top frame.
+
 (define (mk-step push bind widen force delay)
   ;; [Rel State State]
   (define (step state)
@@ -29,7 +31,7 @@
          [(lrc l xs es b)
           (define-values (σ0 a) (push state))
           (define-values (ρ* σ*) (bind (ev σ0 e ρ k δ)))
-          (set (ev σ* (first es) ρ* (lrk (first xs) (rest xs) (rest es) b ρ* a δ)))]
+          (set (ev σ* (first es) ρ* (lrk (first xs) (rest xs) (rest es) b ρ* a) δ))]
          [(app l e es)
           (define-values (σ* a) (push state))
           (set (ev σ* e ρ (ls es '() ρ a) δ))]
@@ -54,19 +56,19 @@
           (define as (reverse (cons v vs)))
           (for*/set ((k (get-cont σ l))
                      (f (force σ (first as))))
-                    (ap σ f (rest as) k))]
+                    (ap σ f (rest as) k l))]
          [(ls (list-rest e es) vs ρ l)
-          (set (ev σ e ρ (ls es (cons v vs) ρ l) '?????))] ; FIXME
+          (set (ev σ e ρ (ls es (cons v vs) ρ l) l))]
          [(ifk c a ρ δ)
           (for*/set [(k (get-cont σ δ))
                      (v (force σ v))]
-            (ev σ (if v c a) ρ δ))]
+            (ev σ (if v c a) ρ k δ))]
          [(1opk o l)
           (for*/set [(k (get-cont σ l))
                      (v (force σ v))]
             (ap-op σ o (list v) k))]
          [(2opak o e ρ l)
-          (set (ev σ e ρ (2opfk o v l)))]
+          (set (ev σ e ρ (2opfk o v l) l))]
          [(2opfk o u l)
           (for*/set [(k (get-cont σ l))
                      (v (force σ v))
@@ -78,7 +80,7 @@
             (ev σ* e ρ k δ))]   ;; ???
          [(lrk x (cons y xs) (cons e es) b ρ δ)
           (define-values (_ σ*) (bind state))
-          (set (ev σ* e ρ (lrk y xs es b ρ δ) δ))] ;; ???
+          (set (ev σ* e ρ (lrk y xs es b ρ δ) δ))]
          [(sk! l δ)
           (define-values (_ σ*) (bind state))
           (for/set ((k (get-cont σ δ)))
@@ -130,6 +132,14 @@
       [_ (set)]))
 
   step)
+
+
+(define (truncate δ k)
+  (cond [(zero? k) '()]
+        [(empty? δ) '()]
+        [else
+         (cons (first δ)
+               (truncate (rest δ) (sub1 k)))]))
 
 (define (stringish? x)
   (or (string? x)
