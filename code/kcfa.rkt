@@ -7,7 +7,6 @@
 ;; TODO
 ;; - compile
 ;; - special fixed
-;; - kCFA
 
 ;; A [Rel X ... Y] is a (X -> ... -> (Setof Y))
 
@@ -21,6 +20,9 @@
 ;; delay : [Rel Sto Addr Val]
 
 ;; Invariant?  δ is the address of the top frame.
+
+(define (ev% σ e ρ k δ)
+  (set (ev σ e ρ k δ)))
 
 (define (mk-step push bind widen force delay)
   ;; [Rel State State]
@@ -63,17 +65,17 @@
                      (f (force σ (first as))))
                     (ap σ f (rest as) k l))]
          [(ls (list-rest e es) vs ρ l)
-          (set (ev σ e ρ (ls es (cons v vs) ρ l) l))]
+          (ev% σ e ρ (ls es (cons v vs) ρ l) l)]
          [(ifk c a ρ δ)
-          (for*/set [(k (get-cont σ δ))
+          (for*/union [(k (get-cont σ δ))
                      (v (force σ v))]
-            (ev σ (if v c a) ρ k δ))]
+            (ev% σ (if v c a) ρ k δ))]
          [(1opk o l)
           (for*/set [(k (get-cont σ l))
                      (v (force σ v))]
             (ap-op σ o (list v) k))]
          [(2opak o e ρ l)
-          (set (ev σ e ρ (2opfk o v l) l))]
+          (ev% σ e ρ (2opfk o v l) l)]
          [(2opfk o u l)
           (for*/set [(k (get-cont σ l))
                      (v (force σ v))
@@ -81,11 +83,11 @@
             (ap-op σ o (list v u) k))]
          [(lrk x '() '() e ρ δ)
           (define-values (_ σ*) (bind state))
-          (for/set ((k (get-cont σ δ)))
-            (ev σ* e ρ k δ))]
+          (for/union ((k (get-cont σ δ)))
+            (ev% σ* e ρ k δ))]
          [(lrk x (cons y xs) (cons e es) b ρ δ)
           (define-values (_ σ*) (bind state))
-          (set (ev σ* e ρ (lrk y xs es b ρ δ) δ))]
+          (ev% σ* e ρ (lrk y xs es b ρ δ) δ)]
          [(sk! l δ)
           (define-values (_ σ*) (bind state))
           (for/set ((k (get-cont σ δ)))
@@ -95,7 +97,7 @@
        (match fun
          [(clos l xs e ρ)
           (define-values (ρ* σ*) (bind state))
-          (set (ev σ* e ρ* k δ))] ;; ????
+          (ev% σ* e ρ* k δ)]
          [_ (set)])]
 
       [(ap-op σ o vs k)
@@ -322,7 +324,7 @@
 
 ;; Exp -> Set State
 (define (inj e)
-  (set (ev (hash) e (hash) 'mt '())))
+  (ev% (hash) e (hash) 'mt '()))
 
 ;; Exp -> Set State^
 (define (inj-wide e)
@@ -342,4 +344,13 @@
                  (for/set ([c cs]) (c->s c σ))))
      (set (cons (for/set ([s ss]) (s->c s))
                 (join-stores ss)))]))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; for/union
+
+(define-syntax-rule (for/union guards body1 body ...)
+  (for/fold ([res (set)]) guards (set-union res (let () body1 body ...))))
+(define-syntax-rule (for*/union guards body1 body ...)
+  (for*/fold ([res (set)]) guards (set-union res (let () body1 body ...))))
 
