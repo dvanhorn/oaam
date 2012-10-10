@@ -4,6 +4,11 @@
          widen)
 (require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt")
 
+;; TODO
+;; - compile
+;; - special fixed
+;; - kCFA
+
 ;; A [Rel X ... Y] is a (X -> ... -> (Setof Y))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -77,7 +82,7 @@
          [(lrk x '() '() e ρ δ)
           (define-values (_ σ*) (bind state))
           (for/set ((k (get-cont σ δ)))
-            (ev σ* e ρ k δ))]   ;; ???
+            (ev σ* e ρ k δ))]
          [(lrk x (cons y xs) (cons e es) b ρ δ)
           (define-values (_ σ*) (bind state))
           (set (ev σ* e ρ (lrk y xs es b ρ δ) δ))]
@@ -182,27 +187,36 @@
 
 
 (define ((mk-eval-bind force) s)
-  (define (next-addr σ)
-    (add1 (for/fold ([i 0])
-            ([k (in-hash-keys σ)])
-            (max i k))))
   (match s
     [(co σ (sk! l a) v)
      ;; empty env says this is the wrong place for this.
      (values (hash) (extend σ l (force σ v)))]
-    [(co σ (lrk x xs es e ρ k) v)
+    [(co σ (lrk x xs es e ρ δ) v)
      (define a (lookup-env ρ x))
      (values ρ (join σ a (force σ v)))]
     [(ev σ (lrc l xs es b) ρ k δ)
-     (define a (next-addr σ))
-     (define as (for/list ([i (in-range (length xs))])
-                  (+ a i)))
+     (define as (map (λ (x) (cons x δ)) xs))
      (values (extend* ρ xs as)
              (join* σ as (map (λ _ (set)) xs)))]
     [(ap σ (clos l xs e ρ) vs k δ)
-     (define a (next-addr σ))
-     (define as (for/list ([i (in-range (length xs))])
-                  (+ a i)))
+     (define as (map (λ (x) (cons x δ)) xs))
+     (values (extend* ρ xs as)
+             (extend* σ as (map (λ (v) (force σ v)) vs)))]))
+
+(define ((mk-0cfa-bind force) s)
+  (match s
+    [(co σ (sk! l a) v)
+     ;; empty env says this is the wrong place for this.
+     (values (hash) (join σ l (force σ v)))]
+    [(co σ (lrk x xs es e ρ a) v)
+     (define a (lookup-env ρ x))
+     (values ρ (join σ a (force σ v)))]
+    [(ev σ (lrc l xs es b) ρ k δ)
+     (define as (map (λ (x) (cons x δ)) xs))
+     (values (extend* ρ xs as)
+             (join* σ as (map (λ _ (set)) xs)))]
+    [(ap σ (clos l xs e ρ) vs k δ)
+     (define as (map (λ (x) (cons x δ)) xs))
      (values (extend* ρ xs as)
              (extend* σ as (map (λ (v) (force σ v)) vs)))]))
 
@@ -214,15 +228,15 @@
 (define strict-eval-bind (mk-eval-bind (λ (_ v) (set v))))
 (define lazy-eval-bind   (mk-eval-bind force))
 
-(define (eval-push s)
+
+
+(define ((push K) s)
   (match s
     [(ev σ e ρ k δ)
-     (define a
-       (add1 (for/fold ([i 0])
-               ([k (in-hash-keys σ)])
-               (max i k))))
+     (define a (cons (exp-lab e) (truncate δ K)))
      (values (join σ a (set k))
              a)]))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -235,26 +249,6 @@
     ['number 'number]
     [else (error "Unknown base value" b)]))
 
-(define ((mk-0cfa-bind force) s)
-  (match s
-    [(co σ (sk! l a) v)
-     ;; empty env says this is the wrong place for this.
-     (values (hash) (join σ l (force σ v)))]
-    [(co σ (lrk x xs es e ρ a) v)
-     (values ρ (join σ x (force σ v)))]
-    [(ev σ (lrc l xs es b) ρ k δ) ;; FIXME: use δ in env.
-     (values (extend* ρ xs xs)
-             (join* σ xs (map (λ _ (set)) xs)))]
-    [(ap σ (clos l xs e ρ) vs k δ)
-     (values (extend* ρ xs xs)
-             (join* σ xs (map (λ (v) (force σ v)) vs)))]))
-
-(define (0cfa-push s)
-  (match s
-    [(ev σ e ρ k δ)
-     (define a (exp-lab e))
-     (values (join σ a (set k))
-             a)]))
 
 (define (delay σ x)
   (set (addr x)))
@@ -267,28 +261,28 @@
 ;; Potpourris of transition relations
 
 (define 0cfa-step
-  (mk-step 0cfa-push
+  (mk-step (push 0)
            strict-0cfa-bind
            widen
            (lambda (σ x) (set x))
            lookup-sto))
 
 (define eval-step
-  (mk-step eval-push
+  (mk-step (push +inf.0)
            strict-eval-bind
            eval-widen
            (lambda (σ x) (set x))
            lookup-sto))
 
 (define lazy-eval-step
-  (mk-step eval-push
+  (mk-step (push +inf.0)
            lazy-eval-bind
            eval-widen
            force
            delay))
 
 (define lazy-0cfa-step
-  (mk-step 0cfa-push
+  (mk-step (push 0)
            lazy-0cfa-bind
            widen
            force
