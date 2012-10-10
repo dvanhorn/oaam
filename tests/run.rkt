@@ -4,7 +4,7 @@
 (require "../code/parse.rkt")
 (require "../benchmarks/progs.rkt")
 
-(require "../code/0cfa.rkt"
+(require "../code/kcfa.rkt"
 	 #;(prefix-in lazy: "../code/0cfa-lazy.rkt")
 	 #;(prefix-in delta: "../code/0cfa-delta.rkt"))
 
