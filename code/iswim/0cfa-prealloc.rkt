@@ -201,8 +201,7 @@
 
 ;; Sexp -> Set State
 (define (inj sexp)
-  (define nlabels 0)
-  (define e (parse sexp (λ (n) (set! nlabels n))))
+  (define-values (e nlabels) (parse sexp))
   (set! σ (make-vector nlabels '()))
   ((compile e) #;empty-environment-> (hash) 'mt))
 

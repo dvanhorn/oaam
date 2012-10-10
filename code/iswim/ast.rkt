@@ -33,12 +33,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser
 
-(define (parse sexp set-nlabels!)
+(define (parse sexp)
   (define nlabels 0)
   (define (next-label!)
     (begin0 nlabels
             (set! nlabels (add1 nlabels))))
-  (begin0
+  (values
    (let parse ([sexp sexp]
                [ρ (hash)])
      (define (parse* sexp) (parse sexp ρ))
@@ -69,4 +69,4 @@
        [(? boolean? b) (bln (next-label!) b)]
        [(? number? n) (num (next-label!) n)]
        [(? symbol? s) (var (next-label!) (hash-ref ρ s (λ () (error 'parse "Open program: ~a" s))))]))
-   (set-nlabels! nlabels)))
+   nlabels))

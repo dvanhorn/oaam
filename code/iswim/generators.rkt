@@ -266,4 +266,4 @@
          (values cs*** ∆***)))
      (cons (update ∆ σ) (set-union cs cs*))]))
 
-(time (aval^ (parse church values)))
+(time (aval^ (let-values ([(e _) (parse church)]) e)))

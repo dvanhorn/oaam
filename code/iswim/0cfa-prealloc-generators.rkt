@@ -24,7 +24,6 @@
 ;; Global store
 (define σ #f)
 (define unions 0)
-(define nlabels #f)
 (define todo '())
 (define seen #f)
 
@@ -210,8 +209,7 @@
 
 ;; Sexp -> Set State
 (define (inj sexp)
-  (define nlabels 0)
-  (define e (parse sexp (λ (n) (set! nlabels n))))
+  (define-values (e nlabels) (parse sexp))
   (set! σ (make-vector nlabels '()))
   ((compile e) #;empty-environment-> (hash) 'mt))
 
