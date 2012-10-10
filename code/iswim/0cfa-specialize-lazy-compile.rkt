@@ -58,7 +58,6 @@
        (define-values (σ* a) (push σ l ρ k))
        (c0 σ* ρ (2opak o c1 ρ a)))]))
 
-(struct addr (a) #:transparent)
 ;; Store (Addr + Val) -> Set Val
 (define (get-val σ v)
   (match v
@@ -218,14 +217,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Widening State to State^
-
-;; Store Store -> Store
-(define (join-store σ1 σ2)
-  (for/fold ([σ σ1])
-    ([k×v (in-hash-pairs σ2)])
-    (hash-set σ (car k×v)
-              (set-union (cdr k×v)
-                         (hash-ref σ (car k×v) (set))))))
 
 ;; State^ -> State^
 ;; Specialized from wide-step : State^ -> { State^ } ≈ State^ -> State^

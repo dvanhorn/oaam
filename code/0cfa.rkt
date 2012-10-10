@@ -19,7 +19,7 @@
   ;; [Rel State State]
   (define (step state)
     (match state
-      [(ev σ e ρ k)
+      [(ev σ e ρ k δ)
        (match e
          [(var l x)           (for/set ((v (delay σ (lookup-env ρ x))))
                                 (co σ k v))]
@@ -28,23 +28,23 @@
          [(lam l x e)         (set (co σ k (clos l x e ρ)))]
          [(lrc l xs es b)
           (define-values (σ0 a) (push state))
-          (define-values (ρ* σ*) (bind (ev σ0 e ρ k)))
-          (set (ev σ* (first es) ρ* (lrk (first xs) (rest xs) (rest es) b ρ* a)))]
+          (define-values (ρ* σ*) (bind (ev σ0 e ρ k δ)))
+          (set (ev σ* (first es) ρ* (lrk (first xs) (rest xs) (rest es) b ρ* a δ)))]
          [(app l e es)
           (define-values (σ* a) (push state))
-          (set (ev σ* e ρ (ls es '() ρ a)))]
+          (set (ev σ* e ρ (ls es '() ρ a) δ))]
          [(ife l e0 e1 e2)
           (define-values (σ* a) (push state))
-          (set (ev σ* e0 ρ (ifk e1 e2 ρ a)))]
+          (set (ev σ* e0 ρ (ifk e1 e2 ρ a) δ))]
          [(1op l o e)
           (define-values (σ* a) (push state))
-          (set (ev σ* e ρ (1opk o a)))]
+          (set (ev σ* e ρ (1opk o a) δ))]
          [(2op l o e f)
           (define-values (σ* a) (push state))
-          (set (ev σ* e ρ (2opak o f ρ a)))]
+          (set (ev σ* e ρ (2opak o f ρ a) δ))]
          [(st! l x e)
           (define-values (σ* a) (push state))
-          (set (ev σ* e ρ (sk! (lookup-env ρ x) a)))])]
+          (set (ev σ* e ρ (sk! (lookup-env ρ x) a) δ))])]
 
       [(co σ k v)
        (match k
@@ -56,11 +56,11 @@
                      (f (force σ (first as))))
                     (ap σ f (rest as) k))]
          [(ls (list-rest e es) vs ρ l)
-          (set (ev σ e ρ (ls es (cons v vs) ρ l)))]
-         [(ifk c a ρ l)
-          (for*/set [(k (get-cont σ l))
+          (set (ev σ e ρ (ls es (cons v vs) ρ l) '?????))] ; FIXME
+         [(ifk c a ρ δ)
+          (for*/set [(k (get-cont σ δ))
                      (v (force σ v))]
-            (ev σ (if v c a) ρ k))]
+            (ev σ (if v c a) ρ δ))]
          [(1opk o l)
           (for*/set [(k (get-cont σ l))
                      (v (force σ v))]
@@ -72,23 +72,23 @@
                      (v (force σ v))
                      (u (force σ u))]
             (ap-op σ o (list v u) k))]
-         [(lrk x '() '() e ρ l)
+         [(lrk x '() '() e ρ δ)
           (define-values (_ σ*) (bind state))
-          (for/set ((k (get-cont σ l)))
-            (ev σ* e ρ k))]
-         [(lrk x (cons y xs) (cons e es) b ρ a)
+          (for/set ((k (get-cont σ δ)))
+            (ev σ* e ρ k δ))]   ;; ???
+         [(lrk x (cons y xs) (cons e es) b ρ δ)
           (define-values (_ σ*) (bind state))
-          (set (ev σ* e ρ (lrk y xs es b ρ a)))]
-         [(sk! l a)
+          (set (ev σ* e ρ (lrk y xs es b ρ δ) δ))] ;; ???
+         [(sk! l δ)
           (define-values (_ σ*) (bind state))
-          (for/set ((k (get-cont σ a)))
+          (for/set ((k (get-cont σ δ)))
             (co σ* k (void)))])]
 
-      [(ap σ fun as k)
+      [(ap σ fun as k δ)
        (match fun
          [(clos l xs e ρ)
           (define-values (ρ* σ*) (bind state))
-          (set (ev σ* e ρ* k))]
+          (set (ev σ* e ρ* k δ))] ;; ????
          [_ (set)])]
 
       [(ap-op σ o vs k)
@@ -183,13 +183,13 @@
     [(co σ (lrk x xs es e ρ k) v)
      (define a (lookup-env ρ x))
      (values ρ (join σ a (force σ v)))]
-    [(ev σ (lrc l xs es b) ρ k)
+    [(ev σ (lrc l xs es b) ρ k δ)
      (define a (next-addr σ))
      (define as (for/list ([i (in-range (length xs))])
                   (+ a i)))
      (values (extend* ρ xs as)
              (join* σ as (map (λ _ (set)) xs)))]
-    [(ap σ (clos l xs e ρ) vs k)
+    [(ap σ (clos l xs e ρ) vs k δ)
      (define a (next-addr σ))
      (define as (for/list ([i (in-range (length xs))])
                   (+ a i)))
@@ -206,7 +206,7 @@
 
 (define (eval-push s)
   (match s
-    [(ev σ e ρ k)
+    [(ev σ e ρ k δ)
      (define a
        (add1 (for/fold ([i 0])
                ([k (in-hash-keys σ)])
@@ -232,16 +232,16 @@
      (values (hash) (join σ l (force σ v)))]
     [(co σ (lrk x xs es e ρ a) v)
      (values ρ (join σ x (force σ v)))]
-    [(ev σ (lrc l xs es b) ρ k)
+    [(ev σ (lrc l xs es b) ρ k δ) ;; FIXME: use δ in env.
      (values (extend* ρ xs xs)
              (join* σ xs (map (λ _ (set)) xs)))]
-    [(ap σ (clos l xs e ρ) vs k)
+    [(ap σ (clos l xs e ρ) vs k δ)
      (values (extend* ρ xs xs)
              (join* σ xs (map (λ (v) (force σ v)) vs)))]))
 
-(define (push s)
+(define (0cfa-push s)
   (match s
-    [(ev σ e ρ k)
+    [(ev σ e ρ k δ)
      (define a (exp-lab e))
      (values (join σ a (set k))
              a)]))
@@ -257,7 +257,7 @@
 ;; Potpourris of transition relations
 
 (define 0cfa-step
-  (mk-step push
+  (mk-step 0cfa-push
            strict-0cfa-bind
            widen
            (lambda (σ x) (set x))
@@ -278,7 +278,7 @@
            delay))
 
 (define lazy-0cfa-step
-  (mk-step push
+  (mk-step 0cfa-push
            lazy-0cfa-bind
            widen
            force
@@ -318,11 +318,11 @@
 
 ;; Exp -> Set State
 (define (inj e)
-  (set (ev (hash) e (hash) 'mt)))
+  (set (ev (hash) e (hash) 'mt '())))
 
 ;; Exp -> Set State^
 (define (inj-wide e)
-  (set (cons (set (ev^ e (hash) 'mt)) (hash))))
+  (set (cons (set (ev^ e (hash) 'mt '())) (hash))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

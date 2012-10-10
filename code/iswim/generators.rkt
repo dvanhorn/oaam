@@ -1,7 +1,7 @@
 #lang racket
 (provide aval^ widen)
-(require "old-ast.rkt" "old-data.rkt"
-         "old-progs.rkt"
+(require "ast.rkt" "data.rkt"
+         "progs.rkt"
          racket/generator
          (for-syntax syntax/parse)
          racket/stxparam)

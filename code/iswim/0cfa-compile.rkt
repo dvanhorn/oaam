@@ -216,20 +216,6 @@
 
 ;; State^ = (cons (Set Conf) Store)
 
-;; Store Store -> Store
-(define (join-store σ1 σ2)
-  (for/fold ([σ σ1])
-    ([k×v (in-hash-pairs σ2)])
-    (hash-set σ (car k×v)
-              (set-union (cdr k×v)
-                         (hash-ref σ (car k×v) (set))))))
-
-;; Set State -> Store
-(define (join-stores ss)
-  (for/fold ([σ (hash)])
-    ([s ss])
-    (join-store σ (state-σ s))))
-
 ;; State^ -> { State^ }
 (define (wide-step state)
   (match state

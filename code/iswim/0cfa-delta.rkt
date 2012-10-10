@@ -68,7 +68,6 @@
        (define-values (∆* a) (push∆ ∆ l ρ k))
        (c0 ∆* ρ (2opak o c1 ρ a)))]))
 
-(struct addr (a) #:transparent)
 ;; Store (Addr + Val) -> Set Val
 (define (get-val σ v)
   (match v
