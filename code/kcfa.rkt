@@ -137,16 +137,64 @@
          [(_ _) (set)])]
 
       [_ (set)]))
+  
+  ;; Expr -> (Store Env Cont -> State)
+  (define (compile e)
+    (match e
+      [(var l x)
+       (λ (σ ρ k δ)
+         (for/set ((v (delay σ (lookup-env ρ x))))
+                  (co σ k v)))]
+      [(num l n) (λ (σ ρ k δ) (set (co σ k n)))]
+      [(bln l b) (λ (σ ρ k δ) (set (co σ k b)))]
+      [(lam l x e)
+       (define c (compile e))
+       (λ (σ ρ k δ) (set (co σ k (clos l x c ρ))))]   
+      [(lrc l xs es b)
+       (define c (compile (first es)))
+       (define cs (map compile (rest es)))
+       (define x (first xs))
+       (define xs* (rest xs))
+       (λ (σ ρ k δ)
+         (define-values (σ0 a) (push state))
+         (define-values (ρ* σ*) (bind (ev σ0 e ρ k δ)))
+         (c σ* ρ* (lrk x xs* cs b ρ* a) δ))]
+      [(app l e es)
+       (define c (compile e))
+       (define cs (map compile es))
+       (λ (σ ρ k δ)
+         (define-values (σ* a) (push state))
+         (c σ* ρ (ls cs '() ρ a) δ))]
+      [(ife l e0 e1 e2)
+       (define c0 (compile e0))
+       (define c1 (compile e1))
+       (define c2 (compile e2))
+       (λ (σ ρ k δ)
+         (define-values (σ* a) (push state))  ;; FIXME
+         (c0 σ* ρ (ifk c1 c2 ρ a) δ))]
+      [(1op l o e)
+       (define c (compile e))
+       (λ (σ ρ k δ)
+         (define-values (σ* a) (push state)) ;; FIXME
+         (c σ* ρ (1opk o a) δ))]   
+      [(2op l o e0 e1)
+       (define c0 (compile e0))
+       (define c1 (compile e1))
+       (λ (σ ρ k δ)
+         (define-values (σ* a) (push state)) ;; FIXME
+         (c0 σ* ρ (2opak o c1 ρ a) δ))]   
+      [(st! l x e)
+       (define c (compile e))
+       (λ (σ ρ k δ)
+         (define-values (σ* a) (push state)) ;; FIXME
+         (c σ* ρ (sk! (lookup-env ρ x) a) δ))]))
 
-  step)
+  step ;; FIXME (values compile step) if compiled
+  )
 
 
-(define (truncate δ k)
-  (cond [(zero? k) '()]
-        [(empty? δ) '()]
-        [else
-         (cons (first δ)
-               (truncate (rest δ) (sub1 k)))]))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Primops
 
 (define (stringish? x)
   (or (string? x)
@@ -243,6 +291,13 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 0CFA-style Abstract semantics
+
+(define (truncate δ k)
+  (cond [(zero? k) '()]
+        [(empty? δ) '()]
+        [else
+         (cons (first δ)
+               (truncate (rest δ) (sub1 k)))]))
 
 (define (widen b)
   (match b
