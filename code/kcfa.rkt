@@ -1,6 +1,7 @@
 #lang racket
-(provide eval aval aval^
-         lazy-eval lazy-aval lazy-aval^
+(provide eval 0cfa 0cfa^
+         lazy-eval lazy-0cfa lazy-0cfa^
+	 1cfa 1cfa^ lazy-1cfa lazy-1cfa^
          widen)
 (require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt")
 
@@ -21,177 +22,181 @@
 
 ;; Invariant?  δ is the address of the top frame.
 
-(define (ev% σ e ρ k δ)
-  (set (ev σ e ρ k δ)))
-
-(define (mk-step push bind widen force delay)
-  ;; [Rel State State]
-  (define (step state)
-    (match state
-      [(ev σ e ρ k δ)
-       (match e
-         [(var l x)           (for/set ((v (delay σ (lookup-env ρ x))))
-                                (co σ k v))]
-         [(num l n)           (set (co σ k n))]
-         [(bln l b)           (set (co σ k b))]
-         [(lam l x e)         (set (co σ k (clos l x e ρ)))]
-         [(lrc l xs es b)
-          (define-values (σ0 a) (push state))
-          (define-values (ρ* σ*) (bind (ev σ0 e ρ k δ)))
-          (set (ev σ* (first es) ρ* (lrk (first xs) (rest xs) (rest es) b ρ* a) δ))]
-         [(app l e es)
-          (define-values (σ* a) (push state))
-          (set (ev σ* e ρ (ls es '() ρ a) δ))]
-         [(ife l e0 e1 e2)
-          (define-values (σ* a) (push state))
-          (set (ev σ* e0 ρ (ifk e1 e2 ρ a) δ))]
-         [(1op l o e)
-          (define-values (σ* a) (push state))
-          (set (ev σ* e ρ (1opk o a) δ))]
-         [(2op l o e f)
-          (define-values (σ* a) (push state))
-          (set (ev σ* e ρ (2opak o f ρ a) δ))]
-         [(st! l x e)
-          (define-values (σ* a) (push state))
-          (set (ev σ* e ρ (sk! (lookup-env ρ x) a) δ))])]
-
-      [(co σ k v)
-       (match k
-         ['mt (for*/set ([v (force σ v)])
-                        (ans σ v))]
-         [(ls '() vs ρ l)
-          (define as (reverse (cons v vs)))
-          (for*/set ((k (get-cont σ l))
-                     (f (force σ (first as))))
-                    (ap σ f (rest as) k l))]
-         [(ls (list-rest e es) vs ρ l)
-          (ev% σ e ρ (ls es (cons v vs) ρ l) l)]
-         [(ifk c a ρ δ)
-          (for*/union [(k (get-cont σ δ))
-                     (v (force σ v))]
-            (ev% σ (if v c a) ρ k δ))]
-         [(1opk o l)
-          (for*/set [(k (get-cont σ l))
-                     (v (force σ v))]
-            (ap-op σ o (list v) k))]
-         [(2opak o e ρ l)
-          (ev% σ e ρ (2opfk o v l) l)]
-         [(2opfk o u l)
-          (for*/set [(k (get-cont σ l))
-                     (v (force σ v))
-                     (u (force σ u))]
-            (ap-op σ o (list v u) k))]
-         [(lrk x '() '() e ρ δ)
-          (define-values (_ σ*) (bind state))
-          (for/union ((k (get-cont σ δ)))
-            (ev% σ* e ρ k δ))]
-         [(lrk x (cons y xs) (cons e es) b ρ δ)
-          (define-values (_ σ*) (bind state))
-          (ev% σ* e ρ (lrk y xs es b ρ δ) δ)]
-         [(sk! l δ)
-          (define-values (_ σ*) (bind state))
-          (for/set ((k (get-cont σ δ)))
-            (co σ* k (void)))])]
-
-      [(ap σ fun as k δ)
-       (match fun
-         [(clos l xs e ρ)
-          (define-values (ρ* σ*) (bind state))
-          (ev% σ* e ρ* k δ)]
-         [_ (set)])]
-
-      [(ap-op σ o vs k)
-       (match* (o vs)
-         [('zero? (list (? number? n))) (set (co σ k (zero? n)))]
-         [('zero? (list 'number))
-          (set (co σ k #t)
-               (co σ k #f))]
-         [('symbol? 'symbol)  (set (co σ k #t))]
-         [('string? (list v)) (set (co σ k (symbol? v)))]
-         [('string? 'string)  (set (co σ k #t))]
-         [('string? (list v)) (set (co σ k (string? v)))]
-         [('not (list #t))  (set (co σ k #f))]
-         [('not (list #f))  (set (co σ k #t))]
-	 [('string=? (list (? string? s1) (? string? s2)))
-          (set (co σ k (string=? s1 s2)))]
-         [('string=? (list (? stringish? s1) (? stringish? s2)))
-          (set (co σ k #t)
-               (co σ k #t))]
-         [('= (list (? number? n) (? number? m)))
-          (set (co σ k (= n m)))]
-         [('= (list (? number? n) 'number))
-          (set (co σ k #t)
-               (co σ k #f))]
-         [('= (list 'number (? number? n)))
-          (set (co σ k #t)
-               (co σ k #f))]
-         [('= (list 'number 'number))
-          (set (co σ k #t)
-               (co σ k #f))]
-         [((? z->z? o) (list x))
-          (for/set ((v (z->z o x)))
-                   (co σ k (widen v)))]
-         [((? z-z->z? o) (list x y))
-          (for/set ((v (z-z->z o x y)))
-                   (co σ k (widen v)))]
-         [(_ _) (set)])]
-
-      [_ (set)]))
+(define (mk-comp compiled?)
+  (define ev%
+    (if compiled?
+        (λ (σ c ρ k δ) (c σ ρ k δ))
+        (λ (σ e ρ k δ) (set (ev σ e ρ k δ)))))
   
-  ;; Expr -> (Store Env Cont -> State)
-  (define (compile e)
-    (match e
-      [(var l x)
-       (λ (σ ρ k δ)
-         (for/set ((v (delay σ (lookup-env ρ x))))
-                  (co σ k v)))]
-      [(num l n) (λ (σ ρ k δ) (set (co σ k n)))]
-      [(bln l b) (λ (σ ρ k δ) (set (co σ k b)))]
-      [(lam l x e)
-       (define c (compile e))
-       (λ (σ ρ k δ) (set (co σ k (clos l x c ρ))))]   
-      [(lrc l xs es b)
-       (define c (compile (first es)))
-       (define cs (map compile (rest es)))
-       (define x (first xs))
-       (define xs* (rest xs))
-       (λ (σ ρ k δ)
-         (define-values (σ0 a) (push state))
-         (define-values (ρ* σ*) (bind (ev σ0 e ρ k δ)))
-         (c σ* ρ* (lrk x xs* cs b ρ* a) δ))]
-      [(app l e es)
-       (define c (compile e))
-       (define cs (map compile es))
-       (λ (σ ρ k δ)
-         (define-values (σ* a) (push state))
-         (c σ* ρ (ls cs '() ρ a) δ))]
-      [(ife l e0 e1 e2)
-       (define c0 (compile e0))
-       (define c1 (compile e1))
-       (define c2 (compile e2))
-       (λ (σ ρ k δ)
-         (define-values (σ* a) (push state))  ;; FIXME
-         (c0 σ* ρ (ifk c1 c2 ρ a) δ))]
-      [(1op l o e)
-       (define c (compile e))
-       (λ (σ ρ k δ)
-         (define-values (σ* a) (push state)) ;; FIXME
-         (c σ* ρ (1opk o a) δ))]   
-      [(2op l o e0 e1)
-       (define c0 (compile e0))
-       (define c1 (compile e1))
-       (λ (σ ρ k δ)
-         (define-values (σ* a) (push state)) ;; FIXME
-         (c0 σ* ρ (2opak o c1 ρ a) δ))]   
-      [(st! l x e)
-       (define c (compile e))
-       (λ (σ ρ k δ)
-         (define-values (σ* a) (push state)) ;; FIXME
-         (c σ* ρ (sk! (lookup-env ρ x) a) δ))]))
+  (λ (push bind widen force delay)
+    ;; [Rel State State]
+    (define (step state)
+      (match state
+        [(ev σ e ρ k δ)
+         (match e
+           [(var l x)           (for/set ((v (delay σ (lookup-env ρ x))))
+                                         (co σ k v))]
+           [(num l n)           (set (co σ k n))]
+           [(bln l b)           (set (co σ k b))]
+           [(lam l x e)         (set (co σ k (clos l x e ρ)))]
+           [(lrc l xs es b)
+            (define-values (σ0 a) (push state))
+            (define-values (ρ* σ*) (bind (ev σ0 e ρ k δ)))
+            (set (ev σ* (first es) ρ* (lrk (first xs) (rest xs) (rest es) b ρ* a) δ))]
+           [(app l e es)
+            (define-values (σ* a) (push state))
+            (set (ev σ* e ρ (ls es '() ρ a) δ))]
+           [(ife l e0 e1 e2)
+            (define-values (σ* a) (push state))
+            (set (ev σ* e0 ρ (ifk e1 e2 ρ a) δ))]
+           [(1op l o e)
+            (define-values (σ* a) (push state))
+            (set (ev σ* e ρ (1opk o a) δ))]
+           [(2op l o e f)
+            (define-values (σ* a) (push state))
+            (set (ev σ* e ρ (2opak o f ρ a) δ))]
+           [(st! l x e)
+            (define-values (σ* a) (push state))
+            (set (ev σ* e ρ (sk! (lookup-env ρ x) a) δ))])]
+        
+        [(co σ k v)
+         (match k
+           ['mt (for*/set ([v (force σ v)])
+                          (ans σ v))]
+           [(ls '() vs ρ l)
+            (define as (reverse (cons v vs)))
+            (for*/set ((k (get-cont σ l))
+                       (f (force σ (first as))))
+                      (ap σ f (rest as) k l))]
+           [(ls (list-rest e es) vs ρ l)
+            (ev% σ e ρ (ls es (cons v vs) ρ l) l)]
+           [(ifk c a ρ δ)
+            (for*/union [(k (get-cont σ δ))
+                         (v (force σ v))]
+                        (ev% σ (if v c a) ρ k δ))]
+           [(1opk o l)
+            (for*/set [(k (get-cont σ l))
+                       (v (force σ v))]
+                      (ap-op σ o (list v) k))]
+           [(2opak o e ρ l)
+            (ev% σ e ρ (2opfk o v l) l)]
+           [(2opfk o u l)
+            (for*/set [(k (get-cont σ l))
+                       (v (force σ v))
+                       (u (force σ u))]
+                      (ap-op σ o (list v u) k))]
+           [(lrk x '() '() e ρ δ)
+            (define-values (_ σ*) (bind state))
+            (for/union ((k (get-cont σ δ)))
+                       (ev% σ* e ρ k δ))]
+           [(lrk x (cons y xs) (cons e es) b ρ δ)
+            (define-values (_ σ*) (bind state))
+            (ev% σ* e ρ (lrk y xs es b ρ δ) δ)]
+           [(sk! l δ)
+            (define-values (_ σ*) (bind state))
+            (for/set ((k (get-cont σ δ)))
+                     (co σ* k (void)))])]
+        
+        [(ap σ fun as k δ)
+         (match fun
+           [(clos l xs e ρ)
+            (define-values (ρ* σ*) (bind state))
+            (ev% σ* e ρ* k δ)]
+           [_ (set)])]
+        
+        [(ap-op σ o vs k)
+         (match* (o vs)
+           [('zero? (list (? number? n))) (set (co σ k (zero? n)))]
+           [('zero? (list 'number))
+            (set (co σ k #t)
+                 (co σ k #f))]
+           [('symbol? 'symbol)  (set (co σ k #t))]
+           [('string? (list v)) (set (co σ k (symbol? v)))]
+           [('string? 'string)  (set (co σ k #t))]
+           [('string? (list v)) (set (co σ k (string? v)))]
+           [('not (list #t))  (set (co σ k #f))]
+           [('not (list #f))  (set (co σ k #t))]
+           [('string=? (list (? string? s1) (? string? s2)))
+            (set (co σ k (string=? s1 s2)))]
+           [('string=? (list (? stringish? s1) (? stringish? s2)))
+            (set (co σ k #t)
+                 (co σ k #t))]
+           [('= (list (? number? n) (? number? m)))
+            (set (co σ k (= n m)))]
+           [('= (list (? number? n) 'number))
+            (set (co σ k #t)
+                 (co σ k #f))]
+           [('= (list 'number (? number? n)))
+            (set (co σ k #t)
+                 (co σ k #f))]
+           [('= (list 'number 'number))
+            (set (co σ k #t)
+                 (co σ k #f))]
+           [((? z->z? o) (list x))
+            (for/set ((v (z->z o x)))
+                     (co σ k (widen v)))]
+           [((? z-z->z? o) (list x y))
+            (for/set ((v (z-z->z o x y)))
+                     (co σ k (widen v)))]
+           [(_ _) (set)])]
+        
+        [_ (set)]))
+    
+    ;; Expr -> (Store Env Cont -> State)
+    (define (compile e)
+      (match e
+        [(var l x)
+         (λ (σ ρ k δ)
+           (for/set ((v (delay σ (lookup-env ρ x))))
+                    (co σ k v)))]
+        [(num l n) (λ (σ ρ k δ) (set (co σ k n)))]
+        [(bln l b) (λ (σ ρ k δ) (set (co σ k b)))]
+        [(lam l x e)
+         (define c (compile e))
+         (λ (σ ρ k δ) (set (co σ k (clos l x c ρ))))]   
+        [(lrc l xs es b)
+         (define c (compile (first es)))
+         (define cs (map compile (rest es)))
+         (define x (first xs))
+         (define xs* (rest xs))
+         (λ (σ ρ k δ)
+           (define-values (σ0 a) (push state))
+           (define-values (ρ* σ*) (bind (ev σ0 e ρ k δ)))
+           (c σ* ρ* (lrk x xs* cs b ρ* a) δ))]
+        [(app l e es)
+         (define c (compile e))
+         (define cs (map compile es))
+         (λ (σ ρ k δ)
+           (define-values (σ* a) (push state))
+           (c σ* ρ (ls cs '() ρ a) δ))]
+        [(ife l e0 e1 e2)
+         (define c0 (compile e0))
+         (define c1 (compile e1))
+         (define c2 (compile e2))
+         (λ (σ ρ k δ)
+           (define-values (σ* a) (push state))  ;; FIXME
+           (c0 σ* ρ (ifk c1 c2 ρ a) δ))]
+        [(1op l o e)
+         (define c (compile e))
+         (λ (σ ρ k δ)
+           (define-values (σ* a) (push state)) ;; FIXME
+           (c σ* ρ (1opk o a) δ))]   
+        [(2op l o e0 e1)
+         (define c0 (compile e0))
+         (define c1 (compile e1))
+         (λ (σ ρ k δ)
+           (define-values (σ* a) (push state)) ;; FIXME
+           (c0 σ* ρ (2opak o c1 ρ a) δ))]   
+        [(st! l x e)
+         (define c (compile e))
+         (λ (σ ρ k δ)
+           (define-values (σ* a) (push state)) ;; FIXME
+           (c σ* ρ (sk! (lookup-env ρ x) a) δ))]))
+    
+    step ;; FIXME (values compile step) if compiled
+    ))
 
-  step ;; FIXME (values compile step) if compiled
-  )
-
+(define mk-step (mk-comp #f))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Primops
@@ -253,7 +258,7 @@
      (values (extend* ρ xs as)
              (extend* σ as (map (λ (v) (force σ v)) vs)))]))
 
-(define ((mk-0cfa-bind force) s)
+(define ((mk-kcfa-bind force) s)
   (match s
     [(co σ (sk! l a) v)
      ;; empty env says this is the wrong place for this.
@@ -310,19 +315,12 @@
 (define (delay σ x)
   (set (addr x)))
 
-(define strict-0cfa-bind (mk-0cfa-bind (λ (_ v) (set v))))
-(define lazy-0cfa-bind   (mk-0cfa-bind force))
+(define strict-kcfa-bind (mk-kcfa-bind (λ (_ v) (set v))))
+(define lazy-kcfa-bind   (mk-kcfa-bind force))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Potpourris of transition relations
-
-(define 0cfa-step
-  (mk-step (push 0)
-           strict-0cfa-bind
-           widen
-           (lambda (σ x) (set x))
-           lookup-sto))
 
 (define eval-step
   (mk-step (push +inf.0)
@@ -338,9 +336,30 @@
            force
            delay))
 
+(define 1cfa-step
+  (mk-step (push 1)
+           strict-kcfa-bind
+           widen
+           (lambda (σ x) (set x))
+           lookup-sto))
+
+(define lazy-1cfa-step
+  (mk-step (push 1)
+           lazy-kcfa-bind
+           widen
+           force
+           delay))
+
+(define 0cfa-step
+  (mk-step (push 0)
+           strict-kcfa-bind
+           widen
+           (lambda (σ x) (set x))
+           lookup-sto))
+
 (define lazy-0cfa-step
   (mk-step (push 0)
-           lazy-0cfa-bind
+           lazy-kcfa-bind
            widen
            force
            delay))
@@ -371,15 +390,19 @@
 (define eval       (mk-aval  eval-step))
 (define eval^      (mk-aval^ eval-step))
 (define lazy-eval  (mk-aval  lazy-eval-step))
-(define aval       (mk-aval  0cfa-step))
-(define aval^      (mk-aval^ 0cfa-step))
-(define lazy-aval^ (mk-aval^ lazy-0cfa-step))
-(define lazy-aval  (mk-aval  lazy-0cfa-step))
+(define 0cfa       (mk-aval  0cfa-step))
+(define 0cfa^      (mk-aval^ 0cfa-step))
+(define 1cfa       (mk-aval  1cfa-step))
+(define 1cfa^      (mk-aval^ 1cfa-step))
+(define lazy-0cfa  (mk-aval  lazy-0cfa-step))
+(define lazy-1cfa  (mk-aval  lazy-1cfa-step))
+(define lazy-0cfa^ (mk-aval^ lazy-0cfa-step))
+(define lazy-1cfa^ (mk-aval^ lazy-1cfa-step))
 
 
 ;; Exp -> Set State
 (define (inj e)
-  (ev% (hash) e (hash) 'mt '()))
+  (set (ev (hash) e (hash) 'mt '())))
 
 ;; Exp -> Set State^
 (define (inj-wide e)
