@@ -46,9 +46,15 @@
 
 (simple-tests eval (λ (x) x))
 (simple-tests lazy-eval (λ (x) x)) ; laziness not working yet
-(simple-tests aval widen)
-(simple-tests aval^ widen)
-(simple-tests lazy-aval^ widen) 
+(simple-tests 0cfa widen)
+(simple-tests 0cfa^ widen)
+(simple-tests lazy-0cfa widen)
+(simple-tests lazy-0cfa^ widen)
+(simple-tests 1cfa widen)
+(simple-tests 1cfa^ widen)
+(simple-tests lazy-1cfa widen)
+(simple-tests lazy-1cfa^ widen)
+
   
 ;(check-in #t (eval (parse-prog church))) ; expensive
 (check-∈ #f (eval (parse-prog vhm08)))
@@ -61,16 +67,16 @@
 ;(check-∈ 550 (eval (parse-prog loop2))) ; too expensive
 (check-∈ #t (eval (parse-prog sat)))          
 
-;(check-in #t (aval^ (parse-prog church))) ; expensive
-(check-∈ #f  (aval^ (parse-prog vhm08)))
+;(check-in #t (0cfa^ (parse-prog church))) ; expensive
+(check-∈ #f  (0cfa^ (parse-prog vhm08)))
 
-(check-∈  2  (aval^ (parse-prog mj09)))
-(check-∈ #f  (aval^ (parse-prog eta)))
-(check-∈ #f  (aval^ (parse-prog kcfa2)))
-(check-∈ #f  (aval^ (parse-prog kcfa3)))
-(check-∈ #f  (aval^ (parse-prog blur)))
-;(check-∈ 550 (aval^ (parse-prog loop2))) ; too expensive
-(check-∈ #t  (aval^ (parse-prog sat)))
+(check-∈  2  (0cfa^ (parse-prog mj09)))
+(check-∈ #f  (0cfa^ (parse-prog eta)))
+(check-∈ #f  (0cfa^ (parse-prog kcfa2)))
+(check-∈ #f  (0cfa^ (parse-prog kcfa3)))
+(check-∈ #f  (0cfa^ (parse-prog blur)))
+;(check-∈ 550 (0cfa^ (parse-prog loop2))) ; too expensive
+(check-∈ #t  (0cfa^ (parse-prog sat)))
 
 
 ;; mutually recursive top-level functions
@@ -87,19 +93,19 @@
                     (not (even? (sub1 y)))))
               (even? 2)])))
 
-(check-∈ 3 (aval^ (parse '(letrec ((f (lambda (z) x)) (x 3)) (f 1)))))
-(check-∈ 3 (aval^ (parse '(letrec ((x 3) (f (lambda (z) x))) (f 1)))))
+(check-∈ 3 (0cfa^ (parse '(letrec ((f (lambda (z) x)) (x 3)) (f 1)))))
+(check-∈ 3 (0cfa^ (parse '(letrec ((x 3) (f (lambda (z) x))) (f 1)))))
 
 #|
 ;; Check result of evaluation against analysis
 
-(check-in 2 (delta:aval^ (parse-prog mj09)))
-(check-in #t (delta:aval^ (parse-prog church)))
+(check-in 2 (delta:0cfa^ (parse-prog mj09)))
+(check-in #t (delta:0cfa^ (parse-prog church)))
 
-(check-in 2 (aval^ (parse-prog mj09)))
-(check-in 2 (lazy:aval^ (parse-prog mj09)))
-(check-in #f (lazy:aval^ (parse-prog blur)))
-(check-in #f (delta:aval^ (parse-prog blur)))
+(check-in 2 (0cfa^ (parse-prog mj09)))
+(check-in 2 (lazy:0cfa^ (parse-prog mj09)))
+(check-in #f (lazy:0cfa^ (parse-prog blur)))
+(check-in #f (delta:0cfa^ (parse-prog blur)))
 |#
 ;; run parser tests
 (require "parse.rkt")
