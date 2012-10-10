@@ -122,27 +122,24 @@
 (define step-compiled^
   (memo-lambda (s)
 
-    (define (ap-op^ o vs)
-      (define (yielder v)
-        (λ (σ k yield) (yield (co^ k v))))
+    (define (ap-op^ o vs k yield)
       (match* (o vs)
-        [('zero? (list (? number? n))) (yielder (zero? n))]
-        [('sub1 (list (? number? n)))  (yielder (widen (sub1 n)))]
-        [('add1 (list (? number? n)))  (yielder (widen (add1 n)))]
+        [('zero? (list (? number? n))) (yield (co^ k (zero? n)))]
+        [('sub1 (list (? number? n)))  (yield (co^ k (widen (sub1 n))))]
+        [('add1 (list (? number? n)))  (yield (co^ k (widen (add1 n))))]
         [('zero? (list 'number))
-         (λ (σ k yield)
-            (yield (co^ k #t))
-            (yield (co^ k #f)))]
+         (yield (co^ k #t))
+         (yield (co^ k #f))]
         [('sub1 (list 'number))
-         (yielder 'number)]
+         (yield (co^ k 'number))]
         [('* (list (? number? n) (? number? m)))
-         (yielder (widen (* m n)))]
+         (yield (co^ k (widen (* m n))))]
         [('* (list (? number? n) 'number))
-         (yielder 'number)]
+         (yield (co^ k 'number))]
         [('* (list 'number 'number))
-         (yielder 'number)]
+         (yield (co^ k 'number))]
         ;; Anything else is stuck
-        [(_ _) (λ (σ k yield) '())]))
+        [(_ _) '()]))
 
     (define (ap^ σ fun a k yield)
       (match fun
@@ -179,23 +176,21 @@
               ∆))]
 
          [(1opk o l)
-          (define apper (ap-op^ o (list v)))
           (generator^ (σ)
             (do ([k (get-cont σ l)]
                  [v (get-val σ v)])
-              (apper σ k yield)))]
+              (ap-op^ o (list v) k yield)))]
          [(2opak o c ρ l)
           (define-values (v* ∆) (c '() ρ (2opfk o v l)))
           (generator^ (σ)
             (yield v*)
             (yield ∆))]
          [(2opfk o u l)
-          (define apper (ap-op^ o (list v u)))
           (generator^ (σ)
             (do ([k (get-cont σ l)]
                  [v (get-val σ v)]
                  [u (get-val σ u)])
-                (apper σ k yield)))])]
+                (ap-op^ o (list v u) k yield)))])]
 
       [_ (generator^ (σ) s)])))
 
