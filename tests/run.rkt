@@ -31,6 +31,15 @@
   (check->> '[(= 4 4)] #t)
   (check->> '[(= 4 3)] #f)
   (check->> '[((lambda (x) x) 3)] 3)
+  (check->> '[(define (box x)
+                (lambda (z) (z (lambda () x) (lambda (y) (set! x y) y))))
+              (define (getter b) (b (lambda (x1 x2) x1)))
+              (define (setter c) (c (lambda (z1 z2) z2)))
+              (define b1 (box 5))
+              (define b2 (box 7))
+              ((setter b2) 18)
+              ((getter b1))]
+              5)
   (check->> '[(letrec ((f (lambda (z) x)) (x 3)) (f 1))]
             3)
   (check->> '[(define x 1)
@@ -45,17 +54,36 @@
             120))
 
 (simple-tests eval (λ (x) x))
-(simple-tests lazy-eval (λ (x) x)) ; laziness not working yet
-(simple-tests 0cfa widen)
-(simple-tests 0cfa^ widen)
-(simple-tests lazy-0cfa widen)
-(simple-tests lazy-0cfa^ widen)
-(simple-tests 1cfa widen)
-(simple-tests 1cfa^ widen)
-(simple-tests lazy-1cfa widen)
-(simple-tests lazy-1cfa^ widen)
+(simple-tests eval^ (λ (x) x))
+(simple-tests eval/c (λ (x) x))
+;(simple-tests eval/c^ (λ (x) x))   ; doesn't work
 
-  
+(simple-tests lazy-eval (λ (x) x))
+(simple-tests lazy-eval^ (λ (x) x))
+(simple-tests lazy-eval/c (λ (x) x))
+;(simple-tests lazy-eval/c^ (λ (x) x))   ; doesn't work
+
+(simple-tests 0cfa    widen)
+(simple-tests 0cfa^   widen)
+(simple-tests 0cfa/c  widen)
+;(simple-tests 0cfa/c^ widen) ; doesn't work
+
+(simple-tests lazy-0cfa    widen)
+(simple-tests lazy-0cfa^   widen)
+(simple-tests lazy-0cfa/c  widen)
+;(simple-tests lazy-0cfa/c^ widen) ; doesn't work
+
+(simple-tests 1cfa    widen)
+(simple-tests 1cfa^   widen)
+(simple-tests 1cfa/c  widen)
+;(simple-tests 1cfa/c^ widen) ; doesn't work
+
+(simple-tests lazy-1cfa    widen)
+(simple-tests lazy-1cfa^   widen)
+(simple-tests lazy-1cfa/c  widen)
+;(simple-tests lazy-1cfa/c^ widen) ; doesn't work
+
+
 ;(check-in #t (eval (parse-prog church))) ; expensive
 (check-∈ #f (eval (parse-prog vhm08)))
 
