@@ -5,10 +5,8 @@
 ;; - Number
 ;; - Boolean
 ;; - Void
-;; - (clos Lab Sym Exp Env)
-;; - (rlos Lab Sym Sym Exp Env)
-(struct clos (l x e ρ)   #:transparent)
-(struct rlos (l f x e ρ) #:transparent)
+;; - (clos Sym Exp Env)
+(struct clos (x e ρ)   #:transparent)
 
 ;; A Cont is one of:
 ;; - 'mt

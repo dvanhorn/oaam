@@ -72,7 +72,7 @@
         
         [(ap σ fun vs k δ)
          (match fun
-           [(clos l xs e ρ)
+           [(clos xs e ρ)
             (define as (map (λ (x) (cons x δ)) xs))
             (define ρ* (extend* ρ xs as))
             (define σ* (extend* σ as (map (λ (v) (force σ v)) vs)))            
@@ -122,7 +122,7 @@
                                          (co σ k v))]
            [(num l n)           (set (co σ k n))]
            [(bln l b)           (set (co σ k b))]
-           [(lam l x e)         (set (co σ k (clos l x e ρ)))]
+           [(lam l x e)         (set (co σ k (clos x e ρ)))]
            [(lrc l xs es b)
             (define-values (σ0 a) (push σ l ρ k δ))            
             (define as (map (λ (x) (cons x δ)) xs))
@@ -170,7 +170,7 @@
       [(bln l b) (λ (σ ρ k δ) (set (co σ k b)))]
       [(lam l x e)
        (define c (compile e))
-       (λ (σ ρ k δ) (set (co σ k (clos l x c ρ))))]   
+       (λ (σ ρ k δ) (set (co σ k (clos x c ρ))))]   
     [(lrc l xs es b)
      (define c (compile (first es)))
      (define cs (map compile (rest es)))
