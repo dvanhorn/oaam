@@ -5,6 +5,7 @@
          (rename-in racket/generator
                     [yield real-yield] ;; I'll take those, thank you.
                     [generator real-generator])
+         racket/trace
          racket/stxparam)
 
 (define-syntax-parameter yield
@@ -53,7 +54,11 @@
       (with-syntax ([((ρ-op ...) (δ-op ...) (l-op ...))
                      (if (zero? (attribute K)) #'(() () ()) #'((ρ) (δ) (l)))]
                     [(expander-flags ...)
-                     (if (attribute wide?) #'(#:expander #:with-first-cons) #'())])
+                     (if (and (attribute wide?)
+                              (not (or (attribute pre-alloc?)
+                                       (attribute imperative?))))
+                         #'(#:expander #:with-first-cons)
+                         #'())])
         (define eval ;; what does ev mean?
           #'(match e
               [(var l x)
@@ -135,24 +140,31 @@
 
             ;; ev is special since it can mean "apply the compiled version" or
             ;; make an actual ev state to later interpret.
-            (mk-op-struct ev (σ e ρ δ k) (σ-op ... e ρ-op ... δ-op ... k)
-                          #,@(if (attribute compiled?)
-                                 #'(#:expander (syntax-parser [(_ σ e ρ δ k) #'#f]))
-                                 #'())) ;; default is what we want if not compiled
-
+            #,@(if (attribute compiled?)
+                   #`((define-syntax ev
+                        (syntax-rules ()
+                          [(_ σ e ρ δ k yield) (e σ-op ... ρ-op ... δ-op ... k yield)]
+                          [(_ σ e ρ δ k) (e σ-op ... ρ-op ... δ-op ... k)]))
+                      (define-match-expander ev:
+                        (syntax-rules () [(_ σ e ρ δ k) #f]))
+                      (...
+                       (begin
+                         (define-syntax pass-yield-to-ev ;; real generators
+                           (syntax-parser
+                             #:literals (ev)
+                             [(_ (ev args:expr ...)) #'(ev args ... real-yield)]
+                             [(_ e:expr) #'(real-yield e)]))
+                         (define-syntax yield-ev
+                           (syntax-parser #:literals (ev)
+                                          [(_ (ev args:expr ...)) #'(ev args ...)]
+                                          [(_ e:expr) #'#,(yield-meaning #'e)])))))
+                   #`((mk-op-struct ev (σ e ρ δ k) (σ-op ... e ρ-op ... δ-op ... k))
+                      (define-syntax pass-yield-to-ev (syntax-rules () [(_ e) #,(yield-meaning #'e)]))
+                      (define-syntax yield-ev (syntax-rules () [(_ e) #,(yield-meaning #'e)]))))
+            
             ;; yield colludes with ev to make compiled and
             ;; other strategies look the same
-            (...
-             (begin
-               (define-syntax pass-yield-to-ev ;; real generators
-                 (syntax-parser
-                   #:literals (ev)
-                   [(_ (ev args:expr ...)) #'(ev args ... real-yield)]
-                   [(_ e:expr) #'(real-yield e)]))
-               (define-syntax yield-ev
-                 (syntax-parser #:literals (ev)
-                    [(_ (ev args:expr ...)) #'(ev args ...)]
-                    [(_ e:expr) #'#,(yield-meaning #'e)]))))           
+                       
 
             ;; No environments in 0cfa
             (define-syntax-rule (lookup-env ρ x)
@@ -161,7 +173,7 @@
             (define-syntax-rule (... (generator body ...))
                #,(cond [(attribute generators?)
                         #'(... (syntax-parameterize ([yield (make-rename-transformer #'pass-yield-to-ev)])
-                            (real-generator () body ...)))]
+                                 (real-generator () body ...)))]
                        [else
                         #'(... (syntax-parameterize ([yield (make-rename-transformer #'yield-ev)])
                             body ...))]))
@@ -196,10 +208,7 @@
                   ;; ≡ ¬(wide and (pre-alloc or imperative))
                   (define binds (let loop ([j (reverse (attribute joins.clause))]
                                            [full #,do-body-meaning])
-                                  (cond [(pair? j)
-                                         (unless (procedure? (car j))
-                                           (error 'WTF "WUHT ~a" (syntax-e (car j))))
-                                         (loop (cdr j) (λ _ ((car j) full)))]
+                                  (cond [(pair? j) (loop (cdr j) (λ _ ((car j) full)))]
                                         [else (full #'σ #'σ #'σ* #'body)])))
                   (#,do-loop-meaning binds #'σ #'([x e] ...))])))
 
@@ -292,12 +301,12 @@
 
             (define (inj e)
               (generator
-                  (yield
-                   (ev (hash) ;; store is a hash unless it's preallocated and global, thus dropped
-                       (compile e)
-                       (hash) ;; no meaning for free variables
-                       '()    ;; starting contour is empty
-                       'mt))))
+                (yield
+                  (ev (hash) ;; store is a hash unless it's preallocated and global, thus dropped
+                      (compile e)
+                      (hash) ;; no meaning for free variables
+                      '()    ;; starting contour is empty
+                      'mt))))
 
             (define (aval e)
               #,(cond [(attribute fixpoint)
@@ -404,7 +413,8 @@
 (define-syntax-rule (prealloc-bind-join (σ* σ a vs) body)
   (begin (join! a vs) body))
 (define-syntax-rule (prealloc-bind-push (σ* a* σ δ l ρ k) body)
-  (begin (join-one! l k) l))
+  (begin (join-one! l k)
+         (let ([a* l]) body)))
 
 ;; Store (Addr + Val) -> Set Val
 (define-syntax-rule (prealloc-force σ* v)
@@ -429,7 +439,7 @@
     (vector-set! σ a next)
     (set! unions (add1 unions))))
 
-(define-syntax-rule (delay σ a) (addr a))
+(define-syntax-rule (delay σ a) (list (addr a)))
 
 (define (widen^ b)
   (cond [(number? b) 'number]
@@ -494,7 +504,8 @@
  #:aval aval ;; constructed evaluator to use/provide
  #:pre-alloc #:compiled #:wide #:imperative)
 
-(aval (prepare-prealloc church))
+(let ([prepped (prepare-prealloc church)])
+  (time (aval prepped)))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 0CFA-style Abstract semantics
 
