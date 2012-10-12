@@ -57,6 +57,68 @@
       (with-syntax ([((ρ-op ...) (δ-op ...) (l-op ...))
                      (if (zero? (attribute K)) #'(() () ()) #'((ρ) (δ) (l)))]
                     [ev: (format-id #'ev "~a:" #'ev)])
+        (define eval ;; what does ev mean?
+          #'(match e
+              [(var l x)
+               (λ% (σ ρ k δ yield)
+                   (do (σ σ*)
+                       ([v (delay (lookup-env ρ x))])
+                     (yield (co σ k v))))]
+              [(num l n)   (λ% (σ ρ k δ yield) (yield (co σ k n)))]
+              [(bln l b)   (λ% (σ ρ k δ yield) (yield (co σ k b)))]
+              [(lam l x e)
+               (define c (compile e))
+               (λ% (σ ρ k δ yield) (yield (co σ k (clos x c ρ))))]
+              [(rec f (lam l x e))
+               (define c (compile e))
+               (λ% (σ ρ k δ yield) (yield (co σ k (rlos f x c ρ))))]
+              [(app l e0 e1)
+               (define c0 (compile e0))
+               (define c1 (compile e1))
+               (λ% (σ ρ k δ yield)
+                   (do (σ σ*)
+                       ([(σ* a) #:push σ δ l ρ k])
+                     (yield (ev σ* c0 ρ δ (ar c1 ρ δ l a)))))]
+              [(ife l e0 e1 e2)
+               (define c0 (compile e0))
+               (define c1 (compile e1))
+               (define c2 (compile e2))
+               (λ% (σ ρ k δ)
+                   (do (σ σ*)
+                       ([(σ* a) #:push σ δ l ρ k])
+                     (yield (ev σ* c0 ρ δ (ifk c1 c2 ρ δ a)))))]
+              [(1op l o e)
+               (define c (compile e))
+               (λ% (σ ρ k δ yield)
+                   (do (σ σ*)
+                       ([(σ* a) #:push σ δ l ρ k])
+                     (yield (ev σ* c ρ δ (1opk o δ a)))))]
+              [(2op l o e0 e1)
+               (define c0 (compile e0))
+               (define c1 (compile e1))
+               (λ% (σ ρ k δ yield)
+                   (do (σ σ*)
+                       ([(σ* a) #:push σ δ l ρ k])
+                     (yield (ev σ* c0 ρ δ (2opak o c1 ρ δ a)))))]
+              [_ (error 'compile "Bad ~a" e)]))
+        (define compile-def
+          (if (attribute compiled?)
+              #`((define-syntax-rule (... (λ% (σ ρ k δ yield) body ...))
+                   #,(cond [(attribute generators?)
+                            #'(λ (σ-op ... ρ-op ... k δ-op ... yield)
+                                 (...
+                                  (syntax-parameterize ([yield (make-rename-transformer #'pass-yield-to-ev)])
+                                    body ...)))]
+                           [else
+                            #'(λ (σ-op ... ρ-op ... k δ-op ...)
+                                 (...
+                                  (syntax-parameterize ([yield (make-rename-transformer #'yield-ev)])
+                                    body ...)))]))
+                 (define (compile e)
+                   #,eval))
+              #`((... (define-syntax-rule (λ% (σ ρ k δ yield) body ...)
+                        (generator body ...)))
+                 (define compile values))))
         #`(begin ;; specialize representation given that 0cfa needs less
             (mk-op-struct co (σ k v)
                           #:expander
@@ -93,19 +155,8 @@
                (define-syntax yield-ev
                  (syntax-parser #:literals (ev)
                                 [(_ (ev args:expr ...)) (ev args ...)]
-                                [(_ e:expr) #,(yield-meaning #'e)]))))
+                                [(_ e:expr) #,(yield-meaning #'e)]))))           
 
-            (define-syntax-rule (... (λ% (σ ρ k δ yield) body ...))
-              #,(cond [(attribute generators?)
-                       #'(λ (σ-op ... ρ-op ... k δ-op ... yield)
-                            (...
-                             (syntax-parameterize ([yield (make-rename-transformer #'pass-yield-to-ev)])
-                               body ...)))]
-                      [else
-                       #'(λ (σ-op ... ρ-op ... k δ-op ...)
-                            (...
-                             (syntax-parameterize ([yield (make-rename-transformer #'yield-ev)])
-                               body ...)))]))
             ;; No environments in 0cfa
             (define-syntax-rule (lookup-env ρ x)
               #,(cond [(zero? (attribute K)) #'x]
@@ -157,54 +208,7 @@
                    #'σ
                    #'([x e] ...))])))
 
-            #,(if (attribute compiled?)
-                  ;; Boucher & Feeley 1996: Compile to closures.
-                  ;; Expr -> Comp
-                  #'(define (compile e)
-                    (match e
-                      [(var l x)
-                       (λ% (σ ρ k δ yield)
-                           (do (σ σ*)
-                               ([v (delay (lookup-env ρ x))])
-                             (yield (co σ k v))))]
-                      [(num l n)   (λ% (σ ρ k δ yield) (yield (co σ k n)))]
-                      [(bln l b)   (λ% (σ ρ k δ yield) (yield (co σ k b)))]
-                      [(lam l x e)
-                       (define c (compile e))
-                       (λ% (σ ρ k δ yield) (yield (co σ k (clos x c ρ))))]
-                      [(rec f (lam l x e))
-                       (define c (compile e))
-                       (λ% (σ ρ k δ yield) (yield (co σ k (rlos f x c ρ))))]
-                      [(app l e0 e1)
-                       (define c0 (compile e0))
-                       (define c1 (compile e1))
-                       (λ% (σ ρ k δ yield)
-                           (do (σ σ*)
-                               ([(σ* a) #:push σ δ l ρ k])
-                             (yield (ev σ* c0 ρ δ (ar c1 ρ δ l a)))))]
-                      [(ife l e0 e1 e2)
-                       (define c0 (compile e0))
-                       (define c1 (compile e1))
-                       (define c2 (compile e2))
-                       (λ% (σ ρ k δ)
-                           (do (σ σ*)
-                               ([(σ* a) #:push σ δ l ρ k])
-                             (yield (ev σ* c0 ρ δ (ifk c1 c2 ρ δ a)))))]
-                      [(1op l o e)
-                       (define c (compile e))
-                       (λ% (σ ρ k δ yield)
-                           (do (σ σ*)
-                               ([(σ* a) #:push σ δ l ρ k])
-                             (yield (ev σ* c ρ δ (1opk o δ a)))))]
-                      [(2op l o e0 e1)
-                       (define c0 (compile e0))
-                       (define c1 (compile e1))
-                       (λ% (σ ρ k δ yield)
-                           (do (σ σ*)
-                               ([(σ* a) #:push σ δ l ρ k])
-                             (yield (ev σ* c0 ρ δ (2opak o c1 ρ δ a)))))]
-                      [_ (error 'compile "Bad ~a" e)]))
-                  #'(define compile values))
+            #,@compile-def
 
             ;; "Bytecode" interpreter
             ;;  State -> State^
@@ -284,7 +288,7 @@
                    ;; Anything else is stuck
                    [(_ _) (void)])]
 
-                [(ev: σ e ρ δ k) (error 'TODO "Non-compiled step")]
+                [(ev: σ e ρ δ k) #,eval]
 
                 [s s]))
 
