@@ -33,13 +33,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser
 
-(define (parse sexp)
-  (define nlabels 0)
-  (define (next-label!)
-    (begin0 nlabels
-            (set! nlabels (add1 nlabels))))
-  (values
-   (let parse ([sexp sexp]
+(define (parse sexp fresh-label! fresh-variable!)
+  (let parse ([sexp sexp]
                [ρ (hash)])
      (define (parse* sexp) (parse sexp ρ))
      (match sexp
@@ -47,26 +42,25 @@
        [`(let* ((,x ,e) . ,r) ,b)
         (parse* `((lambda (,x) (let* ,r ,b)) ,e))]
        [`(lambda (,x) ,e)
-        (define x-lab (next-label!))
-        (lam (next-label!) x-lab (parse e (hash-set ρ x x-lab)))]
+        (define x-lab (fresh-variable! x))
+        (lam (fresh-label!) x-lab (parse e (hash-set ρ x x-lab)))]
        [`(if ,e0 ,e1 ,e2)
-        (ife (next-label!) (parse* e0) (parse* e1) (parse* e2))]
+        (ife (fresh-label!) (parse* e0) (parse* e1) (parse* e2))]
        [`(rec ,f ,e)
-        (define f-lab (next-label!))
+        (define f-lab (fresh-variable! f))
         (rec f-lab (parse e (hash-set ρ f f-lab)))]
        [`(sub1 ,e)
-        (1op (next-label!) 'sub1 (parse* e))]
+        (1op (fresh-label!) 'sub1 (parse* e))]
        [`(add1 ,e)
-        (1op (next-label!) 'add1 (parse* e))]
+        (1op (fresh-label!) 'add1 (parse* e))]
        [`(zero? ,e)
-        (1op (next-label!) 'zero? (parse* e))]
+        (1op (fresh-label!) 'zero? (parse* e))]
        [`(* ,e0 ,e1)
-        (2op (next-label!) '* (parse* e0) (parse* e1))]
+        (2op (fresh-label!) '* (parse* e0) (parse* e1))]
        [`(,e0 ,e1)
-        (app (next-label!)
+        (app (fresh-label!)
              (parse* e0)
              (parse* e1))]
-       [(? boolean? b) (bln (next-label!) b)]
-       [(? number? n) (num (next-label!) n)]
-       [(? symbol? s) (var (next-label!) (hash-ref ρ s (λ () (error 'parse "Open program: ~a" s))))]))
-   nlabels))
+       [(? boolean? b) (bln (fresh-label!) b)]
+       [(? number? n) (num (fresh-label!) n)]
+       [(? symbol? s) (var (fresh-label!) (hash-ref ρ s (λ () (error 'parse "Open program: ~a" s))))])))
