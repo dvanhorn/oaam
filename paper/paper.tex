@@ -119,38 +119,67 @@ Racket.
 \label{fig:aam}
 \end{figure}
 
-\paragraph{Concrete interpretation:}
-
-To obtain a concrete interpreter from the relation given in
-Figure~\ref{fig:aam}, set the implicit parameters as follows:
-\begin{gather}
+\paragraph{Concrete interpretation} can be characterized by setting the implicit
+parameters of the relation given in Figure~\ref{fig:aam} as follows:
 \begin{align*}
-\mathit{push}(l,\msto,\mkont) &= \maddr,\sigma[\maddr\mapsto\{\mkont\}]
+\mathit{push}(l,\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
 \mbox{ where }\maddr \notin\msto
 \\
-\mathit{bind}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\sigma[\maddr\mapsto\{\mval\}]
+\mathit{bind}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\msto\sqcup[\maddr\mapsto\{\mval\}]
 \end{align*}
-\\[2mm]
+The resulting relation is non-deterministic in its choice of
+addresses, however it must always choose a fresh address when
+allocating a continuation or variable binding.  If we consider machine
+states equivalent up to consistent renaming, this relation defines
+a deterministic machine.  (The relation is really a function.)
+
+
+\paragraph{Abstract interpretation} can be characterized by setting the implicit
+parameters just as above, but dropping the $\maddr \not\in \msto$
+condition.  This family of interpereters is also non-deterministic in
+choices of addresses, but it is free to choose addresses that are
+already in use.  Consequently, the machines may be non-deterministic
+when mutiple values reside in a store location.
+
+It is important to recognize from this definition that \emph{any}
+allocation strategy is an abstract interpretation.  In particular,
+concrete intepretation is a kind of abstract interpretation.  So is an
+interpretation that allocates a single cell into which all bindings
+and continuations are stored.  On the one hand is an abstract
+intepretation that is non-computable and gives only the ground truth
+of a programs behavior; on the other is an abstract interpretation
+that is easy to compute but gives little information.  Useful program
+analyses lay somewhere in between and can be characterized by their
+choice of address representation and allocation strategy.
+Uniform \(k\)-CFA is one such analysis.
+
+\paragraph{Uniform \(k\)-CFA} can be characterized by the following allocation
+strategy:
+
+\begin{align*}
+\mathit{push} &= \dots\\
+\mathit{bind} &= \dots
+\end{align*}
+
+\paragraph{Primitives}
+
+
+
+%% \begin{align*}
+%% \widehat{\mathit{push}}(\maddr,\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
+%% % \mbox{ where }\maddr \notin\msto
+%% \\
+%% \widehat{\mathit{bind}}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\msto\sqcup[\maddr\mapsto\{\mval\}]
+%% \end{align*}
+
+
 \begin{align*}
 \mnum+1 &\in \delta(\saddone,\mnum) &
 \mnum-1 &\in \delta(\ssubone,\mnum)\\
 \strue &\in \delta(\szerohuh,\szero) &
 \sfalse &\in \delta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
 \end{align*}
-\end{gather}
 
-\paragraph{Abstract interpretation:}
-
-To obtain an abstract interpreter from the relation given in
-Figure~\ref{fig:aam}, set the implicit parameters as follows:
-\begin{gather}
-\begin{align*}
-\widehat{\mathit{push}}(l,\msto,\mkont) &= l,\sigma\sqcup[l\mapsto\{\mkont\}]
-\mbox{ where }\maddr \notin\msto
-\\
-\widehat{\mathit{bind}}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\mvar],\msto\sqcup[\mvar\mapsto\{\mval\}]
-\end{align*}
-\\[2mm]
 \begin{align*}
 \sNum &\in \hat\delta(\saddone,\mnum) &
 \sNum &\in \hat\delta(\ssubone,\mnum)\\
@@ -159,7 +188,6 @@ Figure~\ref{fig:aam}, set the implicit parameters as follows:
 \strue &\in \hat\delta(\szerohuh,\szero) &
 \sfalse &\in \hat\delta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
 \end{align*}
-\end{gather}
 
 
 \begin{figure}
@@ -236,6 +264,42 @@ Lazy:
 
 \subsection{Abstract compilation}
 
+We can eliminate the {\tt ev} states from the run-time interpretation
+of a program by specializing the machine transition relation to the
+program being analyzed.  This eliminates interpretative overhead by
+first compiling the program into ``byte code'' instructions.
+
+The essence of the compilation effect can be seen by consider an example
+such as
+\[
+\sapp{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2}}{\mexp_3}
+\]
+which makes the following transitions:
+\begin{align}
+& \ev{\sapp{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2}}{\mexp_3},\menv,\mkont,\msto_0}\\
+\machstep\; &
+\ev{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2},\menv,\kar{\mexp_3,\menv,\maddr_1},\msto_1}
+\\
+\machstep\; &
+\ev{\sapp\mvar{\mexp_1},\menv,\kar{\mexp_2,\menv,\maddr_2},\msto_2}
+\\
+\machstep\; &
+\ev{\mvar, \menv,\kar{\mexp_1,\menv,\maddr_3},\msto_3} % {\mexp_2}
+\\
+\machstep\; &
+\co{\kar{\mexp_1,\menv},\mval,\msto_4} % {\mexp_1}{\mexp_2}
+\mbox{ where } \mval \in \msto(\menv(\maddr))
+\end{align}
+
+where $\msto_4 = \msto_0 \sqcup \{ [\maddr_1 \mapsto \{ \mkont \}],
+[\maddr_2 \mapsto \kar{\mexp_3,\menv,\maddr_1}]
+[\maddr_3 \mapsto \kar{\mexp_2,\menv,\maddr_2}]$.
+
+
+Notice that the only difference between concrete and abstract interpretation
+is which addresses are pushed.
+
+
 Compile:
    cpu time: 255397 real time: 261532 gc time: 2947
 
@@ -266,5 +330,96 @@ Other benchmarks
 Abstract machines are not only a good model for rapid analysis
 development, they also can be systematically developed into efficient
 algorithms.
+
+\appendix
+\section{Relation to Uniform \(k\)-CFA (A Case Against Acceptability)}
+
+This machine's allocation strategy mimics the Uniform k-CFA analysis
+in Principles of Program Analysis, which is defined in terms of
+``$\delta$ contours.''  However, because the machine represetation makes
+context explicit via continuations, we can calculate these contours
+rather than thread them throught the evaluator.  In other words, we
+can use the CESK* machine without modification to obtain Uniform k-CFA
+by way of a simple allocation strategy.  (In this way, it's a
+simplification of the presentation in JFP.)
+
+NNH uses a coinductive acceptability relation to specify Uniform
+k-CFA:
+
+\[
+   C,R \models^{ce}_\delta E
+\]
+
+The cache and global environment form a finite store-like structure
+holding bindings and return values.  The contour environment ce maps
+variables to locations in R which contains their bindings, just as the
+environment of the CESK* machine does.  The current contour delta is a
+string of application labels describing the enclosing context under
+which this term is being analyzed (or evaluated).  If you view the
+acceptability relation as a big-step evalator, the
+$(\widehat C,\widehat\rho)$ component should be seen as a global
+store ce is the environment mapping variables to their locations.
+
+Starting form the initial configuration for a program and iterating
+the machine transition relation until reaching a fixpoint of reachable
+states will \emph{underestimate} the acceptability relation of Uniform
+k-CFA.  You can recover acceptability by feeding this store back into
+the initial configuration and iterating again.  Repeating this process
+until a complete run of the program reaches no new states will be the
+least solution that is acceptable.
+
+HOWEVER.  Why should we care about acceptability?  What this
+machine computes is safe.  In other words, it computes a more
+precise characterization of the run-time behavior of a program.  In
+doing is so, it actually saves work (as can be seen above).
+
+An Example:
+
+\begin{verbatim}
+ (let ((id (lambda (x) x)))
+   (begin (id 1) (id 2)))
+\end{verbatim}
+
+Under Uniform 0-CFA, we would have:
+\[
+   [{\tt x} \mapsto \{{\tt 1}, {\tt 2}\}] \in \widehat\rho
+\]
+
+in the least solution to $\models$.  This says that, when run, 'x' is
+bound to 1 or 2.
+
+Under the machine semantics using a 0CFA allocation policy, the trace
+semantics of the machine show that x is bound to 1, and that at some
+later point, x becomes bound to 1 or 2.  Moreover, the machine would
+show that (id 1) evaluates to 1 and only 1, while Uniform 0CFA must
+give that (id 1) is either 1 or 2 to be acceptable.  We don't see any
+value in these kinds of false flows that are due to the global and
+timeless aspects of C,R which acceptability requires the heap to be
+both finite and unchanging over the course of abstract
+interpretation. (Another view of the difference: the machine abstracts
+a program's execution as a \emph{finite state machine} that mimics the
+machine interpretation of the program; the aceptability relation of
+Uniform \(k\)-CFA abstracts a program's execution as a \emph{finite
+  map} that mimics the big-step evaluator: from terms to (sets of)
+values.)
+
+\section{Pushdown Analysis}
+
+It is straightforward to instantiate a \emph{pushdown} abstraction by
+bounding only the variable binding portion of the heap, but using a
+unique allocation strategy for continuations.  Such a strategy
+abstracts a program's execution as a \emph{pushdown automata}
+that mimics the machine interpretation.  This strategy therefore
+models the abstract stack in a true stack like fashion and always
+properly matches function calls with their return.
+
+Although such analyses can be formulated straightforwardly in the
+abstract machine approach, it is not clear all of the techniques of
+this paper can be applied to similar effect in the pushdown context.
+The main problem is calculation of an analysis can no longer be
+computed as the fixed point of the machine transition relation.
+Although there are several implementations (CFA2,ICFP'12), they
+operate at speeds roughly on par with our starting point: unoptimized
+store widened machines.
 
 \end{document}
