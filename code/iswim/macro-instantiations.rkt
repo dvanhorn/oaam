@@ -60,7 +60,7 @@
   (set! seen (make-hash))
   e)
 
-(define (prealloc-get-cont σ l) (vector-ref σ l))
+(define-syntax-rule (prealloc-get-cont σ* l) (vector-ref σ l))
 
 (define-syntax-rule (prealloc-bind-join-one (σ* σ a v) body)
   (begin (join-one! a v) body))
@@ -104,10 +104,10 @@
            (set! todo '())
            (for ([c (in-list todo-old)]) (step c))
            (loop)])))
-#;
+
 (define-syntax mk-wide-imperative-analysis
   (mk-mk-analysis global-body global-loop yield!))
-#;
+
 (mk-wide-imperative-analysis
  #:bind-join-one prealloc-bind-join-one
  #:bind-join prealloc-bind-join
@@ -121,7 +121,7 @@
  #:fixpoint prealloc/imperative-fixpoint
  #:aval aval! ;; constructed evaluator to use/provide
  #:pre-alloc #:compiled #:wide #:imperative)
-#;
+
 (let ([prepped (prepare-prealloc church)])
   (time (aval! prepped)))
 

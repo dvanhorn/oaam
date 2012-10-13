@@ -1,6 +1,6 @@
 #lang racket
 (require "ast.rkt"
-         (for-syntax syntax/parse racket/syntax racket/match) 
+         (for-syntax syntax/parse racket/syntax racket/match)
          (rename-in racket/generator
                     [yield real-yield] ;; I'll take those, thank you.
                     [generator real-generator])
@@ -53,12 +53,14 @@
       "Pre-allocation and store deltas are antithetical."
       #:fail-unless (or (attribute fixpoint) (attribute set-monad?))
       "Cannot use a general fixpoint for step function that doesn't return sets."
+      (define global-σ?
+        (and (attribute wide?)
+             (or (attribute pre-alloc?) (attribute imperative?))))
       (with-syntax ([((ρ-op ...) (δ-op ...) (l-op ...))
                      (if (zero? (attribute K)) #'(() () ()) #'((ρ) (δ) (l)))]
+                    [(σ-cop ...) (if global-σ? #'() #'(σ))]
                     [(expander-flags ...)
-                     (if (and (attribute wide?)
-                              (not (or (attribute pre-alloc?)
-                                       (attribute imperative?))))
+                     (if (and (attribute wide?) (not global-σ?))
                          #'(#:expander #:with-first-cons)
                          #'())])
         (define eval ;; what does ev mean?
@@ -112,16 +114,16 @@
               #`((define-syntax-rule (... (λ% (σ ρ k δ yield) body ...))
                    #,(cond [(attribute generators?)
                             (syntax/loc stx
-                              (λ (σ ρ-op ... k δ-op ... dummy)
+                              (λ (σ-cop ... ρ-op ... k δ-op ... dummy)
                                  (...
                                   (syntax-parameterize ([yield (pass-given-yield-to-ev #'dummy)])
-                                    body ...))))]
+                                    (begin body ...)))))]
                            [else
                             (syntax/loc stx
-                              (λ (σ ρ-op ... k δ-op ...)
+                              (λ (σ-cop ... ρ-op ... k δ-op ...)
                                  (...
                                   (syntax-parameterize ([yield (make-rename-transformer #'yield-ev)])
-                                    body ...))))]))
+                                    (begin body ...)))))]))
                  (define (compile e)
                    #,eval))
               #`((... (define-syntax-rule (λ% (σ ρ k δ yield) body ...)
@@ -144,10 +146,11 @@
             ;; ev is special since it can mean "apply the compiled version" or
             ;; make an actual ev state to later interpret.
             #,@(if (attribute compiled?)
-                   #'((define-syntax ev
+                   #`((define-syntax ev
                         (syntax-rules ()
-                          [(_ σ e ρ δ k yield) (e σ ρ-op ... δ-op ... k yield)]
-                          [(_ σ e ρ δ k) (e σ ρ-op ... δ-op ... k)]))
+                          ;; σ only optional if it's global (wide, imperative/prealloc)
+                          [(_ σ e ρ δ k yield) (e σ-cop ... ρ-op ... δ-op ... k yield)]
+                          [(_ σ e ρ δ k) (e σ-cop ... ρ-op ... δ-op ... k)]))
                       (define-match-expander ev:
                         (syntax-rules () [(_ σ e ρ δ k) #f]))
                       (...
@@ -158,13 +161,15 @@
                               (syntax/loc syn
                                 (ev args ... real-yield))]
                              [(_ e:expr) (syntax/loc syn (real-yield e))]))
+                         ;; Need to not capture the unquote-syntaxes here.
+                         #,#'(...
                          (define-for-syntax ((pass-given-yield-to-ev the-yield) syn) ;; real generators
                            (syntax-parse syn #:literals (ev)
                              [(_ (ev args:expr ...))
-                              (quasisyntax/loc syn 
+                              (quasisyntax/loc syn
                                 (ev args ... #,the-yield))]
                              [(_ e:expr) (quasisyntax/loc syn
-                                           (#,the-yield e))]))
+                                           (#,the-yield e))])))
                          (define-syntax (yield-ev syn)
                            (syntax-parse syn #:literals (ev)
                              [(_ (ev args:expr ...)) (syntax/loc syn
@@ -189,7 +194,7 @@
                        [else
                         (syntax/loc stx
                           (... (syntax-parameterize ([yield (make-rename-transformer #'yield-ev)])
-                            body ...)))]))
+                                 (begin (void) body ...))))]))
 
             (...
              (define-syntax (do stx)
@@ -247,10 +252,12 @@
                                     [_ (full #'σ #'σ #'body)])))
                   (define hoist-binds
                     #,(if (attribute σ-∆s?)
-                          #'(... #'([joins.ids (let ([joins.prev-σs σ]) joins.vs)] ...))
+                          (if global-σ?
+                              #'(... #'([joins.ids joins.vs] ...))
+                              #'(... #'([joins.ids (let ([joins.prev-σs σ]) joins.vs)] ...)))
                           #''()))
                   (#,do-loop-meaning hoist-binds binds #'σ #'([x e] ...))]
-                 [(_ (σ:id) ([x:id e:expr] ... blob ...) body:expr)                  
+                 [(_ (σ:id) ([x:id e:expr] ... blob ...) body:expr)
                   (raise-syntax-error #f "Joins failed" stx)])))
 
             #,@compile-def
