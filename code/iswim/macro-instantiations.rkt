@@ -2,7 +2,7 @@
 (require (rename-in racket/generator
                     [yield real-yield]
                     [generator real-generator])
-         "env.rkt" "ast.rkt"
+         "env.rkt" "ast.rkt" "progs.rkt"
          "macro-all.rkt")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -33,25 +33,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Global store, imperative worklist
 (begin-for-syntax
- (define global-body #'(λ (inner-σ outer-σ new-σ body) body))
- (define global-loop #'(λ (binds outer-σ guards) #`(for* #,guards #,binds)))
-
- (define non-global/set-body
-   #'(λ (inner-σ outer-σ new-σ body)
-        #`(values #,inner-σ (set-union acc-states #,body))))
- (define non-global/set-loop
-   #'(λ (binds outer-σ guards)
-        #`(let*-values ([(outer-σ) '()]
-                        [(acc-σ acc-states)
-                         (for*/fold ([acc-σ outer-σ] [acc-states (set)]) #,guards
-                           #,binds)])
-            (cons acc-σ acc-states)))))
+ (define global-body #'(λ (inner-σ outer-σ body) body))
+ (define global-loop #'(λ (hoist binds outer-σ guards) #`(for* #,guards #,binds))))
 
 (define-for-syntax (yield! s)
-  #`(let ([c #,s])
+  (quasisyntax/loc s
+    (let ([c #,s])
       (unless (= unions (hash-ref seen c -1))
         (hash-set! seen c unions)
-        (set! todo (cons c todo)))))
+        (set! todo (cons c todo))))))
 
 ;; Global store, imperative worklist.
 (define σ #f)
@@ -114,10 +104,10 @@
            (set! todo '())
            (for ([c (in-list todo-old)]) (step c))
            (loop)])))
-
+#;
 (define-syntax mk-wide-imperative-analysis
   (mk-mk-analysis global-body global-loop yield!))
-
+#;
 (mk-wide-imperative-analysis
  #:bind-join-one prealloc-bind-join-one
  #:bind-join prealloc-bind-join
@@ -131,19 +121,21 @@
  #:fixpoint prealloc/imperative-fixpoint
  #:aval aval! ;; constructed evaluator to use/provide
  #:pre-alloc #:compiled #:wide #:imperative)
-
+#;
 (let ([prepped (prepare-prealloc church)])
   (time (aval! prepped)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Store deltas, real generators
 (begin-for-syntax
- (define (non-global/generator-body inner-σ outer-σ new-σ body)
-   #`(begin #,body #,inner-σ))
+ (define non-global/generator-body
+   #'(λ (inner-σ outer-σ body) #`(begin #,body #,inner-σ)))
  ;; σ-∆s and σ threading
- (define (non-global/generator-loop binds outer-σ guards)
-   #`(let ([#,outer-σ '()])
-       (real-yield (for*/fold ([acc-σ outer-σ]) #,guards #,binds))))
+ (define non-global/generator-loop
+   #'(λ (hoist binds outer-σ guards)
+      #`(begin (real-yield (for*/fold ([acc-σ '()]) #,guards
+                      (let #,hoist (let ([#,outer-σ '()]) #,binds))))
+               'done)))
  (define (real-yield-fn s) #`(real-yield #,s)))
 
 ;; Apply deltas to the store
@@ -162,41 +154,44 @@
     [(cons σ cs)
      (define-values (cs* ∆)
        (for/fold ([cs* (set)] [∆* '()])
-         ([c cs])
+         ([c cs]
+          #:unless (ans? c))
          (define gen (step (cons σ c)))
          (define-values (cs** ∆**)
            (for/fold ([cs** cs*] [last #f])
-               ([c (in-producer gen (λ _ (eq? 'done (generator-status gen))))])
-             (cond [last (values (set-add cs** last) c)]
-                   [else (values cs** c)])))
-         (define-values (cs*** ∆***)
-           (cond [(list? ∆**) (values cs** (append ∆** ∆*))]
-                 [else (values (set-add cs** ∆**) ∆*)]))
-         (values cs*** ∆***)))
+               ([c (in-producer gen (λ (x) (eq? 'done x)))])
+             (cond [(list? c) (values cs** (if last (append c last) c))]
+                   [else (values (set-add cs** c) last)])))
+         (define ∆*** (if (list? ∆**) (append ∆** ∆*) ∆*))
+         (values cs** ∆***)))
      (cons (update ∆ σ) (set-union cs cs*))]))
 
 (define (generator/wide/σ-∆s-fixpoint step fst)
-  (let loop ()
-    (cond [(null? todo)
-           (for*/set ([(c at-unions) (in-hash seen)]
-                      #:when (ans? c))
+  (define wide-step (σ-∆s/generator/wide-step-specialized step))
+  (define cs (if (eq? 'done (generator-state fst)) (error 'WAT) (fst)))
+  (define ∆ (if (eq? 'done (generator-state fst)) '() (fst)))
+  (define fst-s (cons (update ∆ (hash)) (set cs)))
+  (define snd (wide-step fst-s))
+  (let loop ((next snd) (prev fst-s))
+    (cond [(equal? next prev)
+           (for/set ([c (cdr prev)]
+                     #:when (ans? c))
              (ans-v c))]
-          [else
-           (define todo-old todo)
-           (set! todo '())
-           (for ([c (in-list todo-old)]) (step c))
-           (loop)])))
+          [else (loop (wide-step next) next)])))
 
 (define-syntax-rule (σ-∆s-bind-join-one (∆* ∆ a v) body)
   (let ([∆* (cons (cons a (set v)) ∆)]) body))
-(define-syntax-rule (σ-∆s-bind-join-many (∆* ∆ a vs) body)
+(define-syntax-rule (σ-∆s-bind-join (∆* ∆ a vs) body)
   (let ([∆* (cons (cons a vs) ∆)]) body))
 (define-syntax-rule (σ-∆s-bind-push (∆* a* ∆ δ l ρ k) body)
   (let ([∆* (cons (cons l (set k)) ∆)]
         [a* l])
     body))
 
-(define (force σ a) (lookup-store σ a))
+(define (force σ v)
+  (match v
+    [(addr a) (lookup-store σ a)]
+    [_ (set v)]))
 
 (mk-generator/σ-∆s-analysis
  #:bind-join-one σ-∆s-bind-join-one
@@ -217,6 +212,18 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Set-monad, wide
+(begin-for-syntax
+ (define non-global/set-body
+   #'(λ (inner-σ outer-σ body)
+        #`(values #,inner-σ (set-union acc-states #,body))))
+ (define non-global/set-loop
+   #'(λ (hoist binds outer-σ guards)
+        #`(let*-values ([(outer-σ) '()]
+                        [(acc-σ acc-states)
+                         (for*/fold ([acc-σ outer-σ] [acc-states (set)]) #,guards
+                           #,binds)])
+            (cons acc-σ acc-states)))))
+
 (define ((wide-step-specialized step) state)
   (match state
     [(cons σ cs)

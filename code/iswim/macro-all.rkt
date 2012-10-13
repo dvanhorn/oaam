@@ -1,12 +1,12 @@
 #lang racket
 (require "ast.rkt"
-         (for-syntax syntax/parse racket/syntax)
+         (for-syntax syntax/parse racket/syntax racket/match) 
          (rename-in racket/generator
                     [yield real-yield] ;; I'll take those, thank you.
                     [generator real-generator])
-         racket/trace
          racket/stxparam)
 (provide yield (for-syntax mk-mk-analysis) (struct-out addr) (struct-out ans))
+
 
 (define-syntax-parameter yield
   (λ (stx) (raise-syntax-error #f "Must be within the context of a generator" stx)))
@@ -48,7 +48,7 @@
       #:fail-unless (implies (attribute pre-alloc?) (attribute wide?))
       "Cannot preallocate narrow stores."
       #:fail-unless (implies (attribute σ-∆s?) (attribute wide?))
-      "Store deltas and narrow stores are antithetical."
+      "Narrow stores and store deltas are antithetical."
       #:fail-when (and (attribute pre-alloc?) (attribute σ-∆s?))
       "Pre-allocation and store deltas are antithetical."
       #:fail-unless (or (attribute fixpoint) (attribute set-monad?))
@@ -62,10 +62,11 @@
                          #'(#:expander #:with-first-cons)
                          #'())])
         (define eval ;; what does ev mean?
-          #'(match e
+          (syntax/loc stx
+            (match e
               [(var l x)
                (λ% (σ ρ k δ yield)
-                   (do (σ σ*)
+                   (do (σ)
                        ([v (delay σ (lookup-env ρ x))])
                      (yield (co σ k v))))]
               [(num l n)   (λ% (σ ρ k δ yield) (yield (co σ k n)))]
@@ -80,7 +81,7 @@
                (define c0 (compile e0))
                (define c1 (compile e1))
                (λ% (σ ρ k δ yield)
-                   (do (σ σ*)
+                   (do (σ)
                        ([(σ* a) #:push σ δ l ρ k])
                      (yield (ev σ* c0 ρ δ (ar c1 ρ δ l a)))))]
               [(ife l e0 e1 e2)
@@ -88,42 +89,44 @@
                (define c1 (compile e1))
                (define c2 (compile e2))
                (λ% (σ ρ k δ yield)
-                   (do (σ σ*)
+                   (do (σ)
                        ([(σ* a) #:push σ δ l ρ k])
                      (yield (ev σ* c0 ρ δ (ifk c1 c2 ρ δ a)))))]
               [(1op l o e)
                (define c (compile e))
                (λ% (σ ρ k δ yield)
-                   (do (σ σ*)
+                   (do (σ)
                        ([(σ* a) #:push σ δ l ρ k])
                      (yield (ev σ* c ρ δ (1opk o δ a)))))]
               [(2op l o e0 e1)
                (define c0 (compile e0))
                (define c1 (compile e1))
                (λ% (σ ρ k δ yield)
-                   (do (σ σ*)
+                   (do (σ)
                        ([(σ* a) #:push σ δ l ρ k])
                      (yield (ev σ* c0 ρ δ (2opak o c1 ρ δ a)))))]
-              [_ (error 'compile "Bad ~a" e)]))
-        
+              [_ (error 'compile "Bad ~a" e)])))
+
         (define compile-def
           (if (attribute compiled?)
               #`((define-syntax-rule (... (λ% (σ ρ k δ yield) body ...))
                    #,(cond [(attribute generators?)
-                            #'(λ (σ ρ-op ... k δ-op ... yield)
+                            (syntax/loc stx
+                              (λ (σ ρ-op ... k δ-op ... dummy)
                                  (...
-                                  (syntax-parameterize ([yield (make-rename-transformer #'pass-yield-to-ev)])
-                                    body ...)))]
+                                  (syntax-parameterize ([yield (pass-given-yield-to-ev #'dummy)])
+                                    body ...))))]
                            [else
-                            #'(λ (σ ρ-op ... k δ-op ...)
+                            (syntax/loc stx
+                              (λ (σ ρ-op ... k δ-op ...)
                                  (...
                                   (syntax-parameterize ([yield (make-rename-transformer #'yield-ev)])
-                                    body ...)))]))
+                                    body ...))))]))
                  (define (compile e)
                    #,eval))
               #`((... (define-syntax-rule (λ% (σ ρ k δ yield) body ...)
                         (generator body ...)))
-                 (define compile values))))
+                 (define (compile e) e))))
 
         #`(begin ;; specialize representation given that 0cfa and widening need less
             (mk-op-struct ap (σ fun arg δ l k) (σ-op ... fun arg δ-op ... l-op ... k) expander-flags ...)
@@ -141,23 +144,33 @@
             ;; ev is special since it can mean "apply the compiled version" or
             ;; make an actual ev state to later interpret.
             #,@(if (attribute compiled?)
-                   #`((define-syntax ev
+                   #'((define-syntax ev
                         (syntax-rules ()
-                          [(_ σ e ρ δ k yield) (e σ-op ... ρ-op ... δ-op ... k yield)]
-                          [(_ σ e ρ δ k) (e σ-op ... ρ-op ... δ-op ... k)]))
+                          [(_ σ e ρ δ k yield) (e σ ρ-op ... δ-op ... k yield)]
+                          [(_ σ e ρ δ k) (e σ ρ-op ... δ-op ... k)]))
                       (define-match-expander ev:
                         (syntax-rules () [(_ σ e ρ δ k) #f]))
                       (...
                        (begin
-                         (define-syntax pass-yield-to-ev ;; real generators
-                           (syntax-parser
-                             #:literals (ev)
-                             [(_ (ev args:expr ...)) #'(ev args ... real-yield)]
-                             [(_ e:expr) #'(real-yield e)]))
-                         (define-syntax yield-ev
-                           (syntax-parser #:literals (ev)
-                                          [(_ (ev args:expr ...)) #'(ev args ...)]
-                                          [(_ e:expr) #'#,(yield-meaning #'e)])))))
+                         (define-syntax (pass-yield-to-ev syn) ;; real generators
+                           (syntax-parse syn #:literals (ev)
+                             [(_ (ev args:expr ...))
+                              (syntax/loc syn
+                                (ev args ... real-yield))]
+                             [(_ e:expr) (syntax/loc syn (real-yield e))]))
+                         (define-for-syntax ((pass-given-yield-to-ev the-yield) syn) ;; real generators
+                           (syntax-parse syn #:literals (ev)
+                             [(_ (ev args:expr ...))
+                              (quasisyntax/loc syn 
+                                (ev args ... #,the-yield))]
+                             [(_ e:expr) (quasisyntax/loc syn
+                                           (#,the-yield e))]))
+                         (define-syntax (yield-ev syn)
+                           (syntax-parse syn #:literals (ev)
+                             [(_ (ev args:expr ...)) (syntax/loc syn
+                                                       (ev args ...))]
+                             [(_ e:expr) (syntax/loc syn
+                                           #,(yield-meaning #'e))])))))
                    #`((mk-op-struct ev (σ e ρ δ k) (σ-op ... e ρ-op ... δ-op ... k))
                       (define-syntax pass-yield-to-ev (syntax-rules () [(_ e) #,(yield-meaning #'e)]))
                       (define-syntax yield-ev (syntax-rules () [(_ e) #,(yield-meaning #'e)]))))
@@ -170,45 +183,75 @@
             ;; other strategies look the same
             (define-syntax-rule (... (generator body ...))
                #,(cond [(attribute generators?)
-                        #'(... (syntax-parameterize ([yield (make-rename-transformer #'pass-yield-to-ev)])
-                                 (real-generator () body ...)))]
+                        (syntax/loc stx
+                          (... (syntax-parameterize ([yield (make-rename-transformer #'pass-yield-to-ev)])
+                                 (real-generator () body ... 'done))))]
                        [else
-                        #'(... (syntax-parameterize ([yield (make-rename-transformer #'yield-ev)])
-                            body ...))]))
+                        (syntax/loc stx
+                          (... (syntax-parameterize ([yield (make-rename-transformer #'yield-ev)])
+                            body ...)))]))
 
             (...
              (define-syntax (do stx)
-               (define-syntax-class (join-clause outer-σ new-σ body)
-                 #:attributes (clause)
-                 (pattern [σ*:id #:join-one σ:expr a:expr v:expr]
+               (define-syntax-class (join-clause prev-σ replace-v outer-σ body)
+                 #:attributes (clause new-σ val)
+                 (pattern [σ*:id (~or (~and #:join-one (~bind [bindf #'bind-join-one]))
+                                      (~and #:join (~bind [bindf #'bind-join]))) σ:expr a:expr v:expr]
+                          #:with new-σ #'σ* #:attr val #'v
                           #:attr clause
                           (λ (rest)
-                             #`(bind-join-one (σ* σ a v) #,(rest #'σ* outer-σ new-σ body))))
-                 (pattern [σ*:id #:join σ:expr a:expr vs:expr]
-                          #:attr clause
-                          (λ (rest)
-                             #`(bind-join (σ* σ a vs) #,(rest #'σ* outer-σ new-σ body))))
+                             #`(bindf (σ* σ a #,(or replace-v #'v)) #,(rest #'σ* outer-σ body))))
                  (pattern [(σ*:id a*:id) #:push σ δ l ρ k]
+                          #:with new-σ #'σ* #:attr val #f
                           #:attr clause
                           (λ (rest)
-                             #`(bind-push (σ* a* σ δ l ρ k) #,(rest #'σ* outer-σ new-σ body)))))
+                             #`(bind-push (σ* a* σ δ l ρ k) #,(rest #'σ* outer-σ body)))))
+               ;; A terrible binding pattern is necessary for store deltas. We /hoist/
+               ;; the values that are used in join so they are in scope of the real σ.
+               (define-splicing-syntax-class (join-clauses maybe-prev-σ outer-σ body)
+                 #:attributes (clauses (ids 1) (vs 1) (prev-σs 1))
+                 (pattern (~seq) #:attr clauses '() #:attr (ids 1) '() #:attr (vs 1) '()
+                          #:attr (prev-σs 1) '())
+                 (pattern (~seq (~bind [new-id (generate-temporary)])
+                           (~var join (join-clause (or maybe-prev-σ outer-σ)
+                                                   (and #,(syntax? (attribute σ-∆s?)) #'new-id)
+                                                   outer-σ body))
+                           (~var joins (join-clauses (attribute join.new-σ) outer-σ body)))
+                          #:attr clauses (cons (attribute join.clause) (attribute joins.clauses))
 
+                          #:attr (ids 1) (let ([v (attribute join.val)]
+                                               [ids* (attribute joins.ids)])
+                                       (if v (cons #'new-id ids*) ids*))
+                          #:attr (vs 1) (let ([v (attribute join.val)]
+                                              [vs* (attribute joins.vs)])
+                                       (if v (cons v vs*) vs*))
+                          #:attr (prev-σs 1)
+                          (let ([v (attribute join.val)])
+                            (if v
+                                (if maybe-prev-σ
+                                    (cons maybe-prev-σ (attribute joins.prev-σs))
+                                    (cons outer-σ (attribute joins.prev-σs)))
+                                (attribute joins.prev-σs)))))
                (syntax-parse stx
-                 ;; if we don't get our hands on a store, σ is the default.
-                 ;; We consider σ* to be an updated store. If using σ or σ* in
-                 ;; the value position for a join-clause, then we use the
-                 ;; original value of σ. (collude with bind-* macros)
-                 [(~and (_ (σ:id σ*:id) ([x:id e:expr] ... blob ...) body:expr)
-                        (_ dk0 ([x0 e0] ... (~var joins (join-clause #'σ #'σ* #'body)) ...) dk1))
+                 ;; if we don't get a store via clauses, σ is the default.
+                 [(~and (_ (σ:id) ([x:id e:expr] ... blob ...) body:expr)
+                        (_ dk0 ([x0 e0] ... (~var joins (join-clauses #f #'σ #'body))) dk1))
                   ;; flags conflate imperative store and imperative worklist in wide case
                   ;; store-passing/store-δ-accumulation is needed if
                   ;; ¬wide or (¬pre-alloc and ¬imperative)
                   ;; ≡ ¬(wide and (pre-alloc or imperative))
-                  (define binds (let loop ([j (reverse (attribute joins.clause))]
+                  (define binds (let loop ([j (reverse (attribute joins.clauses))]
                                            [full #,do-body-meaning])
-                                  (cond [(pair? j) (loop (cdr j) (λ _ ((car j) full)))]
-                                        [else (full #'σ #'σ #'σ* #'body)])))
-                  (#,do-loop-meaning binds #'σ #'([x e] ...))])))
+                                  (match j
+                                    [(cons fn js) (loop js (λ _ (fn full)))]
+                                    [_ (full #'σ #'σ #'body)])))
+                  (define hoist-binds
+                    #,(if (attribute σ-∆s?)
+                          #'(... #'([joins.ids (let ([joins.prev-σs σ]) joins.vs)] ...))
+                          #''()))
+                  (#,do-loop-meaning hoist-binds binds #'σ #'([x e] ...))]
+                 [(_ (σ:id) ([x:id e:expr] ... blob ...) body:expr)                  
+                  (raise-syntax-error #f "Joins failed" stx)])))
 
             #,@compile-def
 
@@ -218,36 +261,36 @@
               (match s
                 [(co: σ k v)
                  (match k
-                   ['mt (generator (do (σ σ*)
+                   ['mt (generator (do (σ)
                                        ([v (force σ v)])
                                      (yield (ans v))))]
                    [(ar: e ρ δ l a)
                     (generator (yield (ev σ e ρ δ (fn v δ l a))))]
                    [(fn: f δ l a)
                     (generator
-                        (do (σ σ*)
+                        (do (σ)
                             ([k (get-cont σ a)]
                              [f (force σ f)])
                           (yield (ap σ f v δ l k))))]
                    [(ifk: t e ρ δ a)
                     (generator
-                        (do (σ σ*)
+                        (do (σ)
                             ([k (get-cont σ a)]
                              [v (force σ v)])
                           (yield (ev σ (if v t e) ρ δ k))))]
 
                    [(1opk: o δ a)
                     (generator
-                        (do (σ σ*)
+                        (do (σ)
                             ([k (get-cont σ a)]
                              [v (force σ v)])
                           (yield (ap-op σ o (list v) k))))]
                    [(2opak: o e ρ δ a)
-                    (generator
-                        (yield (ev σ e ρ δ (2opfk o v δ a))))]
+                    (generator (yield (ev σ e ρ δ (2opfk o v δ a))))]
+
                    [(2opfk: o u δ a)
                     (generator
-                        (do (σ σ*)
+                        (do (σ)
                             ([k (get-cont σ a)]
                              [v (force σ v)]
                              [u (force σ u)])
@@ -259,19 +302,19 @@
                    [(clos: x e ρ)
                     (define x-addr (make-var-contour x δ))
                     (generator
-                        (do (σ σ*)
+                        (do (σ)
                             ([σ* #:join σ x-addr (force σ v)])
                           (yield (ev σ* e (extend ρ x x-addr) (tick δ l) k))))]
                    [(rlos: f x e ρ)
                     (define f-addr (make-var-contour f δ))
                     (define x-addr (make-var-contour x δ))
                     (generator
-                        (do (σ σ*)
+                        (do (σ)
                             ([σ* #:join-one σ f-addr fun]
                              [σ* #:join σ* x-addr (force σ* v)])
                           (yield (ev σ* e (extend (extend ρ x x-addr) f f-addr) (tick δ l) k))))]
                    ;; Anything else is stuck
-                   [_ #f])]
+                   [_ (generator)])]
 
                 [(ap-op: σ o vs k)
                  (match* (o vs)
@@ -279,7 +322,7 @@
                    [('sub1 (list (? number? n)))  (generator (yield (co σ k (widen (sub1 n)))))]
                    [('add1 (list (? number? n)))  (generator (yield (co σ k (widen (add1 n)))))]
                    [('zero? (list 'number))
-                    (generator (do (σ σ*)
+                    (generator (do (σ)
                                    ([b (in-list '(#t #f))])
                                  (yield (co σ k b))))]
                    [('sub1 (list 'number)) (generator (yield (co σ k 'number)))]
@@ -295,7 +338,7 @@
                 ;; Unreachable if compiled. However, avoid code duplication.
                 [(ev: σ e ρ δ k) #,(if (attribute compiled?) #'(void) eval)]
 
-                [s s]))
+                [s (generator)]))
 
             (define (inj e)
               (generator
@@ -308,9 +351,9 @@
 
             (define (aval e)
               #,(cond [(attribute fixpoint)
-                       #'(fixpoint step (inj e))]
+                       (syntax/loc stx (fixpoint step (inj e)))]
                       [else ;; must be in set monad
-                       #'(fix step (inj e))]))))])))
+                       (syntax/loc stx (fix step (inj e)))]))))])))
 
 ;; Make a struct that looks like it has all the fields given, but really
 ;; only has the subfields.
@@ -321,18 +364,17 @@
                [name: (format-id #'name "~a:" #'name)])
         (~optional
          (~seq #:expander
-               (~or expander:expr
-                    (~and #:with-first-cons
+               (~or (~and #:with-first-cons
                           (~bind [expander
                                   #`(syntax-rules ()
                                       [(_ σ #,@(cdr (syntax->list #'(fields ...))))
-                                       (cons σ (container subfields ...))])]))))
+                                       (cons σ (container subfields ...))])]))
+                    expander:expr))
          #:defaults ([expander
                       #'(syntax-rules ()
-                          [(_ fields ...)
-                           (container subfields ...)])])))
+                          [(_ fields ...) (container subfields ...)])])))
      #:fail-unless (for/and ([s (in-list (syntax->list #'(subfields ...)))])
-                     (for/or ([f (in-list (syntax->list #'(fields ...)))]) 
+                     (for/or ([f (in-list (syntax->list #'(fields ...)))])
                        (free-identifier=? f s)))
      "Subfields should be contained in fields list."
      #'(begin (struct container (subfields ...) #:prefab)
