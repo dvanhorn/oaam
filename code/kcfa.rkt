@@ -10,8 +10,9 @@
 (require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt")
 
 ;; TODO
-;; - fix wide compile
 ;; - special fixed
+;; - store diffs
+;; - ...
 
 ;; A [Rel X ... Y] is a (X -> ... -> (Setof Y))
 
