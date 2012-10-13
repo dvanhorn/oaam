@@ -411,7 +411,7 @@
 
 (define ((inj-wide/c c) e)
   (for/set ((s (in-set ((c e) (hash) (hash) k0 ε))))
-           (cons (set (s->c s)) (hash))))
+           (cons (set (s->c s)) (state-σ s))))
 
 (define (mk-evals step comp-step compile)
   (values (mk-aval  step inj)

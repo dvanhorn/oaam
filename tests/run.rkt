@@ -51,37 +51,46 @@
                     1
                     (* n (fact (sub1 n)))))
               (fact 5)]
-            120))
+            120)
+  #;
+  (check->> '[(define (ack m n)
+		(if (zero? m)
+		    (add1 n)
+		    (if (zero? n)
+			(ack (sub1 m) 1)
+			(ack (sub1 m) (ack m (sub1 n))))))
+	      (ack 2 2)]
+	    7))
 
 (simple-tests eval (λ (x) x))
 (simple-tests eval^ (λ (x) x))
 (simple-tests eval/c (λ (x) x))
-;(simple-tests eval/c^ (λ (x) x))   ; doesn't work
+(simple-tests eval/c^ (λ (x) x))
 
 (simple-tests lazy-eval (λ (x) x))
 (simple-tests lazy-eval^ (λ (x) x))
 (simple-tests lazy-eval/c (λ (x) x))
-;(simple-tests lazy-eval/c^ (λ (x) x))   ; doesn't work
+(simple-tests lazy-eval/c^ (λ (x) x))
 
 (simple-tests 0cfa    widen)
 (simple-tests 0cfa^   widen)
 (simple-tests 0cfa/c  widen)
-;(simple-tests 0cfa/c^ widen) ; doesn't work
+(simple-tests 0cfa/c^ widen)
 
 (simple-tests lazy-0cfa    widen)
 (simple-tests lazy-0cfa^   widen)
 (simple-tests lazy-0cfa/c  widen)
-;(simple-tests lazy-0cfa/c^ widen) ; doesn't work
+(simple-tests lazy-0cfa/c^ widen)
 
 (simple-tests 1cfa    widen)
 (simple-tests 1cfa^   widen)
 (simple-tests 1cfa/c  widen)
-;(simple-tests 1cfa/c^ widen) ; doesn't work
+(simple-tests 1cfa/c^ widen)
 
 (simple-tests lazy-1cfa    widen)
 (simple-tests lazy-1cfa^   widen)
 (simple-tests lazy-1cfa/c  widen)
-;(simple-tests lazy-1cfa/c^ widen) ; doesn't work
+(simple-tests lazy-1cfa/c^ widen)
 
 
 ;(check-in #t (eval (parse-prog church))) ; expensive
@@ -93,7 +102,7 @@
 (check-∈ #f (eval (parse-prog kcfa3)))
 (check-∈ #f (eval (parse-prog blur)))
 ;(check-∈ 550 (eval (parse-prog loop2))) ; too expensive
-(check-∈ #t (eval (parse-prog sat)))          
+(check-∈ #t (eval (parse-prog sat)))
 
 ;(check-in #t (0cfa^ (parse-prog church))) ; expensive
 (check-∈ #f  (0cfa^ (parse-prog vhm08)))
@@ -108,7 +117,7 @@
 
 
 ;; mutually recursive top-level functions
-(check-∈ #t 
+(check-∈ #t
           (eval
            (parse-prog
             '[(define (even? x)
