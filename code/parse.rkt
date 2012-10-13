@@ -78,7 +78,7 @@
     [`(,(? op2-name? o) ,e0 ,e1)
      (2op (gensym) o (parse e0) (parse e1))]
     [`(,e . ,es)
-     (app (gensym)
+     (app (gensym '@)
           (parse e)
           (map parse es))]
     [(? boolean? b) (bln (gensym) b)]

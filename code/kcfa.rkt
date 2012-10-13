@@ -33,49 +33,55 @@
       (match state
         [(co σ k v)
          (match k
-           ['mt (for*/set ([v (force σ v)])
-                          (ans σ v))]
-           [(ls '() vs ρ a)
-            (define as (reverse (cons v vs)))
-            (for*/set ((k (get-cont σ a))
-                       (f (force σ (first as))))
-                      (ap σ f (rest as) k (car a)))]
-           [(ls (list-rest e es) vs ρ a)
-            (ev% σ e ρ (ls es (cons v vs) ρ a))]
-           [(ifk t e ρ a)
+           [(mt) (for*/set ([v (force σ v)])
+                             (ans σ v))]
+           
+           [(ls l '() vs ρ a δ)
+            (define args (reverse (cons v vs)))
+            (for*/union ((k (get-cont σ a))
+                         (f (force σ (first args))))
+                      
+                      (match f
+                        [(clos xs e ρ)
+                         (if (= (length xs) (length (rest args)))
+                             (let ()
+                               (define-values (ρ* σ* δ*) (bind ρ σ l δ xs (rest args)))
+                               (ev% σ* e ρ* k δ*))
+                             (begin
+                               ;(printf "arity mismatch~n")
+                               (set)))]
+                        [_ (set)]))]
+                      
+                      
+           [(ls l (list-rest e es) vs ρ a δ)
+            (ev% σ e ρ (ls l es (cons v vs) ρ a δ) δ)]
+           [(ifk t e ρ a δ)
             (for*/union [(k (get-cont σ a))
                          (v (force σ v))]
-                        (ev% σ (if v t e) ρ k))]
+                        (ev% σ (if v t e) ρ k δ))]
            [(1opk o a)
             (for*/set [(k (get-cont σ a))
                        (v (force σ v))]
                       (ap-op σ o (list v) k))]
-           [(2opak o e ρ a)
-            (ev% σ e ρ (2opfk o v a))]
+           [(2opak o e ρ a δ)
+            (ev% σ e ρ (2opfk o v a) δ)]
            [(2opfk o u a)
             (for*/set [(k (get-cont σ a))
                        (v (force σ v))
                        (u (force σ u))]
                       (ap-op σ o (list v u) k))]
-           [(lrk x '() '() e ρ a)
+           [(lrk x '() '() e ρ a δ)
             (define σ* (join σ (lookup-env ρ x) (force σ v)))
             (for/union ((k (get-cont σ a)))
-                       (ev% σ* e ρ k))]
-           [(lrk x (cons y xs) (cons e es) b ρ a)
+                       (ev% σ* e ρ k δ))]
+           [(lrk x (cons y xs) (cons e es) b ρ a δ)
             (define σ* (join σ (lookup-env ρ x) (force σ v)))            
-            (ev% σ* e ρ (lrk y xs es b ρ a))]
+            (ev% σ* e ρ (lrk y xs es b ρ a δ) δ)]
            [(sk! l a)
             (define σ* (setter σ l v))
             (for/set ((k (get-cont σ a)))
                      (co σ* k (void)))])]
-        
-        [(ap σ fun vs k l) ;; l is label of apply node coresponding to this application.
-         (match fun
-           [(clos xs e ρ)
-            (define-values (ρ* σ*) (bind (cons l (parent k)) ρ σ xs vs))
-            (ev% σ* e ρ* k)]
-           [_ (set)])]
-        
+                       
         [(ap-op σ o vs k)
          (match* (o vs)
            [('zero? (list (? number? n))) (set (co σ k (zero? n)))]
@@ -113,7 +119,7 @@
            [(_ _) (set)])]
         
         ;; this code is dead when running compiled code.
-        [(ev σ e ρ k)
+        [(ev σ e ρ k δ)
          (match e
            [(var l x)           (for/set ((v (delay σ (lookup-env ρ x))))
                                          (co σ k v))]
@@ -121,32 +127,45 @@
            [(bln l b)           (set (co σ k b))]
            [(lam l x e)         (set (co σ k (clos x e ρ)))]
            [(lrc l xs es b)
-            (define-values (σ0 a) (push σ l ρ k))            
-            (define as (map (λ (x) (cons x (cdr a))) xs))
+            (define-values (σ0 a) (push σ l δ k))            
+            (define as (map (λ (x) (cons x δ)) xs))
             (define ρ* (extend* ρ xs as))
             (define σ* (join* σ0 as (map (λ _ (set)) xs)))
-            (set (ev σ* (first es) ρ* (lrk (first xs) (rest xs) (rest es) b ρ* a)))]
+            (set (ev σ* (first es) ρ* (lrk (first xs) (rest xs) (rest es) b ρ* a δ) δ))]
            [(app l e0 es)
-            (define-values (σ* a) (push σ l ρ k))
-            (set (ev σ* e0 ρ (ls es '() ρ a)))]
+            (define-values (σ* a) (push σ l δ k))
+            (set (ev σ* e0 ρ (ls l es '() ρ a δ) δ))]
            [(ife l e0 e1 e2)
-            (define-values (σ* a) (push σ l ρ k))
-            (set (ev σ* e0 ρ (ifk e1 e2 ρ a)))]
+            (define-values (σ* a) (push σ l δ k))
+            (set (ev σ* e0 ρ (ifk e1 e2 ρ a δ) δ))]
            [(1op l o e0)
-            (define-values (σ* a) (push σ l ρ k))
-            (set (ev σ* e0 ρ (1opk o a)))]
+            (define-values (σ* a) (push σ l δ k))
+            (set (ev σ* e0 ρ (1opk o a) δ))]
            [(2op l o e0 e1)
-            (define-values (σ* a) (push σ l ρ k))
-            (set (ev σ* e0 ρ (2opak o e1 ρ a)))]
+            (define-values (σ* a) (push σ l δ k))
+            (set (ev σ* e0 ρ (2opak o e1 ρ a δ) δ))]
            [(st! l x e0)
-            (define-values (σ* a) (push σ l ρ k))
-            (set (ev σ* e0 ρ (sk! (lookup-env ρ x) a)))])]
+            (define-values (σ* a) (push σ l δ k))
+            (set (ev σ* e0 ρ (sk! (lookup-env ρ x) a) δ))])]
         
         [_ (set)]))
     step))
 
-(define (ev-interp  σ e ρ k) (set (ev σ e ρ k)))
-(define (ev-compile σ c ρ k) (c σ ρ k))
+
+(define ((push K) σ l δ k)
+  (define a (cons l δ))
+  (values (join σ a (set k))
+          a))
+
+(define ((bind K) ρ σ l δ xs vs)
+  (define δ* (truncate (cons l δ) K))
+  (define as (map (λ (x) (cons x δ*)) xs))  
+  (define ρ* (extend* ρ xs as))
+  (define σ* (join* σ as (map (λ (v) (force σ v)) vs)))
+  (values ρ* σ* δ*))
+
+(define (ev-interp  σ e ρ k δ) (set (ev σ e ρ k δ)))
+(define (ev-compile σ c ρ k δ) (c σ ρ k δ))
  
 (define mk-step  (mk-mk-step ev-interp))
 
@@ -160,14 +179,14 @@
   (define (compile e)
     (match e
       [(var l x)
-       (λ (σ ρ k)
+       (λ (σ ρ k δ)
          (for/set ((v (delay σ (lookup-env ρ x))))
                   (co σ k v)))]
-      [(num l n) (λ (σ ρ k) (set (co σ k n)))]
-      [(bln l b) (λ (σ ρ k) (set (co σ k b)))]
+      [(num l n) (λ (σ ρ k δ) (set (co σ k n)))]
+      [(bln l b) (λ (σ ρ k δ) (set (co σ k b)))]
       [(lam l x e)
        (define c (compile e))
-       (λ (σ ρ k) (set (co σ k (clos x c ρ))))]   
+       (λ (σ ρ k δ) (set (co σ k (clos x c ρ))))]   
     [(lrc l xs es b)
      (define c (compile (first es)))
      (define cs (map compile (rest es)))
@@ -175,41 +194,41 @@
      (define x (first xs))
      (define xs* (rest xs))
      (define ss (map (λ _ (set)) xs))
-     (λ (σ ρ k)
-       (define-values (σ0 a) (push σ l ρ k))       
-       (define as (map (λ (x) (cons x (cdr a))) xs))
+     (λ (σ ρ k δ)
+       (define-values (σ0 a) (push σ l δ k))            
+       (define as (map (λ (x) (cons x δ)) xs))
        (define ρ* (extend* ρ xs as))
-       (define σ* (join* σ0 as ss)) 
-       (c σ* ρ* (lrk x xs* cs cb ρ* a)))]
+       (define σ* (join* σ0 as (map (λ _ (set)) xs)))
+       (c σ* ρ* (lrk x xs* cs cb ρ* a δ) δ))]
     [(app l e es)
      (define c (compile e))
      (define cs (map compile es))
      (λ (σ ρ k δ)
-       (define-values (σ* a) (push σ l ρ k))
-       (c σ* ρ (ls cs '() ρ a)))]
+       (define-values (σ* a) (push σ l δ k))
+       (c σ* ρ (ls l cs '() ρ a δ) δ))]
     [(ife l e0 e1 e2)
      (define c0 (compile e0))
      (define c1 (compile e1))
      (define c2 (compile e2))
-     (λ (σ ρ k)
-       (define-values (σ* a) (push σ l ρ k))
-       (c0 σ* ρ (ifk c1 c2 ρ a)))]
+     (λ (σ ρ k δ)
+       (define-values (σ* a) (push σ l δ k))
+       (c0 σ* ρ (ifk c1 c2 ρ a δ) δ))]
     [(1op l o e)
      (define c (compile e))
-     (λ (σ ρ k)
-       (define-values (σ* a) (push σ l ρ k))
-       (c σ* ρ (1opk o a)))]   
+     (λ (σ ρ k δ)
+       (define-values (σ* a) (push σ l δ k))
+       (c σ* ρ (1opk o a) δ))]   
     [(2op l o e0 e1)
      (define c0 (compile e0))
      (define c1 (compile e1))
-     (λ (σ ρ k)
-       (define-values (σ* a) (push σ l ρ k))
-       (c0 σ* ρ (2opak o c1 ρ a)))]   
+     (λ (σ ρ k δ)
+       (define-values (σ* a) (push σ l δ k))
+       (c0 σ* ρ (2opak o c1 ρ a δ) δ))]   
     [(st! l x e)
      (define c (compile e))         
-     (λ (σ ρ k)
-       (define-values (σ* a) (push σ l ρ k))
-       (c σ* ρ (sk! (lookup-env ρ x) a)))]))
+     (λ (σ ρ k δ)
+       (define-values (σ* a) (push σ l δ k))
+       (c σ* ρ (sk! (lookup-env ρ x) a) δ))]))
   compile)
     
 
@@ -272,29 +291,6 @@
 
 (define lazy-eval-setter
   (mk-eval-setter force))
-
-(define (parent k) 
-  (match k
-    ['mt '()]
-    [_ (cdr (match k
-              [(ifk t e ρ a) a]
-              [(1opk o a) a]
-              [(2opak o e ρ a) a]
-              [(2opfk o v a) a]
-              [(lrk x xs es e ρ a)  a]
-              [(sk! x a)  a]
-              [(ls es vs ρ a) a]))]))
-
-(define ((push K) σ l ρ k)
-  (define a (cons l (truncate (parent k) K)))
-  (values (join σ a (set k))
-          a))
-
-(define ((bind K) a ρ σ xs vs)
-  (define as (map (λ (x) (cons x (truncate a K))) xs))
-  (define ρ* (extend* ρ xs as))
-  (define σ* (extend* σ as (map (λ (v) (force σ v)) vs)))
-  (values ρ* σ*))
   
   
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -399,19 +395,22 @@
                             #:when (ans^? c))
                            (ans^-v c))]))))
 
+(define k0 (mt))
+(define ε '())
+
 ;; Exp -> Set State
 (define (inj e)
-  (set (ev (hash) e (hash) 'mt)))
+  (set (ev (hash) e (hash) k0 ε)))
 
 ;; Exp -> Set State^
 (define (inj-wide e)
-  (set (cons (set (ev^ e (hash) 'mt)) (hash))))
+  (set (cons (set (ev^ e (hash) k0 ε)) (hash))))
 
 (define ((inj/c c) e)
-  ((c e) (hash) (hash) 'mt))
+  ((c e) (hash) (hash) k0 ε))
 
 (define ((inj-wide/c c) e)
-  (for/set ((s (in-set ((c e) (hash) (hash) 'mt))))
+  (for/set ((s (in-set ((c e) (hash) (hash) k0 ε))))
            (cons (set (s->c s)) (hash))))
 
 (define (mk-evals step comp-step compile)
@@ -433,10 +432,10 @@
   (mk-evals lazy-0cfa-step comp-lazy-0cfa-step compile-lazy-0cfa))
 
 (define-values (1cfa 1cfa^ 1cfa/c 1cfa/c^)
-  (mk-evals 0cfa-step comp-0cfa-step compile-0cfa))
+  (mk-evals 1cfa-step comp-1cfa-step compile-1cfa))
 
 (define-values (lazy-1cfa lazy-1cfa^ lazy-1cfa/c lazy-1cfa/c^)
-  (mk-evals lazy-0cfa-step comp-lazy-0cfa-step compile-lazy-0cfa))
+  (mk-evals lazy-1cfa-step comp-lazy-1cfa-step compile-lazy-1cfa))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
