@@ -18,6 +18,6 @@
 (struct app exp (rator rand) #:transparent)
 (struct rec (name fun)       #:transparent)
 (struct ife exp (t c a)      #:transparent)
-(struct 1op exp (o a)        #:transparent)
-(struct 2op exp (o a b)      #:transparent)
 (struct st! exp (x e)        #:transparent)
+
+(struct primr exp (which) #:transparent)

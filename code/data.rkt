@@ -1,26 +1,35 @@
 #lang racket
 (provide (all-defined-out))
-
 ;; A Val is one of:
 ;; - Number
 ;; - Boolean
 ;; - Void
+;; - String
+;; - Symbol
+;; - '()
+;; - 'number
+;; - 'string
+;; - 'symbol
 ;; - (clos Sym Exp Env)
+;; - (primop Sym)
+;; - (consv Addr Addr)
+;; - (vectorv Number (listof Addr))
+;; - (vectorv Number Addr) ;; collapsed into one addr
 (struct clos (x e ρ)   #:transparent)
+(struct primop (which) #:transparent)
+(struct consv (car cdr) #:transparent)
+(struct vectorv (length cells) #:transparent)
+
+(struct stuck* () #:transparent)
+(define stuck (stuck*))
 
 ;; A Cont is one of:
 ;; - 'mt
 ;; - (ifk Exp Exp Env Cont)
-;; - (1opk Opr Cont)
-;; - (2opak Opr Exp Env Cont)
-;; - (2opfk Opr Val Cont)
 ;; - (lrk Sym [Listof Sym] [Listof Exp] Exp Env Cont)
 ;; - (sk! Sym Cont)
 ;; - (ls [Listof Exp] [Listof Val] Env Cont)
 (struct ifk (c a ρ k)       #:transparent)
-(struct 1opk (o k)          #:transparent)
-(struct 2opak (o e ρ k)     #:transparent)
-(struct 2opfk (o v k)       #:transparent)
 (struct lrk (x xs es e ρ k) #:transparent)
 (struct sk! (x k)           #:transparent)
 (struct ls (es vs ρ k)      #:transparent)
@@ -59,5 +68,3 @@
     [(ap _ f a k δ)   (ap^ f a k δ)]
     [(ap-op _ o vs k) (ap-op^ o vs k)]
     [(ans _ v) (ans^ v)]))
-
-
