@@ -1,41 +1,44 @@
 \newcommand{\superscript}[1]{\ensuremath{^{#1}}}
-\newcommand{\tuple}[2]{{\tt #1\ }({#2})}
+\newcommand{\tuple}[3][\ ]{{\tt #2{#1}}({#3})}
 
 % Values
 \newcommand{\clos}[1]{\tuple{clos}{#1}}
 \newcommand{\rlos}[1]{\tuple{rlos}{#1}}
 
 % States
-\newcommand{\ev}[1]{\tuple{ev}{#1}}
+\newcommand{\ev}[2][\ ]{\tuple[#1]{ev}{#2}}
 \newcommand{\co}[1]{\tuple{co}{#1}}
-\newcommand{\ap}[1]{\tuple{ap}{#1}}
+\newcommand{\ap}[2][\ ]{\tuple[#1]{ap}{#2}}
 \newcommand{\ans}[1]{\tuple{ans}{#1}}
 
 % Continuations
 \newcommand{\kmt}{\tt mt}
-\newcommand{\kar}[1]{\tuple{ar}{#1}}
-\newcommand{\kfn}[1]{\tuple{fn}{#1}}
-\newcommand{\kif}[1]{\tuple{fi}{#1}}
-\newcommand{\kuop}[1]{\tuple{oa}{#1}}
-\newcommand{\kbopa}[1]{\tuple{oa1}{#1}}
-\newcommand{\kbopb}[1]{\tuple{oa2}{#1}}
+\newcommand{\kar}[2][\ ]{\tuple[#1]{ar}{#2}}
+\newcommand{\kfn}[2][\ ]{\tuple[#1]{fn}{#2}}
+\newcommand{\kif}[2][\ ]{\tuple[#1]{fi}{#2}}
+\newcommand{\kuop}[2][\ ]{\tuple[#1]{oa}{#2}}
+\newcommand{\kbopa}[2][\ ]{\tuple[#1]{oa1}{#2}}
+\newcommand{\kbopb}[2][\ ]{\tuple[#1]{oa2}{#2}}
 
 % Syntax
 \newcommand{\syntax}[1]{{\tt #1}}
-\newcommand{\sapp}[2]{\tuple{app}{#1,#2}}
-\newcommand{\slam}[2]{\tuple{lam}{#1,#2}}
-\newcommand{\srec}[3]{\tuple{rec}{#1,#2,#3}}
-\newcommand{\svar}[1]{\tuple{var}{#1}}
-\newcommand{\snum}[1]{\tuple{num}{#1}}
-\newcommand{\sif}[3]{\tuple{if}{#1,#2,#3}}
-\newcommand{\sopu}[2]{\tuple{op}{#1,#2}}
-\newcommand{\sopb}[3]{\tuple{op2}{#1,#2,#3}}
+\newcommand{\sapp}[3][\ ]{\tuple[#1]{app}{#2,#3}}
+\newcommand{\slam}[3][\ ]{\tuple[#1]{lam}{#2,#3}}
+\newcommand{\srec}[4][\ ]{\tuple[#1]{rec}{#2,#3,#4}}
+\newcommand{\svar}[2][\ ]{\tuple[#1]{var}{#2}}
+\newcommand{\snum}[2][\ ]{\tuple[#1]{num}{#2}}
+\newcommand{\sbln}[2][\ ]{\tuple[#1]{bool}{#2}}
+\newcommand{\sif}[4][\ ]{\tuple[#1]{if}{#2,#3,#4}}
+\newcommand{\sop}[2][\ ]{\tuple[#1]{op}{#2}}
+\newcommand{\sopu}[3][\ ]{\tuple[#1]{op}{#2,#3}}
+\newcommand{\sopb}[4][\ ]{\tuple[#1]{op2}{#2,#3,#4}}
 \newcommand{\strue}{{\tt tt}}
 \newcommand{\sfalse}{{\tt ff}}
 \newcommand{\saddone}{{\tt add1}}
 \newcommand{\ssubone}{{\tt sub1}}
 \newcommand{\szerohuh}{\syntax{zero?}}
 \newcommand{\szero}{\syntax{0}}
+\newcommand{\slit}[2][\ ]{\tuple[#1]{lit}{#2}}
 
 \newcommand{\sNum}{\syntax{Z}}
 
@@ -48,10 +51,17 @@
 \newcommand{\mexpf}{f}
 \newcommand{\menv}{\rho}
 \newcommand{\mkont}{\kappa}
+\newcommand{\mcntr}{\delta}
 \newcommand{\msto}{\sigma}
 \newcommand{\mop}{o}
 \newcommand{\mval}{v}
 \newcommand{\mnum}{z}
+\newcommand{\mbln}{b}
 \newcommand{\mvalx}[1]{#1}
-
+\newcommand{\mlab}{\ell}
 \newcommand\machstep{\longmapsto}
+\newcommand\multimachstep{\longmapsto\!\!\!\!\!\rightarrow}
+\newcommand{\mlit}{c}
+\newcommand{\mstate}{\varsigma}
+
+\newcommand{\interpdelta}{\Delta}
