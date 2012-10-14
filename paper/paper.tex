@@ -35,7 +35,9 @@ precise (and purely functional).
 
 \subsection{Notation and prerequisites}
 
-Prereqs: Semantics Engineering, AAM.
+Prereqs: Semantics Engineering \cite{dvanhorn:Felleisen2009Semantics},
+AAM \cite{dvanhorn:VanHorn2011Abstracting}
+\cite{dvanhorn:VanHorn2012Systematic}.
 
 Notation: concrete examples of programs under analysis is given in
 (monochrome) Scheme notation.  Code is given in (syntax colored)
@@ -447,12 +449,20 @@ Delta Store + Special + Compile + Lazy:
 
 \section{Evaluation}
 
+\cite{dvanhorn:Earl2012Introspective}
+
+\cite{dvanhorn:wright-jagannathan-toplas98}
+
 Other benchmarks
 
 \section{Related work}
 
-Boucher and Feeley, CC'96 introduce the idea of abstract compilation
-by closure generation.  (Feeley and Lapalme.)
+Boucher and Feeley \cite{dvanhorn:Boucher1996Abstract} introduced the
+idea of \emph{abstract compilation}, which used closure generation
+\cite{dvanhorn:Feeley1987Using} to improve the performance of control
+flow analysis.  We have adapted the closure generation technique from
+composition evaluators to abstract machines and applied it to similar
+effect.
 
 \section{Conclusion}
 
@@ -460,8 +470,13 @@ Abstract machines are not only a good model for rapid analysis
 development, they also can be systematically developed into efficient
 algorithms.
 
+\bibliographystyle{plain}
+\bibliography{dvh-bibliography}
+
 \appendix
 \section{Relation to Uniform \(k\)-CFA (A Case Against Acceptability)}
+
+\cite{dvanhorn:nielson-nielson-popl97} \cite{dvanhorn:Neilson:1999}
 
 This machine's allocation strategy mimics the Uniform k-CFA analysis
 in Principles of Program Analysis, which is defined in terms of
@@ -549,6 +564,7 @@ The main problem is calculation of an analysis can no longer be
 computed as the fixed point of the machine transition relation.
 Although there are several implementations (CFA2,ICFP'12), they
 operate at speeds roughly on par with our starting point: unoptimized
-store widened machines.
+store widened
+machines. \cite{dvanhorn:Earl2012Introspective,dvanhorn:Vardoulakis2011CFA2}
 
 \end{document}
