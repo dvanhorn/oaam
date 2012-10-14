@@ -280,7 +280,44 @@ The \syntax{plus} and \syntax{mult} functions are written as usual.
 
 This program reaches $N$ states under concrete interpretation.
 
+\subsection{Generic fixpoint calculator}
+
+We compute the semantics of a program by iterating the state
+transition relation until a fixed point in the reachable states is
+reached.
+
+\begin{verbatim}
+;; appl : (∀ (X) ((X -> (Setof X)) -> ((Setof X) -> (Setof X))))
+(define ((appl f) s)
+  (for/fold ([i (set)])
+    ([x (in-set s)])
+    (set-union i (f x))))
+
+;; Calculate fixpoint of (appl f).
+;; fix : (∀ (X) ((X -> (Setof X)) (Setof X) -> (Setof X)))
+(define (fix f s)
+  (let loop ((accum (set)) (front s))
+    (if (set-empty? front)
+        accum
+        (let ((new-front ((appl f) front)))
+          (loop (set-union accum front)
+                (set-subtract new-front accum))))))
+\end{verbatim}
+
 \subsection{Store widening}
+
+\begin{verbatim}
+;; State^ = (cons (Set Conf) Store)
+
+;; (State -> Setof State) -> State^ -> { State^ }
+(define ((wide-step step) state)
+  (match state
+    [(cons cs σ)
+     (define ss ((appl step)
+                 (for/set ([c cs]) (c->s c σ))))
+     (set (cons (for/set ([s ss]) (s->c s))
+                (join-stores ss)))]))
+\end{verbatim}
 
 \subsection{Baseline evaluation}
 
@@ -413,6 +450,9 @@ Delta Store + Special + Compile + Lazy:
 Other benchmarks
 
 \section{Related work}
+
+Boucher and Feeley, CC'96 introduce the idea of abstract compilation
+by closure generation.  (Feeley and Lapalme.)
 
 \section{Conclusion}
 
