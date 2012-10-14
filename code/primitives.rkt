@@ -50,7 +50,7 @@
 
   (define-syntax (mk-prim-meaning-table stx)
     (syntax-parse stx
-      [(_ (~optional (~and #:static static?)) getter setter widen table-id:id)
+      [(_ (~optional (~and #:static static?)) getter setter widen delay table-id:id)
        #`(begin
            #,(if (attribute static?)
                #'(...
@@ -246,7 +246,7 @@
               [set-cdr! #f #t set-cdr!v (p -> !)]
               [error #f #f errorv (#:rest any -> any)])))]))
 
-  (mk-prim-meaning-table #:static _ _ _ prim-static))
+  (mk-prim-meaning-table #:static _ _ _ _ prim-static))
 (require (for-syntax 'prims) 'prims)
 
 (define-syntax (mk-primitive-fns stx)

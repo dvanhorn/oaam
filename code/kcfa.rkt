@@ -40,7 +40,7 @@
 
 (define (mk-mk-step ev%)
   (λ (push bind getter setter widen force delay)
-    (mk-prim-meaning-table getter setter widen prim-meaning-table)
+    (mk-prim-meaning-table getter setter widen delay prim-meaning-table)
     ;; [Rel State State]
     (define (step state)
       (match state
