@@ -30,11 +30,11 @@
 ;; - (lrk Sym [Listof Sym] [Listof Exp] Exp Env Cont)
 ;; - (sk! Sym Cont)
 ;; - (ls [Listof Exp] [Listof Val] Env Cont)
-(struct mt ()               #:transparent)
-(struct ifk (c a ρ k)       #:transparent)
-(struct lrk (x xs es e ρ k) #:transparent)
-(struct sk! (x k)           #:transparent)
-(struct ls (es vs ρ k)      #:transparent)
+(struct mt ()                 #:transparent)
+(struct ifk (c a ρ k δ)       #:transparent)
+(struct lrk (x xs es e ρ k δ) #:transparent)
+(struct sk! (x k)             #:transparent)
+(struct ls (l es vs ρ k δ)    #:transparent)
 
 ;; State
 (struct state (σ)            #:transparent)

@@ -1,16 +1,16 @@
 #lang racket
 (provide parse parse-prog)
-(require "ast.rkt")
+(require "ast.rkt" "primitives.rkt")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser
 
 (define (parse-prog los)
   (match los
-    [(list e) (parse e)]
+    [(list e) (parse e gensym gensym)]
     [(list (and ds `(define ,_ . ,_)) ... es ...)
-     (define bs (parse-defns ds))
-     (parse `(letrec ,bs (begin ,@es)))]))
+     (define bs (parse-defns ds))     
+     (parse `(letrec ,bs (begin ,@es)) gensym gensym)]))
 
 (define (parse-defns ds)
   (match ds
@@ -20,67 +20,78 @@
     [`((define ,f ,e) . ,ds)
      (cons (list f e)
            (parse-defns ds))]))
-       
-(define (op1-name? x)
-  (memq x '(add1 sub1 zero? not)))
 
-(define (op2-name? x)
-  (memq x '(* + - =)))
-
-(define (parse-seq s)
-  (parse (cons 'begin s)))
-
-(define (parse sexp)
-  (match sexp
-    [`(begin ,e) (parse e)]
-    [`(begin ,e . ,r)
-     (parse `((lambda (,(gensym)) (begin . ,r)) ,e))]
-    [`(let () . ,b)
-     (parse `(begin . ,b))]
-    [`(let ((,xs ,es) ...) . ,b)
-     (parse `((lambda ,xs . ,b) . ,es))]
-    [`(let* () . ,s) (parse-seq s)]
-    [`(let* ((,x ,e) . ,r) . ,b)
-     (app (gensym)
-          (lam (gensym) (list x) (parse `(let* ,r ,@b)))
-          (list (parse e)))]
-    [`(set! ,x ,e) (st! (gensym) x (parse e))]
-    [`(letrec () . ,s) (parse-seq s)]
-    [`(letrec ((,xs ,es) ...) . ,s)
-     (lrc (gensym) xs (map parse es) (parse-seq s))]
-    [`(letrec* () . ,s) (parse s)] ;; our letrec is letrec*
-    [`(letrec* ((,xs ,es) ...) . ,s)
-     (lrc (gensym) xs (map parse es) (parse-seq s))]
-    [`(lambda ,xs . ,s)
-     (lam (gensym) xs (parse-seq s))]
-    [`(cond ((else ,a1))) (parse a1)]
-    [`(cond ((,q1 ,a1) . ,r))
-     (parse `(if ,q1 ,a1 (cond . ,r)))]
-    [`(cond ((,q1 ,a1) . r))
-     (parse `(if ,q1 ,a1 (cond . r)))]
-    [`(cond) (parse 0)] ;; FIXME
-    [`(if ,e0 ,e1 ,e2)
-     (ife (gensym) (parse e0) (parse e1) (parse e2))]
-    [`(rec ,f ,e) ;; KILLME
-     (rec f (parse e))]
-    [`(and) (parse #f)]
-    [`(and ,e) (parse e)]
-    [`(and ,e . ,es)
-     (parse `(if ,e (and ,@es) #f))]
-    [`(or) (parse #t)]
-    [`(or ,e) (parse e)]
-    [`(or ,e . ,es)
-     (define tmp (gensym)) ;; FIXME don't generate names
-     (parse `(let ((,tmp ,e))
-               (if ,tmp ,tmp (or ,@es))))]
-    [`(,(? op1-name? o) ,e)
-     (1op (gensym) o (parse e))]    
-    [`(,(? op2-name? o) ,e0 ,e1)
-     (2op (gensym) o (parse e0) (parse e1))]
-    [`(,e . ,es)
-     (app (gensym)
-          (parse e)
-          (map parse es))]
-    [(? boolean? b) (bln (gensym) b)]
-    [(? number? n) (num (gensym) n)]
-    [(? symbol? s) (var (gensym) s)]))
+(define (parse sexp fresh-label! fresh-variable!)
+  (let parse* ([sexp sexp]
+               [ρ (hasheq)])
+    (define (parse sexp) (parse* sexp ρ))
+    (define ((parse_ ρ) sexp) (parse* sexp ρ))
+    (define (rename x) (hash-ref ρ x (λ () (error 'parse "Unbound variable ~a" x))))
+    (define (parse-seq s [ρ ρ]) (parse* (cons 'begin s) ρ))
+    (define (fresh-xs xs)
+      (define xs-id (map fresh-variable! xs))
+      (values xs-id
+              (for/fold ([ρ ρ]) ([x xs] [x-id xs-id]) (hash-set ρ x x-id))))
+    (match sexp
+      [`(begin ,e) (parse e)]
+      [`(begin ,e . ,r)
+       (parse `((lambda (,(gensym)) (begin . ,r)) ,e))]
+      [`(let () . ,b)
+       (parse `(begin . ,b))]
+      [`(let ((,xs ,es) ...) . ,b)
+       (parse `((lambda ,xs . ,b) . ,es))]
+      [`(let* () . ,s) (parse-seq s)]
+      [`(let* ((,x ,e) . ,r) . ,b)
+       (define x-id (fresh-variable! x))
+       (app (fresh-label!)
+            (lam (fresh-label!) (list x-id)
+                 (parse* `(let* ,r ,@b) (hash-set ρ x x-id)))
+            (list (parse e)))]
+      [`(set! ,x ,e) (st! (fresh-label!) (rename x) (parse e))]
+      [`(letrec () . ,s) (parse-seq s)]
+      [`(letrec ((,xs ,es) ...) . ,s)
+       (define-values (xs-id ρ) (fresh-xs xs))
+       (lrc (fresh-label!) xs-id (map (parse_ ρ) es) (parse-seq s ρ))]
+      [`(letrec* () . ,s) (parse s)] ;; our letrec is letrec*
+      [`(letrec* ((,xs ,es) ...) . ,s)
+       (define-values (xs-id ρ) (fresh-xs xs))
+       (lrc (fresh-label!) xs-id (map (parse_ ρ) es) (parse-seq s ρ))]
+      [`(lambda ,xs . ,s)
+       (define-values (xs-id ρ) (fresh-xs xs))
+       (lam (fresh-label!) xs-id (parse-seq s ρ))]
+      [`(cond ((else ,a1))) (parse a1)]
+      [`(cond ((,q1 ,a1) . ,r))
+       (parse `(if ,q1 ,a1 (cond . ,r)))]
+      [`(cond ((,q1 ,a1) . r))
+       (parse `(if ,q1 ,a1 (cond . r)))]
+      [`(cond) (parse 0)] ;; FIXME
+      [`(if ,e0 ,e1 ,e2)
+       (ife (fresh-label!) (parse e0) (parse e1) (parse e2))]
+      [`(and) (parse #f)]
+      [`(and ,e) (parse e)]
+      [`(and ,e . ,es)
+       (parse `(if ,e (and ,@es) #f))]
+      [`(or) (parse #t)]
+      [`(or ,e) (parse e)]
+      [`(or ,e . ,es)
+       (define tmp (gensym)) ;; FIXME don't generate names
+       (parse `(let ((,tmp ,e))
+                 (if ,tmp ,tmp (or ,@es))))]
+      [`(quote ,d)
+       (cond [(or (boolean? d)
+                  (number? d)
+                  (symbol? d)
+                  (string? d)
+                  (null? d))
+              (datum (fresh-label!) d)]
+             [(pair? d) (parse `(cons (quote ,(car d)) (quote ,(cdr d))))]
+             [else (error 'parse "Unsupported datum ~a" d)])]
+      [`(,e . ,es)
+       (app (fresh-label!)
+            (parse e)
+            (map parse es))]
+      [(? symbol? s)
+       (if (and (primitive? s)
+                (not (hash-has-key? ρ s)))
+         (primr (fresh-label!) s)
+         (var (fresh-label!) (rename s)))])))

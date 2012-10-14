@@ -20,7 +20,7 @@
 
 (define (toSetOfLists list-of-sets)
   (match list-of-sets
-    ['() ∅]
+    ['() (set)]
     [(list singleS) (for/set ([hd (in-set singleS)]) (list hd))]
     [(cons hdS tail)
      (for*/set ([hd (in-set hdS)]
@@ -40,7 +40,7 @@
 
 (define (mk-mk-step ev%)
   (λ (push bind getter setter widen force delay)
-    (mk-prim-meaning getter setter widen prim-meaning)
+    (mk-prim-meaning-table getter setter widen prim-meaning-table)
     ;; [Rel State State]
     (define (step state)
       (match state
@@ -53,7 +53,6 @@
             (define args (reverse (cons v vs)))
             (for*/union ((k (get-cont σ a))
                          (f (force σ (first args))))
-
               (match f
                 [(clos xs e ρ)
                  (cond [(= (length xs) (length (rest args)))
@@ -65,18 +64,22 @@
                 [(primop o)
                  (define forced (for/list ([a (in-list (rest args))])
                                   (force σ a)))
+                 (define meaning (hash-ref prim-meaning-table o))
                  (cond [(changes-store? o)
-                        (for/fold ([cs (set)]) ([vs (in-set (toSetOfLists forced))])
-                          (define-values (σ* rs) (apply (hash-ref prim-meaning o) σ l δ vs))
+                        (for/fold ([cs (set)]) ([vs (in-set (toSetOfLists forced))]
+                                                #:when (check-good o vs))
+                          (define-values (σ* rs) (apply meaning σ l δ vs))
                           (for/fold ([cs cs]) ([r (in-list rs)])
                             (set-add cs (co σ k r))))]
                        [(reads-store? o)
                         (for*/set ([vs (in-set (toSetOfLists forced))]
-                                   [r (in-list (apply (hash-ref prim-meaning o) σ vs))])
+                                   #:when (check-good o vs)
+                                   [r (in-list (apply meaning σ vs))])
                           (co σ k r))]
                        [else
                         (for*/set ([vs (in-set (toSetOfLists forced))]
-                                   [r (in-list (apply (hash-ref prim-meaning o) vs))])
+                                   #:when (check-good o vs)
+                                   [r (in-list (apply meaning vs))])
                           (co σ k r))])]
                 [_ (set)]))]
 
@@ -103,8 +106,7 @@
          (match e
            [(var l x)           (for/set ((v (delay σ (lookup-env ρ x))))
                                          (co σ k v))]
-           [(num l n)           (set (co σ k n))]
-           [(bln l b)           (set (co σ k b))]
+           [(datum l d)           (set (co σ k d))]
            [(lam l x e)         (set (co σ k (clos x e ρ)))]
            [(lrc l xs es b)
             (define-values (σ0 a) (push σ l δ k))
@@ -118,15 +120,11 @@
            [(ife l e0 e1 e2)
             (define-values (σ* a) (push σ l δ k))
             (set (ev σ* e0 ρ (ifk e1 e2 ρ a δ) δ))]
-           [(1op l o e0)
-            (define-values (σ* a) (push σ l δ k))
-            (set (ev σ* e0 ρ (1opk o a) δ))]
-           [(2op l o e0 e1)
-            (define-values (σ* a) (push σ l δ k))
-            (set (ev σ* e0 ρ (2opak o e1 ρ a δ) δ))]
            [(st! l x e0)
             (define-values (σ* a) (push σ l δ k))
-            (set (ev σ* e0 ρ (sk! (lookup-env ρ x) a) δ))])]
+            (set (ev σ* e0 ρ (sk! (lookup-env ρ x) a) δ))]
+           [(primr l which)
+            (set (co σ k (primop which)))])]
 
         [_ (set)]))
     step))
@@ -148,10 +146,10 @@
 
 (define mk-step  (mk-mk-step ev-interp))
 
-(define (mk-comp-step push bind setter widen force delay)
-  (values (mk-step push bind setter widen force delay)
+(define (mk-comp-step push bind getter setter widen force delay)
+  (values (mk-step push bind getter setter widen force delay)
           (mk-comp push delay)
-          ((mk-mk-step ev-compile) push bind setter widen force delay)))
+          ((mk-mk-step ev-compile) push bind getter setter widen force delay)))
 
 (define (mk-comp push delay)
   ;; Expr -> (Store Env Cont Contour -> State)
@@ -161,8 +159,7 @@
        (λ (σ ρ k δ)
          (for/set ((v (delay σ (lookup-env ρ x))))
                   (co σ k v)))]
-      [(num l n) (λ (σ ρ k δ) (set (co σ k n)))]
-      [(bln l b) (λ (σ ρ k δ) (set (co σ k b)))]
+      [(datum l d) (λ (σ ρ k δ) (set (co σ k d)))]
       [(primr l which)
        (define p (primop which))
        (λ (σ ρ k δ) (set (co σ k p)))]
@@ -199,7 +196,9 @@
      (define c (compile e))
      (λ (σ ρ k δ)
        (define-values (σ* a) (push σ l δ k))
-       (c σ* ρ (sk! (lookup-env ρ x) a) δ))]))
+       (c σ* ρ (sk! (lookup-env ρ x) a) δ))]
+    [(primr l which) (define p (primop which))
+     (λ (σ ρ k δ) (set (co σ k p)))]))
   compile)
 
 
@@ -245,7 +244,8 @@
         [(boolean? b) b]
         [else (error "Unknown base value" b)]))
 
-
+(define (hash-getter σ addr) (hash-ref σ addr (λ ()
+                                                 (error 'getter "Unbound addr ~a" addr))))
 (define (mk-eval-setter force)
   (λ (σ l v) (extend σ l (force σ v))))
 
@@ -297,6 +297,7 @@
 (define-values (eval-step compile-eval comp-eval-step)
   (mk-comp-step (push +inf.0)
                 (bind +inf.0)
+                hash-getter
                 strict-eval-setter
                 eval-widen
                 (lambda (σ x) (set x))
@@ -305,6 +306,7 @@
 (define-values (lazy-eval-step compile-lazy-eval comp-lazy-eval-step)
   (mk-comp-step (push +inf.0)
                 (bind +inf.0)
+                hash-getter
                 strict-eval-setter
                 eval-widen
                 force
@@ -313,6 +315,7 @@
 (define-values (1cfa-step compile-1cfa comp-1cfa-step)
   (mk-comp-step (push 1)
                 (bind 1)
+                hash-getter
                 strict-kcfa-setter
                 widen
                 (lambda (σ x) (set x))
@@ -321,6 +324,7 @@
 (define-values (lazy-1cfa-step compile-lazy-1cfa comp-lazy-1cfa-step)
   (mk-comp-step (push 1)
                 (bind 1)
+                hash-getter
                 lazy-kcfa-setter
                 widen
                 force
@@ -329,6 +333,7 @@
 (define-values (0cfa-step compile-0cfa comp-0cfa-step)
   (mk-comp-step (push 0)
                 (bind 0)
+                hash-getter
                 strict-kcfa-setter
                 widen
                 (lambda (σ x) (set x))
@@ -337,6 +342,7 @@
 (define-values (lazy-0cfa-step compile-lazy-0cfa comp-lazy-0cfa-step)
   (mk-comp-step (push 0)
                 (bind 0)
+                hash-getter
                 lazy-kcfa-setter
                 widen
                 force

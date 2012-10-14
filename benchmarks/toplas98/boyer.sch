@@ -3,6 +3,15 @@
 ; get, put, remprop	oz/91
 ; 
 
+(define (assq k l)
+  (cond [(null? l) #f]
+        [(eq? (caar l) k) (car l)]
+        [else (assq k (cdr l))]))
+(define (member v l)
+  (cond [(null? l) #f]
+        [(equal? v (car l)) l]
+        [else (member v (cdr l))]))
+
 (define *namelist* '())      ; top-level name/plst chain 
 (define *lastlook* '(xxx ())) ; look-aside cache
 
@@ -13,7 +22,8 @@
       *lastlook*
       (let ((pair (assq name *namelist*)))
         (if pair
-            (set! *lastlook* pair))
+          (set! *lastlook* pair)
+          (void))
         pair)))
 (define (get name prop)
   (let ((r (nameprop name)))
