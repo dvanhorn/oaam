@@ -144,7 +144,7 @@
                (define A-addr `((A . ,l) . ,δ))
                (define D-addr `((D . ,l) . ,δ))
                (define σ*  (setter σ A-addr v0))
-               (define σ** (setter σ D-addr v1))
+               (define σ** (setter σ* D-addr v1))
                (values σ** `(,(consv A-addr D-addr))))
              (define (make-vectorv σ l δ size [default 0])
                (match (widen size)
@@ -163,16 +163,17 @@
 
              (define (chase dirs σ v)
                (match dirs
-                 ['() (values σ `(,v))]
+                 ['() `(,v)]
                  [(cons dir dirs)
                   (match v
                     [(consv a d)
                      (define addr (case dir [(#\a) a] [(#\d) d]))
-                     (for/fold ([σ σ] [vals '()])
-                         ([v (getter σ addr)])
-                       (define-values (σ* vals*) (chase dirs σ v))
-                       (values σ* (append vals* vals)))]
-                    [_ (values σ '())])]))
+                     (if (null? dirs)
+                       (delay σ addr)
+                       (for/fold ([vals '()])
+                           ([v (getter σ addr)])
+                         (append (chase dirs σ v) vals)))]
+                    [_ '()])]))
 
              (define (mk-cons-accessor which)
                (define dirs (cdr (reverse (cdr (string->list (symbol->string which))))))
@@ -209,8 +210,6 @@
               ;; should be '() or p, but not expressible nor needed yet.
               (list        #f #t make-list    (#:rest any -> any))
               (cons        #f #t make-consv   (any any -> p))
-              (car         #t #f consv-car*   (p -> any))
-              (cdr         #t #f consv-car*   (p -> any))
               (void        #f #f voidv        (-> !))
               (null?       #f #f nullv?       (any -> b))
               [car #t #f (mk-cons-accessor 'car) (p -> any)]             

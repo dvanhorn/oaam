@@ -66,11 +66,14 @@
                                   (force σ a)))
                  (define meaning (hash-ref prim-meaning-table o))
                  (cond [(changes-store? o)
-                        (for/fold ([cs (set)]) ([vs (in-set (toSetOfLists forced))]
-                                                #:when (check-good o vs))
-                          (define-values (σ* rs) (apply meaning σ l δ vs))
-                          (for/fold ([cs cs]) ([r (in-list rs)])
-                            (set-add cs (co σ k r))))]
+                        (define-values (_ cs) ;; thread through store changes
+                          (for/fold ([σ σ] [cs (set)]) ([vs (in-set (toSetOfLists forced))]
+                                                        #:when (check-good o vs))
+                            (define-values (σ* rs) (apply meaning σ l δ vs))
+                            (values σ*
+                                    (for/fold ([cs cs]) ([r (in-list rs)])
+                                      (set-add cs (co σ* k r))))))
+                        cs]
                        [(reads-store? o)
                         (for*/set ([vs (in-set (toSetOfLists forced))]
                                    #:when (check-good o vs)
