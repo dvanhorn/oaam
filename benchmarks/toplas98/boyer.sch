@@ -5,13 +5,12 @@
 
 (define (assq k l)
   (cond [(null? l) #f]
-        [(eq? k (caar l)) (car l)]
+        [(eq? (caar l) k) (car l)]
         [else (assq k (cdr l))]))
-
-(define (member a l)
+(define (member v l)
   (cond [(null? l) #f]
-        [(equal? a (car l)) l]
-        [else (member a (cdr l))]))
+        [(equal? v (car l)) l]
+        [else (member v (cdr l))]))
 
 (define *namelist* '())      ; top-level name/plst chain 
 (define *lastlook* '(xxx ())) ; look-aside cache
@@ -23,8 +22,8 @@
       *lastlook*
       (let ((pair (assq name *namelist*)))
         (if pair
-            (set! *lastlook* pair)
-            (void))
+          (set! *lastlook* pair)
+          (void))
         pair)))
 (define (get name prop)
   (let ((r (nameprop name)))

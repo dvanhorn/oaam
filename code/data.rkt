@@ -18,10 +18,9 @@
 (struct clos (x e ρ)   #:transparent)
 (struct primop (which) #:transparent)
 (struct consv (car cdr) #:transparent)
+(struct vectorv^ (length cell) #:transparent)
 (struct vectorv (length cells) #:transparent)
 
-(struct stuck* () #:transparent)
-(define stuck (stuck*))
 
 ;; A Cont is one of:
 ;; - 'mt
@@ -29,11 +28,11 @@
 ;; - (lrk Sym [Listof Sym] [Listof Exp] Exp Env Cont)
 ;; - (sk! Sym Cont)
 ;; - (ls [Listof Exp] [Listof Val] Env Cont)
-(struct mt () #:transparent)
-(struct ifk (c a ρ k)       #:transparent)
-(struct lrk (x xs es e ρ k) #:transparent)
-(struct sk! (x k)           #:transparent)
-(struct ls (es vs ρ k)      #:transparent)
+(struct mt ()                 #:transparent)
+(struct ifk (c a ρ k δ)       #:transparent)
+(struct lrk (x xs es e ρ k δ) #:transparent)
+(struct sk! (x k)             #:transparent)
+(struct ls (l es vs ρ k δ)    #:transparent)
 
 ;; State
 (struct state (σ)            #:transparent)
@@ -68,4 +67,5 @@
     [(co _ k v)       (co^ k v)]
     [(ap _ f a k l)   (ap^ f a k l)]
     [(ap-op _ o vs k) (ap-op^ o vs k)]
-    [(ans _ v)        (ans^ v)]))
+    [(ans _ v) (ans^ v)]))
+
