@@ -7,7 +7,7 @@
          mk-prim-meaning-table)
 
 (module prims racket
-  (require (for-syntax syntax/parse racket/base) "data.rkt")
+  (require (for-syntax syntax/parse racket/base) "data.rkt" "notation.rkt")
   (provide mk-prim-meaning-table z s p b any)
   (define-values (z s p b v any !) (values #f #f #f #f #f #f #f))
 
@@ -48,9 +48,6 @@
                                   #`(#,f vs))))))
     (provide type))
 
-  (define-syntax-rule (for/append guards body1 body ...)
-    (for/fold ([res '()]) guards (append (let () body1 body ...) res)))
-
   (define-syntax (mk-prim-meaning-table stx)
     (syntax-parse stx
       [(_ (~optional (~and #:static static?)) getter setter widen delay table-id:id)
@@ -63,6 +60,7 @@
                        #'(begin
                            (define td
                              (make-hasheq '((prim read-store? write-store?) ...)))
+                           ;; Use type information to compile a type checker function
                            (define-syntax (mk-check-good stx)
                              (syntax-case stx ()
                                [(_ check-good)
@@ -115,7 +113,6 @@
                  [(_ _) (error 'equalv? "Incomplete match ~a ~a" v0 v1)]))
              (define (vectorv-ref σ vec z)
                (match vec
-                 [(vectorv _ '()) '()]
                  [(vectorv _ l)
                   ;; sloppy. Abstract ref could get stuck, but just join all addrs.
                   (cond [(eq? 'number z)
@@ -125,7 +122,6 @@
                  [(vectorv^ _ abs-cell) (for/list ([v (delay σ abs-cell)]) v)]))
              (define (vectorv-set! σ l δ vec i val)
                (match vec
-                 [(vectorv _ '()) (values σ '())]
                  [(vectorv _ l)
                   (cond [(eq? 'number i)
                          (error 'vectorv-set! "Abstract vectors should have a single cell")]
@@ -210,6 +206,7 @@
                                (define snd-addr `((L ,i D . ,l) . ,δ))
                                (loop (setter σ last-addr (consv fst-addr snd-addr))
                                      snd-addr
+                                     (rest vs)
                                      (add1 i))]))]))
 
              (define (wide-num fn)
@@ -275,8 +272,8 @@
               [cdddar      #t #f (mk-cons-accessor 'cdddar) (p -> any)]
               [cddddr      #t #f (mk-cons-accessor 'cddddr) (p -> any)]
               ;; imperative ops
-              [set-car!    #f #t set-car!v (p -> !)]
-              [set-cdr!    #f #t set-cdr!v (p -> !)]
+              [set-car!    #f #t set-car!v (p any -> !)]
+              [set-cdr!    #f #t set-cdr!v (p any -> !)]
               [void        #f #f voidv     (-> !)]
               [error       #f #f errorv    (#:rest any -> any)])))]))
 

@@ -1,6 +1,6 @@
 #lang racket
 (provide parse parse-prog)
-(require "ast.rkt" "primitives.rkt")
+(require "ast.rkt" "primitives.rkt" "data.rkt")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser
@@ -83,15 +83,10 @@
           (app (fresh-label!)
                (var (fresh-label!) (rename 'quote))
                (list (parse d)))]
-         [(or (boolean? d)
-              (number? d)
-              (symbol? d)
-              (string? d)
-              (null? d))
-              (datum (fresh-label!) d)]
-             [(pair? d)
-              (parse `(cons (quote ,(car d)) (quote ,(cdr d))))]
-             [else (error 'parse "Unsupported datum ~a" d)])]
+         [(atomic? d) (datum (fresh-label!) d)]
+         ;; List literals get exploded into conses
+         [(pair? d) (parse `(cons (quote ,(car d)) (quote ,(cdr d))))]
+         [else (error 'parse "Unsupported datum ~a" d)])]
       [`(,e . ,es)
        (app (fresh-label!)
             (parse e)
@@ -100,5 +95,7 @@
        (if (and (primitive? s)
                 (not (hash-has-key? ρ s)))
          (primr (fresh-label!) s)
-         (var (fresh-label!) (rename s)))])))
+         (var (fresh-label!) (rename s)))]
+      [(? atomic? d) (datum (fresh-label!) d)]
+      [err (error 'parse "Unknown form ~a" err)])))
 

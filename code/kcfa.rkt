@@ -8,7 +8,7 @@
          lazy-1cfa lazy-1cfa^ lazy-1cfa/c lazy-1cfa/c^
          widen)
 (require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt"
-         "primitives.rkt")
+         "notation.rkt" "primitives.rkt")
 
 ;; TODO
 ;; - special fixed
@@ -17,10 +17,9 @@
 
 ;; A [Rel X ... Y] is a (X -> ... -> (Setof Y))
 
-
 (define (toSetOfLists list-of-sets)
   (match list-of-sets
-    ['() (set)]
+    ['() ∅]
     [(list singleS) (for/set ([hd (in-set singleS)]) (list hd))]
     [(cons hdS tail)
      (for*/set ([hd (in-set hdS)]
@@ -60,19 +59,19 @@
                         (ev% σ* e ρ* k δ*)]
                        [else
                         ;(printf "arity mismatch~n")
-                        (set)])]
+                        ∅])]
                 [(primop o)
                  (define forced (for/list ([a (in-list (rest args))])
                                   (force σ a)))
                  (define meaning (hash-ref prim-meaning-table o))
                  (cond [(changes-store? o)
                         (define-values (_ cs) ;; thread through store changes
-                          (for/fold ([σ σ] [cs (set)]) ([vs (in-set (toSetOfLists forced))]
+                          (for/fold ([σ σ] [cs ∅]) ([vs (in-set (toSetOfLists forced))]
                                                         #:when (check-good o vs))
                             (define-values (σ* rs) (apply meaning σ l δ vs))
                             (values σ*
-                                    (for/fold ([cs cs]) ([r (in-list rs)])
-                                      (set-add cs (co σ* k r))))))
+                                    (for/set #:initial cs ([r (in-list rs)])
+                                      (co σ* k r)))))
                         cs]
                        [(reads-store? o)
                         (for*/set ([vs (in-set (toSetOfLists forced))]
@@ -84,7 +83,7 @@
                                    #:when (check-good o vs)
                                    [r (in-list (apply meaning vs))])
                           (co σ k r))])]
-                [_ (set)]))]
+                [_ ∅]))]
 
            [(ls l (list-rest e es) vs ρ a δ)
             (ev% σ e ρ (ls l es (cons v vs) ρ a δ) δ)]
@@ -115,7 +114,7 @@
             (define-values (σ0 a) (push σ l δ k))
             (define as (map (λ (x) (cons x δ)) xs))
             (define ρ* (extend* ρ xs as))
-            (define σ* (join* σ0 as (map (λ _ (set)) xs)))
+            (define σ* (join* σ0 as (map (λ _ ∅) xs)))
             (set (ev σ* (first es) ρ* (lrk (first xs) (rest xs) (rest es) b ρ* a δ) δ))]
            [(app l e0 es)
             (define-values (σ* a) (push σ l δ k))
@@ -129,7 +128,7 @@
            [(primr l which)
             (set (co σ k (primop which)))])]
 
-        [_ (set)]))
+        [_ ∅]))
     step))
 
 (define ((push K) σ l δ k)
@@ -175,12 +174,12 @@
      (define cb (compile b))
      (define x (first xs))
      (define xs* (rest xs))
-     (define ss (map (λ _ (set)) xs))
+     (define ss (map (λ _ ∅) xs))
      (λ (σ ρ k δ)
        (define-values (σ0 a) (push σ l δ k))
        (define as (map (λ (x) (cons x δ)) xs))
        (define ρ* (extend* ρ xs as))
-       (define σ* (join* σ0 as (map (λ _ (set)) xs)))
+       (define σ* (join* σ0 as (map (λ _ ∅) xs)))
        (c σ* ρ* (lrk x xs* cs cb ρ* a δ) δ))]
     [(app l e es)
      (define c (compile e))
@@ -322,7 +321,8 @@
 (define ((mk-aval step inj) e)
   (for/set ([s (fix step (inj e))]
             #:when (ans? s))
-           (ans-v s)))
+    (match-define (ans σ v) s)
+    (ans (restrict-to-reachable σ v) s)))
 
 ;; (State -> Setof State) -> Exp -> Set Val
 ;; 0CFA without store widening
@@ -330,14 +330,14 @@
 ;; (State^ -> Setof State^) -> Exp -> Set Val
 ;; 0CFA with store widening
 (define ((mk-aval^ step inj) e)
-  (for/fold ([vs (set)])
+  (for/fold ([vs ∅])
     ([s (fix (wide-step step) (inj e))])
-    (set-union vs
-               (match s
-                 [(cons cs σ)
-                  (for/set ([c cs]
-                            #:when (ans^? c))
-                           (ans^-v c))]))))
+    (∪ vs
+       (match s
+         [(cons cs σ)
+          (for/set ([c cs]
+                    #:when (ans^? c))
+            (ans^-v c))]))))
 
 (define k0 (mt))
 (define ε '())
@@ -395,12 +395,3 @@
                  (for/set ([c cs]) (c->s c σ))))
      (set (cons (for/set ([s ss]) (s->c s))
                 (join-stores ss)))]))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; for/union
-
-(define-syntax-rule (for/union guards body1 body ...)
-  (for/fold ([res (set)]) guards (set-union res (let () body1 body ...))))
-(define-syntax-rule (for*/union guards body1 body ...)
-  (for*/fold ([res (set)]) guards (set-union res (let () body1 body ...))))

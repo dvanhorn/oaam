@@ -1,6 +1,6 @@
 #lang racket
 (provide (all-defined-out))
-(require "data.rkt")
+(require "data.rkt" "ast.rkt" "notation.rkt")
 
 (define (lookup ρ σ x)
   (hash-ref σ (hash-ref ρ x)))
@@ -47,3 +47,17 @@
   (for/fold ([σ (hash)])
     ([s ss])
     (join-store σ (state-σ s))))
+
+(define (reach σ root)
+  (define seen ∅)
+  (let loop ([as root])
+    (for/union #:res acc ([a (in-set as)]
+                          #:unless (a . ∈ . seen))
+      (set! seen (∪1 seen a))
+      (for/union #:initial acc
+                 ([v (in-set (hash-ref σ a))])
+        (loop (touches v))))))
+
+(define (restrict-to-reachable σ v)
+  (for/hash ([a (in-set (reach σ (touches v)))])
+    (values a (hash-ref σ a))))

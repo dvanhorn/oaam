@@ -1,4 +1,5 @@
 #lang racket
+(require "ast.rkt")
 (provide (all-defined-out))
 ;; A Val is one of:
 ;; - Number
@@ -21,6 +22,26 @@
 (struct vectorv^ (length cell) #:transparent)
 (struct vectorv (length cells) #:transparent)
 
+;; What are the supported primitives for a datum form?
+;; REMARK: no list literals.
+(define (atomic? x)
+  (or (number? x)
+      (boolean? x)
+      (void? x)
+      (string? x)
+      (symbol? x)
+      (null? x)))
+
+(define (touches v)
+  (match v
+    [(clos xs e ρ)
+     (for/hash ([x (in-set (free e))]
+                #:unless (memv x xs))
+       (hash-ref ρ x))]
+    [(consv a d) (set a d)]
+    [(vectorv _ l) (list->set l)]
+    [(vectorv^ _ a) (set a)]
+    [_ (set)]))
 
 ;; A Cont is one of:
 ;; - 'mt
