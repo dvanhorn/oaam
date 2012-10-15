@@ -2,6 +2,7 @@
 \usepackage{alltt}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{stmaryrd}
 \usepackage{xltxtra}
 \setmonofont[Scale=MatchLowercase]{DejaVu Sans Mono}
 %
@@ -34,7 +35,9 @@ precise (and purely functional).
 
 \subsection{Notation and prerequisites}
 
-Prereqs: Semantics Engineering, AAM.
+Prereqs: Semantics Engineering \cite{dvanhorn:Felleisen2009Semantics},
+AAM \cite{dvanhorn:VanHorn2011Abstracting}
+\cite{dvanhorn:VanHorn2012Systematic}.
 
 Notation: concrete examples of programs under analysis is given in
 (monochrome) Scheme notation.  Code is given in (syntax colored)
@@ -44,80 +47,104 @@ Racket.
 \section{Starting point}
 \subsection{An abstract$^2$ machine for ISWIM}
 
+ISWIM is a family of programming languages parameterized by a set of
+base values and operations.  To make things concrete, we consider a
+member of the ISWIM family with integers, booleans, and a few
+operations.
+
+\begin{figure}
+\[
+\begin{array}{l@{\qquad}rcl}
+\text{Expressions} & \mathit{e} &=& \svar[^\mlab]\mvar\\
+&&|& \slit[^\mlab]\mlit\\
+&&|& \slam[^\mlab]\mvar\mexp\\
+&&|& \sapp[^\mlab]\mexp\mexp \\
+&&|& \sif[^\mlab]\mexp\mexp\mexp \\
+\text{Variables}&\mvar &=& \syntax{x}\ |\ \syntax{y}\ |\ \dots\\
+\text{Literals}&\mlit &=& \mnum\ |\ \mbln\ |\ \mop\\
+\text{Integers}&\mnum &=& \syntax{0}\ |\ \syntax{1}\ |\ \syntax{-1}\ |\ \dots\\
+\text{Booleans}&\mbln &=& \strue\ |\ \sfalse\\
+\text{Operations}&\mop &=& \syntax{zero?}\ |\ \syntax{add1}\ |\ \syntax{sub1}\ |\ \dots
+\end{array}
+\]
+\caption{Syntax of ISWIM}
+\label{fig:syntax}
+\end{figure}
+
+Figure~\ref{fig:syntax} defines the (abstract) syntax of ISWIM.
+Figure~\ref{fig:aam} defines the semantics of ISWIM as a machine
+model.  Evaluation is defined as the set of states reachable by the
+reflexive, transitive closure of the machine transition relation.  The
+machine is a very slight variation on a standard abstract machine for
+ISWIM in ``eval, continue, apply'' form.
+
+Compared with the standard machine semantics, this definition is
+different in the following ways:
+\begin{itemize}
+\item the store maps addresses to \emph{sets} of values,
+\item continuations are heap-allocated,
+\item there are ``contour values'' (written $\mcntr$) and syntax
+  labels ($\mlab$) threaded through the computation, and
+\item the machine is implicity parameterized by the functions
+  $\mathit{push}$, $\mathit{bind}$, and $\interpdelta$.
+\end{itemize}
+
 \begin{figure}
 \begin{align*}
-\ev{\svar{x},\rho,\kappa,\sigma} &\machstep
-\co{\kappa,v,\sigma}
-\text{ where }v \in \msto(\menv(x))
-\\
-\ev{\snum{n},\menv,\mkont,\msto} &\machstep
-\co{\mkont,n,\msto}
-\\
-\ev{\slam\mvar\mexp,\menv,\mkont,\msto} &\machstep
-\co{\mkont,\clos{\mvar,\mexp,\menv}}
-\\
-%% \ev{\srec\mvarf\mvar\mexp,\menv,\mkont,\msto} &\machstep
-%% \co{\mkont,\rlos{\mvarf,\mvar,\mexp,\menv}}
-%% \\
-\ev{\sapp{\mexpi0}{\mexpi1},\menv,\mkont,\msto} &\machstep
-\ev{\mexpi{0},\menv,\kar{\mexpi{1},\menv,a},\msto'}
-\text{ where }a,\msto' = \mathit{push}(l,\msto,\mkont)
-\\
-\ev{\sif{\mexpi0}{\mexpi1}{\mexpi2},\menv,\mkont,\msto} &\machstep
-\ev{\mexpi0,\menv,\kif{\mexpi1,\mexpi2,\menv,\maddr},\msto'}
-\text{ where }a,\msto' = \mathit{push}(l,\msto,\mkont)
-\\
-\ev{\sopu\mop\mexp,\menv,\mkont,\msto} &\machstep
-\ev{\mexp,\menv,\kuop{\mop,\maddr},\msto'}
-\text{ where }a,\msto' = \mathit{push}(l,\msto,\mkont)
-%%\\
-%% \ev{\sopb\mop{\mexpi0}{\mexpi1},\menv,\mkont,\msto} &\machstep
-%% \ev{\mexpi0,\menv,\kbopa{\mexpi1,\menv,\maddr},\msto'}
-%% \text{ where }a,\msto' = \mathit{push}(l,\msto,\mkont)
+\mathit{eval}(\mexp) &= \{ \mstate\ |\ \ev[^{\epsilon}]{\mexp,\varnothing,\varnothing,\kmt} \multimachstep \mstate \} \text{ where }
 \\[2mm]
+%% EVAL
+\ev{\svar\mvar,\menv,\msto,\mkont} &\machstep
+\co{\mkont,\mval,\msto}
+\text{ where }\mval \in \msto(\menv(\mvar))
+\\
+\ev{\slit\mlit,\menv,\msto,\mkont} &\machstep
+\co{\mkont,\mlit,\msto}
+\\
+\ev{\slam\mvar\mexp,\menv,\msto,\mkont} &\machstep
+\co{\mkont,\clos{\mvar,\mexp,\menv},\msto}
+\\
+\ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &\machstep
+\ev[^\mcntr]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}
+\text{ where }\maddr,\msto' = \mathit{push}^\mcntr_\mlab(\msto,\mkont)
+\\
+\ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} &\machstep
+\ev[^\mcntr]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}
+\text{ where }\maddr,\msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)
+\\[2mm]
+%% CONTINUE
 \co{\kmt,\mval,\msto} &\machstep
 \ans{\msto,\mval}
 \\
-\co{\kar{\mexp,\menv,\maddr},\mval,\msto} & \machstep
-\ev{\mexp,\menv,\kfn{\mval,\maddr},\msto}
+\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto} & \machstep
+\ev[^\mcntr]{\mexp,\menv,\msto,\kfn[^\mcntr_\mlab]{\mval,\maddr}}
 \\
-\co{\kfn{{\mvalx{u}},\maddr},\mval,\msto} & \machstep
-\ap{\mval,\mvalx{u},\mkont,\msto}
+\co{\kfn[^\mcntr_\mlab]{{\mvalx{u}},\maddr},\mval,\msto} & \machstep
+\ap[^\mcntr_\mlab]{\mval,\mvalx{u},\mkont,\msto}
 \text{ where }\mkont \in \msto(\maddr)
 \\
-\co{\kif{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto} & \machstep
-\ev{\mexpi0,\menv,\mkont,\msto}
+\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto} & \machstep
+\ev[^\mcntr]{\mexpi0,\menv,\msto,\mkont}
 \text{ where }\mkont\in\msto(\maddr)
 \\
-\co{\kif{\mexpi0,\mexpi1,\menv,\maddr},\sfalse,\msto} & \machstep
-\ev{\mexpi1,\menv,\mkont,\msto}
+\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\sfalse,\msto} & \machstep
+\ev[^\mcntr]{\mexpi1,\menv,\msto,\mkont}
 \text{ where }\mkont\in\msto(\maddr)
+\\[2mm]
+%% APPLY
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont} & \machstep
+\ev[^{\mcntr'}\!]{\mexp,\menv',\msto',\mkont}
+\text{ where }\menv',\msto',\mcntr' = \mathit{bind\,}^{ \mcntr}_\mlab(\msto,\mvar,\mval)
 \\
-\co{\kuop{\mop,\maddr},\mval,\msto} & \machstep
+\ap{\mop,\mval,\msto,\mkont} & \machstep
 \co{\mkont,\mval',\msto}
 \text{ where }\mkont\in\msto(\maddr)
-\text{ and } \mval'\in\delta(\mop,\mval)
-%% \\
-%% \co{\kbopa{\mop,\mexp,\menv,\maddr},\mval,\msto} & \machstep
-%% \ev{\mexp,\menv,\kbopb{\mop,\mval,\maddr},\msto}
-%% \\
-%% \co{\kbopb{\mop,\mvalx{u},\maddr},\mval,\msto} & \machstep
-%% \co{\mkont,\mval',\msto}
-%% \text{ where }\mkont=\msto(\maddr)
-%% \text{ and } \mval'=\delta(\mop,\mval,\mvalx{u})
-\\[2mm]
-\ap{\clos{\mvar,\mexp,\menv},\mval,\mkont} & \machstep
-\ev{\mexp,\menv',\mkont,\msto'}
-\text{ where }\menv',\msto' = \mathit{bind}(\msto,\mvar,\mval)
-\\
-%% \ap{\rlos{\mvarf,\mvar,\mexp,\menv},\mval,\mkont} & \machstep
-%% \ev{\mexp,\menv',\mkont,\msto'}
-%% \text{ where }\menv',\msto' = \mathit{bind}(\msto,\langle\mvar,\mval\rangle,\langle\mvarf,
-%% \rlos{\mvarf,\mvar,\mexp,\menv}\rangle)
+\text{ and } \mval'\in\interpdelta(\mop,\mval)
 \end{align*}
 \caption{Abstract$^2$ machine for ISWIM}
 \label{fig:aam}
 \end{figure}
+
 
 \paragraph{Concrete interpretation} can be characterized by setting the implicit
 parameters of the relation given in Figure~\ref{fig:aam} as follows:
@@ -151,6 +178,12 @@ of a programs behavior; on the other is an abstract interpretation
 that is easy to compute but gives little information.  Useful program
 analyses lay somewhere in between and can be characterized by their
 choice of address representation and allocation strategy.
+
+%% We now have a framework for describing program analysis for the ISWIM
+%% family of languages, whereby approximation of both control and
+%% environment structure is regulated by the heap and allocation
+%% policies.
+
 Uniform \(k\)-CFA is one such analysis.
 
 \paragraph{Uniform \(k\)-CFA} can be characterized by the following allocation
@@ -249,7 +282,44 @@ The \syntax{plus} and \syntax{mult} functions are written as usual.
 
 This program reaches $N$ states under concrete interpretation.
 
+\subsection{Generic fixpoint calculator}
+
+We compute the semantics of a program by iterating the state
+transition relation until a fixed point in the reachable states is
+reached.
+
+\begin{verbatim}
+;; appl : (∀ (X) ((X -> (Setof X)) -> ((Setof X) -> (Setof X))))
+(define ((appl f) s)
+  (for/fold ([i (set)])
+    ([x (in-set s)])
+    (set-union i (f x))))
+
+;; Calculate fixpoint of (appl f).
+;; fix : (∀ (X) ((X -> (Setof X)) (Setof X) -> (Setof X)))
+(define (fix f s)
+  (let loop ((accum (set)) (front s))
+    (if (set-empty? front)
+        accum
+        (let ((new-front ((appl f) front)))
+          (loop (set-union accum front)
+                (set-subtract new-front accum))))))
+\end{verbatim}
+
 \subsection{Store widening}
+
+\begin{verbatim}
+;; State^ = (cons (Set Conf) Store)
+
+;; (State -> Setof State) -> State^ -> { State^ }
+(define ((wide-step step) state)
+  (match state
+    [(cons cs σ)
+     (define ss ((appl step)
+                 (for/set ([c cs]) (c->s c σ))))
+     (set (cons (for/set ([s ss]) (s->c s))
+                (join-stores ss)))]))
+\end{verbatim}
 
 \subsection{Baseline evaluation}
 
@@ -299,6 +369,64 @@ where $\msto_4 = \msto_0 \sqcup \{ [\maddr_1 \mapsto \{ \mkont \}],
 Notice that the only difference between concrete and abstract interpretation
 is which addresses are pushed.
 
+\begin{figure}
+\begin{align*}
+\compile{\svar\mvar} &= \lambda(\menv,\msto,\mkont) .\co{\mkont,\mval,\msto} \text{ where }\mval\in\msto(\menv(\mvar))
+\\
+\compile{\slit\mlit} &= \lambda(\menv,\msto,\mkont) .
+\co{\mkont,\mlit,\msto}
+\\
+\compile{\slam\mvar\mexp} &= \lambda(\menv,\msto,\mkont) .
+\co{\mkont,\clos{\mvar,\compile\mexp,\menv},\msto}
+\\
+\compile{\sapp[^\mlab]{\mexpi0}{\mexpi1}} &= \lambda^\mcntr(\menv,\msto,\mkont) .
+\compile{\mexpi0}^\mcntr(\menv,\msto',\kar[_\mlab^\mcntr]{\compile{\mexpi1},\menv,\maddr})
+\text{ where }\maddr,\msto' = \mathit{push}^\mcntr_\mlab(\msto,\mkont)
+\\
+\compile{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}} &= \lambda^\mcntr(\menv,\msto,\mkont) .
+\compile{\mexpi0}^\delta(\menv,\msto',\kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})
+\text{ where }\maddr,\msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)
+\end{align*}
+\caption{Compilation}
+\end{figure}
+
+\begin{figure}
+\begin{align*}
+\mathit{eval}(\mexp) &= \{ \mstate\ |\ \compile{\mexp}(\epsilon,\varnothing,\varnothing,\kmt) \multimachstep \mstate \} \text{ where }
+\\[2mm]
+%% CONTINUE
+\co{\kmt,\mval,\msto} &\machstep
+\ans{\msto,\mval}
+\\
+\co{\kar[^\mcntr_\mlab]{\mcomp,\menv,\maddr},\mval,\msto} & \machstep
+\mcomp^\mcntr(\menv,\msto,\kfn[^\mcntr_\mlab]{\mval,\maddr})
+\\
+\co{\kfn[^\mcntr_\mlab]{{\mvalx{u}},\maddr},\mval,\msto} & \machstep
+\ap[^\mcntr_\mlab]{\mval,\mvalx{u},\mkont,\msto}
+\text{ where }\mkont \in \msto(\maddr)
+\\
+\co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\strue,\msto} & \machstep
+\mcompi0^\mcntr(\menv,\msto,\mkont)
+\text{ where }\mkont\in\msto(\maddr)
+\\
+\co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\sfalse,\msto} & \machstep
+\mcompi1^\mcntr(\menv,\msto,\mkont)
+\text{ where }\mkont\in\msto(\maddr)
+\\[2mm]
+%% APPLY
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\msto,\mkont} & \machstep
+\mcomp^{\mcntr'}(\menv',\msto',\mkont)
+\text{ where }\menv',\msto',\mcntr' = \mathit{bind\,}^{ \mcntr}_\mlab(\msto,\mvar,\mval)
+\\
+\ap{\mop,\mval,\msto,\mkont} & \machstep
+\co{\mkont,\mval',\msto}
+\text{ where }\mkont\in\msto(\maddr)
+\text{ and } \mval'\in\interpdelta(\mop,\mval)
+\end{align*}
+\caption{Abstract$^2$ machine for compiled ISWIM}
+\label{fig:caam}
+\end{figure}
+
 
 Compile:
    cpu time: 255397 real time: 261532 gc time: 2947
@@ -321,9 +449,20 @@ Delta Store + Special + Compile + Lazy:
 
 \section{Evaluation}
 
+\cite{dvanhorn:Earl2012Introspective}
+
+\cite{dvanhorn:wright-jagannathan-toplas98}
+
 Other benchmarks
 
 \section{Related work}
+
+Boucher and Feeley \cite{dvanhorn:Boucher1996Abstract} introduced the
+idea of \emph{abstract compilation}, which used closure generation
+\cite{dvanhorn:Feeley1987Using} to improve the performance of control
+flow analysis.  We have adapted the closure generation technique from
+composition evaluators to abstract machines and applied it to similar
+effect.
 
 \section{Conclusion}
 
@@ -331,8 +470,13 @@ Abstract machines are not only a good model for rapid analysis
 development, they also can be systematically developed into efficient
 algorithms.
 
+\bibliographystyle{splncs}
+\bibliography{dvh-bibliography}
+
 \appendix
 \section{Relation to Uniform \(k\)-CFA (A Case Against Acceptability)}
+
+\cite{dvanhorn:nielson-nielson-popl97} \cite{dvanhorn:Neilson:1999}
 
 This machine's allocation strategy mimics the Uniform k-CFA analysis
 in Principles of Program Analysis, which is defined in terms of
@@ -420,6 +564,7 @@ The main problem is calculation of an analysis can no longer be
 computed as the fixed point of the machine transition relation.
 Although there are several implementations (CFA2,ICFP'12), they
 operate at speeds roughly on par with our starting point: unoptimized
-store widened machines.
+store widened
+machines. \cite{dvanhorn:Earl2012Introspective,dvanhorn:Vardoulakis2011CFA2}
 
 \end{document}
