@@ -1,6 +1,5 @@
 #lang racket
 
-(require racket/trace)
 (provide rkt->sexp sch->sexp)
 
 ;; expect top level forms
@@ -28,7 +27,6 @@
     (split-at-right forms 1))
   (append (for/list ([def defs]) (define-values->sexp def))
           (list (expr->sexp (car exps)))))
-(trace top-level->sexp)
 
 (define (define-values->sexp sexp)
   (match sexp

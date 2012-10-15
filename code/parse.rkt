@@ -78,13 +78,19 @@
        (parse `(let ((,tmp ,e))
                  (if ,tmp ,tmp (or ,@es))))]
       [`(quote ,d)
-       (cond [(or (boolean? d)
-                  (number? d)
-                  (symbol? d)
-                  (string? d)
-                  (null? d))
+       (cond
+         [(hash-has-key? ρ 'quote) ;; was rebound
+          (app (fresh-label!)
+               (var (fresh-label!) (rename 'quote))
+               (list (parse d)))]
+         [(or (boolean? d)
+              (number? d)
+              (symbol? d)
+              (string? d)
+              (null? d))
               (datum (fresh-label!) d)]
-             [(pair? d) (parse `(cons (quote ,(car d)) (quote ,(cdr d))))]
+             [(pair? d)
+              (parse `(cons (quote ,(car d)) (quote ,(cdr d))))]
              [else (error 'parse "Unsupported datum ~a" d)])]
       [`(,e . ,es)
        (app (fresh-label!)
@@ -95,3 +101,4 @@
                 (not (hash-has-key? ρ s)))
          (primr (fresh-label!) s)
          (var (fresh-label!) (rename s)))])))
+

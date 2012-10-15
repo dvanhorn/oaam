@@ -18,7 +18,7 @@
             [(s) #'(or (string? v) (eq? v 'string))]
             [(!) #'(void? v)]
             [(b) #'(boolean? v)]
-            [(v) #'(vectorv? v)]
+            [(v) #'(or (vectorv? v) (vectorv^? v))]
             [(p) #'(consv? v)]
             [(any) #'#t])))
 
@@ -48,6 +48,9 @@
                                   #`(#,f vs))))))
     (provide type))
 
+  (define-syntax-rule (for/append guards body1 body ...)
+    (for/fold ([res '()]) guards (append (let () body1 body ...) res)))
+
   (define-syntax (mk-prim-meaning-table stx)
     (syntax-parse stx
       [(_ (~optional (~and #:static static?)) getter setter widen delay table-id:id)
@@ -62,9 +65,10 @@
                              (make-hasheq '((prim read-store? write-store?) ...)))
                            (define-syntax (mk-check-good stx)
                              (syntax-case stx ()
-                               [(_ check-good) (syntax/loc stx
-                                                 (define (check-good o vs)
-                                                   (case o [(prim) (t.checker-fn vs)] ...)))]))
+                               [(_ check-good)
+                                (syntax/loc stx
+                                  (define (check-good o vs)
+                                    (case o [(prim) (t.checker-fn vs)] ...)))]))
                            (provide td mk-check-good))]
                       [(_ defines ... ([x0 x1 x2 x3 x4] ...)) (raise-syntax-error #f "Bad type decls" stx)])))
                #'(...
@@ -112,22 +116,25 @@
              (define (vectorv-ref σ vec z)
                (match vec
                  [(vectorv _ '()) '()]
-                 [(vectorv _ (? list? l))
+                 [(vectorv _ l)
                   ;; sloppy. Abstract ref could get stuck, but just join all addrs.
                   (cond [(eq? 'number z)
                          (error 'vectorv-ref "Abstract vectors should have a single cell")]
                         [(or (< z 0) (>= z (length l))) '()]
-                        [else (getter σ (list-ref l z))])]
-                 [(vectorv _ abs-cell) (getter abs-cell)]))
+                        [else (for/list ([v (delay σ (list-ref l z))]) v)])]
+                 [(vectorv^ _ abs-cell) (for/list ([v (delay σ abs-cell)]) v)]))
              (define (vectorv-set! σ l δ vec i val)
                (match vec
                  [(vectorv _ '()) (values σ '())]
-                 [(vectorv _ (? list? l))
+                 [(vectorv _ l)
                   (cond [(eq? 'number i)
                          (error 'vectorv-set! "Abstract vectors should have a single cell")]
                         [(or (< z 0) (>= z (length l))) (values σ '())]
-                        [else (values (setter σ (list-ref l i) val) (void))])]
-                 [(vectorv _ abs-cell) (setter σ abs-cell val)]))
+                        [else (values (setter σ (list-ref l i) val) `(,(void)))])]
+                 [(vectorv^ _ abs-cell) (values (setter σ abs-cell val) `(,(void)))]))
+             (define (vectorv-length v)
+               (match v
+                 [(or (vectorv len _) (vectorv^ len _)) `(,len)]))
              (define (add1v n)
                (if (eq? 'number n)
                  '(number)
@@ -151,16 +158,15 @@
                  ['number
                   (define V-addr `((V . ,l) . ,δ))
                   (define σ* (setter σ V-addr default))
-                  (values σ* (vectorv^ size V-addr))]
+                  (values σ* `(,(vectorv^ size V-addr)))]
                  [_ (define V-addrs
                       (for/list ([i (in-range size)]) `((V ,i . ,l) . ,δ)))
                     (define σ* (for/fold ([σ σ]) ([a (in-list V-addrs)])
                                  (setter σ a default)))
-                    (values σ* (vectorv size V-addrs))]))
-             (define (vectorv*? v) (or (vectorv? v) (vectorv^? v)))
-             (define (consv-car* σ v) (delay σ (consv-car v)))
-             (define (consv-cdr* σ v) (delay σ (consv-cdr v)))
-
+                    (values σ* `(,(vectorv size V-addrs)))]))
+             (define (vectorv*? v) `(,(or (vectorv? v) (vectorv^? v))))
+             (define (consv*? v) `(,(consv? v)))
+             
              (define (chase dirs σ v)
                (match dirs
                  ['() `(,v)]
@@ -169,10 +175,9 @@
                     [(consv a d)
                      (define addr (case dir [(#\a) a] [(#\d) d]))
                      (if (null? dirs)
-                       (delay σ addr)
-                       (for/fold ([vals '()])
-                           ([v (getter σ addr)])
-                         (append (chase dirs σ v) vals)))]
+                       (for/list ([v (delay σ addr)]) v)
+                       (for/append ([v (getter σ addr)])
+                         (chase dirs σ v)))]
                     [_ '()])]))
 
              (define (mk-cons-accessor which)
@@ -188,63 +193,92 @@
              (define (notv v) `(,(not v)))
              (define (nullv? v) `(,(null? v)))
              (define (voidv) `(,(void)))
+
+             (define (make-listv σ l δ . vs)
+               (cond [(null? vs) (values σ '(()))]
+                     [else
+                      (define fst-addr `((L 0 . ,l) . ,δ))
+                      (define snd-addr `((L 0 D . ,l) . ,δ))
+                      (define val (consv fst-addr snd-addr))
+                      (let loop ([σ (setter σ fst-addr (first vs))]
+                                 [last-addr snd-addr]
+                                 [vs (rest vs)]
+                                 [i 1])
+                        (cond [(null? vs) (values (setter σ last-addr '()) `(,val))]
+                              [else
+                               (define fst-addr `((L ,i . ,l) . ,δ))
+                               (define snd-addr `((L ,i D . ,l) . ,δ))
+                               (loop (setter σ last-addr (consv fst-addr snd-addr))
+                                     snd-addr
+                                     (add1 i))]))]))
+
+             (define (wide-num fn)
+               (λ vs
+                 `(,(widen (apply fn (filter-not (λ (x) (eq? x 'number)) vs))))))
+             (define *v (wide-num *))
+             (define +v (wide-num +))
+             (define -v (wide-num -))
+             (define =v (wide-num =))
              
              ;; Booleans are for reads-store? writes-store?
-             ((add1        #f #f add1v        (z -> z))
-              (sub1        #f #f sub1v        (z -> z))
-              (zero?       #f #f zero?v       (z -> b))
-              (not         #f #f notv         (any -> b))
-              (*           #f #f *            (z z -> z))
-              (+           #f #f +            (z z -> z))
-              (-           #f #f -            (z z -> z))
-              (=           #f #f =            (z z -> b))
-              (equal?      #t #f equalv?      (any any -> b))
-              (eqv?        #t #f equalv?      (any any -> b))
-              (eq?         #t #f equalv?      (any any -> b))
-              (vector?     #f #f vectorv*?     (any -> b))
-              (pair?       #f #f consv?       (any -> b))
-              (vector-ref  #t #f vectorv-ref  (v z -> any))
-              (vector-set! #f #t vectorv-set! (v z any -> !))
-              (make-vector #f #t make-vectorv ((z -> v)
-                                               (z any -> v)))
+             ((add1          #f #f add1v          (z -> z))
+              (sub1          #f #f sub1v          (z -> z))
+              (zero?         #f #f zero?v         (z -> b))
+              (not           #f #f notv           (any -> b))
+              (*             #f #f *v             (#:rest z -> z))
+              (+             #f #f +v             (#:rest z -> z))
+              (-             #f #f -v             (#:rest z -> z))
+              (=             #f #f =v             (#:rest z -> b))
+              (equal?        #t #f equalv?        (any any -> b))
+              (eqv?          #t #f equalv?        (any any -> b))
+              (eq?           #t #f equalv?        (any any -> b))
+              ;; vector ops
+              (vector?       #f #f vectorv*?      (any -> b))
+              (vector-ref    #t #f vectorv-ref    (v z -> any))
+              (vector-set!   #f #t vectorv-set!   (v z any -> !))
+              [vector-length #f #f vectorv-length (v -> z)]
+              [make-vector   #f #t make-vectorv   ((z -> v)
+                                                   (z any -> v))]
               ;; should be '() or p, but not expressible nor needed yet.
-              (list        #f #t make-list    (#:rest any -> any))
-              (cons        #f #t make-consv   (any any -> p))
-              (void        #f #f voidv        (-> !))
-              (null?       #f #f nullv?       (any -> b))
-              [car #t #f (mk-cons-accessor 'car) (p -> any)]             
-              [cdr #t #f (mk-cons-accessor 'cdr) (p -> any)]
-              [caar #t #f (mk-cons-accessor 'caar) (p -> any)]
-              [cadr #t #f (mk-cons-accessor 'cadr) (p -> any)]
-              [cdar #t #f (mk-cons-accessor 'cdar) (p -> any)]
-              [cddr #t #f (mk-cons-accessor 'cddr) (p -> any)]
-              [caaar #t #f (mk-cons-accessor 'caaar) (p -> any)]
-              [caadr #t #f (mk-cons-accessor 'caadr) (p -> any)]
-              [cadar #t #f (mk-cons-accessor 'cadar) (p -> any)]
-              [caddr #t #f (mk-cons-accessor 'caddr) (p -> any)]
-              [cdaar #t #f (mk-cons-accessor 'cdaar) (p -> any)]
-              [cdadr #t #f (mk-cons-accessor 'cdadr) (p -> any)]
-              [cddar #t #f (mk-cons-accessor 'cddar) (p -> any)]
-              [cdddr #t #f (mk-cons-accessor 'cdddr) (p -> any)]
-              [caaaar #t #f (mk-cons-accessor 'caaaar) (p -> any)]
-              [caaadr #t #f (mk-cons-accessor 'caaadr) (p -> any)]
-              [caadar #t #f (mk-cons-accessor 'caadar) (p -> any)]
-              [caaddr #t #f (mk-cons-accessor 'caaddr) (p -> any)]
-              [cadaar #t #f (mk-cons-accessor 'cadaar) (p -> any)]
-              [cadadr #t #f (mk-cons-accessor 'cadadr) (p -> any)]
-              [caddar #t #f (mk-cons-accessor 'caddar) (p -> any)]
-              [cadddr #t #f (mk-cons-accessor 'cadddr) (p -> any)]
-              [cdaaar #t #f (mk-cons-accessor 'cdaaar) (p -> any)]
-              [cdaadr #t #f (mk-cons-accessor 'cdaadr) (p -> any)]
-              [cdadar #t #f (mk-cons-accessor 'cdadar) (p -> any)]
-              [cdaddr #t #f (mk-cons-accessor 'cdaddr) (p -> any)]
-              [cddaar #t #f (mk-cons-accessor 'cddaar) (p -> any)]
-              [cddadr #t #f (mk-cons-accessor 'cddadr) (p -> any)]
-              [cdddar #t #f (mk-cons-accessor 'cdddar) (p -> any)]
-              [cddddr #t #f (mk-cons-accessor 'cddddr) (p -> any)]
-              [set-car! #f #t set-car!v (p -> !)]
-              [set-cdr! #f #t set-cdr!v (p -> !)]
-              [error #f #f errorv (#:rest any -> any)])))]))
+              [list        #f #t make-listv (#:rest any -> any)]
+              [null?       #f #f nullv?     (any -> b)]
+              [pair?       #f #f consv*?    (any -> b)]
+              [cons        #f #t make-consv (any any -> p)]
+              [car         #t #f (mk-cons-accessor 'car)    (p -> any)]             
+              [cdr         #t #f (mk-cons-accessor 'cdr)    (p -> any)]
+              [caar        #t #f (mk-cons-accessor 'caar)   (p -> any)]
+              [cadr        #t #f (mk-cons-accessor 'cadr)   (p -> any)]
+              [cdar        #t #f (mk-cons-accessor 'cdar)   (p -> any)]
+              [cddr        #t #f (mk-cons-accessor 'cddr)   (p -> any)]
+              [caaar       #t #f (mk-cons-accessor 'caaar)  (p -> any)]
+              [caadr       #t #f (mk-cons-accessor 'caadr)  (p -> any)]
+              [cadar       #t #f (mk-cons-accessor 'cadar)  (p -> any)]
+              [caddr       #t #f (mk-cons-accessor 'caddr)  (p -> any)]
+              [cdaar       #t #f (mk-cons-accessor 'cdaar)  (p -> any)]
+              [cdadr       #t #f (mk-cons-accessor 'cdadr)  (p -> any)]
+              [cddar       #t #f (mk-cons-accessor 'cddar)  (p -> any)]
+              [cdddr       #t #f (mk-cons-accessor 'cdddr)  (p -> any)]
+              [caaaar      #t #f (mk-cons-accessor 'caaaar) (p -> any)]
+              [caaadr      #t #f (mk-cons-accessor 'caaadr) (p -> any)]
+              [caadar      #t #f (mk-cons-accessor 'caadar) (p -> any)]
+              [caaddr      #t #f (mk-cons-accessor 'caaddr) (p -> any)]
+              [cadaar      #t #f (mk-cons-accessor 'cadaar) (p -> any)]
+              [cadadr      #t #f (mk-cons-accessor 'cadadr) (p -> any)]
+              [caddar      #t #f (mk-cons-accessor 'caddar) (p -> any)]
+              [cadddr      #t #f (mk-cons-accessor 'cadddr) (p -> any)]
+              [cdaaar      #t #f (mk-cons-accessor 'cdaaar) (p -> any)]
+              [cdaadr      #t #f (mk-cons-accessor 'cdaadr) (p -> any)]
+              [cdadar      #t #f (mk-cons-accessor 'cdadar) (p -> any)]
+              [cdaddr      #t #f (mk-cons-accessor 'cdaddr) (p -> any)]
+              [cddaar      #t #f (mk-cons-accessor 'cddaar) (p -> any)]
+              [cddadr      #t #f (mk-cons-accessor 'cddadr) (p -> any)]
+              [cdddar      #t #f (mk-cons-accessor 'cdddar) (p -> any)]
+              [cddddr      #t #f (mk-cons-accessor 'cddddr) (p -> any)]
+              ;; imperative ops
+              [set-car!    #f #t set-car!v (p -> !)]
+              [set-cdr!    #f #t set-cdr!v (p -> !)]
+              [void        #f #f voidv     (-> !)]
+              [error       #f #f errorv    (#:rest any -> any)])))]))
 
   (mk-prim-meaning-table #:static _ _ _ _ prim-static))
 (require (for-syntax 'prims) 'prims)

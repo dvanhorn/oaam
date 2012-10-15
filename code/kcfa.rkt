@@ -204,41 +204,6 @@
      (λ (σ ρ k δ) (set (co σ k p)))]))
   compile)
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Primops
-
-(define (stringish? x)
-  (or (string? x)
-      (eq? 'string x)))
-
-(define (z->z? o)
-  (memq o '(add1 sub1)))
-
-(define (z->z o x)
-  (match* (o x)
-    [(o 'number) (set 'number)]
-    [(o (? number? n))
-     (set (case o
-            [(add1) (add1 n)]
-            [(sub1) (sub1 n)]))]
-    [(o _) (set)]))
-
-(define (z-z->z? o)
-  (memq o '(+ - *)))
-
-(define (z-z->z o x y)
-  (match* (o x y)
-    [(o 'number 'number) (set 'number)]
-    [(o 'number (? number?)) (set 'number)]
-    [(o (? number?) 'number) (set 'number)]
-    [(o (? number? n) (? number? m))
-     (set (case o
-            [(+) (+ n m)]
-            [(-) (- n m)]
-            [(*) (* n m)]))]
-    [(o _ _) (set)]))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Concrete semantics
 
@@ -247,8 +212,8 @@
         [(boolean? b) b]
         [else (error "Unknown base value" b)]))
 
-(define (hash-getter σ addr) (hash-ref σ addr (λ ()
-                                                 (error 'getter "Unbound addr ~a" addr))))
+(define (hash-getter σ addr)
+  (hash-ref σ addr (λ () (error 'getter "Unbound addr ~a" addr))))
 (define (mk-eval-setter force)
   (λ (σ l v) (extend σ l (force σ v))))
 
@@ -283,7 +248,6 @@
     [(? boolean?) b]
     ['number 'number]
     [else (error "Unknown base value" b)]))
-
 
 (define (delay σ x)
   (set (addr x)))
