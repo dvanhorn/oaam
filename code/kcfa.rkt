@@ -17,9 +17,10 @@
 
 ;; A [Rel X ... Y] is a (X -> ... -> (Setof Y))
 
+(define snull (set '()))
 (define (toSetOfLists list-of-sets)
   (match list-of-sets
-    ['() ∅]
+    ['() snull]
     [(list singleS) (for/set ([hd (in-set singleS)]) (list hd))]
     [(cons hdS tail)
      (for*/set ([hd (in-set hdS)]
@@ -90,26 +91,26 @@
            [(ifk t e ρ a δ)
             (for*/union [(k (get-cont σ a))
                          (v (force σ v))]
-                        (ev% σ (if v t e) ρ k δ))]
+              (ev% σ (if v t e) ρ k δ))]
            [(lrk x '() '() e ρ a δ)
             (define σ* (join σ (lookup-env ρ x) (force σ v)))
             (for/union ((k (get-cont σ a)))
-                       (ev% σ* e ρ k δ))]
+              (ev% σ* e ρ k δ))]
            [(lrk x (cons y xs) (cons e es) b ρ a δ)
             (define σ* (join σ (lookup-env ρ x) (force σ v)))
             (ev% σ* e ρ (lrk y xs es b ρ a δ) δ)]
            [(sk! l a)
             (define σ* (setter σ l v))
             (for/set ((k (get-cont σ a)))
-                     (co σ* k (void)))])]
+              (co σ* k (void)))])]
 
         ;; this code is dead when running compiled code.
         [(ev σ e ρ k δ)
          (match e
-           [(var l x)           (for/set ((v (delay σ (lookup-env ρ x))))
-                                         (co σ k v))]
-           [(datum l d)           (set (co σ k d))]
-           [(lam l x e)         (set (co σ k (clos x e ρ)))]
+           [(var l x) (for/set ((v (delay σ (lookup-env ρ x))))
+                        (co σ k v))]
+           [(datum l d) (set (co σ k d))]
+           [(lam l x e) (set (co σ k (clos x e ρ)))]
            [(lrc l xs es b)
             (define-values (σ0 a) (push σ l δ k))
             (define as (map (λ (x) (cons x δ)) xs))
@@ -207,8 +208,7 @@
 ;; Concrete semantics
 
 (define (eval-widen b)
-  (cond [(number? b) b]
-        [(boolean? b) b]
+  (cond [(atomic? b) b]
         [else (error "Unknown base value" b)]))
 
 (define (hash-getter σ addr)
@@ -244,6 +244,8 @@
 (define (widen b)
   (match b
     [(? number?) 'number]
+    [(? string?) 'string]
+    [(? symbol?) 'symbol]
     [(? boolean?) b]
     ['number 'number]
     [else (error "Unknown base value" b)]))
@@ -322,7 +324,7 @@
   (for/set ([s (fix step (inj e))]
             #:when (ans? s))
     (match-define (ans σ v) s)
-    (ans (restrict-to-reachable σ v) s)))
+    (ans (restrict-to-reachable σ v) v)))
 
 ;; (State -> Setof State) -> Exp -> Set Val
 ;; 0CFA without store widening

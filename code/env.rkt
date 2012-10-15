@@ -53,10 +53,10 @@
   (let loop ([as root])
     (for/union #:res acc ([a (in-set as)]
                           #:unless (a . ∈ . seen))
-      (set! seen (∪1 seen a))
-      (for/union #:initial acc
-                 ([v (in-set (hash-ref σ a))])
-        (loop (touches v))))))
+               (set! seen (∪1 seen a))
+               (for/union #:initial (∪1 acc a)
+                          ([v (in-set (hash-ref σ a))])
+                          (loop (touches v))))))
 
 (define (restrict-to-reachable σ v)
   (for/hash ([a (in-set (reach σ (touches v)))])

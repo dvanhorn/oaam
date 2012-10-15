@@ -64,6 +64,8 @@
                            (define-syntax (mk-check-good stx)
                              (syntax-case stx ()
                                [(_ check-good)
+                                (printf "Checkers: ~a~%"
+                                        (map syntax->datum (syntax->list #'([prim t.checker-fn] ...))))
                                 (syntax/loc stx
                                   (define (check-good o vs)
                                     (case o [(prim) (t.checker-fn vs)] ...)))]))
@@ -193,8 +195,9 @@
              (define (make-listv σ l δ . vs)
                (cond [(null? vs) (values σ '(()))]
                      [else
-                      (define fst-addr `((L 0 . ,l) . ,δ))
-                      (define snd-addr `((L 0 D . ,l) . ,δ))
+                      (define (laddr i)
+                        (values `((L ,i . ,l) . ,δ) `((L ,i D . ,l) . ,δ)))
+                      (define-values (fst-addr snd-addr) (laddr 0))
                       (define val (consv fst-addr snd-addr))
                       (let loop ([σ (setter σ fst-addr (first vs))]
                                  [last-addr snd-addr]
@@ -202,12 +205,10 @@
                                  [i 1])
                         (cond [(null? vs) (values (setter σ last-addr '()) `(,val))]
                               [else
-                               (define fst-addr `((L ,i . ,l) . ,δ))
-                               (define snd-addr `((L ,i D . ,l) . ,δ))
-                               (loop (setter σ last-addr (consv fst-addr snd-addr))
-                                     snd-addr
-                                     (rest vs)
-                                     (add1 i))]))]))
+                               (define-values (fst-addr snd-addr) (laddr i))
+                               (define σ*  (setter σ  fst-addr  (first vs)))
+                               (define σ** (setter σ* last-addr (consv fst-addr snd-addr)))
+                               (loop σ** snd-addr (rest vs) (add1 i))]))]))
 
              (define (wide-num fn)
                (λ vs
