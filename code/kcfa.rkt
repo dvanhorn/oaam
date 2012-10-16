@@ -13,12 +13,9 @@
          (rename-in racket/generator
                     [yield real-yield]
                     [generator real-generator])
-         racket/stxparam
+         racket/stxparam racket/splicing
          (for-syntax syntax/parse racket/syntax))
 
-(define-syntax-parameter yield
-  (λ (stx)
-     (raise-syntax-error #f "Must be within the context of a generator" stx)))
 (define-syntax-parameter yield-meaning
   (λ (stx) (raise-syntax-error #f "Must parameterize for mk-analysis" stx)))
 
@@ -42,19 +39,16 @@
 
 (begin-for-syntax
  (define-syntax-rule (implies ante concl) (if ante concl #t)))
+;; Expects syntax parameters getter setter widen delay make-var-contour
 (define-syntax (mk-analysis stx)
   (syntax-parse stx
     [(_ (~or ;; analysis parameters
-         (~once (~seq #:bind-join-one xbind-join-one:id))
+         (~once (~seq #:bind-join-one bind-join-one:id))
          (~once (~seq #:bind-join bind-join:id))
          (~once (~seq #:bind-join* bind-join*:id))
          (~once (~seq #:bind-push bind-push:id))
          (~once (~seq #:tick tick:id))
-         (~once (~seq #:make-var-contour make-var-contour:id))
-         (~once (~seq #:getter getter:id))
          (~once (~seq #:force force:id))
-         (~once (~seq #:delay delay:id))
-         (~once (~seq #:widen widen:id))
          (~once (~seq #:fixpoint fixpoint:expr))
          (~once (~seq #:aval aval:id)) ;; name the evaluator to use/provide
          ;; Define the compiler? With what name?
@@ -142,12 +136,12 @@
                   #,(cond [(attribute generators?)
                            #'(λ (σ-op ... ρ-op ... k δ-op ... yield)
                                 (...
-                                 (syntax-parameterize ([yield (make-rename-transformer #'pass-yield-to-ev)])
+                                 (syntax-parameterize ([yield pass-yield-to-ev])
                                    body ...)))]
                           [else
                            #'(λ (σ-op ... ρ-op ... k δ-op ...)
                                 (...
-                                 (syntax-parameterize ([yield (make-rename-transformer #'yield-ev)])
+                                 (syntax-parameterize ([yield yield-ev])
                                    body ...)))]))
                 (define (compile e)
                   #,eval))
@@ -180,31 +174,22 @@
                        (syntax-rules () [(_ σ e ρ δ k) #f]))
                      (...
                       (begin
-                        (define-syntax (pass-yield-to-ev syn) ;; real generators
+                        (define-for-syntax (pass-yield-to-ev syn) ;; real generators
                           (syntax-parse syn #:literals (ev)
-                                        [(_ (ev args:expr ...))
-                                         (syntax/loc syn
-                                           (ev args ... real-yield))]
-                                        [(_ e:expr) (syntax/loc syn (real-yield e))]))
-                        ;; Need to not capture the unquote-syntaxes here.
-                        #,#'(...
-                             (define-for-syntax ((pass-given-yield-to-ev the-yield) syn) ;; real generators
-                               (syntax-parse syn #:literals (ev)
-                                             [(_ (ev args:expr ...))
-                                              (quasisyntax/loc syn
-                                                (ev args ... #,the-yield))]
-                                             [(_ e:expr) (quasisyntax/loc syn
-                                                           (#,the-yield e))])))
-                        (define-syntax (yield-ev syn)
+                            [(_ (ev args:expr ...))
+                             (syntax/loc syn
+                               (ev args ... real-yield))]
+                            [(_ e:expr) (syntax/loc syn (real-yield e))]))
+                        (define-for-syntax (yield-ev syn)
                           (syntax-parse syn #:literals (ev)
-                                        [(_ (ev args:expr ...)) (syntax/loc syn
-                                                                  (ev args ...))]
-                                        [(_ e:expr) (syntax/loc syn
-                                                      (yield-meaning e))])))))
+                            [(_ (ev args:expr ...))
+                             (syntax/loc syn (ev args ...))]
+                            [(_ e:expr)
+                             (syntax/loc syn (yield-meaning e))])))))
                   #`((mk-op-struct ev (σ e ρ δ k) (σ-op ... e ρ-op ... δ-op ... k)
                                    expander-flags ...)
-                     (define-syntax pass-yield-to-ev (syntax-rules () [(_ e) (yield-meaning e)]))
-                     (define-syntax yield-ev (syntax-rules () [(_ e) (yield-meaning e)]))))
+                     (define-for-syntax pass-yield-to-ev (syntax-rules () [(_ e) (yield-meaning e)]))
+                     (define-for-syntax yield-ev pass-yield-to-ev)))
 
            (define-syntax-rule (define/ρ ρ body)
              #,(if (zero? (attribute K))
@@ -220,13 +205,27 @@
               (syntax-parser
                 [(_ body:expr ...+)
                  (cond [(attribute generators?)
-                        #'(syntax-parameterize ([yield (make-rename-transformer #'pass-yield-to-ev)])
+                        #'(syntax-parameterize ([yield pass-yield-to-ev])
                             (real-generator () body ... 'done))]
                        [else
-                        #'(syntax-parameterize ([yield (make-rename-transformer #'yield-ev)])
+                        #'(syntax-parameterize ([yield yield-ev])
                             (begin (void) body ...))])])))
 
            #,@compile-def
+
+           ;; Let primitives yield single values instead of entire states.
+           (define-syntax (with-prim-yield stx)
+             (syntax-parse stx
+               [(_ body)
+                (define yield-transformer (syntax-parameter-value #'yield))
+                #`(syntax-parameterize
+                      ([yield
+                        (λ (syn)
+                           (syntax-case syn ()
+                               [(_ v)
+                                (with-syntax ([k (datum->syntax syn 'k)])
+                                  (yield-transformer #'(yield (co target-σ k v))))]))])
+                    body)]))
 
            (mk-prim-meaning getter setter widen delay prim-meaning)
            ;; [Rel State State]
@@ -251,9 +250,9 @@
                            [(primop o)
                             (define forced (for/list ([a (in-list (rest args))])
                                              (force σ a)))
-                            (do (σ) ([vs (in-set (toSetOfLists forced))])
-                              ;; FIXME: make this expand into the right meaning
-                              (prim-meaning o σ l δ vs))]
+                            (with-prim-yield
+                             (do (σ) ([vs (in-set (toSetOfLists forced))])
+                               (prim-meaning o σ l δ vs)))]
                            [_ (generator)])))]
 
                   [(ls: l (list-rest e es) vs ρ a δ)
@@ -300,78 +299,38 @@
                       #'(fixpoint step (inj e))]
                      [else ;; must be in set monad
                       #'(fix step (inj e))]))))]))
-#|
-(define ((push K) σ l δ k)
-  (define a (cons l δ))
-  (values (join σ a (set k))
-          a))
 
-(define ((bind K) ρ σ l δ xs vs)
-  (define δ* (truncate (cons l δ) K))
-  (define as (map (λ (x) (cons x δ*)) xs))
-  (define ρ* (extend* ρ xs as))
-  (define σ* (join* σ as (map (λ (v) (force σ v)) vs)))
-  (values ρ* σ* δ*))
+(splicing-syntax-parameterize
+ ([target-σ #t]
+  [target-cs #t]
+  [yield-meaning (syntax-rules () [(_ e) (set-add target-cs e)])]
+  [widen (make-rename-transformer widen^)])
+ (mk-analysis #:bind-join-one ...
+              #:bind-join ...
+              #:bind-join* ...
+              #:bind-push ...
+              #:tick ...
+              #:force ...
+              #:fixpoint ...
+              #:aval aval))
 
-(define (ev-interp  σ e ρ k δ) (set (ev σ e ρ k δ)))
-(define (ev-compile σ c ρ k δ) (c σ ρ k δ))
+(define-for-syntax (mk-bind-push K)
+  (syntax-rules ()
+    [(_ (σ* a* σ l δ k) body)
+     (let ([a* (make-var-contour l δ)])
+       (bind-join-one (σ* σ a* k) body))]))
 
-(define mk-step  (mk-mk-step ev-interp))
-
-(define (mk-comp-step push bind getter setter widen force delay)
-  (values (mk-step push bind getter setter widen force delay)
-          (mk-comp push delay)
-          ((mk-mk-step ev-compile) push bind getter setter widen force delay)))
-
-(define (mk-comp push delay)
-  ;; Expr -> (Store Env Cont Contour -> State)
-  (define (compile e)
-    (match e
-      [(var l x)
-       (λ (σ ρ k δ)
-         (for/set ((v (delay σ (lookup-env ρ x))))
-                  (co σ k v)))]
-      [(datum l d) (λ (σ ρ k δ) (set (co σ k d)))]
-      [(primr l which)
-       (define p (primop which))
-       (λ (σ ρ k δ) (set (co σ k p)))]
-      [(lam l x e)
-       (define c (compile e))
-       (λ (σ ρ k δ) (set (co σ k (clos x c ρ))))]
-    [(lrc l xs es b)
-     (define c (compile (first es)))
-     (define cs (map compile (rest es)))
-     (define cb (compile b))
-     (define x (first xs))
-     (define xs* (rest xs))
-     (define ss (map (λ _ ∅) xs))
-     (λ (σ ρ k δ)
-       (define-values (σ0 a) (push σ l δ k))
-       (define as (map (λ (x) (cons x δ)) xs))
-       (define ρ* (extend* ρ xs as))
-       (define σ* (join* σ0 as (map (λ _ ∅) xs)))
-       (c σ* ρ* (lrk x xs* cs cb ρ* a δ) δ))]
-    [(app l e es)
-     (define c (compile e))
-     (define cs (map compile es))
-     (λ (σ ρ k δ)
-       (define-values (σ* a) (push σ l δ k))
-       (c σ* ρ (ls l cs '() ρ a δ) δ))]
-    [(ife l e0 e1 e2)
-     (define c0 (compile e0))
-     (define c1 (compile e1))
-     (define c2 (compile e2))
-     (λ (σ ρ k δ)
-       (define-values (σ* a) (push σ l δ k))
-       (c0 σ* ρ (ifk c1 c2 ρ a δ) δ))]
-    [(st! l x e)
-     (define c (compile e))
-     (λ (σ ρ k δ)
-       (define-values (σ* a) (push σ l δ k))
-       (c σ* ρ (sk! (lookup-env ρ x) a) δ))]
-    [(primr l which) (define p (primop which))
-     (λ (σ ρ k δ) (set (co σ k p)))]))
-  compile)
+(define-for-syntax ((mk-bind K) stx)
+  (syntax-case stx ()
+    [(_ (ρ* σ* δ*) (ρ σ l δ xs vs) body)
+     (if (zero? K)
+         (syntax/loc stx
+           (bind-join* (σ* σ xs (map (λ (v) (force σ v)) vs)) body))
+         (quasisyntax/loc stx
+           (let* ([δ* (truncate (cons l δ) #,K)]
+                  [as (map (λ (x) (cons x δ*)) xs)]
+                  [ρ* (extend* ρ xs as)])
+             (bind-join* (σ* σ as (map (λ (v) (force σ v)) vs)) body))))]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Concrete semantics
@@ -410,7 +369,7 @@
          (cons (first δ)
                (truncate (rest δ) (sub1 k)))]))
 
-(define (widen b)
+(define (widen^ b)
   (match b
     [(? number?) 'number]
     [(? string?) 'string]
@@ -421,7 +380,7 @@
 
 (define (delay σ x) (set (addr x)))
 
-(define strict-kcfa-setter 
+(define strict-kcfa-setter
   (mk-kcfa-setter (λ (_ v) (set v))))
 
 (define lazy-kcfa-setter
@@ -430,60 +389,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Potpourris of transition relations
 
-(define-values (eval-step compile-eval comp-eval-step)
-  (mk-comp-step (push +inf.0)
-                (bind +inf.0)
-                hash-getter
-                strict-eval-setter
-                eval-widen
-                (lambda (σ x) (set x))
-                lookup-sto))
-
-(define-values (lazy-eval-step compile-lazy-eval comp-lazy-eval-step)
-  (mk-comp-step (push +inf.0)
-                (bind +inf.0)
-                hash-getter
-                strict-eval-setter
-                eval-widen
-                force
-                delay))
-
-(define-values (1cfa-step compile-1cfa comp-1cfa-step)
-  (mk-comp-step (push 1)
-                (bind 1)
-                hash-getter
-                strict-kcfa-setter
-                widen
-                (lambda (σ x) (set x))
-                lookup-sto))
-
-(define-values (lazy-1cfa-step compile-lazy-1cfa comp-lazy-1cfa-step)
-  (mk-comp-step (push 1)
-                (bind 1)
-                hash-getter
-                lazy-kcfa-setter
-                widen
-                force
-                delay))
-
-(define-values (0cfa-step compile-0cfa comp-0cfa-step)
-  (mk-comp-step (push 0)
-                (bind 0)
-                hash-getter
-                strict-kcfa-setter
-                widen
-                (lambda (σ x) (set x))
-                lookup-sto))
-
-(define-values (lazy-0cfa-step compile-lazy-0cfa comp-lazy-0cfa-step)
-  (mk-comp-step (push 0)
-                (bind 0)
-                hash-getter
-                lazy-kcfa-setter
-                widen
-                force
-                delay))
-
+;; concrete compiled strict/lazy
+;; 1cfa compiled strict/lazy
+;; 0cfa compiled strict/lazy
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Potpourris of evaluators
@@ -511,21 +419,6 @@
 
 (define k0 (mt))
 (define ε '())
-
-;; Exp -> Set State
-(define (inj e)
-  (set (ev (hash) e (hash) k0 ε)))
-
-;; Exp -> Set State^
-(define (inj-wide e)
-  (set (cons (set (ev^ e (hash) k0 ε)) (hash))))
-
-(define ((inj/c c) e)
-  ((c e) (hash) (hash) k0 ε))
-
-(define ((inj-wide/c c) e)
-  (for/set ((s (in-set ((c e) (hash) (hash) k0 ε))))
-           (cons (set (s->c s)) (state-σ s))))
 
 (define (mk-evals step comp-step compile)
   (values (mk-aval  step inj)
