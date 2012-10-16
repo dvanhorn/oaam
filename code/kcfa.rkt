@@ -45,18 +45,16 @@
 (define-syntax (mk-analysis stx)
   (syntax-parse stx
     [(_ (~or ;; analysis parameters
-         (~once (~seq #:bind-join-one bind-join-one:id))
+         (~once (~seq #:bind-join-one xbind-join-one:id))
          (~once (~seq #:bind-join bind-join:id))
          (~once (~seq #:bind-join* bind-join*:id))
          (~once (~seq #:bind-push bind-push:id))
          (~once (~seq #:tick tick:id))
+         (~once (~seq #:make-var-contour make-var-contour:id))
          (~once (~seq #:getter getter:id))
          (~once (~seq #:force force:id))
          (~once (~seq #:delay delay:id))
          (~once (~seq #:widen widen:id))
-         (~once (~seq #:fresh-label! fresh-label!:id))
-         (~once (~seq #:fresh-variable! fresh-variable!:id))
-         (~once (~seq #:make-var-contour make-var-contour:id))
          (~once (~seq #:fixpoint fixpoint:expr))
          (~once (~seq #:aval aval:id)) ;; name the evaluator to use/provide
          ;; Define the compiler? With what name?
@@ -230,7 +228,7 @@
 
            #,@compile-def
 
-           (mk-prim-meaning-table getter setter widen delay prim-meaning-table)
+           (mk-prim-meaning getter setter widen delay prim-meaning)
            ;; [Rel State State]
            (define (step state)
              (match state
@@ -253,24 +251,9 @@
                            [(primop o)
                             (define forced (for/list ([a (in-list (rest args))])
                                              (force σ a)))
-                            (define meaning (hash-ref prim-meaning-table o))
-                            (cond [(changes-store? o)
-                                   (do (σ) ([vs (in-set (toSetOfLists forced))]
-                                            #:when (check-good o vs)
-                                            ;; FIXME
-                                            [(σ* rs) #:prim (apply meaning σ l δ vs)]
-                                            [r (in-list rs)])
-                                     (yield (co σ* k r)))]
-                                  [(reads-store? o)
-                                   (do (σ) ([vs (in-set (toSetOfLists forced))]
-                                            #:when (check-good o vs)
-                                            [r (in-list (apply meaning σ vs))])
-                                     (yield (co σ k r)))]
-                                  [else
-                                   (do (σ) ([vs (in-set (toSetOfLists forced))]
-                                            #:when (check-good o vs)
-                                            [r (in-list (apply meaning vs))])
-                                     (yield (co σ k r)))])]
+                            (do (σ) ([vs (in-set (toSetOfLists forced))])
+                              ;; FIXME: make this expand into the right meaning
+                              (prim-meaning o σ l δ vs))]
                            [_ (generator)])))]
 
                   [(ls: l (list-rest e es) vs ρ a δ)
