@@ -1,6 +1,7 @@
 #lang racket
 
 (require (for-syntax syntax/parse racket/syntax
+                     racket/list
                      racket/stxparam
                      racket/match)
          racket/stxparam)
@@ -8,13 +9,13 @@
          define-simple-macro*
          ∅ ∪ ∩ ∖ ∪1 ∪/l ∖1 ∖/l ∈
          mk-op-struct
-         continue
-         bind-join-one
+         continue do
+         yield yield-table
          bind-join
          bind-join*
          bind-push
          bind
-         target-σ target-cs
+         target-σ target-cs do-body-transformer
          (for-syntax mk-do))
 
 ;; define-simple-macro does not have an implicit quasisyntax.
@@ -75,183 +76,212 @@
 ;; Specialize representations
 (define-syntax mk-op-struct
   (syntax-parser
-    [(_ stx name:id (fields:id ...) (subfields:id ...)
-        (~optional (~seq #:expander expander:expr) ;; want a different match expander?
+    [(_ name:id (fields:id ...) (subfields:id ...)
+        (~bind [container (format-id #'name "~a-container" #'name)]
+               [name: (format-id #'name "~a:" #'name)])
+        (~optional (~seq #:expander
+                         (~or (~and #:with-first-cons
+                                    (~bind [expander
+                                            #`(syntax-rules ()
+                                                [(_ σ #,@(cdr (syntax->list #'(fields ...))))
+                                                 (cons σ (container subfields ...))])]))
+                              expander:expr)) ;; want a different match expander?
                    #:defaults ([expander
-                                #'(λ (stx)
-                                     (syntax-case stx ()
-                                       [(_ fields ...)
-                                        #'(container subfields ...)]))])))
+                                #'(syntax-rules ()
+                                    [(_ fields ...)
+                                     (container subfields ...)])])))
      #:fail-unless (for/and ([s (in-list (syntax->list #'(subfields ...)))])
                      (for/or ([f (in-list (syntax->list #'(fields ...)))])
                        (free-identifier=? f s)))
      "Subfields should be contained in fields list."
-     (with-syntax* ([container (format-id #'name "~a-container" #'name)]
-                    [name: (format-id #'name "~a:" #'name)])
-       #'(begin (struct container (subfields ...) #:prefab)
-                (define-syntax-rule (name fields ...) (container subfields ...))
-                (define-match-expander name: expander)))]))
+     #'(begin (struct container (subfields ...) #:prefab)
+              (define-syntax-rule (name fields ...) (container subfields ...))
+              (define-match-expander name: expander))]))
 
-(define-syntax-parameter bind-join-one #f)
-(define-syntax-parameter bind-join #f)
-(define-syntax-parameter bind-join* #f)
-(define-syntax-parameter bind-push #f)
-(define-syntax-parameter bind #f)
+(define-syntax-parameter yield
+  (λ (stx)
+     (raise-syntax-error #f "Must be within the context of a generator" stx)))
+;; We can't put a closure of a transformer in syntax, so we'll
+;; just gensym up some keys to refer to them later.
+(define-syntax-parameter yield-table (hasheq))
+
+(define-for-syntax (mk-analysis-err stx)
+  (raise-syntax-error #f "For use in mk-analysis and its input transformers" stx))
+(define-syntax-parameter bind-join mk-analysis-err)
+(define-syntax-parameter bind-join* mk-analysis-err)
+(define-syntax-parameter bind-push mk-analysis-err)
+(define-syntax-parameter bind mk-analysis-err)
+(define-syntax-parameter do #f) ;; to give to primitives
 ;; What is do folding over?
 (define-syntax-parameter target-σ #f)
 (define-syntax-parameter target-cs #f)
-(define-syntax-parameter do-body-transformer #f)
+(define-syntax-parameter do-body-transformer mk-analysis-err)
 ;; Private
 (define-syntax-parameter in-do-ctx? #f)
 
-(define-for-syntax ((mk-do σ-∆s? set-monad? global-σ? generators?) stx)
-  ;; Construct the values tuple given the previously bound σ and cs
-  (define in-do? (syntax-parameter-value #'in-do-ctx?))
-  (define gen-wrap
-    (if (or in-do? (not generators?)
-            (not (or (not global-σ?) σ-∆s?)))
-        values
-        (λ (stx) `(begin (real-yield #,stx) 'done))))
-  (define-syntax-class (join-clause replace-v outer-σ body)
-    #:attributes (clause new-σ val)
-    (pattern [σ*:id (~or (~and #:set (~bind [bindf #'bind-join-one]))
-                         (~and #:join (~bind [bindf #'bind-join]))
-                         (~and #:join* (~bind [bindf #'bind-join*]))) σ:expr a:expr v:expr]
-             #:with new-σ #'σ* #:attr val #'v
-             #:attr clause
-             (λ (rest)
-                #`(bindf (σ* σ a #,(or replace-v #'v))
-                         (syntax-parameterize ([target-σ (and (syntax-parameter-value #'target-σ)
-                                                              (make-rename-transformer #'σ*))])
-                           #,rest))))
-    (pattern [(ρ* σ* δ*) #:bind ρ σ l δ xs vs] ;; these vals don't get hoisted
-             #:with new-σ #'σ* #:attr val #f
-             #:attr clause
-             (λ (rest)
-                #`(bind (ρ* σ* δ*) (ρ σ l δ xs vs)
-                        (syntax-parameterize ([target-σ (and (syntax-parameter-value #'target-σ)
-                                                             (make-rename-transformer #'σ*))])
-                          #,rest))))
-    (pattern [(σ*:id a*:id) #:push σ l δ k] ;; no vals to hoist.
-             #:with new-σ #'σ* #:attr val #f
-             #:attr clause
-             (λ (rest)
-                #`(bind-push (σ* a* σ l δ ρ k)
-                             (syntax-parameterize ([target-σ (and (syntax-parameter-value #'target-σ)
-                                                                  (make-rename-transformer #'σ*))])
-                               #,rest)))))
+(define-for-syntax (mk-do σ-∆s? set-monad? global-σ? generators?)
+  (define (dot stx)
+    ;; Construct the values tuple given the previously bound σ and cs
+    (define in-do? (syntax-parameter-value #'in-do-ctx?))
+    (define gen-wrap
+      (if (or in-do? (not generators?)
+              (not (or (not global-σ?) σ-∆s?)))
+          values
+          (λ (stx) `(begin (real-yield #,stx) 'done))))
+    (define (bind-rest inner-σ body)
+      #`(syntax-parameterize ([target-σ (and (syntax-parameter-value #'target-σ)
+                                             (make-rename-transformer #'#,inner-σ))])
+          #,body))
+    (define-syntax-class (join-clause replace-v outer-σ body)
+      #:attributes (clause new-σ val)
+      (pattern [σ*:id (~or (~and #:join (~bind [bindf #'bind-join]))
+                           (~and #:join* (~bind [bindf #'bind-join*]))) σ:expr a:expr vs:expr]
+               #:with new-σ #'σ* #:attr val #'vs
+               #:attr clause
+               (λ (rest)
+                  #`(bindf (σ* σ a #,(or replace-v #'vs)) #,(bind-rest #'σ* rest))))
+      (pattern [(ρ* σ* δ*) #:bind ρ σ l δ xs vs] ;; these vals don't get hoisted
+               #:with new-σ #'σ* #:attr val #f
+               #:attr clause
+               (λ (rest)
+                  #`(bind (ρ* σ* δ*) (ρ σ l δ xs vs) #,(bind-rest #'σ* rest))))
+      (pattern [(σ*:id a*:id) #:push σ l δ k] ;; no vals to hoist.
+               #:with new-σ #'σ* #:attr val #f
+               #:attr clause
+               (λ (rest)
+                  #`(bind-push (σ* a* σ l δ k) #,(bind-rest #'σ* rest)))))
 
-  ;; When we hit for clauses, the continuation is the for*/fold constructor
-  (define-splicing-syntax-class (comp-clauses prev-σ outer-σ body)
-    #:attributes (clause)
-    (pattern (~and (~seq (~or [x:id e:expr]
-                              [(xs:id ...) ev:expr]
-                              (~seq #:when guardw:expr)
-                              (~seq #:unless guardu:expr)) ...)
-                   (~seq guards ...))
-             #:attr clause
-             (λ (rest)
-                ;; build a new fold or a fold that continues adding to the
-                ;; outer do's targets.
-                ;; Make sure the targets are determine at the right time during
-                ;; expansion
-                (gen-wrap
-                 #`(let-syntax
-                       ([folder
-                         (...
-                          (λ (stx)
-                             (syntax-parse stx
-                               ([(_ (gs ...) body)
-                                 (define tσ (syntax-parameter-value #'target-σ))
-                                 (define tcs (syntax-parameter-value #'target-cs))
-                                 (with-syntax* ([(do-targets ...)
-                                                 (append (if tσ (list #'target-σ) '())
-                                                         (if tcs (list #'target-cs) '()))]
-                                                [(targets ...) (generate-temporaries #'(do-targets ...))]
-                                                [(tvalues ...)
-                                                 (append (listy (and tσ prev-σ))
-                                                         (if tcs
-                                                             (if in-do?
-                                                                 (list tcs)
-                                                                 (list #'∅))
-                                                             '()))])
-                                   (syntax/loc stx
-                                     (for*/fold ([targets tvalues] ...) (gs ...)
-                                       (syntax-parameterize ([do-targets (make-rename-transformer #'targets)] ...)
-                                         body))))]))))])
-                     (folder (guards ...) #,rest))))))
+    (define-splicing-syntax-class comp-clauses
+      #:attributes ((guards 1))
+      (pattern (~and (~seq (~or [x:id e:expr]
+                                [(xs:id ...) ev:expr]
+                                (~seq #:when guardw:expr)
+                                (~seq #:unless guardu:expr)) ...+)
+                     (~seq guards ...))))
 
-  ;; A terrible binding pattern is necessary for store deltas. We /hoist/
-  ;; the values that are used in join so they are in scope of the real σ.
-  (define-splicing-syntax-class (join-clauses maybe-prev-σ outer-σ body)
-    #:attributes (clauses (ids 1) (vs 1) (prev-σs 1))
-    (pattern (~seq) #:attr clauses '() #:attr (ids 1) '() #:attr (vs 1) '()
-             #:attr (prev-σs 1) '())
-    (pattern (~seq (~bind [new-id (generate-temporary)])
-                   (~or (~var c (comp-clauses (or maybe-prev-σ outer-σ) outer-σ body))
-                        (~var join (join-clause (and σ-∆s? #'new-id)
-                                                outer-σ body)))
-                   (~var joins (join-clauses (attribute join.new-σ) outer-σ body)))
-             #:attr clauses (cons (or (attribute join.clause)
-                                      (attribute c.clause))
-                                  (attribute joins.clauses))
-             #:do [(define v (attribute join.val))
-                   (define ids* (attribute joins.ids))
-                   (define vs* (attribute joins.vs))]
-             #:attr (ids 1) (if v (cons #'new-id ids*) ids*)
-             #:attr (vs 1) (if v (cons v vs*) vs*)
-             #:attr (prev-σs 1) (if v
-                                    (if maybe-prev-σ
-                                        (cons maybe-prev-σ (attribute joins.prev-σs))
-                                        (cons outer-σ (attribute joins.prev-σs)))
-                                    (attribute joins.prev-σs))))
-
-  (syntax-parse stx
-    ;; if we don't get a store via clauses, σ is the default.
-    [(_ (σ:id) (joins) body:expr)
-     ;; This necessitates an order that do-targets is specified.
-     ;; First store, then states
-     #:declare joins (join-clauses #f #'σ #'body)
-     ;; flags conflate imperative store and imperative worklist in wide case
-     ;; store-passing/store-δ-accumulation is needed if
-     ;; ¬wide or (¬pre-alloc and ¬imperative)
-     ;; ≡ ¬(wide and (pre-alloc or imperative))
-     (define current-yield-transformer (syntax-parameter-value #'yield))
-     (define binds (let loop ([j (reverse (attribute joins.clauses))]
-                              [full
-                               #`(syntax-parameterize
-                                     ([yield (λ (syn)
-                                                (syntax-case syn ()
-                                                  [(_ e)
-                                                   #'(do-body-transformer
-                                                      #,(current-yield-transformer
-                                                         #'(yield e)))]))])
-                                     (do-body-transformer body))])
-                     (match j
-                       [(cons fn js) (loop js (fn full))]
-                       [_ full])))
-     ;; FIXME: hoisting should be done before every comp-clause construction
-     (define hoist-binds
-       (if σ-∆s?
-           (if global-σ?
-               #'([joins.ids joins.vs] ...)
-               #'([joins.ids (let ([joins.prev-σs σ]) joins.vs)] ...))
-           #'()))
-     (quasisyntax/loc stx
-       (let #,hoist-binds #,binds))]
-    ;; When fold/fold doesn't cut it, we need a safe way to recur.
-    [(_ (σ:id) loop:id ([args:id arg0:expr] ...) body:expr)
-     (define tσ (syntax-parameter-value #'target-σ))
-     (define tcs (syntax-parameter-value #'target-cs))
-     (with-syntax ([(do-targets ...) (append (listy tσ) (listy tcs))]
-                   [(new-targets ...) (append (if tσ (list #'tσ) '())
-                                              (if tcs (list #'tcs) '()))])
-       (quasisyntax/loc stx
-         (let loop (#,@(append (if tσ (list #`[tσ #,tσ]) '())
-                               (if tσ (list #`[tcs #,tcs]) '()))
-                    [args arg0] ...)
-           (syntax-parameterize ([do-targets (make-rename-transformer #'new-targets)] ...)
-             body))))]
-
-    [(_ (σ:id) ([x:id e:expr] ... blob ...) body:expr)
-     (raise-syntax-error #f "Joins failed" stx)]))
+    ;; A terrible binding pattern is necessary for store deltas. We /hoist/
+    ;; the values that are used in join so they are in scope of the real σ.
+    (define-splicing-syntax-class (join-clauses maybe-prev-σ outer-σ body)
+      #:attributes (clauses (ids 1) (vs 1) (prev-σs 1) last-σ)
+      (pattern (~seq (~bind [new-id (generate-temporary)])
+                     (~var join (join-clause (and σ-∆s? #'new-id)
+                                             outer-σ body))
+                     (~var joins (join-clauses (attribute join.new-σ) outer-σ body)))
+               #:attr clauses (cons (attribute join.clause)
+                                    (attribute joins.clauses))
+               #:do [(define v (attribute join.val))
+                     (define ids* (attribute joins.ids))
+                     (define vs* (attribute joins.vs))]
+               #:attr (ids 1) (if v (cons #'new-id ids*) ids*)
+               #:attr (vs 1) (if v (cons v vs*) vs*)
+               #:attr (prev-σs 1) (if v
+                                      (if maybe-prev-σ
+                                          (cons maybe-prev-σ (attribute joins.prev-σs))
+                                          (cons outer-σ (attribute joins.prev-σs)))
+                                      (attribute joins.prev-σs))
+               #:attr last-σ (attribute joins.last-σ))
+      (pattern (~seq) #:attr clauses '() #:attr (ids 1) '() #:attr (vs 1) '()
+               #:attr (prev-σs 1) '()
+               #:attr last-σ maybe-prev-σ
+               #:fail-unless maybe-prev-σ "Expected at least one join clause"))
+    (syntax-parse stx
+      [(_ (σ:id) (c:comp-clauses clauses ...) body:expr)
+       ;; build a new fold or a fold that continues adding to the
+       ;; outer do's targets.
+       ;; Make sure the targets are determine at the right time during
+       ;; expansion
+       (gen-wrap
+        #`(let-syntax
+              ([folder
+                (...
+                 (λ (stx)
+                    (syntax-parse stx
+                      [(_ prev-σ (gs ...) body*)
+                       (define tσ (syntax-parameter-value #'target-σ))
+                       (define tcs (syntax-parameter-value #'target-cs))
+                       (with-syntax* ([(do-targets ...)
+                                       (append (if tσ (list #'target-σ) '())
+                                               (if tcs (list #'target-cs) '()))]
+                                      [(targets ...) (generate-temporaries #'(do-targets ...))]
+                                      [(tvalues ...)
+                                       (append (listy (and tσ #'prev-σ))
+                                               (if tcs
+                                                   (if #,in-do?
+                                                       (list tcs)
+                                                       (list #'∅))
+                                                   '()))])
+                         (syntax/loc stx
+                           (for*/fold ([targets tvalues] ...) (gs ...)
+                             (syntax-parameterize ([do-targets (make-rename-transformer #'targets)] ...)
+                               body*))))])))])
+            (folder σ (c.guards ...)
+                    (syntax-parameterize ([in-do-ctx? #t])
+                      #,(dot #'(#f (σ) (clauses ...) body))))))]
+      ;; if we don't get a store via clauses, σ is the default.
+      [(_ (σ:id) (joins clauses ...) body:expr)
+       ;; This necessitates an order that do-targets is specified.
+       ;; First store, then states
+       #:declare joins (join-clauses #f #'σ #'body)
+       ;; flags conflate imperative store and imperative worklist in wide case
+       ;; store-passing/store-δ-accumulation is needed if
+       ;; ¬wide or (¬pre-alloc and ¬imperative)
+       ;; ≡ ¬(wide and (pre-alloc or imperative))
+       (define inner-σ (or (attribute joins.last-σ) #'σ))
+       (define binds (let loop ([j (reverse (attribute joins.clauses))]
+                                [full (dot #`(#f (#,inner-σ)
+                                                (clauses ...)
+                                              (syntax-parameterize ([in-do-ctx? #t])
+                                                body)))])
+                       (match j
+                         [(cons fn js) (loop js (fn full))]
+                         [_ full])))
+       (define hoist-binds
+         (if σ-∆s?
+             (if global-σ?
+                 #'([joins.ids joins.vs] ...)
+                 #'([joins.ids (let ([joins.prev-σs σ]) joins.vs)] ...))
+             #'())) 
+       (quasisyntax/loc stx (let #,hoist-binds #,(gen-wrap binds)))]
+      [(_ (σ:id) (blob clauses ...) body:expr)
+       (raise-syntax-error #f "Expected for-clause or join clause." #'blob)]
+      [(_ (σ:id) (blob clauses ...) body ...)
+       (raise-syntax-error #f "Expected single expression body" #'(body ...))]
+      [(_ (σ:id) () body:expr)
+       (define yb (gensym))
+       #`(syntax-parameterize
+             ([yield-table (hash-set (syntax-parameter-value #'yield-table)
+                                     '#,yb
+                                      (syntax-parameter-value #'yield))]
+              [yield (syntax-parser
+                       [(_ e)
+                        ((syntax-parameter-value #'do-body-transformer)
+                         ((hash-ref (syntax-parameter-value #'yield-table)
+                                    '#,yb)
+                          #'(yield e)))]
+                       [s (raise-syntax-error #f "Do yield one" #'s)])]
+              [in-do-ctx? #t])
+           body)]
+      ;; When fold/fold doesn't cut it, we need a safe way to recur.
+      [(_ (σ:id) loop:id ([args:id arg0:expr] ...) body:expr)
+       (define tσ (syntax-parameter-value #'target-σ))
+       (define tcs (syntax-parameter-value #'target-cs))
+       (with-syntax ([(do-targets ...) (append (if tσ (list #'target-σ) '())
+                                               (if tcs (list #'target-cs) '()))]
+                     [(new-targets ...) (append (if tσ (list #'tσ) '())
+                                                (if tcs (list #'tcs) '()))]
+                     [(argps ...) (generate-temporaries #'(args ...))])
+         (quasisyntax/loc stx
+           (let real-loop (#,@(append (if tσ (list #`[tσ #,tσ]) '())
+                                      (if tcs (list #`[tcs #,tcs]) '()))
+                           [args arg0] ...)
+             (syntax-parameterize ([do-targets (make-rename-transformer #'new-targets)] ...)
+               (let-syntax ([loop (syntax-rules ()
+                                    [(_ σ* argps ...)
+                                     (real-loop σ*
+                                                #,@(if tcs #'(target-cs) #'())
+                                                argps ...)])])
+                 body)))))]
+      [(_ blob . rest) (raise-syntax-error #f "Expected default store." #'blob)]
+      [(_ . rest) (raise-syntax-error #f "Complete fail" stx)]
+      [_ (raise-syntax-error #f "Must be applied" stx)]))
+  dot)

@@ -1,21 +1,19 @@
 #lang racket
 
 (require "data.rkt" "notation.rkt"
-         (for-syntax racket/list racket/base racket/syntax))
+         (for-syntax syntax/parse racket/syntax
+                     racket/list racket/base)
+         racket/stxparam
+         racket/unsafe/ops)
 (provide primitive? changes-store? reads-store? primitive?
-         syntax/parse/define
-         racket/unsafe/ops
-         mk-prim-meaning
-         yield getter setter widen delay make-var-contour)
+         mk-prims
+         force getter widen delay make-var-contour)
 
 (define-syntax-parameter getter #f)
-(define-syntax-parameter setter #f)
+(define-syntax-parameter force #f)
 (define-syntax-parameter widen #f)
 (define-syntax-parameter delay #f)
 (define-syntax-parameter make-var-contour #f)
-(define-syntax-parameter yield
-  (λ (stx)
-     (raise-syntax-error #f "Must be within the context of a generator" stx)))
 
 ;; Identifiers for the crappy type DSL
 ;; Meanings (respectively): Number String Pair Boolean Vector Any Void
@@ -79,11 +77,17 @@
          defines ...
          (define-syntax-rule (mean o σ l δ vs)
            (case o
-             [(prim) (if (t.checker-fn vs)
-                         (cond [write-store? (meaning σ l δ vs)]
-                               [read-store (meaning σ vs)]
-                               [else (meaning vs)])
-                         (continue))] ...))))]))
+             #,@(for/list ([p (in-list (syntax->list #'(prim ...)))]
+                           [w? (in-list (syntax->datum #'(write-store? ...)))]
+                           [r? (in-list (syntax->datum #'(read-store? ...)))]
+                           [m (in-list (syntax->list #'(meaning ...)))]
+                           [checker (in-list (attribute t.checker-fn))])
+                  #`[(#,p)
+                     (if (#,checker vs)
+                         #,(cond [w? #`(#,m σ l δ vs)]
+                                 [r? #`(#,m σ vs)]
+                                 [else #`(#,m vs)])
+                         (continue))])))))]))
 
 (define-simple-macro* (define/read (name:id σ:id v:id ...) body ...+)
   ;; XXX: not capture-avoiding, so we have to be careful in our definitions
@@ -100,13 +104,13 @@
       #,@(let ([defvs (length (syntax->list #'(opval ...)))])
            (if (zero? defvs)
                #'()
-               #'((define rest-len (length rest))
+               #`((define rest-len (length rest))
                   (define rest* (for/vector #:length #,defvs
-                                            ([v (in-list rest)]) v))
+                                            ([v* (in-list rest)]) v*))
                   ;; Populate the rest of the default arguments with w
-                  (for ([v (in-list (drop (list opval ...) rest-len))]
+                  (for ([v* (in-list (drop (list opval ...) rest-len))]
                         [i (in-naturals rest-len)])
-                    (unsafe-vector-set! rest* i v))
+                    (unsafe-vector-set! rest* i v*))
                   (define-values (opv ...)
                     (values #,@(for/list ([i (in-range defvs)])
                                  #`(unsafe-vector-ref rest* #,i)))))))
@@ -115,20 +119,21 @@
 (define-syntax (mk-prims stx)
   (syntax-parse stx
     [(_ (~or (~seq (~and #:static static?) primitive?:id changes-store?:id reads-store?:id)
-             (~seq mean:id defines ...)))
+             mean:id))
      (if (attribute static?)
          (quasisyntax/loc stx
            (mk-static-primitive-functions
-            primitive? changes-store? read-store? #,table))
+            primitive? changes-store? reads-store? #,prim-table))
          (quasisyntax/loc stx
-           (mk-primitive-meaning mean #,@prim-defines #,table)))]))
+           (mk-primitive-meaning mean #,@prim-defines #,prim-table)))]))
 
 (define-for-syntax prim-defines
   #'((define both '(#t #f))
      (define-simple-macro* (yield-both)
        ;; Do needs σ, but it's already bound by an outer do (if σ ever bound)
        ;; If not ever bound, just give a dummy identifier.
-       (do (#,(or (syntax-parameter-value #'target-σ) #'σ))
+       (do (#,(or (and (syntax-parameter-value #'target-σ) #'target-σ)
+                  #'σ))
            ([b (in-list '(#t #f))]) (yield b)))
      (define-syntax-rule (yield-delay σ v)
        (do (σ) ([v* (delay σ v)]) (yield v*)))
@@ -174,7 +179,7 @@
      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
      ;; Prims that read the store
      (define/read (equalv? σ v0 v1)
-       (define-syntax-rule (both-if pred) (if pred (yield-both) (yield #f)))x
+       (define-syntax-rule (both-if pred) (if pred (yield-both) (yield #f)))
        (match* (v0 v1)
          [((? clos?) _) (both-if (clos? v1))] ;; FIXME: not right for concrete
          [(_ (? clos?)) (yield #f)]           ;; first not a closure
@@ -268,17 +273,17 @@
           (cond [(eq? 'number i)
                  (error 'vectorv-set! "Abstract vectors should have a single cell")]
                 [(or (< z 0) (>= z (length addrs))) (continue)]
-                [else (do (σ) ([σ* #:set σ (list-ref addrs i) val])
+                [else (do (σ) ([σ* #:join σ (list-ref addrs i) (force σ val)])
                         (yield (void)))])]
          [(vectorv^ _ abs-cell)
-          (do (σ) ([σ* #:set σ abs-cell val])
+          (do (σ) ([σ* #:join σ abs-cell (force σ val)])
             (yield (void)))]))
 
      (define/write (make-vectorv σ l δ size [default 0])
        (match (widen size)
          ['number
           (define V-addr (make-var-contour `(V . ,l) δ))
-          (do (σ) ([σ* #:set σ V-addr default])
+          (do (σ) ([σ* #:join σ V-addr (force σ default)])
             (yield (vectorv^ size V-addr)))]
          [_ (define V-addrs
               (for/list ([i (in-range size)]) (make-var-contour `(V ,i . ,l) δ)))
@@ -288,14 +293,14 @@
      (define/write (make-consv σ l δ v0 v1)
        (define A-addr (make-var-contour `(A . ,l) δ))
        (define D-addr (make-var-contour `(D . ,l) δ))
-       (do (σ) ([σ* #:set σ A-addr v0]
-                [σ* #:set σ* D-addr v1])
+       (do (σ) ([σ* #:join σ A-addr (force σ v0)]
+                [σ* #:join σ* D-addr (force σ* v1)])
          (yield (consv A-addr D-addr))))
 
      (define/write (set-car!v σ l δ p v)
-       (do (σ) ([σ* #:set σ (consv-car p) v]) (yield (void))))
+       (do (σ) ([σ* #:join σ (consv-car p) (force σ v)]) (yield (void))))
      (define/write (set-cdr!v σ l δ p v)
-       (do (σ) ([σ* #:set σ (consv-cdr p) v]) (yield (void))))
+       (do (σ) ([σ* #:join σ (consv-cdr p) (force σ v)]) (yield (void))))
 
      (define-simple-macro* (make-listv σ l δ vs)
        (cond [(null? vs) (continue)]
@@ -305,24 +310,24 @@
                         (make-var-contour `(L ,i D . ,l) δ)))
               (define-values (fst-addr snd-addr) (laddr 0))
               (define val (consv fst-addr snd-addr))
-              (do (σ) ([σ* #:set σ fst-addr (first vs)])
+              (do (σ) ([σ* #:join σ fst-addr (force σ (first vs))])
                 (do (σ*) loop ([last-addr snd-addr]
                                [vs (rest vs)]
                                [i 1])
                     (cond
                      [(null? vs)
-                      (do (σ*) ([σ* #:set σ* last-addr '()])
+                      (do (σ*) ([σ* #:join σ* last-addr snull])
                         (yield val))]
                      [else
                       (define-values (fst-addr snd-addr) (laddr i))
-                      (do (σ*) ([σ* #:set σ* fst-addr (first vs)]
-                                [σ* #:set σ* last-addr (consv fst-addr snd-addr)])
+                      (do (σ*) ([σ* #:join σ* fst-addr (force σ* (first vs))]
+                                [σ* #:join σ* last-addr (set (consv fst-addr snd-addr))])
                         (loop σ* snd-addr (rest vs) (add1 i)))])))]))))
 
 (define-for-syntax prim-table
   #'(;; Numbers
      [add1 #f #f add1v (z -> z)]
-     [sub1 #f #f add1v (z -> z)]
+     [sub1 #f #f sub1v (z -> z)]
      [+    #f #f +v    (#:rest z -> z)]
      [-    #f #f -v    (#:rest z -> z)]
      [*    #f #f *v    (#:rest z -> z)]
@@ -348,7 +353,7 @@
      [error #f #f errorv (#:rest any -> any)]
      ;; Booleans
      [not #f #f notv (any -> b)]
-     [boolean? #f #f boolean?v (any -> b)]
+     [boolean? #f #f booleanv? (any -> b)]
      ;; Pairs/lists
      [cons #f #t make-consv (any any -> p)]
      [list #f #t make-list (#:rest any -> any)]
@@ -387,6 +392,4 @@
      [cdddar #t #f cdddarv (p -> any)]
      [cddddr #t #f cddddrv (p -> any)]))
 
-
-(mk-prim-meaning #:static prim-static prim-meaning)
-(mk-primitive-fns primitive? changes-store? reads-store?)
+(mk-prims #:static primitive? changes-store? reads-store?)
