@@ -10,13 +10,13 @@
          ∅ ∪ ∩ ∖ ∪1 ∪/l ∖1 ∖/l ∈
          mk-op-struct
          continue do
-         yield yield-table
+         yield
          bind-join
          bind-join*
          bind-push
          bind
          target-σ target-cs do-body-transformer
-         (for-syntax mk-do))
+         (for-syntax mk-do init-target-cs))
 
 ;; define-simple-macro does not have an implicit quasisyntax.
 (define-syntax (define-simple-macro* stx)
@@ -70,8 +70,8 @@
      #:fail-unless (syntax-parameter-value #'in-do-ctx?)
      "May only be used in the syntactic context of a do form"
      (quasisyntax/loc stx
-       (values #,@(append (listy (syntax-parameter-value #'target-σ))
-                          (listy (syntax-parameter-value #'target-cs)))))]))
+       (values #,@(append (listy (and (syntax-parameter-value #'target-σ) #'target-σ))
+                          (listy (and (syntax-parameter-value #'target-cs) #'target-cs)))))]))
 
 ;; Specialize representations
 (define-syntax mk-op-struct
@@ -101,9 +101,6 @@
 (define-syntax-parameter yield
   (λ (stx)
      (raise-syntax-error #f "Must be within the context of a generator" stx)))
-;; We can't put a closure of a transformer in syntax, so we'll
-;; just gensym up some keys to refer to them later.
-(define-syntax-parameter yield-table (hasheq))
 
 (define-for-syntax (mk-analysis-err stx)
   (raise-syntax-error #f "For use in mk-analysis and its input transformers" stx))
@@ -118,6 +115,15 @@
 (define-syntax-parameter do-body-transformer mk-analysis-err)
 ;; Private
 (define-syntax-parameter in-do-ctx? #f)
+
+(define-for-syntax (init-target-cs set-monad?)
+  (let ([tcs (or (syntax-parameter-value #'target-cs) set-monad?)])
+    (cond [(and tcs (boolean? tcs))
+           (λ (body)
+              #`(let ([cs ∅])
+                  (syntax-parameterize ([target-cs (make-rename-transformer #'cs)])
+                    #,body)))]
+          [else values])))
 
 (define-for-syntax (mk-do σ-∆s? set-monad? global-σ? generators?)
   (define (dot stx)
@@ -207,7 +213,7 @@
                                        (append (listy (and tσ #'prev-σ))
                                                (if tcs
                                                    (if #,in-do?
-                                                       (list tcs)
+                                                       (list #'target-cs)
                                                        (list #'∅))
                                                    '()))])
                          (syntax/loc stx
@@ -247,40 +253,35 @@
       [(_ (σ:id) (blob clauses ...) body ...)
        (raise-syntax-error #f "Expected single expression body" #'(body ...))]
       [(_ (σ:id) () body:expr)
-       (define yb (gensym))
-       #`(syntax-parameterize
-             ([yield-table (hash-set (syntax-parameter-value #'yield-table)
-                                     '#,yb
-                                      (syntax-parameter-value #'yield))]
-              [yield (syntax-parser
-                       [(_ e)
-                        ((syntax-parameter-value #'do-body-transformer)
-                         ((hash-ref (syntax-parameter-value #'yield-table)
-                                    '#,yb)
-                          #'(yield e)))]
-                       [s (raise-syntax-error #f "Do yield one" #'s)])]
-              [in-do-ctx? #t])
+       (define yield-tr (syntax-parameter-value #'yield))
+       (define new (syntax-parser
+                     [(_ e)
+                      ((syntax-parameter-value #'do-body-transformer)
+                       (yield-tr #'(yield e)))]
+                     [s (raise-syntax-error #f "Do yield one" #'s)]))
+       #`(syntax-parameterize ([yield #,new]
+                               [in-do-ctx? #t])
            body)]
       ;; When fold/fold doesn't cut it, we need a safe way to recur.
       [(_ (σ:id) loop:id ([args:id arg0:expr] ...) body:expr)
        (define tσ (syntax-parameter-value #'target-σ))
        (define tcs (syntax-parameter-value #'target-cs))
-       (with-syntax ([(do-targets ...) (append (if tσ (list #'target-σ) '())
-                                               (if tcs (list #'target-cs) '()))]
+       (define tσs (if tσ (list #'target-σ) '()))
+       (define tcss (if tcs (list #'target-cs) '()))
+       (with-syntax ([(do-targets ...) (append tσs tcss)]
                      [(new-targets ...) (append (if tσ (list #'tσ) '())
                                                 (if tcs (list #'tcs) '()))]
                      [(argps ...) (generate-temporaries #'(args ...))])
-         (quasisyntax/loc stx
-           (let real-loop (#,@(append (if tσ (list #`[tσ #,tσ]) '())
-                                      (if tcs (list #`[tcs #,tcs]) '()))
-                           [args arg0] ...)
-             (syntax-parameterize ([do-targets (make-rename-transformer #'new-targets)] ...)
-               (let-syntax ([loop (syntax-rules ()
-                                    [(_ σ* argps ...)
-                                     (real-loop σ*
-                                                #,@(if tcs #'(target-cs) #'())
-                                                argps ...)])])
-                 body)))))]
+         ((init-target-cs set-monad?)
+          (quasisyntax/loc stx
+            (let real-loop (#,@(append (if tσ (list #`[tσ target-σ]) '())
+                                       (if tcs (list #`[tcs target-cs]) '()))
+                            [args arg0] ...)
+              (syntax-parameterize ([do-targets (make-rename-transformer #'new-targets)] ...)
+                (let-syntax ([loop (syntax-rules ()
+                                     [(_ σ* argps ...)
+                                      (real-loop σ* #,@tcss argps ...)])])
+                  body))))))]
       [(_ blob . rest) (raise-syntax-error #f "Expected default store." #'blob)]
       [(_ . rest) (raise-syntax-error #f "Complete fail" stx)]
       [_ (raise-syntax-error #f "Must be applied" stx)]))

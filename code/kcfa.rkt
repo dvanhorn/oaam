@@ -88,15 +88,14 @@
          (if (attribute compiled?)
              (values #'(...
                         (λ (syn) (syntax-parse syn #:literals (ev)
-                                  #;[(_ (ev args:expr ...))
-                                               (syntax/loc syn (ev args ... real-yield))]
+                                   [(_ (ev args:expr ...))
+                                    (syntax/loc syn (ev args ... real-yield))]
                                    [(_ e:expr) (syntax/loc syn (real-yield e))]
                                    [_ (raise-syntax-error #f "One thing" syn)])))
                       #'(...
                          (λ (syn)
-                            (printf "Yield ev gonna shit on ~a~%" (syntax->datum syn))
-                           (syntax-parse syn ;#:literals (ev)
-                             #;[(_ ((~datum ev) args:expr ...)) #'(ev args ...)]
+                           (syntax-parse syn #:literals (ev)
+                             [(_ (ev args:expr ...)) #'(ev args ...)]
                              [(_ e:expr) #'(yield-meaning e)]
                              [_ (raise-syntax-error #f "Pls one" syn)]))))
              (values #'(syntax-parser [(_ e) #'(yield-meaning e)])
@@ -148,22 +147,13 @@
                     (yield (ev σ* c ρ (sk! (lookup-env ρ x) a) δ))))]
              [(primr l which) (define p (primop which))
               (λ% (σ ρ k δ yield) (yield (co σ k p)))]))
-
-       (define init-target-cs
-         (let ([tcs (or (syntax-parameter-value #'target-cs)
-                        (syntax? (attribute set-monad?)))])
-           (cond [(and tcs (boolean? tcs))
-                  (λ (body)
-                     #`(let ([cs ∅])
-                         (syntax-parameterize ([target-cs (make-rename-transformer #'cs)])
-                           #,body)))]
-                 [else values])))
+       
        (define compile-def
          (if (attribute compiled?)
              #`((define-syntax-rule (... (λ% (σ ρ k δ yield) body ...))
                   (syntax-parameterize ([target-σ (and (syntax-parameter-value #'target-σ)
                                                        (make-rename-transformer #'σ))])
-                    #,(init-target-cs
+                    #,((init-target-cs (syntax? (attribute set-monad?)))
                        (cond [(attribute generators?)
                               #`(λ (σ-op ... ρ-op ... k δ-op ... yield)
                                    (...
@@ -178,7 +168,7 @@
              #`((... (define-syntax-rule (λ% (σ ρ k δ yield) body ...)
                        (generator body ...)))
                 (define compile values))))
-       (printf "Compile def ~a~%" (syntax->datum compile-def))
+
        #`(begin ;; specialize representation given that 0cfa needs less
            (mk-op-struct co (σ k v) (σ-op ... k v) expander-flags ...)
            (struct mt () #:prefab)
@@ -225,7 +215,7 @@
             (define-syntax generator
               (syntax-parser
                 [(_ body:expr ...)
-                 #'#,(init-target-cs
+                 #'#,((init-target-cs (syntax? (attribute set-monad?)))
                       (cond [(attribute generators?)
                              #`(...
                                 (syntax-parameterize ([yield (... #,pass-yield-to-ev)])
@@ -238,36 +228,26 @@
            ;; Let primitives yield single values instead of entire states.
            (define-syntax (with-prim-yield stx)
              (syntax-parse stx
-               [(_ body)
-                (define yk (gensym))
-                #`(syntax-parameterize
-                      ([yield-table (hash-set (syntax-parameter-value #'yield-table)
-                                              '#,yk
-                                              (syntax-parameter-value #'yield))]
-                       [yield
-                        (λ (syn)
-                           (syntax-case syn ()
-                               [(_ v) ;; The only unhygienic thing in the implementation
-                                (with-syntax ([k (datum->syntax syn 'k)])
-                                  (printf "Prim yield/target-σ ~a, tr ~a~%"
-                                          (syntax-parameter-value #'target-σ)
-                                          (hash-ref (syntax-parameter-value #'yield-table) '#,yk))
-                                  ((hash-ref (syntax-parameter-value #'yield-table) '#,yk)
-                                   #'(yield 'wigglebob #;(co target-σ k v)
-                                      )))]
-                               [_ (raise-syntax-error #f "Yield one thing" syn)]))])
+               [(_ k body)
+                (define yield-tr (syntax-parameter-value #'yield))
+                (define new (λ (syn)
+                               (syntax-case syn ()
+                                 [(_ v) ;; The only unhygienic thing in the implementation
+                                  (yield-tr #'(yield (co target-σ k v)))]
+                                 [_ (raise-syntax-error #f "Yield one thing" syn)])))
+                #`(syntax-parameterize ([yield #,new])
                     body)]))
 
            (define (inj e)
              (generator
-                 (yield
-                  (ev (hash) ;; store is a hash unless it's preallocated and global, thus dropped
-                      (compile e)
-                      (hash) ;; no meaning for free variables
-                      '()    ;; starting contour is empty
-                      (mt)))))
+              (yield
+               (ev (hash) ;; store is a hash unless it's preallocated and global, thus dropped
+                   (compile e)
+                   (hash) ;; no meaning for free variables
+                   '()    ;; starting contour is empty
+                   (mt)))))
 
-           (define (aval e) #'(fixpoint step (inj e)))
+           (define (aval e) (fixpoint step (inj e)))
 
            #,@compile-def
 
@@ -294,7 +274,7 @@
                            [(primop o)
                             (define forced (for/list ([a (in-list (rest args))])
                                              (force σ a)))
-                            (with-prim-yield
+                            (with-prim-yield k
                              (do (σ) ([vs (in-set (toSetOfLists forced))])
                                (prim-meaning o σ l δ vs)))]
                            [_ (generator)])))]
@@ -309,7 +289,7 @@
                          (yield (ev σ (if v t e) ρ k δ))))]
                   [(lrk: x '() '() e ρ a δ)
                    (generator
-                       (do (σ) ([σ* #:join σ (lookup-env ρ x) v]
+                       (do (σ) ([σ* #:join σ (lookup-env ρ x) (force σ v)]
                                 [k (getter σ a)])
                          (yield (ev σ* e ρ k δ))))]
                   [(lrk: x (cons y xs) (cons e es) b ρ a δ)
@@ -351,7 +331,6 @@
 (define-syntax (the-bind-push stx)
   (syntax-parse stx
     [(_ (σ* a* σ l δ k) body)
-     (printf "Expanding push on ~a~%" (syntax->datum stx))
      #'(let ([a* (make-var-contour l δ)])
        (bind-join (σ* σ a* (set k)) body))]))
 
@@ -409,11 +388,7 @@
 
 (define-syntax-rule (with-set-monad body)
   (splicing-syntax-parameterize
-   ([yield-meaning (λ (stx) (syntax-parse stx [(_ e)
-                     (when (boolean? (syntax-parameter-value #'target-cs))
-                       (raise-syntax-error #f "target-cs used before bound" stx))
-                     (printf "Whut ~a~%" (syntax-parameter-value #'target-cs))
-                     #'(∪1 target-cs e)]))])
+   ([yield-meaning (λ (stx) (syntax-parse stx [(_ e) #'(∪1 target-cs e)]))])
    body))
 
 (define-syntax-rule (with-lazy body)
@@ -459,17 +434,17 @@
 ;; Compiled wide concrete store-passing set monad
 (with-lazy
  (with-∞-ctx
-  (with-σ-∆s
+  (with-σ-passing
    (with-set-monad
-    (splicing-syntax-parameterize ([do-body-transformer
-                                    (λ (stx)
-                                       (printf "tσ: ~a~%" (syntax-parameter-value #'target-σ))
-                                       #`(values target-σ #,stx))]
+    (splicing-syntax-parameterize ([do-body-transformer (λ (stx) stx)
+                                    #;
+                                    (λ (stx) #`(values target-σ #,stx))]
                                    [widen (make-rename-transformer #'eval-widen)])
       (mk-analysis #:tick tick-∞
-                   #:aval eval^
-                   #:compiled #:wide #:set-monad
+                   #:aval eval
+                   #:compiled #:set-monad ;#:wide
                    #:kcfa +inf.0))))))
+(provide eval)
 
 ;; concrete compiled strict/lazy
 ;; 1cfa compiled strict/lazy
