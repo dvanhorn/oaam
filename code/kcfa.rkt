@@ -13,9 +13,10 @@
          (rename-in racket/generator
                     [yield real-yield]
                     [generator real-generator])
-         racket/stxparam racket/splicing
          (for-syntax syntax/parse racket/syntax
-                     racket/pretty))
+                     racket/pretty)
+         racket/stxparam
+         racket/splicing)
 
 ;; Yield is an overloaded term that will do some manipulation to its
 ;; input. Yield-meaning is the intended meaning of yield.
@@ -23,7 +24,6 @@
   (λ (stx) (raise-syntax-error #f "Must parameterize for mk-analysis" stx)))
 
 
-(define snull (set '()))
 (define (toSetOfLists list-of-sets)
   (match list-of-sets
     ['() snull]
@@ -87,12 +87,16 @@
                         #'(() () ())
                         #'((ρ) (δ) (l)))]
                    [ev: (format-id #'ev "~a:" #'ev)]
+                   [ans: (format-id #'ans "~a:" #'ans)]
                    [ev #'ev]
+                   ;; represent σ explicitly in all states?
                    [(σ-op ...) (if (or global-σ? (attribute wide?)) #'() #'(σ))]
+                   ;; explicitly pass σ/∆ to compiled forms?
                    [(σ-gop ...) (if σ-threading? #'(σ) #'())]
+                   ;; If σ not part of state and not global, it is passed
+                   ;; in as (cons σ state), so expand accordingly.
                    [(expander-flags ...)
                     (cond [(and (attribute wide?) (not global-σ?))
-                           (printf "Expander cons~%")
                            #'(#:expander #:with-first-cons)]
                           [else #'()])])
        (define-values (pass-yield-to-ev yield-ev)
@@ -156,7 +160,7 @@
                     (yield (ev σ* c ρ (sk! (lookup-env ρ x) a) δ))))]
              [(primr l which) (define p (primop which))
               (λ% (σ* ρ k δ yield) (yield (co σ* k p)))]))
-       
+
        (define compile-def
          (if (attribute compiled?)
              #`((...
@@ -169,7 +173,7 @@
                                                         [target-σ (make-rename-transformer #'σ)])
                                     body ...)))]
                            [else
-                            #`(λ (σ-gop ... ρ-op ... k δ-op ...)                                
+                            #`(λ (σ-gop ... ρ-op ... k δ-op ...)
                                  (...
                                   (syntax-parameterize ([yield (... #,yield-ev)]
                                                         [target-σ (make-rename-transformer #'σ)])
@@ -207,8 +211,8 @@
                          ;; σ only optional if it's global (wide, imperative/prealloc)
                          [(_ σ e ρ k δ yield) #'(e σ-gop ... ρ-op ... k δ-op ... yield)]
                          [(_ σ e ρ k δ) #'(e σ-gop ... ρ-op ... k δ-op ...)]))
-                     (define-match-expander ev:
-                       (syntax-rules () [(_ σ e ρ k δ) (cons σ #f)])))
+                     (define-match-expander ev: ;; inert
+                       (syntax-rules () [(_ . args) (list . args)])))
                   #`((mk-op-struct ev (σ e ρ k δ) (σ-op ... e ρ-op ... k δ-op ...)
                                    expander-flags ...)))
 
@@ -256,7 +260,7 @@
            (define (aval e) (fixpoint step (inj e)))
 
            #,@compile-def
-           
+
            (mk-prims prim-meaning)
            ;; [Rel State State]
            (define (step state)
@@ -277,14 +281,14 @@
                             (cond [(= (length xs) (length (rest args)))
                                    (do (σ) ([(ρ* σ* δ*) #:bind ρ σ l δ xs (rest args)])
                                        (yield (ev σ* e ρ* k δ*)))]
-                                  [else (generator)])]
+                                  [else (generator (yield (co σ k v)))])]
                            [(primop o)
                             (define forced (for/list ([a (in-list (rest args))])
-                                             (force σ a)))                            
+                                             (force σ a)))
                             (with-prim-yield k
                              (do (σ) ([vs (in-set (toSetOfLists forced))])
                                (prim-meaning o σ l δ vs)))]
-                           [_ (generator)])))]
+                           [_ (generator (yield (co σ k v)))])))]
 
                   [(ls: l (list-rest e es) vs ρ a δ)
                    (generator
@@ -310,15 +314,15 @@
                          (yield (co σ* k (void)))))]))]
 
                ;; this code is dead when running compiled code.
-               [(ev: σ e ρ k δ) 
+               [(ev: σ e ρ k δ)
                 #,(if (attribute compiled?)
                       #'(syntax-parameterize ([target-σ (make-rename-transformer #'σ)])
-                          (generator))
+                          (generator (yield (ev σ e ρ k δ))))
                         eval)]
 
                [(ans: σ v)
                 (syntax-parameterize ([target-σ (make-rename-transformer #'σ)])
-                  (generator))]
+                  (generator (yield (ans σ v))))]
                [_ (error 'step "What? ~a" state)]))))))]))
 
 (define (map2-append f acc ls0 ls1)
@@ -370,17 +374,23 @@
      (match state
        [(cons σ cs)
         (define-values (σ* cs*)
-          (for/fold ([σ σ] [cs ∅]) ([c (in-set cs)])
-            (define-values (σ* cs*) (step (cons σ c)))
-            (values (join-store σ σ*) (∪ cs* cs))))
+          (for/fold ([σ* σ] [cs ∅]) ([c (in-set cs)])
+            (define-values (σ** cs*) (step (cons σ c)))
+            (values (join-store σ* σ**) (∪ cs* cs))))
         (set (cons σ* cs*))]
        [_ (error 'wide-step "bad output ~a~%" state)])))
 
 (define-syntax-rule (set-fixpoint^ step fst)
   (let-values ([(σ cs) fst])
-    (for/union ([s (fix (wide-step step) (set (cons σ cs)))])
+    (for/fold ([last-σ (hash)]
+               [final-cs ∅])
+        ([s (fix (wide-step step) (set (cons σ cs)))])
       (match s
-        [(cons σ cs) (filter-fix cs)]
+        [(cons σ cs)
+         (values (join-store last-σ σ)
+                 (for/set #:initial final-cs ([c (in-set cs)]
+                                              #:when (ans^? c))
+                          c))]
         [_ (printf "bad output ~a~%" s)]))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -482,8 +492,7 @@
 
 (define-syntax-rule (with-σ-passing-set-monad body)
   (splicing-syntax-parameterize
-   ([yield-meaning (λ (stx) (syntax-parse stx [(_ e)
-                                               #'(values target-σ (∪1 target-cs e))]))])
+   ([yield-meaning (syntax-rules () [(_ e) (values target-σ (∪1 target-cs e))])])
    body))
 
 (define-syntax-rule (with-mutable-worklist body)
@@ -559,13 +568,9 @@
                    #:fixpoint set-fixpoint^
                    #:compiled #:set-monad #:wide #:σ-passing
                    #:kcfa +inf.0))))))
-(define (filter-fix cs)
-  (for/set ([σcs (in-set cs)]
-            #:when ans^?)
-    (ans^-v σcs)))
+
 ;(define (f-lazy-eval/c e) (filter-fix (lazy-eval/c e)))
-(define (f-lazy-eval^/c e) (filter-fix (lazy-eval^/c e)))
-(provide #;f-lazy-eval/c f-lazy-eval^/c)
+(provide #;f-lazy-eval/c lazy-eval^/c)
 
 #;#;#;
 (with-lazy

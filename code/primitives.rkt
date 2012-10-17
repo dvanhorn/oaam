@@ -6,7 +6,7 @@
          racket/stxparam
          racket/unsafe/ops)
 (provide primitive? changes-store? reads-store? primitive?
-         mk-prims
+         mk-prims snull
          force getter widen delay make-var-contour)
 
 (define-syntax-parameter getter #f)
@@ -18,6 +18,8 @@
 ;; Identifiers for the crappy type DSL
 ;; Meanings (respectively): Number String Pair Boolean Vector Any Void
 (define-values (z s p b v any !) (values #f #f #f #f #f #f #f))
+
+(define snull (set '()))
 
 (begin-for-syntax
  (define (type-match t v)
@@ -356,7 +358,7 @@
      [boolean? #f #f booleanv? (any -> b)]
      ;; Pairs/lists
      [cons #f #t make-consv (any any -> p)]
-     [list #f #t make-list (#:rest any -> any)]
+     [list #f #t make-listv (#:rest any -> any)]
      [pair? #f #f consv*? (any -> b)]
      [null? #f #f nullv? (any -> b)]
      [set-car! #f #t set-car!v (p any -> !)]

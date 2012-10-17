@@ -41,7 +41,7 @@
     (hash-set σ (car k×v)
               (set-union (cdr k×v)
                          (hash-ref σ (car k×v) (set))))))
-
+#;
 ;; Set State -> Store
 (define (join-stores ss)
   (for/fold ([σ (hash)])

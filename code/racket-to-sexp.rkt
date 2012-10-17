@@ -1,6 +1,8 @@
 #lang racket
 
-(provide rkt->sexp sch->sexp)
+(provide rkt->sexp sch->sexp
+         expand-sexp-expr
+         expand-sexp-prog)
 
 ;; expect top level forms
 (define (sch->sexp file)
@@ -21,6 +23,17 @@
                                                  `(#%require . ,rest)) #f]
                                             [_ #t])
                               forms))]))
+
+(define (expand-sexp sexp)
+  (syntax->datum (expand (datum->syntax #f sexp))))
+(define (expand-sexp-expr sexp)
+  (parameterize ([current-namespace (make-base-namespace)])
+    (expr->sexp (expand-sexp sexp))))
+(define (expand-sexp-prog sexp)
+  (parameterize ([current-namespace (make-base-namespace)])
+    (define-values (defs expr) (split-at-right (map expand-sexp sexp) 1))
+    (append (map define-values->sexp defs)
+            (map expr->sexp expr))))
 
 (define (top-level->sexp forms)
   (define-values (defs exps)
