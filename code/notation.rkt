@@ -260,7 +260,9 @@
                          (syntax/loc stx
                            (for*/fold ([targets tvalues] ... voidc ...) (gs ...)
                              (syntax-parameterize ([do-targets (make-rename-transformer #'targets)] ...)
-                               body*))))])))])
+                               #,(if add-void?
+                                     #`(begin body* (void))
+                                     #'body*)))))])))])
             (folder σ (c.guards ...)
                     (syntax-parameterize ([in-do-ctx? #t])
                       #,(dot #'(#f (σ) (clauses ...) body))))))]

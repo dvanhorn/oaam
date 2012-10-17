@@ -52,16 +52,26 @@
     ([s ss])
     (join-store σ (state-σ s))))
 
-(define (reach σ root)
+(define ((mk-reach ref) σ root)
   (define seen ∅)
   (let loop ([as root])
     (for/union #:res acc ([a (in-set as)]
                           #:unless (a . ∈ . seen))
                (set! seen (∪1 seen a))
                (for/union #:initial (∪1 acc a)
-                          ([v (in-set (hash-ref σ a))])
+                          ([v (in-set (ref σ a))])
                           (loop (touches v))))))
+
+(define reach (mk-reach hash-ref))
+(define reach/vec (mk-reach vector-ref))
 
 (define (restrict-to-reachable σ v)
   (for/hash ([a (in-set (reach σ (touches v)))])
     (values a (hash-ref σ a))))
+;; not really a restriction since it's not a vector, but meh.
+(define (restrict-to-reachable/vector σvec v)
+  (for/hash ([a (in-set (reach/vec σvec
+                                   (if (set? v)
+                                       (for/union ([v* (in-set v)]) (touches v*))
+                                       (touches v))))])
+    (values a (vector-ref σvec a))))

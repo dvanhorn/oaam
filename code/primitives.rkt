@@ -71,7 +71,7 @@
 
 (define-syntax (mk-primitive-meaning stx)
   (syntax-parse stx
-    [(_ mean:id defines ... 
+    [(_ mean:id defines ...
         ([prim read-store? write-store? meaning t:type] ...))
      (quasisyntax/loc stx
        (begin
@@ -335,6 +335,10 @@
      [=    #f #f =v    (#:rest z -> b)]
      [number? #f #f numberv? (any -> b)]
      [zero?   #f #f zero?v (z -> b)]
+     ;; Comparisons
+     [equal? #t #f equalv? (any any -> b)]
+     [eqv? #t #f equalv? (any any -> b)]
+     [eq? #t #f equalv? (any any -> b)]
      ;; Vectors
      [make-vector #f #t make-vectorv ((z -> v)
                                       (z any -> v))]

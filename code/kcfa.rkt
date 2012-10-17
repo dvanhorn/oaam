@@ -1,21 +1,12 @@
 #lang racket
-#;
-(provide eval eval^ eval/c eval/c^
-         lazy-eval lazy-eval^ lazy-eval/c lazy-eval/c^
-         0cfa 0cfa^ 0cfa/c 0cfa/c^
-         0cfa-step comp-0cfa-step compile-0cfa
-         lazy-0cfa lazy-0cfa^ lazy-0cfa/c lazy-0cfa/c^
-         1cfa 1cfa^ 1cfa/c 1cfa/c^
-         lazy-1cfa lazy-1cfa^ lazy-1cfa/c lazy-1cfa/c^
-         widen)
+
 (require "ast.rkt" "fix.rkt" "data.rkt"
          "env.rkt"
          "notation.rkt" "primitives.rkt" "parse.rkt"
          (rename-in racket/generator
                     [yield real-yield]
                     [generator real-generator])
-         (for-syntax syntax/parse racket/syntax
-                     racket/pretty)
+         (for-syntax syntax/parse racket/syntax)
          racket/stxparam
          racket/splicing)
 
@@ -23,7 +14,6 @@
 ;; input. Yield-meaning is the intended meaning of yield.
 (define-syntax-parameter yield-meaning
   (λ (stx) (raise-syntax-error #f "Must parameterize for mk-analysis" stx)))
-
 
 (define (toSetOfLists list-of-sets)
   (match list-of-sets
@@ -412,6 +402,24 @@
 (define todo #f)
 (define unions 0)
 (define seen #f)
+(define next-loc #f)
+(define contour-table #f)
+
+(define (ensure-σ-size)
+  (when (= next-loc (vector-length global-σ))
+    (set! global-σ
+          (for/vector #:length (* 2 next-loc) #:fill ∅ ;; ∅ → '()
+                      ([v (in-vector global-σ)]
+                       [i (in-naturals)]
+                       #:when (< i next-loc))
+                      v))))
+
+(define-syntax-rule (get-contour-index!-0 c)
+  (or (hash-ref contour-table c #f)
+      (begin0 next-loc
+              (ensure-σ-size)
+              (hash-set! contour-table c next-loc)
+              (set! next-loc (add1 next-loc)))))
 
 (define-for-syntax yield!
   (syntax-parser [(_ e) #'(let ([c e])
@@ -419,12 +427,21 @@
                               (hash-set! seen c unions)
                               (set! todo (∪1 todo c))))])) ;; ∪1 → cons
 
-(define (prepare-prealloc sexp)
+(define-syntax-rule (make-var-contour-0-prealloc x δ)
+  (cond [(exact-nonnegative-integer? x) x]
+        [else (get-contour-index!-0 x)]))
+
+(define (prepare-prealloc parser sexp)
   (define nlabels 0)
   (define (fresh-label!) (begin0 nlabels (set! nlabels (add1 nlabels))))
   (define (fresh-variable! x) (begin0 nlabels (set! nlabels (add1 nlabels))))
-  (define e (parse sexp fresh-label! fresh-variable!))
-  (set! global-σ (make-vector nlabels ∅)) ;; ∅ → '()
+  (define e (parser sexp fresh-label! fresh-variable!))
+  ;; Start with a constant factor larger store since we are likely to
+  ;; allocate some composite data. This way we don't incur a reallocation
+  ;; right up front.
+  (set! global-σ (make-vector (* 2 nlabels) ∅)) ;; ∅ → '()
+  (set! next-loc nlabels)
+  (set! contour-table (make-hash))
   (set! unions 0)
   (set! todo ∅)
   (set! seen (make-hash))
@@ -450,13 +467,16 @@
 (define-syntax-rule (global-getter σ* a)
   (vector-ref global-σ a))
 
-(define-syntax-rule (mk-prealloc^-fixpoint name ans^?)
+(define-syntax-rule (mk-prealloc^-fixpoint name ans^? ans^-v)
   (define (name step fst)
     (let loop ()
       (cond [(∅? todo) ;; → null?
-             (for*/set ([(c at-unions) (in-hash seen)]
-                        #:when (ans^? c))
-               c)]
+             (define vs
+               (for*/set ([(c at-unions) (in-hash seen)]
+                          #:when (ans^? c))
+                 (ans^-v c)))
+             (cons (restrict-to-reachable/vector global-σ vs)
+                   vs)]
             [else
              (define todo-old todo)
              (set! todo ∅)                        ;; → '()
@@ -528,6 +548,12 @@
   (splicing-syntax-parameterize
    ([bind (make-rename-transformer #'bind-0)]
     [make-var-contour (make-rename-transformer #'make-var-contour-0)])
+   body))
+
+(define-syntax-rule (with-0-ctx/prealloc body)
+  (splicing-syntax-parameterize
+   ([bind (make-rename-transformer #'bind-0)]
+    [make-var-contour (make-rename-transformer #'make-var-contour-0-prealloc)])
    body))
 
 (define-syntax-rule (with-∞-ctx body)
@@ -617,9 +643,9 @@
                    #:compiled #:wide #:σ-∆s #:set-monad))))))
 (provide lazy-0cfa∆/c)
 
-(mk-prealloc^-fixpoint prealloc/imperative-fixpoint prealloc-ans?)
+(mk-prealloc^-fixpoint prealloc/imperative-fixpoint prealloc-ans? prealloc-ans-v)
 (with-lazy
- (with-0-ctx
+ (with-0-ctx/prealloc
   (with-mutable-store
    (with-mutable-worklist
     (splicing-syntax-parameterize ([widen (make-rename-transformer #'widen^)])
@@ -628,7 +654,7 @@
                    #:fixpoint prealloc/imperative-fixpoint
                    #:pre-alloc #:compiled #:imperative #:wide))))))
 (define (lazy-0cfa^/c! sexp)
-  (lazy-0cfa^/c!-prepared (prepare-prealloc sexp)))
+  (lazy-0cfa^/c!-prepared (prepare-prealloc parse-prog sexp)))
 (provide lazy-0cfa^/c!)
 
 ;; concrete compiled strict/lazy
