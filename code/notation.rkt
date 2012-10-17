@@ -15,7 +15,7 @@
          bind-join*
          bind-push
          bind
-         target-σ target-cs do-body-transformer
+         target-σ? target-cs? target-σ target-cs
          (for-syntax mk-do init-target-cs))
 
 ;; define-simple-macro does not have an implicit quasisyntax.
@@ -67,11 +67,9 @@
 (define-syntax (continue stx)
   (syntax-parse stx
     [(_)
-     #:fail-unless (syntax-parameter-value #'in-do-ctx?)
-     "May only be used in the syntactic context of a do form"
      (quasisyntax/loc stx
-       (values #,@(append (listy (and (syntax-parameter-value #'target-σ) #'target-σ))
-                          (listy (and (syntax-parameter-value #'target-cs) #'target-cs)))))]))
+       (values #,@(append (listy (and (syntax-parameter-value #'target-σ?) #'target-σ))
+                          (listy (and (syntax-parameter-value #'target-cs?) #'target-cs)))))]))
 
 ;; Specialize representations
 (define-syntax mk-op-struct
@@ -110,14 +108,16 @@
 (define-syntax-parameter bind mk-analysis-err)
 (define-syntax-parameter do #f) ;; to give to primitives
 ;; What is do folding over?
-(define-syntax-parameter target-σ #f)
+(define-syntax-parameter target-σ? #f)
+(define-syntax-parameter target-cs? #f)
+(define-syntax-parameter target-σ
+  (λ (stx) (syntax-case stx () [_ (raise-syntax-error #f "Must be bound" stx)])))
 (define-syntax-parameter target-cs #f)
-(define-syntax-parameter do-body-transformer mk-analysis-err)
 ;; Private
 (define-syntax-parameter in-do-ctx? #f)
 
 (define-for-syntax (init-target-cs set-monad?)
-  (let ([tcs (or (syntax-parameter-value #'target-cs) set-monad?)])
+  (let ([tcs (or (syntax-parameter-value #'target-cs?) set-monad?)])
     (cond [(and tcs (boolean? tcs))
            (λ (body)
               #`(let ([cs ∅])
@@ -135,8 +135,7 @@
           values
           (λ (stx) `(begin (real-yield #,stx) 'done))))
     (define (bind-rest inner-σ body)
-      #`(syntax-parameterize ([target-σ (and (syntax-parameter-value #'target-σ)
-                                             (make-rename-transformer #'#,inner-σ))])
+      #`(syntax-parameterize ([target-σ (make-rename-transformer #'#,inner-σ)])
           #,body))
     (define-syntax-class (join-clause replace-v outer-σ body)
       #:attributes (clause new-σ val)
@@ -203,8 +202,8 @@
                  (λ (stx)
                     (syntax-parse stx
                       [(_ prev-σ (gs ...) body*)
-                       (define tσ (syntax-parameter-value #'target-σ))
-                       (define tcs (syntax-parameter-value #'target-cs))
+                       (define tσ (syntax-parameter-value #'target-σ?))
+                       (define tcs (syntax-parameter-value #'target-cs?))
                        (with-syntax* ([(do-targets ...)
                                        (append (if tσ (list #'target-σ) '())
                                                (if tcs (list #'target-cs) '()))]
@@ -253,19 +252,12 @@
       [(_ (σ:id) (blob clauses ...) body ...)
        (raise-syntax-error #f "Expected single expression body" #'(body ...))]
       [(_ (σ:id) () body:expr)
-       (define yield-tr (syntax-parameter-value #'yield))
-       (define new (syntax-parser
-                     [(_ e)
-                      ((syntax-parameter-value #'do-body-transformer)
-                       (yield-tr #'(yield e)))]
-                     [s (raise-syntax-error #f "Do yield one" #'s)]))
-       #`(syntax-parameterize ([yield #,new]
-                               [in-do-ctx? #t])
+       #`(syntax-parameterize ([in-do-ctx? #t])
            body)]
       ;; When fold/fold doesn't cut it, we need a safe way to recur.
       [(_ (σ:id) loop:id ([args:id arg0:expr] ...) body:expr)
-       (define tσ (syntax-parameter-value #'target-σ))
-       (define tcs (syntax-parameter-value #'target-cs))
+       (define tσ (syntax-parameter-value #'target-σ?))
+       (define tcs (syntax-parameter-value #'target-cs?))
        (define tσs (if tσ (list #'target-σ) '()))
        (define tcss (if tcs (list #'target-cs) '()))
        (with-syntax ([(do-targets ...) (append tσs tcss)]
@@ -280,7 +272,8 @@
               (syntax-parameterize ([do-targets (make-rename-transformer #'new-targets)] ...)
                 (let-syntax ([loop (syntax-rules ()
                                      [(_ σ* argps ...)
-                                      (real-loop σ* #,@tcss argps ...)])])
+                                      (real-loop #,@(if tσ (list #'σ*) '())
+                                                 #,@tcss argps ...)])])
                   body))))))]
       [(_ blob . rest) (raise-syntax-error #f "Expected default store." #'blob)]
       [(_ . rest) (raise-syntax-error #f "Complete fail" stx)]

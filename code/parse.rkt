@@ -5,12 +5,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser
 
-(define (parse-prog los)
+(define (parse-prog los [fresh-label! gensym] [fresh-variable! gensym])
   (match los
-    [(list e) (parse e gensym gensym)]
+    [(list e) (parse e fresh-label! fresh-variable!)]
     [(list (and ds `(define ,_ . ,_)) ... es ...)
      (define bs (parse-defns ds))     
-     (parse `(letrec ,bs (begin ,@es)) gensym gensym)]))
+     (parse `(letrec ,bs (begin ,@es)) fresh-label! fresh-variable!)]))
 
 (define (parse-defns ds)
   (match ds
@@ -21,7 +21,7 @@
      (cons (list f e)
            (parse-defns ds))]))
 
-(define (parse sexp fresh-label! fresh-variable!)
+(define (parse sexp [fresh-label! gensym] [fresh-variable! gensym])
   (let parse* ([sexp sexp]
                [ρ (hasheq)])
     (define (parse sexp) (parse* sexp ρ))
