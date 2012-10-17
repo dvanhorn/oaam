@@ -7,13 +7,12 @@
          racket/unsafe/ops)
 (provide primitive? changes-store? reads-store? primitive?
          mk-prims snull
-         force getter widen delay make-var-contour)
+         force getter widen delay)
 
 (define-syntax-parameter getter #f)
 (define-syntax-parameter force #f)
 (define-syntax-parameter widen #f)
 (define-syntax-parameter delay #f)
-(define-syntax-parameter make-var-contour #f)
 
 ;; Identifiers for the crappy type DSL
 ;; Meanings (respectively): Number String Pair Boolean Vector Any Void

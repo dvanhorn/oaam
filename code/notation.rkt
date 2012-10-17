@@ -9,14 +9,13 @@
          racket/stxparam)
 (provide for/union for*/union for/set for*/set
          define-simple-macro*
-         ∅ ∪ ∩ ∖ ∪1 ∪/l ∖1 ∖/l ∈
+         ∅ ∅? ∪ ∩ ∖ ∪1 ∪/l ∖1 ∖/l ∈
          mk-op-struct
          continue do
          yield
          bind-join
          bind-join*
-         bind-push
-         bind
+         bind make-var-contour
          target-σ? target-cs? target-σ target-cs
          (for-syntax mk-do init-target-cs))
 
@@ -46,13 +45,13 @@
   (for/fold ([o.res o.init]) guards (append (let () body ...) o.res)))
 
 ;; Set notations
-(define-values (∅ ∪ ∩ ∖ ∪1 ∪/l ∖1 ∖/l ∈)
+(define-values (∅ ∅? ∪ ∩ ∖ ∪1 ∪/l ∖1 ∖/l ∈)
   (let ([set-add*
          (λ (s xs) (for/fold ([s s]) ([x (in-list xs)]) (set-add s x)))]
         [set-remove*
          (λ (s xs) (for/fold ([s s]) ([x (in-list xs)]) (set-remove s x)))]
         [in? (λ (x s) (set-member? s x))])
-    (values (set) set-union set-intersect set-subtract
+    (values (set) set-empty? set-union set-intersect set-subtract
             set-add set-add*
             set-remove set-remove* in?)))
 
@@ -137,7 +136,14 @@
   (raise-syntax-error #f "For use in mk-analysis and its input transformers" stx))
 (define-syntax-parameter bind-join mk-analysis-err)
 (define-syntax-parameter bind-join* mk-analysis-err)
-(define-syntax-parameter bind-push mk-analysis-err)
+
+(define-syntax-parameter make-var-contour #f)
+(define-syntax (bind-push stx)
+  (syntax-parse stx
+    [(_ (σ* a* σ l δ k) body)
+     #'(let ([a* (make-var-contour l δ)])
+       (bind-join (σ* σ a* (set k)) body))]))
+
 (define-syntax-parameter bind mk-analysis-err)
 (define-syntax-parameter do #f) ;; to give to primitives
 ;; What is do folding over?
@@ -150,7 +156,8 @@
 (define-syntax-parameter in-do-ctx? #f)
 
 (define-for-syntax (init-target-cs set-monad?)
-  (let ([tcs (or (syntax-parameter-value #'target-cs?) set-monad?)])
+  (let ([tcs (or (syntax-parameter-value #'target-cs?)
+                 set-monad?)])
     (cond [(and tcs (boolean? tcs))
            (λ (body)
               #`(let ([cs ∅])
@@ -162,6 +169,7 @@
   (define (dot stx)
     ;; Construct the values tuple given the previously bound σ and cs
     (define in-do? (syntax-parameter-value #'in-do-ctx?))
+    (define add-void? (and global-σ? (not σ-∆s?)))
     (define gen-wrap
       (if (or in-do? (not generators?)
               (not (or (not global-σ?) σ-∆s?)))
@@ -247,9 +255,10 @@
                                                    (if #,in-do?
                                                        (list #'target-cs)
                                                        (list #'∅))
-                                                   '()))])
+                                                   '()))]
+                                      [(voidc ...) #'#,(if add-void? #'([dummy (void)]) #'())])
                          (syntax/loc stx
-                           (for*/fold ([targets tvalues] ...) (gs ...)
+                           (for*/fold ([targets tvalues] ... voidc ...) (gs ...)
                              (syntax-parameterize ([do-targets (make-rename-transformer #'targets)] ...)
                                body*))))])))])
             (folder σ (c.guards ...)
