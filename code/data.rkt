@@ -32,12 +32,15 @@
       (symbol? x)
       (null? x)))
 
-(define (touches v)
+(define (touches v [0cfa? #f])
   (match v
     [(clos xs e ρ)
-     (for/hash ([x (in-set (free e))]
-                #:unless (memv x xs))
-       (hash-ref ρ x))]
+     (cond [0cfa? (free e)]
+           [else
+            (for/hash ([x (in-set (free e))]
+                       #:unless (memv x xs))
+              (hash-ref ρ x
+                        (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ))))])]
     [(consv a d) (set a d)]
     [(vectorv _ l) (list->set l)]
     [(vectorv^ _ a) (set a)]

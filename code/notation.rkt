@@ -138,11 +138,9 @@
 (define-syntax-parameter bind-join* mk-analysis-err)
 
 (define-syntax-parameter make-var-contour #f)
-(define-syntax (bind-push stx)
-  (syntax-parse stx
-    [(_ (σ* a* σ l δ k) body)
-     #'(let ([a* (make-var-contour l δ)])
-       (bind-join (σ* σ a* (set k)) body))]))
+(define-syntax-rule (bind-push (σ* a* σ l δ k) body)
+  (let ([a* (make-var-contour l δ)])
+    (bind-join (σ* σ a* (set k)) body)))
 
 (define-syntax-parameter bind mk-analysis-err)
 (define-syntax-parameter do #f) ;; to give to primitives
@@ -175,9 +173,7 @@
               (not (or (not global-σ?) σ-∆s?)))
           values
           (λ (stx) `(begin (real-yield #,stx) 'done))))
-    (define (bind-rest inner-σ body)
-      #`(syntax-parameterize ([target-σ (make-rename-transformer #'#,inner-σ)])
-          #,body))
+
     (define-syntax-class (join-clause replace-v outer-σ body)
       #:attributes (clause new-σ val)
       (pattern [σ*:id (~or (~and #:join (~bind [bindf #'bind-join]))
@@ -185,17 +181,17 @@
                #:with new-σ #'σ* #:attr val #'vs
                #:attr clause
                (λ (rest)
-                  #`(bindf (σ* σ a #,(or replace-v #'vs)) #,(bind-rest #'σ* rest))))
+                  #`(bindf (σ* σ a #,(or replace-v #'vs)) #,rest)))
       (pattern [(ρ* σ* δ*) #:bind ρ σ l δ xs vs] ;; these vals don't get hoisted
                #:with new-σ #'σ* #:attr val #f
                #:attr clause
                (λ (rest)
-                  #`(bind (ρ* σ* δ*) (ρ σ l δ xs vs) #,(bind-rest #'σ* rest))))
+                  #`(bind (ρ* σ* δ*) (ρ σ l δ xs vs) #,rest)))
       (pattern [(σ*:id a*:id) #:push σ l δ k] ;; no vals to hoist.
                #:with new-σ #'σ* #:attr val #f
                #:attr clause
                (λ (rest)
-                  #`(bind-push (σ* a* σ l δ k) #,(bind-rest #'σ* rest)))))
+                  #`(bind-push (σ* a* σ l δ k) #,rest))))
 
     (define-splicing-syntax-class comp-clauses
       #:attributes ((guards 1))
@@ -242,7 +238,7 @@
                 (...
                  (λ (stx)
                     (syntax-parse stx
-                      [(_ prev-σ (gs ...) body*)
+                      [(_ prev-σ (g gs ...) body*)
                        (define tσ (syntax-parameter-value #'target-σ?))
                        (define tcs (syntax-parameter-value #'target-cs?))
                        (with-syntax* ([(do-targets ...)
@@ -258,11 +254,12 @@
                                                    '()))]
                                       [(voidc ...) #'#,(if add-void? #'([dummy (void)]) #'())])
                          (syntax/loc stx
-                           (for*/fold ([targets tvalues] ... voidc ...) (gs ...)
+                           (for/fold ([targets tvalues] ... voidc ...) (g)
                              (syntax-parameterize ([do-targets (make-rename-transformer #'targets)] ...)
-                               #,(if add-void?
-                                     #`(begin body* (void))
-                                     #'body*)))))])))])
+                               (for*/fold ([targets tvalues] ... voidc ...) (gs ...)
+                                 #,(if add-void?
+                                       #`(begin body* (void))
+                                       #'body*))))))])))])
             (folder σ (c.guards ...)
                     (syntax-parameterize ([in-do-ctx? #t])
                       #,(dot #'(#f (σ) (clauses ...) body))))))]
@@ -304,14 +301,16 @@
        (define tcs (syntax-parameter-value #'target-cs?))
        (define tσs (if tσ (list #'target-σ) '()))
        (define tcss (if tcs (list #'target-cs) '()))
-       (with-syntax ([(do-targets ...) (append tσs tcss)]
-                     [(new-targets ...) (append (if tσ (list #'tσ) '())
-                                                (if tcs (list #'tcs) '()))]
-                     [(argps ...) (generate-temporaries #'(args ...))])
+       (with-syntax* ([tσ* (generate-temporary)]
+                      [tcs* (generate-temporary)]
+                      [(do-targets ...) (append tσs tcss)]
+                      [(new-targets ...) (append (if tσ (list #'tσ*) '())
+                                                 (if tcs (list #'tcs*) '()))]
+                      [(argps ...) (generate-temporaries #'(args ...))])
          ((init-target-cs set-monad?)
           (quasisyntax/loc stx
-            (let real-loop (#,@(append (if tσ (list #`[tσ target-σ]) '())
-                                       (if tcs (list #`[tcs target-cs]) '()))
+            (let real-loop (#,@(append (if tσ (list #`[tσ* target-σ]) '())
+                                       (if tcs (list #`[tcs* target-cs]) '()))
                             [args arg0] ...)
               (syntax-parameterize ([do-targets (make-rename-transformer #'new-targets)] ...)
                 (let-syntax ([loop (syntax-rules ()

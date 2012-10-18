@@ -5,7 +5,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser
 
-(define (parse-prog los [fresh-label! gensym] [fresh-variable! gensym])
+(define (igensym [start 'g]) (string->symbol (symbol->string (gensym start))))
+
+(define (parse-prog los [fresh-label! igensym] [fresh-variable! igensym])
   (match los
     [(list e) (parse e fresh-label! fresh-variable!)]
     [(list (and ds `(define ,_ . ,_)) ... es ...)
@@ -21,7 +23,7 @@
      (cons (list f e)
            (parse-defns ds))]))
 
-(define (parse sexp [fresh-label! gensym] [fresh-variable! gensym])
+(define (parse sexp [fresh-label! igensym] [fresh-variable! igensym])
   (let parse* ([sexp sexp]
                [ρ (hasheq)])
     (define (parse sexp) (parse* sexp ρ))
@@ -35,7 +37,7 @@
     (match sexp
       [`(begin ,e) (parse e)]
       [`(begin ,e . ,r)
-       (parse `((lambda (,(gensym)) (begin . ,r)) ,e))]
+       (parse `((lambda (,(igensym)) (begin . ,r)) ,e))]
       [`(let () . ,b) (parse-seq b)]
       [`(let ((,xs ,es) ...) . ,b)
        (parse `((lambda ,xs . ,b) . ,es))]
