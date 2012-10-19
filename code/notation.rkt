@@ -243,18 +243,18 @@
                        (define tσ (syntax-parameter-value #'target-σ?))
                        (define tcs (syntax-parameter-value #'target-cs?))
                        (with-syntax* ([(do-targets ...)
-                                       (append (if tσ (list #'target-σ) '())
-                                               (if tcs (list #'target-cs) '()))]
+                                       (append (listy (and tσ #'target-σ))
+                                               (listy (and tcs #'target-cs)))]
                                       [(targets ...)
-                                       (append (if tσ (list #'prev-σ) '())
-                                               (if tcs (list (generate-temporary)) '()))]
+                                       ;; shadow σ since body might still refer to it.
+                                       (append (listy (and tσ #'prev-σ))
+                                               (listy (and tcs (generate-temporary))))]
                                       [(tvalues ...)
                                        (append (listy (and tσ #'prev-σ))
-                                               (if tcs
-                                                   (if #,in-do?
-                                                       (list #'target-cs)
-                                                       (list #'∅))
-                                                   '()))]
+                                               (listy (and tcs
+                                                           (if #,in-do?
+                                                               #'target-cs
+                                                               #'∅))))]
                                       [(voidc ...) #'#,(if add-void? #'([dummy (void)]) #'())])
                          (syntax/loc stx
                            (for/fold ([targets tvalues] ... voidc ...) (g)
@@ -302,23 +302,23 @@
       [(_ (σ:id) loop:id ([args:id arg0:expr] ...) body:expr)
        (define tσ (syntax-parameter-value #'target-σ?))
        (define tcs (syntax-parameter-value #'target-cs?))
-       (define tσs (if tσ (list #'target-σ) '()))
-       (define tcss (if tcs (list #'target-cs) '()))
+       (define tσs (listy (and tσ #'target-σ)))
+       (define tcss (listy (and tcs #'target-cs)))
        (with-syntax* ([tσ* (generate-temporary)]
                       [tcs* (generate-temporary)]
                       [(do-targets ...) (append tσs tcss)]
-                      [(new-targets ...) (append (if tσ (list #'tσ*) '())
-                                                 (if tcs (list #'tcs*) '()))]
+                      [(new-targets ...) (append (listy (and tσ #'tσ*))
+                                                 (listy (and tcs #'tcs*)))]
                       [(argps ...) (generate-temporaries #'(args ...))])
          ((init-target-cs set-monad?)
           (quasisyntax/loc stx
-            (let real-loop (#,@(append (if tσ (list #`[tσ* target-σ]) '())
-                                       (if tcs (list #`[tcs* target-cs]) '()))
+            (let real-loop (#,@(append (listy (and tσ #`[tσ* target-σ]))
+                                       (listy (and tcs #`[tcs* target-cs])))
                             [args arg0] ...)
               (syntax-parameterize ([do-targets (make-rename-transformer #'new-targets)] ...)
                 (let-syntax ([loop (syntax-rules ()
                                      [(_ σ* argps ...)
-                                      (real-loop #,@(if tσ (list #'σ*) '())
+                                      (real-loop #,@(listy (and tσ #'σ*))
                                                  #,@tcss argps ...)])])
                   body))))))]
       [(_ blob . rest) (raise-syntax-error #f "Expected default store." #'blob)]
