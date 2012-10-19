@@ -11,15 +11,14 @@
                        (rest vs))]))
 (define (join σ a s)
   (hash-set σ a
-            (set-union s (hash-ref σ a ∅))))
+            (∪ s (hash-ref σ a ∅))))
 (define (join* σ as ss)
   (cond [(empty? as) σ]
         [else (join* (join σ (first as) (first ss))
                      (rest as)
                      (rest ss))]))
 (define (join-one σ a x)
-  (hash-set σ a
-            (set-add (hash-ref σ a ∅) x)))
+  (hash-set σ a (∪1 (hash-ref σ a ∅) x)))
 (define (join-one* σ as xs)
   (cond [(empty? as) σ]
         [else (join-one* (join-one σ (first as) (first xs))
@@ -31,7 +30,7 @@
   (for/fold ([σ σ1])
     ([k×v (in-hash-pairs σ2)])
     (hash-set σ (car k×v)
-              (set-union (cdr k×v)
+              (∪ (cdr k×v)
                          (hash-ref σ (car k×v) ∅)))))
 
 (define (update ∆s σ)

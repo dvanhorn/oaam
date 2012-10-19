@@ -49,8 +49,7 @@
                     #:defaults ([K 0]))
          (~optional (~or (~and #:generators generators?)
                          (~and #:set-monad set-monad?)
-                         (~and #:imperative imperative?))
-                    #:defaults ([set-monad? #'#:set-monad]))) ...)
+                         (~and #:imperative imperative?)))) ...)
      #:do [(define-syntax-rule (given kw) (syntax? (attribute kw)))
            (define global-σ?
              (and (given wide?)
@@ -67,18 +66,15 @@
      "Cannot use a general fixpoint for step function that doesn't return sets."
      #:fail-when (and (given σ-passing?) global-σ?)
      "Cannot use store passing with a global store"
-
      (with-syntax ([((ρ-op ...) (δ-op ...) (l-op ...))
-                    (if (zero? (attribute K))
-                        #'(() () ())
-                        #'((ρ) (δ) (l)))]
+                    (if (zero? (attribute K)) #'(() () ()) #'((ρ) (δ) (l)))]
                    [ev: (format-id #'ev "~a:" #'ev)]
                    [ans: (format-id #'ans "~a:" #'ans)]
                    [ev #'ev]
                    ;; represent σ explicitly in all states?
-                   [(σ-op ...) (if (or global-σ? (attribute wide?)) #'() #'(σ))]
+                   [(σ-op ...) (if (given wide?) #'() #'(σ))]
                    ;; explicitly pass σ/∆ to compiled forms?
-                   [(σ-gop ...) (if (or σ-threading? (not (attribute wide?))) #'(σ) #'())]
+                   [(σ-gop ...) (if (or σ-threading? (not (given wide?))) #'(σ) #'())]
                    ;; If σ not part of state and not global, it is passed
                    ;; in as (cons σ state), so expand accordingly.
                    [(expander-flags ...)
@@ -107,13 +103,13 @@
               (λ% (σ ρ k δ yield)
                   (do (σ) ([v (delay σ (lookup-env ρ x))])
                     (yield (co σ k v))))]
-             [(datum l d) (λ% (σ ρ k δ yield) (yield (co σ k d)))]
+             [(datum l d) (λ% (σ ρ k δ yield) (do (σ) () (yield (co σ k d))))]
              [(primr l which)
               (define p (primop which))
-              (λ% (σ ρ k δ yield) (yield (co σ k p)))]
+              (λ% (σ ρ k δ yield) (do (σ) () (yield (co σ k p))))]
              [(lam l x e)
               (define c (compile e))
-              (λ% (σ ρ k δ yield) (yield (co σ k (clos x c ρ))))]
+              (λ% (σ ρ k δ yield) (do (σ) () (yield (co σ k (clos x c ρ)))))]
              [(lrc l xs es b)
               (define c (compile (first es)))
               (define cs (map compile (rest es)))
@@ -132,7 +128,7 @@
               (define cs (map compile es))
               (λ% (σ ρ k δ yield)
                   (do (σ) ([(σ* a) #:push σ l δ k])
-                    (yield (ev σ* c ρ (ls l cs '() ρ a δ) δ))))]
+                    (yield (ev σ* c ρ (ls l 0 cs '() ρ a δ) δ))))]
              [(ife l e0 e1 e2)
               (define c0 (compile e0))
               (define c1 (compile e1))
@@ -146,41 +142,52 @@
                   (do (σ) ([(σ* a) #:push σ l δ k])
                     (yield (ev σ* c ρ (sk! (lookup-env ρ x) a) δ))))]
              [(primr l which) (define p (primop which))
-              (λ% (σ ρ k δ yield) (yield (co σ k p)))])))
+              (λ% (σ ρ k δ yield) (do (σ) () (yield (co σ k p))))])))
 
        (define compile-def
          (if (attribute compiled?)
-             #`((...
+             (quasisyntax/loc stx
+               ((...
                  (define-syntax-rule (λ% (σ ρ k δ yield) body ...)
-                  #,((init-target-cs c-passing?)
+                  #,(init-top-σ #f (given σ-∆s?)
+                     #'σ
+                     (init-target-cs
+                     #f
+                     c-passing?
                      (cond [(attribute generators?)
-                            #`(λ (σ-gop ... ρ-op ... k δ-op ... yield)
+                            (quasisyntax/loc stx
+                              (λ (σ-gop ... ρ-op ... k δ-op ... yield)
                                  (...
                                   (syntax-parameterize ([yield (... #,pass-yield-to-ev)]
                                                         [target-σ (make-rename-transformer #'σ)])
-                                    body ...)))]
+                                    body ...))))]
                            [else
-                            #`(λ (σ-gop ... ρ-op ... k δ-op ...)
+                            (quasisyntax/loc stx
+                              (λ (σ-gop ... ρ-op ... k δ-op ...)
                                  (...
                                   (syntax-parameterize ([yield (... #,yield-ev)]
                                                         [target-σ (make-rename-transformer #'σ)])
-                                    body ...)))]))))
-                (define (compile e) #,eval))
+                                    body ...))))])))))
+                (define (compile e) #,eval)))
              ;; brittle, since other identifiers must be the same in ev:
-             #`((... (define-syntax-rule (λ% (σ ρ k δ yield) body ...)
-                       (let ([σ target-σ])
-                         (generator body ...))))
-                (define compile values))))
+             (quasisyntax/loc stx
+               ((... (define-syntax-rule (λ% (σ ρ k δ yield) body ...)
+                       (generator body ...)))
+                (define compile values)))))
 
-       #`(begin ;; specialize representation given that 0cfa needs less
+       (quasisyntax/loc stx
+         (begin ;; specialize representation given that 0cfa needs less
            (mk-op-struct co (σ k v) (σ-op ... k v) expander-flags ...)
            (mk-op-struct ans (σ v) (σ-op ... v) expander-flags ...)
+           (mk-op-struct ap (σ l fn-addr v-addrs k δ)
+                         (σ-op ... l fn-addr v-addrs k δ-op ...)
+                         expander-flags ...)
            (struct mt () #:prefab)
            (struct sk! (x k) #:prefab)
            (struct primop (which) #:prefab)
            (mk-op-struct ifk (t e ρ k δ) (t e ρ-op ... k δ-op ...))
            (mk-op-struct lrk (x xs es e ρ k δ) (x xs es e ρ-op ... k δ-op ...))
-           (mk-op-struct ls (l es vs ρ k δ) (l es vs ρ-op ... k δ-op ...))
+           (mk-op-struct ls (l n es vs ρ k δ) (l n es vs ρ-op ... k δ-op ...))
            (mk-op-struct clos (x e ρ) (x e ρ-op ...))
            (splicing-syntax-parameterize ([target-σ? #,σ-threading?]
                                           [target-cs? #,c-passing?])
@@ -194,15 +201,17 @@
            ;; ev is special since it can mean "apply the compiled version" or
            ;; make an actual ev state to later interpret.
            #,@(if (given compiled?)
-                  #`((define-syntax (ev stx)
-                       (syntax-parse stx
+                  (quasisyntax/loc stx
+                    ((define-syntax ev
+                       (syntax-rules ()
                          ;; σ only optional if it's global (wide, imperative/prealloc)
-                         [(_ σ e ρ k δ yield) #'(e σ-gop ... ρ-op ... k δ-op ... yield)]
-                         [(_ σ e ρ k δ) #'(e σ-gop ... ρ-op ... k δ-op ...)]))
+                         [(_ σ e ρ k δ yield) (e σ-gop ... ρ-op ... k δ-op ... yield)]
+                         [(_ σ e ρ k δ) (e σ-gop ... ρ-op ... k δ-op ...)]))
                      (define-match-expander ev: ;; inert, but introduces bindings
-                       (syntax-rules () [(_ . args) (list . args)])))
-                  #`((mk-op-struct ev (σ e ρ k δ) (σ-op ... e ρ-op ... k δ-op ...)
-                                   expander-flags ...)))
+                       (syntax-rules () [(_ . args) (list . args)]))))
+                  (quasisyntax/loc stx
+                    ((mk-op-struct ev (σ e ρ k δ) (σ-op ... e ρ-op ... k δ-op ...)
+                                   expander-flags ...))))
 
             (define-syntax-rule (define/ρ ρ body)
              #,(if (zero? (attribute K))
@@ -214,29 +223,34 @@
              #,(cond [(zero? (attribute K)) #'x]
                      [else #'(hash-ref ρ x (λ () (error 'lookup "Unbound var ~a" x)))]))
            (...
-            (define-syntax generator
-              (syntax-parser
+            (define-syntax (generator syn)
+              (syntax-parse syn
                 [(_ body:expr ...)
-                 #'#,((init-target-cs c-passing?)
+                 (syntax/loc syn
+                   #,(init-target-cs
+                      #f
+                      c-passing?
                       (cond [(given generators?)
-                             #`(...
+                             (quasisyntax/loc stx
+                               (...
                                 (syntax-parameterize ([yield (... #,pass-yield-to-ev)])
-                                  (real-generator () body ... 'done)))]
+                                  (real-generator () body ... 'done))))]
                             [else
-                             #`(...
+                             (quasisyntax/loc stx
+                               (...
                                 (syntax-parameterize ([yield (... #,yield-ev)])
-                                  (begin (continue) body ...)))]))])))
+                                  (begin (continue) body ...))))])))])))
 
            ;; Let primitives yield single values instead of entire states.
-           (define-syntax (with-prim-yield stx)
-             (syntax-parse stx
+           (define-syntax (with-prim-yield syn)
+             (syntax-parse syn
                [(_ k body)
                 (define yield-tr (syntax-parameter-value #'yield-meaning))
                 (define new
-                  (λ (stx)
-                     (syntax-parse stx
+                  (λ (sx)
+                     (syntax-parse sx
                        [(_ v)
-                        (yield-tr (syntax/loc stx (yield (co target-σ k v))))])))
+                        (yield-tr (syntax/loc sx (yield (co target-σ k v))))])))
                 #`(syntax-parameterize ([yield #,new]) body)]))
 
            (define (inj e)
@@ -258,40 +272,29 @@
            (define (step state)
              (match state
                [(co: σ k v)
-                (syntax-parameterize ([target-σ (make-rename-transformer #'σ)])
+                (syntax-parameterize ([target-σ (make-rename-transformer #'σ)]
+                                      [top-σ (make-rename-transformer #'σ)])
                 (match k
                   [(mt) (generator (do (σ) ([v (force σ v)])
                                      (yield (ans σ v))))]
 
-                  [(ls: l '() vs ρ a δ)
-                   (define args (reverse (cons v vs)))
+                  ;; We need this intermediate step so that σ-∆s work.
+                  ;; The above join is not merged into the store until
+                  ;; after the step, and the address is needed by the call.
+                  [(ls: l n '() v-addrs ρ a δ)
+                   (define v-addr (make-var-contour (cons l n) δ))
+                   (define args (reverse (cons v-addr v-addrs)))
                    (generator
-                       (do (σ) ([k* (getter σ a)]
-                                [f (force σ (first args))])
-                         (match f
-                           [(clos: xs e ρ)
-                            (cond [(= (length xs) (length (rest args)))
-                                   (do (σ)
-                                       ([(ρ* σ* δ*) #:bind ρ σ l δ xs (rest args)])
-                                     (yield (ev σ* e ρ* k* δ*)))]
-                                  ;; Yield the same state to signal "stuckness".
-                                  [else
-                                   (printf "Arity error on ~a~%" f)
-                                   (yield (co σ k v))])]
-                           [(primop o)
-                            ;; Get all possible values for all arguments
-                            (define forced (for/list ([a (in-list (rest args))])
-                                             (force σ a)))
-                            (with-prim-yield
-                             k*
-                             ;; Analyze all combinations of these arguments
-                             (do (σ) ([vs (in-set (toSetOfLists forced))])
-                               (prim-meaning o σ l δ vs)))]
-                           [_ (yield (co σ k v))])))]
+                       (do (σ) ([σ* #:join σ v-addr (force σ v)]
+                                [k (getter σ* a)])
+                         (yield (ap σ* l (first args) (rest args) k δ))))]
 
-                  [(ls: l (list-rest e es) vs ρ a δ)
+                  [(ls: l n (list-rest e es) v-addrs ρ a δ)
+                   (define v-addr (make-var-contour (cons l n) δ))
                    (generator
-                       (yield (ev σ e ρ (ls l es (cons v vs) ρ a δ) δ)))]
+                       (do (σ) ([σ* #:join σ v-addr (force σ v)])
+                         (yield (ev σ* e ρ
+                                    (ls l (add1 n) es (cons v-addr v-addrs) ρ a δ) δ))))]
                   [(ifk: t e ρ a δ)
                    (generator
                        (do (σ) ([k* (getter σ a)]
@@ -312,19 +315,52 @@
                                 [k* (getter σ* a)])
                          (yield (co σ* k* (void)))))]))]
 
+               ;; v is not a value here. It is an address.
+               [(ap: σ l fn-addr arg-addrs k δ)
+                (syntax-parameterize ([target-σ (make-rename-transformer #'σ)]
+                                      [top-σ (make-rename-transformer #'σ)])
+                (generator
+                    (do (σ) ([f (getter σ fn-addr)])
+                      (match f
+                        [(clos: xs e ρ)
+                         (cond [(= (length xs) (length arg-addrs))
+                                (do (σ)
+                                    ([(ρ* σ* δ*) #:bind ρ σ l δ xs arg-addrs])
+                                  (yield (ev σ* e ρ* k δ*)))]
+                               ;; Yield the same state to signal "stuckness".
+                               [else
+                                (printf "Arity error on ~a~%" f)
+                                (yield (ap σ l fn-addr arg-addrs k δ))])]
+                        [(primop o)
+                         ;; Get all possible values for all arguments
+                         (define all (for/list ([a (in-list arg-addrs)])
+                                       (getter σ a)))
+                         (with-prim-yield
+                          k
+                          ;; Analyze all combinations of these arguments
+                          (do (σ) ([vs (in-set (toSetOfLists all))])
+                            (prim-meaning o σ l δ vs)))]
+                        [_
+                         (printf "Stuck (non-function) ~a~%" f)
+                         (yield (ap σ l fn-addr arg-addrs k δ))]))))]
+
                ;; this code is dead when running compiled code.
                [(ev: σ e ρ k δ)
-                (syntax-parameterize ([target-σ (make-rename-transformer #'σ)])
+                (syntax-parameterize ([target-σ (make-rename-transformer #'σ)]
+                                      [top-σ (make-rename-transformer #'σ)])
+                  (unless (hash? σ)
+                    (error 'step "Bad ev σ: ~a~%" σ))
                   #,(if (given compiled?)
                         #'(generator (yield (ev σ e ρ k δ)))
                         eval))]
 
                [(ans: σ v)
-                (syntax-parameterize ([target-σ (make-rename-transformer #'σ)])
+                (syntax-parameterize ([top-σ (make-rename-transformer #'σ)]
+                                      [target-σ (make-rename-transformer #'σ)])
                   (generator (yield (ans σ v))))]
                [_ (error 'step "What? ~a" state)]))
-           (trace step)
-           ))))]))
+;;           (trace step)
+           )))))]))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; That concludes the framework. See kcfa-instantiations.rkt for common
 ;; definitions for the framework parameters and a few instantiations.

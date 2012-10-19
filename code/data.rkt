@@ -16,11 +16,11 @@
 ;; - (consv Addr Addr)
 ;; - (vectorv Number (listof Addr))
 ;; - (vectorv Number Addr) ;; collapsed into one addr
-(struct clos (x e ρ)   #:transparent)
-(struct primop (which) #:transparent)
-(struct consv (car cdr) #:transparent)
-(struct vectorv^ (length cell) #:transparent)
-(struct vectorv (length cells) #:transparent)
+(struct clos (x e ρ)   #:prefab)
+(struct primop (which) #:prefab)
+(struct consv (car cdr) #:prefab)
+(struct vectorv^ (length cell) #:prefab)
+(struct vectorv (length cells) #:prefab)
 
 ;; What are the supported primitives for a datum form?
 ;; REMARK: no list literals.
@@ -51,11 +51,12 @@
 ;; - (ifk Exp Exp Env Cont)
 ;; - (lrk Sym [Listof Sym] [Listof Exp] Exp Env Cont)
 ;; - (sk! Sym Cont)
-;; - (ls [Listof Exp] [Listof Val] Env Cont)
-(struct mt ()                 #:transparent)
-(struct ifk (c a ρ k δ)       #:transparent)
-(struct lrk (x xs es e ρ k δ) #:transparent)
-(struct sk! (x k)             #:transparent)
-(struct ls (l es vs ρ k δ)    #:transparent)
+;; - (ls [Listof Exp] Natural [Listof Val] Env Cont)
+(struct mt ()                 #:prefab)
+(struct ifk (c a ρ k δ)       #:prefab)
+(struct lrk (x xs es e ρ k δ) #:prefab)
+(struct sk! (x k)             #:prefab)
+;; n = Which subexpression are we evaluating?
+(struct ls (l n es vs ρ k δ)  #:prefab)
 
-(struct addr (a) #:transparent)
+(struct addr (a) #:prefab)

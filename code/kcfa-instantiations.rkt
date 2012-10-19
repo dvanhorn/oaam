@@ -1,5 +1,5 @@
 #lang racket
-
+(require (rename-in racket/generator [yield real-yield]))
 (require "kcfa.rkt" "data.rkt" "parse.rkt" "notation.rkt"
          "primitives.rkt" "fix.rkt" "env.rkt"
          (for-syntax syntax/parse
@@ -26,28 +26,31 @@
 (define-simple-macro* (bind-join*-whole (σjoin* σ as vss) body)
   (let ([σjoin* (join* σ as vss)]) #,(bind-rest #'σjoin* #'body)))
 (define-simple-macro* (bind-join-∆s (∆s* ∆s a vs) body)
-  (let ([∆s* (cons (cons a vs) ∆s)]) body))
+  (let ([∆s* (cons (cons a vs) ∆s)]) #,(bind-rest #'∆s* #'body)))
 (define-simple-macro* (bind-join*-∆s (∆s* ∆s as vss) body)
-  (let ([∆s* (map2-append cons ∆s as vss)]) body))
+  (let ([∆s* (map2-append cons ∆s as vss)]) #,(bind-rest #'∆s* #'body)))
 
-(define-for-syntax ((mk-bind K) stx)
-  (syntax-case stx ()
-    [(_ (ρ* σ* δ*) (ρ σ l δ xs vs) body)
+(define-for-syntax ((mk-bind σ-∆s? K) stx)
+  (syntax-parse stx
+    [(_ (ρ* σ* δ*) (ρ σ l δ xs v-addrs) body)
+     (define vs
+       (quasisyntax/loc stx
+         (map (λ (v) (getter #,(if σ-∆s? #'top-σ #'σ) v)) v-addrs)))
      (if (zero? K)
-         (syntax/loc stx
-           (begin
-             #;(printf "Bind* ~a to [force] ~a~%" xs vs)
-             (bind-join* (σ* σ xs (map (λ (v) (force σ v)) vs)) body)))
+         (quasisyntax/loc stx
+           (bind-join* (σ* σ xs #,vs) body))
          (quasisyntax/loc stx
            (let* ([δ* (truncate (cons l δ) #,K)]
                   [as (map (λ (x) (cons x δ*)) xs)]
                   [ρ* (extend* ρ xs as)])
-             (bind-join* (σ* σ as (map (λ (v) (force σ v)) vs)) body))))]))
+             (bind-join* (σ* σ as #,vs) body))))]))
 (define-syntax-rule (make-var-contour-0 x δ) x)
 (define-syntax-rule (make-var-contour-k x δ) (cons x δ))
 
-(define-syntax bind-0 (mk-bind 0))
-(define-syntax bind-∞ (mk-bind +inf.0))
+(define-syntax bind-0 (mk-bind #f 0))
+(define-syntax bind-∞ (mk-bind #f +inf.0))
+(define-syntax bind-∆s-0 (mk-bind #t 0))
+(define-syntax bind-∆s-∞ (mk-bind #t +inf.0))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Widen set-monad fixpoint
@@ -64,19 +67,52 @@
 
 (define-syntax-rule (mk-set-fixpoint^ fix name ans^?)
  (define-syntax-rule (name step fst)
-  (let-values ([(σ cs) fst])
-    (for/fold ([last-σ (hash)]
-               [final-cs ∅])
-        ([s (fix (wide-step step) (set (cons σ cs)))])
-      (match s
-        [(cons σ cs)
-         (define-values (σ* cs*)
-           (values (join-store last-σ σ)
-                 (for/set #:initial final-cs ([c (in-set cs)]
-                                              #:when (ans^? c))
-                          c)))
-         (values σ* cs*)]
-        [_ (printf "bad output ~a~%" s)])))))
+   (let-values ([(σ cs) fst])
+     (for/fold ([last-σ (hash)]
+                [final-cs ∅])
+         ([s (fix (wide-step step) (set (cons σ cs)))])
+       (match s
+         [(cons σ cs)
+          (define-values (σ* cs*)
+            (values (join-store last-σ σ)
+                    (for/set #:initial final-cs ([c (in-set cs)]
+                                                 #:when (ans^? c))
+                             c)))
+          (values σ* cs*)]
+         [_ (printf "bad output ~a~%" s)])))))
+
+(define-syntax-rule (pull gen ∆-base cs-base)
+  (let*-values ([(cs ∆)
+                 (for/fold ([cs cs-base] [last #f])
+                     ([c (in-producer gen (λ (x) (eq? 'done x)))])
+                   (cond [(list? c) (values cs (if last (append c last) c))]
+                         [else (values (set-add cs c) last)]))]
+                [(∆*) (if (list? ∆) (append ∆ ∆-base) ∆-base)])
+    (values cs ∆*)))
+
+(define-syntax-rule (σ-∆s/generator/wide-step-specialized step ans?)
+  (λ (state)
+     (match state
+       [(cons σ cs)
+        (define-values (cs* ∆)
+          (for/fold ([cs* ∅] [∆* '()])
+              ([c cs] #:unless (ans? c))
+            (pull (step (cons σ c)) ∆* cs*)))
+        (cons (update ∆ σ) (set-union cs cs*))])))
+
+(define-syntax-rule (mk-generator/wide/σ-∆s-fixpoint name ans?)
+  (define-syntax-rule (name step fst)
+    (let ()
+      (define wide-step (σ-∆s/generator/wide-step-specialized step ans?))
+      (define-values (cs ∆) (pull fst '() ∅))
+      (define fst-s (cons (update ∆ (hash)) cs))
+      (define snd (wide-step fst-s))
+      (let loop ((next snd) (prev fst-s))
+        (cond [(equal? next prev)
+               (for/set ([c (cdr prev)]
+                         #:when (ans? c))
+                 c)]
+              [else (loop (wide-step next) next)])))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Wide fixpoint for σ-∆s
@@ -205,11 +241,18 @@
 (define (hash-getter σ a)
   (hash-ref σ a (λ () (error 'getter "Unbound address ~a in store ~a" a σ))))
 
+(define-syntax-rule (top-hash-getter σ a)
+  (hash-ref top-σ a (λ () (error 'top-hash-getter "Unbound address ~a in store ~a" a σ))))
+
 (define (lazy-force σ x)
   (match x
+    [(addr a) (hash-getter σ a)]
+    [v (set v)]))
+
+(define-syntax-rule (lazy-force-σ-∆s σ x)
+  (match x
     [(addr a)
-     (hash-ref σ a (λ () (error 'getter "(force) Unbound address ~a in store ~a" a σ)))
-     #;(hash-getter σ a)]
+     (hash-ref top-σ a (λ () (error 'getter "(force) Unbound address ~a in store ~a" a σ)))]
     [v (set v)]))
 
 (define-syntax-rule (lazy-force! σ x)
@@ -262,6 +305,13 @@
                                                  (values target-σ (∪1 target-cs e)))]))])
    body))
 
+(define-syntax-rule (with-σ-passing-generators body)
+  (splicing-syntax-parameterize
+   ([yield-meaning (λ (stx) (syntax-parse stx [(_ e)
+                                               (syntax/loc stx
+                                                 (begin (real-yield e) target-σ))]))])
+   body))
+
 (define-syntax-rule (with-mutable-worklist body)
   (splicing-syntax-parameterize
    ([yield-meaning yield!])
@@ -273,9 +323,21 @@
     [force (make-rename-transformer #'lazy-force)])
    body))
 
+(define-syntax-rule (with-lazy-σ-∆s body)
+  (splicing-syntax-parameterize
+   ([delay (make-rename-transformer #'lazy-delay)]
+    [force (make-rename-transformer #'lazy-force-σ-∆s)])
+   body))
+
 (define-syntax-rule (with-0-ctx body)
   (splicing-syntax-parameterize
    ([bind (make-rename-transformer #'bind-0)]
+    [make-var-contour (make-rename-transformer #'make-var-contour-0)])
+   body))
+
+(define-syntax-rule (with-0-σ-∆s-ctx body)
+  (splicing-syntax-parameterize
+   ([bind (make-rename-transformer #'bind-∆s-0)]
     [make-var-contour (make-rename-transformer #'make-var-contour-0)])
    body))
 
@@ -313,8 +375,8 @@
   (splicing-syntax-parameterize
    ([bind-join (make-rename-transformer #'bind-join-∆s)]
     [bind-join* (make-rename-transformer #'bind-join*-∆s)]
-    [getter (make-rename-transformer #'hash-getter)]
-    [force (make-rename-transformer #'lazy-force)])
+    [getter (make-rename-transformer #'top-hash-getter)]
+    [force (make-rename-transformer #'lazy-force-σ-∆s)])
    body))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -352,8 +414,9 @@
                    #:fixpoint eval-set-fixpoint^
                    #:compiled #:set-monad #:wide #:σ-passing
                    #:kcfa +inf.0))))))
-
 (provide lazy-eval^/c)
+|#
+
 (mk-set-fixpoint^ fix 0cfa-set-fixpoint^/c 0cfa-ans^/c?)
 (with-lazy
  (with-0-ctx
@@ -364,9 +427,8 @@
                    #:fixpoint 0cfa-set-fixpoint^/c
                    #:σ-passing
                    #:compiled #:wide #:set-monad))))))
-
 (provide lazy-0cfa^/c)
-|#
+
 (mk-set-fixpoint^ fix 0cfa-set-fixpoint^ 0cfa-ans^?)
 (with-lazy
  (with-0-ctx
@@ -377,9 +439,31 @@
                    #:fixpoint 0cfa-set-fixpoint^
                    #:σ-passing
                    #:wide #:set-monad))))))
-
 (provide lazy-0cfa^)
-#|
+
+(mk-generator/wide/σ-∆s-fixpoint lazy-0cfa-gen^-fix gen-ans^?)
+(with-lazy-σ-∆s
+ (with-0-σ-∆s-ctx
+  (with-σ-∆s
+   (with-σ-passing-generators
+    (with-abstract
+      (mk-analysis #:aval lazy-0cfa^-gen-σ-∆s #:ans gen-ans^
+                   #:fixpoint lazy-0cfa-gen^-fix
+                   #:σ-∆s
+                   #:wide #:generators))))))
+(provide lazy-0cfa^-gen-σ-∆s)
+
+(mk-generator/wide/σ-∆s-fixpoint lazy-0cfa-gen^-fix/c gen-ans^/c?)
+(with-lazy-σ-∆s
+ (with-0-σ-∆s-ctx
+  (with-σ-∆s
+   (with-σ-passing-generators
+    (with-abstract
+      (mk-analysis #:aval lazy-0cfa^-gen-σ-∆s/c #:ans gen-ans^/c
+                   #:fixpoint lazy-0cfa-gen^-fix/c
+                   #:σ-∆s
+                   #:compiled #:wide #:generators))))))
+(provide lazy-0cfa^-gen-σ-∆s/c)
 
 ;; FIXME bind-join conses onto a hash rather than a list
 #;#;#;
@@ -394,7 +478,7 @@
                    #:wide #:σ-∆s #:set-monad
                    #:compiled))))))
 (provide lazy-0cfa∆/c)
-
+#;#;#;#;
 (mk-prealloc^-fixpoint prealloc/imperative-fixpoint prealloc-ans? prealloc-ans-v #t)
 (with-lazy
  (with-0-ctx/prealloc
@@ -407,4 +491,3 @@
 (define (lazy-0cfa^/c! sexp)
   (lazy-0cfa^/c!-prepared (prepare-prealloc parse-prog sexp)))
 (provide lazy-0cfa^/c!)
-|#

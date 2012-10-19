@@ -93,29 +93,35 @@
 (define-simple-macro* (define/read (name:id σ:id v:id ...) body ...+)
   ;; XXX: not capture-avoiding, so we have to be careful in our definitions
   (define-simple-macro* (name σ vs)
-    (match-let ([(list v ...) vs]) body ...)))
+    (match vs
+      [(list v ...) body ...]
+      [_ (error 'name "internal error: Bad input ~a" vs)])))
 
 (define-simple-macro* (define/basic (name:id v:id ...) body ...+)
   (define-simple-macro* (name vs)
-    (match-let ([(list v ...) vs]) body ...)))
+    (match vs
+      [(list v ...) body ...]
+      [_ (error 'name "internal error: Bad input ~a" vs)])))
 
 (define-simple-macro* (define/write (name:id σ:id l:id δ:id v:id ... [opv:id opval:expr] ...) body ...+)
   (define-simple-macro* (name σ l δ vs)
-    (match-let ([(list-rest v ... rest) vs])
-      #,@(let ([defvs (length (syntax->list #'(opval ...)))])
-           (if (zero? defvs)
-               #'()
-               #`((define rest-len (length rest))
-                  (define rest* (for/vector #:length #,defvs
-                                            ([v* (in-list rest)]) v*))
-                  ;; Populate the rest of the default arguments with w
-                  (for ([v* (in-list (drop (list opval ...) rest-len))]
-                        [i (in-naturals rest-len)])
-                    (unsafe-vector-set! rest* i v*))
-                  (define-values (opv ...)
-                    (values #,@(for/list ([i (in-range defvs)])
-                                 #`(unsafe-vector-ref rest* #,i)))))))
-      body ...)))
+    (match vs
+      [(list-rest v ... rest)
+       #,@(let ([defvs (length (syntax->list #'(opval ...)))])
+            (if (zero? defvs)
+                #'()
+                #`((define rest-len (length rest))
+                   (define rest* (for/vector #:length #,defvs
+                                             ([v* (in-list rest)]) v*))
+                   ;; Populate the rest of the default arguments with w
+                   (for ([v* (in-list (drop (list opval ...) rest-len))]
+                         [i (in-naturals rest-len)])
+                     (unsafe-vector-set! rest* i v*))
+                   (define-values (opv ...)
+                     (values #,@(for/list ([i (in-range defvs)])
+                                  #`(unsafe-vector-ref rest* #,i)))))))
+       body ...]
+      [_ (error 'name "internal error: Bad input ~a" vs)])))
 
 (define-syntax (mk-prims stx)
   (syntax-parse stx
@@ -154,10 +160,10 @@
            (yield (zero? n))))
      (define-simple-macro* (wide-num fn vs)
        (yield (widen (apply fn (filter-not (λ (x) (eq? x 'number)) vs)))))
-     (define/basic (*v vs) (wide-num * vs))
-     (define/basic (+v vs) (wide-num + vs))
-     (define/basic (-v vs) (wide-num - vs))
-     (define/basic (=v vs)
+     (define-simple-macro* (*v vs) (wide-num * vs))
+     (define-simple-macro* (+v vs) (wide-num + vs))
+     (define-simple-macro* (-v vs) (wide-num - vs))
+     (define-simple-macro* (=v vs)
        (if (memv 'number vs)
            (yield-both)
            (yield (apply = vs))))
