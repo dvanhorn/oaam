@@ -5,7 +5,8 @@
                      racket/list
                      racket/stxparam
                      racket/match
-                     syntax/id-table)
+                     syntax/id-table
+                     syntax/srcloc)
          racket/stxparam)
 (provide for/union for*/union for/set for*/set
          define-simple-macro*
@@ -244,7 +245,9 @@
                        (with-syntax* ([(do-targets ...)
                                        (append (if tσ (list #'target-σ) '())
                                                (if tcs (list #'target-cs) '()))]
-                                      [(targets ...) (generate-temporaries #'(do-targets ...))]
+                                      [(targets ...)
+                                       (append (if tσ (list #'prev-σ) '())
+                                               (if tcs (list (generate-temporary)) '()))]
                                       [(tvalues ...)
                                        (append (listy (and tσ #'prev-σ))
                                                (if tcs
@@ -262,7 +265,7 @@
                                        #'body*))))))])))])
             (folder σ (c.guards ...)
                     (syntax-parameterize ([in-do-ctx? #t])
-                      #,(dot #'(#f (σ) (clauses ...) body))))))]
+                      #,(dot (syntax/loc stx (#f (σ) (clauses ...) body)))))))]
       ;; if we don't get a store via clauses, σ is the default.
       [(_ (σ:id) (joins clauses ...) body:expr)
        ;; This necessitates an order that do-targets is specified.
