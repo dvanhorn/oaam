@@ -7,12 +7,15 @@
          racket/unsafe/ops)
 (provide primitive? changes-store? reads-store? primitive?
          mk-prims snull
-         force getter widen delay)
+         yield force getter widen delay)
 
 (define-syntax-parameter getter #f)
 (define-syntax-parameter force #f)
 (define-syntax-parameter widen #f)
 (define-syntax-parameter delay #f)
+(define-syntax-parameter yield
+  (λ (stx)
+     (raise-syntax-error #f "Must be within the context of a generator" stx)))
 
 ;; Identifiers for the crappy type DSL
 ;; Meanings (respectively): Number String Pair Boolean Vector Any Void

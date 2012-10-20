@@ -424,6 +424,14 @@
                    #:compiled #:wide #:set-monad))))))
 (provide lazy-0cfa^/c)
 
+(with-lazy
+ (with-0-ctx
+  (with-whole-σ
+   (with-narrow-set-monad
+    (with-abstract
+      (mk-analysis #:aval lazy-0cfa #:ans 0cfa-ans #:set-monad))))))
+(provide lazy-0cfa)
+
 (mk-set-fixpoint^ fix 0cfa-set-fixpoint^ 0cfa-ans^?)
 (with-lazy
  (with-0-ctx
@@ -448,18 +456,6 @@
                    #:wide #:generators))))))
 (provide lazy-0cfa^-gen-σ-∆s)
 
-(mk-generator/wide/σ-∆s-fixpoint lazy-0cfa-gen^-fix/c gen-ans^/c?)
-(with-lazy-σ-∆s
- (with-0-σ-∆s-ctx
-  (with-σ-∆s
-   (with-σ-passing-generators
-    (with-abstract
-      (mk-analysis #:aval lazy-0cfa^-gen-σ-∆s/c #:ans gen-ans^/c
-                   #:fixpoint lazy-0cfa-gen^-fix/c
-                   #:σ-∆s
-                   #:compiled #:wide #:generators))))))
-(provide lazy-0cfa^-gen-σ-∆s/c)
-;; FIXME bind-join conses onto a hash rather than a list
 
 (mk-∆-fix^ lazy-0cfa∆^-fixpoint 0cfa∆-ans^?)
 (with-lazy-σ-∆s
@@ -472,6 +468,18 @@
                    #:wide #:σ-∆s #:set-monad
                    #:compiled))))))
 (provide lazy-0cfa∆/c)
+
+(mk-generator/wide/σ-∆s-fixpoint lazy-0cfa-gen^-fix/c gen-ans^/c?)
+(with-lazy-σ-∆s
+ (with-0-σ-∆s-ctx
+  (with-σ-∆s
+   (with-σ-passing-generators
+    (with-abstract
+      (mk-analysis #:aval lazy-0cfa^-gen-σ-∆s/c #:ans gen-ans^/c
+                   #:fixpoint lazy-0cfa-gen^-fix/c
+                   #:σ-∆s
+                   #:compiled #:wide #:generators))))))
+(provide lazy-0cfa^-gen-σ-∆s/c)
 
 (mk-prealloc^-fixpoint prealloc/imperative-fixpoint prealloc-ans? prealloc-ans-v #t)
 (with-lazy
