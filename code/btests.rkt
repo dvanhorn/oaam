@@ -10,7 +10,6 @@
 (define (prep-sexp sexp) (parse-prog (expand-sexp-prog sexp)))
 (define (prep file) (parse-prog (sch->sexp file)))
 
-(define eval lazy-0cfa^/c)
 #|
  (eval (prep-sexp '(
                     (let ([x '0])
@@ -41,9 +40,16 @@
 |#
 
 
-(time (eval (prep "../benchmarks/church.sch")))
-(time (lazy-0cfa^ (prep "../benchmarks/church.sch")))
+#;
+(time (lazy-0cfa^/c (prep "../benchmarks/church.sch")))
+#;
+      (time (lazy-eval^/c (prep "../benchmarks/church.sch")))
+#;
 (time (lazy-0cfa∆/c (prep "../benchmarks/church.sch")))
+
+(time (lazy-0cfa (prep "../benchmarks/vanhorn-mairson08.sch")))
+
+#;#;
 (time (lazy-0cfa^-gen-σ-∆s/c (prep "../benchmarks/church.sch")))
 (time (lazy-0cfa^/c! (prep! "../benchmarks/church.sch")))
 #;

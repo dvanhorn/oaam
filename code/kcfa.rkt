@@ -188,7 +188,7 @@
                          ;; σ only optional if it's global (wide, imperative/prealloc)
                          [(_ σ e ρ k δ)
                           #'(e #,@(listy (and (given σ-∆s?) #'top-σ))
-                             σ-gop ... ρ-op ... k δ-op ...)]))
+                               σ-gop ... ρ-op ... k δ-op ...)]))
                      (define-match-expander ev: ;; inert, but introduces bindings
                        (syntax-rules () [(_ . args) (list . args)]))))
                   (quasisyntax/loc stx
@@ -212,7 +212,7 @@
                    (syntax-parameterize ([yield (... #,yield-ev)])
                      #,(cond [(given generators?)
                               (quasisyntax/loc stx
-                                (... (real-generator () body ... 'done)))]
+                                (... (real-generator () body ...)))]
                              [else
                               (quasisyntax/loc stx
                                 (... (begin body ...)))])))])))
@@ -232,7 +232,7 @@
            (define (inj e)
              (define σ₀ (hash))
              (generator
-              (do (σ₀) () (yield (ev σ₀ (compile e) (hash) (mt) ε)))))
+              (do (σ₀) () (yield (ev σ₀ (compile e) (hash) (mt) '())))))
 
            (define (aval e) (fixpoint step (inj e)))
 
@@ -313,19 +313,13 @@
 
                ;; this code is dead when running compiled code.
                [(ev: σ e ρ k δ)
+                #;
+                (printf "Step: ~a~%" (unparse e))
                 #,(if (given compiled?)
                       #'(generator (do (σ) () (yield (ev σ e ρ k δ))))
                       eval)]
 
                [(ans: σ v) (generator (do (σ) () (yield (ans σ v))))]
                [_ (error 'step "What? ~a" state)]))
-;(trace step)
+           (trace step)
            )))))]))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; That concludes the framework. See kcfa-instantiations.rkt for common
-;; definitions for the framework parameters and a few instantiations.
-;; These aren't in the framework themselves, even though the flags are
-;; there. The flags are for setting up the binding structure that these
-;; different strategies utilize.
-;; One can imagine other parameterizations with the same binding structures.
-

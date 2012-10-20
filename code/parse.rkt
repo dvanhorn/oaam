@@ -1,5 +1,5 @@
 #lang racket
-(provide parse parse-prog)
+(provide parse parse-prog unparse)
 (require "ast.rkt" "primitives.rkt" "data.rkt")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -76,3 +76,12 @@
          (var (fresh-label!) (rename s)))]
       [(? atomic? d) (datum (fresh-label!) d)]
       [err (error 'parse "Unknown form ~a" err)])))
+
+(define (unparse e)
+  (match e
+    [(or (var _ x) (datum _ x) (primr _ x)) x]
+    [(app _ e es) (map unparse (cons e es))]
+    [(lam _ xs body) `(λ ,xs ,(unparse body))]
+    [(ife _ g t e) `(if ,(unparse g) ,(unparse t) ,(unparse e))]
+    [(st! _ x e) `(set! ,x ,(unparse e))]
+    [(lrc _ xs es body) `(letrec ,(map list xs (map unparse es)) ,(unparse body))]))

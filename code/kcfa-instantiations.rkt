@@ -48,6 +48,7 @@
 (define-syntax-rule (make-var-contour-k x δ) (cons x δ))
 
 (define-syntax bind-0 (mk-bind #f 0))
+(define-syntax bind-1 (mk-bind #f 1))
 (define-syntax bind-∞ (mk-bind #f +inf.0))
 (define-syntax bind-∆s-0 (mk-bind #t 0))
 (define-syntax bind-∆s-∞ (mk-bind #t +inf.0))
@@ -67,10 +68,10 @@
 
 (define-syntax-rule (mk-set-fixpoint^ fix name ans^?)
  (define-syntax-rule (name step fst)
-   (let-values ([(σ cs) fst])
-     (for/fold ([last-σ (hash)]
-                [final-cs ∅])
-         ([s (fix (wide-step step) (set (cons σ cs)))])
+   (let ()
+     (define-values (σ cs) fst)
+     (define s (fix (wide-step step) (set (cons σ cs))))
+     (for/fold ([last-σ (hash)] [final-cs ∅]) ([s s])
        (match s
          [(cons σ cs)
           (define-values (σ* cs*)
@@ -348,6 +349,12 @@
     [make-var-contour (make-rename-transformer #'make-var-contour-k)])
    body))
 
+(define-syntax-rule (with-1-ctx body)
+  (splicing-syntax-parameterize
+   ([bind (make-rename-transformer #'bind-1)]
+    [make-var-contour (make-rename-transformer #'make-var-contour-k)])
+   body))
+
 (define-syntax-rule (with-whole-σ body)
   (splicing-syntax-parameterize
    ([bind-join (make-rename-transformer #'bind-join-whole)]
@@ -387,8 +394,8 @@
                    #:σ-passing ;; not really passing, but carried.
                    #:set-monad #:kcfa +inf.0
                    #:compiled))))))
-
 (provide lazy-eval/c)
+
 (with-lazy
  (with-∞-ctx
   (with-whole-σ
@@ -397,7 +404,8 @@
       (mk-analysis #:aval lazy-eval #:ans ans
                    #:σ-passing
                    #:set-monad #:kcfa +inf.0))))))
-(provide lazy-eval/c)
+(provide lazy-eval)
+|#
 
 (mk-set-fixpoint^ fix eval-set-fixpoint^ ans^?)
 (with-lazy
@@ -410,7 +418,6 @@
                    #:compiled #:set-monad #:wide #:σ-passing
                    #:kcfa +inf.0))))))
 (provide lazy-eval^/c)
-|#
 
 (mk-set-fixpoint^ fix 0cfa-set-fixpoint^/c 0cfa-ans^/c?)
 (with-lazy
