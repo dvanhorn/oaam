@@ -16,7 +16,6 @@
      (define tσtcs
        (append (listy (and (syntax-parameter-value #'target-σ?) #'target-σ))
                (listy (and (syntax-parameter-value #'target-cs?) #'target-cs))))
-     (when (null? tσtcs) (printf "yikes~%"))
      (quasisyntax/loc stx
        (values #,@tσtcs))]))
 
@@ -61,10 +60,10 @@
     ;; Construct the values tuple given the previously bound σ and cs
     (define in-do? (or in-do-rec? (syntax-parameter-value #'in-do-ctx?)))
     (define gen-wrap
-      (if (or in-do? (not generators?)
-              (not (or (not global-σ?) σ-∆s?)))
-          values
-          (λ (stx) #`(begin (real-yield #,stx) 'done))))
+      (cond [(or in-do? (not generators?)
+                 (not (or (not global-σ?) σ-∆s?)))
+             values]
+            [else (λ (stx) #`(begin (real-yield #,stx) 'done))]))
     (define tσ (syntax-parameter-value #'target-σ?))
     (define tcs (syntax-parameter-value #'target-cs?))
     (define add-void? (and global-σ? (not σ-∆s?)))
@@ -80,11 +79,11 @@
                #:with new-σ #'σ*
                #:attr clause
                (λ (rest) #`(bindf (σ* σ a vs) #,rest)))
-      (pattern [(ρ* σ* δ*) #:bind ρ σ l δ xs vs] ;; these vals don't get hoisted
+      (pattern [(ρ* σ* δ*) #:bind ρ σ l δ xs vs]
                #:with new-σ #'σ*
                #:attr clause
                (λ (rest) #`(bind (ρ* σ* δ*) (ρ σ l δ xs vs) #,rest)))
-      (pattern [(σ*:id a*:id) #:push σ l δ k] ;; no vals to hoist.
+      (pattern [(σ*:id a*:id) #:push σ l δ k]
                #:with new-σ #'σ*
                #:attr clause
                (λ (rest) #`(bind-push (σ* a* σ l δ k) #,rest))))
@@ -109,8 +108,6 @@
                #:fail-unless maybe-prev-σ "Expected at least one join clause"))
     (syntax-parse stx
       [(_ (σ:id) (c:comp-clauses clauses ...) body:expr ...+)
-       (when (null? tσtcs)
-         (printf "Null!~%"))
        ;; build a new fold or a fold that continues adding to the
        ;; outer do's targets. σ is bound to itelf since the body may
        ;; still refer to it. cs go to a new identifier.
@@ -155,9 +152,12 @@
            #,(init-top-σ in-do? σ-∆s? #'σ
               (init-target-cs
                in-do? set-monad?
-               (quasisyntax/loc stx (begin body ... #,@(listy (and add-void? #'(void)))))))))]
+               (quasisyntax/loc stx
+                 (begin body ... #,@(listy (and add-void? #'(void)))
+                        ;;#,@(listy (and σ-∆s? generators? (not in-do?) #''done))
+                        ))))))]
 
-      ;; When fold/fold doesn't cut it, we need a safe way to recur.
+      ;; when fold/fold doesn't cut it, we need a safe way to recur.
       [(_ (σ:id) loop:id ([args:id arg0:expr] ...) body:expr ...+)
        (define tcss (listy (and tcs #'target-cs)))
        (with-syntax* ([tcs* (generate-temporary 'tcs*)]

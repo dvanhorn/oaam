@@ -4,13 +4,25 @@
          "env.rkt" "primitives.rkt" "parse.rkt"
          "notation.rkt" "op-struct.rkt" "do.rkt"
          (rename-in racket/generator
-                    [yield real-yield]
+                    [yield real-yield*]
                     [generator real-generator])
          (for-syntax syntax/parse racket/syntax)
          racket/stxparam
          racket/splicing
          racket/trace)
 (provide yield-meaning mk-analysis)
+
+(define-syntax (real-yield stx)
+  (syntax-case stx ()
+    [(_ x)
+     #'(begin
+       (when (list? x) (printf "(kcfa) OmG A LIST ~a~%" x))
+       (printf "Yielded ~a, ~a~%" top-σ target-σ)
+       (real-yield* x))]
+    [x #'(λ (x) (begin
+       (when (list? x) (printf "(kcfa) OmG A LIST ~a~%" x))
+       (printf "Yielded ~a, ~a~%" top-σ target-σ)
+       (yield-meaning x)))]))
 
 ;; Yield is an overloaded term that will do some manipulation to its
 ;; input. Yield-meaning is the intended meaning of yield.
@@ -82,22 +94,19 @@
                            #'(#:expander #:with-first-cons)]
                           [else #'()])]
                    [inj-σ (if (given σ-∆s?) #''() #'(hash))])
-       (printf "Threading: ~a, set-monad: ~a~%" σ-threading? c-passing?)
        (define-values (pass-yield-to-ev yield-ev)
          (if (attribute compiled?)
-             (values (λ (pyield)
-                        #`(...
-                           (λ (syn) (syntax-parse syn #:literals (ev)
-                                      [(_ (ev args:expr ...))
-                                       (syntax/loc syn (ev args ... #,pyield))]
-                                      [(_ e:expr) (syntax/loc syn (#,pyield e))]))))
+             (values #`(...
+                        (λ (syn) (syntax-parse syn #:literals (ev)
+                                   [(_ (ev args:expr ...))
+                                    (syntax/loc syn (ev args ... (λ (x) (yield-meaning x))))]
+                                   [(_ e:expr) (syntax/loc syn (yield-meaning e))])))
                      #'(...
                          (λ (syn)
                            (syntax-parse syn #:literals (ev)
                              [(_ (ev args:expr ...)) (syntax/loc syn (ev args ...))]
                              [(_ e:expr) (syntax/loc syn (yield-meaning e))]))))
-             (values (λ (pyield)
-                        #'(syntax-rules () [(_ e) (yield-meaning e)]))
+             (values #'(syntax-rules () [(_ e) (yield-meaning e)])
                      #'(syntax-rules () [(_ e) (yield-meaning e)]))))
 
        (define eval ;; what does ev mean?
@@ -153,15 +162,13 @@
                 (define hidden-σ? (and (given σ-∆s?) (not global-σ?)))
                 (define hidden-σ (generate-temporary))
                 (define topp (if hidden-σ? hidden-σ #'σ))
-                (printf "hidden-σ ~a ~a ~a~%" hidden-σ? hidden-σ topp)
                 (with-syntax ([(top ...) (listy (and hidden-σ? hidden-σ))]
                               [topp #`(make-rename-transformer #'#,topp)]
-                              [((dummy ...) (done ...) yieldtr)
+                              [((dummy ...) yieldtr)
                                (if (given generators?)
                                    (list (list #'dummy)
-                                         (list #''done)
-                                         (pass-yield-to-ev #'dummy))
-                                   (list '() '() yield-ev))])
+                                         pass-yield-to-ev)
+                                   (list '() yield-ev))])
                   (quasisyntax/loc stx
                     ((define-syntax-rule (... (λ% (σ ρ k δ yield) body ...))
                        #,(init-target-cs
@@ -173,8 +180,7 @@
                                                      [target-σ (make-rename-transformer #'σ)]
                                                      [top-σ topp]
                                                      [top-σ? #t])
-                                 (printf "Passed topp: ~a~%~a~%" top ... σ)
-                                 body (... ...) done ...)))))
+                                 body (... ...))))))
                      (define (compile e) #,eval))))]
                [else
                 ;; brittle, since other identifiers must be the same in ev:
@@ -216,10 +222,8 @@
                          [(_ σ e ρ k δ . yield)
                           (with-syntax ([(... (topp ...))
                                          (listy (and #,(given σ-∆s?) #'top-σ))])
-                            #'(begin
-                                (printf "Topp: ~a~% σ: ~a~%" top-σ σ)
-                                (e topp (... ...) σ-gop ... ρ-op ... k δ-op ...
-                                 . yield)))]))
+                            #'(e topp (... ...) σ-gop ... ρ-op ... k δ-op ...
+                                 . yield))]))
                      (define-match-expander ev: ;; inert, but introduces bindings
                        (syntax-rules () [(_ . args) (list . args)]))))
                   (quasisyntax/loc stx
@@ -246,7 +250,7 @@
                       (cond [(given generators?)
                              (quasisyntax/loc stx
                                (...
-                                (syntax-parameterize ([yield (... #,(pass-yield-to-ev #'real-yield))])
+                                (syntax-parameterize ([yield (... #,pass-yield-to-ev)])
                                   (real-generator () body ... 'done))))]
                             [else
                              (quasisyntax/loc stx

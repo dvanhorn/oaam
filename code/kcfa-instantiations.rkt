@@ -38,7 +38,8 @@
          (map (λ (v) (getter #,(if σ-∆s? #'top-σ #'σ) v)) v-addrs)))
      (if (zero? K)
          (quasisyntax/loc stx
-           (bind-join* (σ* σ xs #,vs) body))
+           (begin (unless (hash? top-σ) (error 'bind "Bad top-σ ~a in ~a" top-σ 'body))
+           (bind-join* (σ* σ xs #,vs) body)))
          (quasisyntax/loc stx
            (let* ([δ* (truncate (cons l δ) #,K)]
                   [as (map (λ (x) (cons x δ*)) xs)]
@@ -79,15 +80,12 @@
                                                  #:when (ans^? c))
                              c)))
           (values σ* cs*)]
-         [_ (printf "bad output ~a~%" s)])))))
+         [_ (error 'name "bad output ~a~%" s)])))))
 
 (define-syntax-rule (pull gen ∆-base cs-base)
   (let*-values ([(cs ∆)
                  (for/fold ([cs cs-base] [last #f])
                      ([c (in-producer gen (λ (x) (eq? 'done x)))])
-                   ;; NOTE TO SELF: MAKE SURE THERE ARE NO SPURIOUS 'done
-                   ;; yields and that σ-∆s are properly returned
-                   (printf "c: ~a~%" c)
                    (cond [(list? c) (values cs (if last (append c last) c))]
                          [else (values (set-add cs c) last)]))]
                 [(∆*) (if (list? ∆) (append ∆ ∆-base) ∆-base)])
@@ -97,11 +95,9 @@
   (λ (state)
      (match state
        [(cons σ cs)
-        (printf "BIG STEP~%")
         (define-values (cs* ∆)
           (for/fold ([cs* ∅] [∆* '()])
               ([c cs] #:unless (ans? c))
-            (printf "STEP~%")
             (pull (step (cons σ c)) ∆* cs*)))
         (cons (update ∆ σ) (set-union cs cs*))])))
 
@@ -141,7 +137,6 @@
                      ;; This state's store monotonically increases
                      (hash-set! seen c (join-store σ last-σ))
                      ;; Add the updated store with next steps to workset
-                     (printf "Stepping ~a~%" c)
                      (define-values (∆ cs*) (stepper (cons σ c)))
                      (set! todo (∪1 todo (cons (update ∆ σ) cs*))))
                    (loop)])))))
@@ -305,16 +300,12 @@
 
 (define-syntax-rule (with-σ-passing-set-monad body)
   (splicing-syntax-parameterize
-   ([yield-meaning (λ (stx) (syntax-parse stx [(_ e)
-                                               (syntax/loc stx
-                                                 (values target-σ (∪1 target-cs e)))]))])
+   ([yield-meaning (syntax-rules () [(_ e) (values target-σ (∪1 target-cs e))])])
    body))
 
 (define-syntax-rule (with-σ-passing-generators body)
   (splicing-syntax-parameterize
-   ([yield-meaning (λ (stx) (syntax-parse stx [(_ e)
-                                               (syntax/loc stx
-                                                 (begin (real-yield e) target-σ))]))])
+   ([yield-meaning (syntax-rules () [(_ e) (begin (real-yield e) target-σ)])])
    body))
 
 (define-syntax-rule (with-mutable-worklist body)
