@@ -3,8 +3,8 @@
 (require "parse.rkt" "kcfa-instantiations.rkt" "racket-to-sexp.rkt"
          racket/trace)
 
-;(define (prep file) (sch->sexp file))
-;(define (prep-sexp sexp) (expand-sexp-prog sexp))
+(define (prep! file) (sch->sexp file))
+(define (prep-sexp! sexp) (expand-sexp-prog sexp))
 ;(trace prep)
 
 (define (prep-sexp sexp) (parse-prog (expand-sexp-prog sexp)))
@@ -40,10 +40,12 @@
                                   (cdr x)))))))
 |#
 
-(time (eval (prep "../benchmarks/church.sch")))
-(time (lazy-0cfa^ (parse-prog (sch->sexp "../benchmarks/church.sch"))))
-(time (lazy-0cfa^-gen-σ-∆s/c (parse-prog (sch->sexp "../benchmarks/church.sch"))))
 
+(time (eval (prep "../benchmarks/church.sch")))
+(time (lazy-0cfa^ (prep "../benchmarks/church.sch")))
+(time (lazy-0cfa∆/c (prep "../benchmarks/church.sch")))
+(time (lazy-0cfa^-gen-σ-∆s/c (prep "../benchmarks/church.sch")))
+(time (lazy-0cfa^/c! (prep! "../benchmarks/church.sch")))
 #;
 (time
  (eval (prep "../benchmarks/toplas98/boyer.sch")))

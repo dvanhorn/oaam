@@ -38,8 +38,7 @@
          (map (λ (v) (getter #,(if σ-∆s? #'top-σ #'σ) v)) v-addrs)))
      (if (zero? K)
          (quasisyntax/loc stx
-           (begin (unless (hash? top-σ) (error 'bind "Bad top-σ ~a in ~a" top-σ 'body))
-           (bind-join* (σ* σ xs #,vs) body)))
+           (bind-join* (σ* σ xs #,vs) body))
          (quasisyntax/loc stx
            (let* ([δ* (truncate (cons l δ) #,K)]
                   [as (map (λ (x) (cons x δ*)) xs)]
@@ -473,7 +472,7 @@
                    #:wide #:σ-∆s #:set-monad
                    #:compiled))))))
 (provide lazy-0cfa∆/c)
-#;#;#;#;
+
 (mk-prealloc^-fixpoint prealloc/imperative-fixpoint prealloc-ans? prealloc-ans-v #t)
 (with-lazy
  (with-0-ctx/prealloc

@@ -153,9 +153,7 @@
               (init-target-cs
                in-do? set-monad?
                (quasisyntax/loc stx
-                 (begin body ... #,@(listy (and add-void? #'(void)))
-                        ;;#,@(listy (and σ-∆s? generators? (not in-do?) #''done))
-                        ))))))]
+                 (begin body ... #,@(listy (and add-void? #'(void)))))))))]
 
       ;; when fold/fold doesn't cut it, we need a safe way to recur.
       [(_ (σ:id) loop:id ([args:id arg0:expr] ...) body:expr ...+)

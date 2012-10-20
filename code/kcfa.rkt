@@ -4,25 +4,13 @@
          "env.rkt" "primitives.rkt" "parse.rkt"
          "notation.rkt" "op-struct.rkt" "do.rkt"
          (rename-in racket/generator
-                    [yield real-yield*]
+                    [yield real-yield]
                     [generator real-generator])
          (for-syntax syntax/parse racket/syntax)
          racket/stxparam
          racket/splicing
          racket/trace)
 (provide yield-meaning mk-analysis)
-
-(define-syntax (real-yield stx)
-  (syntax-case stx ()
-    [(_ x)
-     #'(begin
-       (when (list? x) (printf "(kcfa) OmG A LIST ~a~%" x))
-       (printf "Yielded ~a, ~a~%" top-σ target-σ)
-       (real-yield* x))]
-    [x #'(λ (x) (begin
-       (when (list? x) (printf "(kcfa) OmG A LIST ~a~%" x))
-       (printf "Yielded ~a, ~a~%" top-σ target-σ)
-       (yield-meaning x)))]))
 
 ;; Yield is an overloaded term that will do some manipulation to its
 ;; input. Yield-meaning is the intended meaning of yield.
@@ -96,11 +84,12 @@
                    [inj-σ (if (given σ-∆s?) #''() #'(hash))])
        (define-values (pass-yield-to-ev yield-ev)
          (if (attribute compiled?)
-             (values #`(...
-                        (λ (syn) (syntax-parse syn #:literals (ev)
-                                   [(_ (ev args:expr ...))
-                                    (syntax/loc syn (ev args ... (λ (x) (yield-meaning x))))]
-                                   [(_ e:expr) (syntax/loc syn (yield-meaning e))])))
+             (values #'(...
+                        (λ (syn)
+                           (syntax-parse syn #:literals (ev)
+                             [(_ (ev args:expr ...))
+                              (syntax/loc syn (ev args ... (λ (x) (yield-meaning x))))]
+                             [(_ e:expr) (syntax/loc syn (yield-meaning e))])))
                      #'(...
                          (λ (syn)
                            (syntax-parse syn #:literals (ev)
@@ -221,7 +210,7 @@
                          ;; σ only optional if it's global (wide, imperative/prealloc)
                          [(_ σ e ρ k δ . yield)
                           (with-syntax ([(... (topp ...))
-                                         (listy (and #,(given σ-∆s?) #'top-σ))])
+                                         (listy #,(and (given σ-∆s?) #'#'top-σ))])
                             #'(e topp (... ...) σ-gop ... ρ-op ... k δ-op ...
                                  . yield))]))
                      (define-match-expander ev: ;; inert, but introduces bindings
@@ -281,7 +270,6 @@
                      (hash) ;; no meaning for free variables
                      (mt)   ;; starting contour is empty
                      ε)))))
-           (trace inj)
 
            (define (aval e) (fixpoint step (inj e)))
 
@@ -349,7 +337,7 @@
                                   (yield (ev σ* e ρ* k δ*)))]
                                ;; Yield the same state to signal "stuckness".
                                [else
-                                (printf "Arity error on ~a~%" f)
+                                ;;(printf "Arity error on ~a~%" f)
                                 (yield (ap σ l fn-addr arg-addrs k δ))])]
                         [(primop o)
                          ;; Get all possible values for all arguments
@@ -361,7 +349,7 @@
                           (do (σ) ([vs (in-set (toSetOfLists all))])
                             (prim-meaning o σ l δ vs)))]
                         [_
-                         (printf "Stuck (non-function) ~a~%" f)
+                         ;;(printf "Stuck (non-function) ~a~%" f)
                          (yield (ap σ l fn-addr arg-addrs k δ))]))))]
 
                ;; this code is dead when running compiled code.
