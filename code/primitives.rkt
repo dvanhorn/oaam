@@ -1,6 +1,6 @@
 #lang racket
 
-(require "data.rkt" "notation.rkt"
+(require "data.rkt" "notation.rkt" "do.rkt"
          (for-syntax syntax/parse racket/syntax
                      racket/list racket/base)
          racket/stxparam

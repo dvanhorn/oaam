@@ -1,7 +1,7 @@
 #lang racket
 (require (rename-in racket/generator [yield real-yield]))
 (require "kcfa.rkt" "data.rkt" "parse.rkt" "notation.rkt"
-         "primitives.rkt" "fix.rkt" "env.rkt"
+         "primitives.rkt" "fix.rkt" "env.rkt" "do.rkt"
          (for-syntax syntax/parse
                      syntax/srcloc)
          racket/stxparam
@@ -85,6 +85,9 @@
   (let*-values ([(cs ∆)
                  (for/fold ([cs cs-base] [last #f])
                      ([c (in-producer gen (λ (x) (eq? 'done x)))])
+                   ;; NOTE TO SELF: MAKE SURE THERE ARE NO SPURIOUS 'done
+                   ;; yields and that σ-∆s are properly returned
+                   (printf "c: ~a~%" c)
                    (cond [(list? c) (values cs (if last (append c last) c))]
                          [else (values (set-add cs c) last)]))]
                 [(∆*) (if (list? ∆) (append ∆ ∆-base) ∆-base)])
@@ -94,9 +97,11 @@
   (λ (state)
      (match state
        [(cons σ cs)
+        (printf "BIG STEP~%")
         (define-values (cs* ∆)
           (for/fold ([cs* ∅] [∆* '()])
               ([c cs] #:unless (ans? c))
+            (printf "STEP~%")
             (pull (step (cons σ c)) ∆* cs*)))
         (cons (update ∆ σ) (set-union cs cs*))])))
 
@@ -464,12 +469,11 @@
                    #:σ-∆s
                    #:compiled #:wide #:generators))))))
 (provide lazy-0cfa^-gen-σ-∆s/c)
-
 ;; FIXME bind-join conses onto a hash rather than a list
-#;#;#;
+
 (mk-∆-fix^ lazy-0cfa∆^-fixpoint 0cfa∆-ans^?)
-(with-lazy
- (with-0-ctx
+(with-lazy-σ-∆s
+ (with-0-σ-∆s-ctx
   (with-σ-∆s
    (with-σ-passing-set-monad
     (with-abstract
