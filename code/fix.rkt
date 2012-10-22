@@ -9,7 +9,7 @@
 ;; Calculate fixpoint of (appl f).
 ;; fix : (∀ (X) ((X -> (Setof X)) (Setof X) -> (Setof X)))
 (define (fix f s)
-  (let loop ((accum (set)) (front s))
-    (cond [(set-empty? front) accum]
+  (let loop ((accum ∅) (front s))
+    (cond [(∅? front) accum]
           [else (define new-front ((appl f) front))
                 (loop (∪ accum front) (new-front . ∖ . accum))])))

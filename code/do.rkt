@@ -1,5 +1,5 @@
 #lang racket
-(require (for-syntax syntax/parse racket/match racket/syntax)
+(require (for-syntax syntax/parse racket/match racket/syntax racket/trace)
          racket/stxparam "notation.rkt"
          racket/generator)
 (provide continue (for-syntax mk-do listy))
@@ -20,7 +20,7 @@
   (begin (define-syntax-parameter id #f) ... (provide id ...)))
 
 (mk-syntax-parameters bind-join bind-join* bind do make-var-contour
-                      target-σ? target-cs? target-σ target-cs top-σ top-σ?)
+                      target-σ? target-cs? target-σ target-cs target-cs-given? top-σ top-σ?)
 
 (define-syntax-rule (bind-push (σ* a* σ l δ k) body)
   (let ([a* (make-var-contour l δ)])
@@ -37,9 +37,10 @@
   (define tσ (syntax-parameter-value #'target-σ?))
   (define tcs (syntax-parameter-value #'target-cs?))
   (define gen-wrap
-    (cond [(or in-do? (not generators?)
-               (not (or (not global-σ?) σ-∆s?)))
+    (cond [(or in-do? (not generators?))
            values]
+          [(and generators? global-σ? (not σ-∆s?))
+           (λ (stx) #`(begin #,stx 'done))]
           [else (λ (stx) #`(begin (yield #,stx) 'done))]))
   (define add-void? (and global-σ? (not σ-∆s?)))
   (define tσtcs
@@ -47,27 +48,27 @@
             (listy (and tcs #'target-cs))))
 
   (define (init-target-cs body)
-    (cond [(and (not in-do?) set-monad?)
+    (cond [(and (not in-do?) set-monad? (not (syntax-parameter-value #'target-cs-given?)))
            #`(let ([cs ∅])
                (syntax-parameterize ([target-cs (make-rename-transformer #'cs)])
                  #,body))]
           [else body]))
 
+  (define top? (syntax-parameter-value #'top-σ?))
   ;; If the top level store is not already installed by λ%, and we are
   ;; not in the middle of constructing a do form, create a hidden binding
   ;; to track the top level store. While we're at it, create the target store
   ;; binding (in σ-∆s it starts off at '())
   (define (init-top-σ σ body)
-    (let ([top? (syntax-parameter-value #'top-σ?)])
-      (cond [(or top? in-do? global-σ?) body]
-            [else (define σ-id (generate-temporary))
-                  #`(let ([#,σ-id #,σ]
-                          #,(if σ-∆s? #`[#,σ '()] #`[#,σ #,σ]))
-                      (syntax-parameterize ([top-σ
-                                             (make-rename-transformer
-                                              #'#,σ-id)]
-                                            [target-σ (make-rename-transformer #'#,σ)])
-                        #,body))])))
+    (cond [(or top? in-do? global-σ?) body]
+          [else
+           (define σ-id (generate-temporary #'hidden-top))
+           #`(let ([#,σ-id #,σ]
+                   #,(if σ-∆s? #`[#,σ '()] #`[#,σ #,σ]))
+               (syntax-parameterize ([top-σ (make-rename-transformer #'#,σ-id)]
+                                     [target-σ (make-rename-transformer #'#,σ)]
+                                     [top-σ? #t])
+                 #,body))]))
 
   (define-syntax-class join-clause
     #:attributes (clause new-σ)
@@ -109,15 +110,24 @@
      ;; build a new fold or a fold that continues adding to the
      ;; outer do's targets. σ is bound to itelf since the body may
      ;; still refer to it. cs go to a new identifier.
-     (with-syntax* ([(targets ...) tσtcs]
-                    [(tvalues ...) tσtcs]
+     (with-syntax* ([(ttarget-σ ...) (listy (and tσ (generate-temporary #'do-σ)))]
+                    [(ttarget-cs ...) (listy (and tcs (generate-temporary #'cs)))]
+                    [(vtarget-σ ...) (listy (and tσ #'target-σ))]
+                    [(vtarget-cs ...) (listy (and tcs #'target-cs))]
+                    [(g gs ...) #'(c.guards ...)]
                     [(voidc ...) (listy (and add-void? #'[dummy (void)]))])
-       (init-top-σ #'σ
-                   (init-target-cs
-                    (gen-wrap
-                     #`(for*/fold ([targets tvalues] ... voidc ...) (c.guards ...)
-                         (with-do
-                          (do (σ) (clauses ...) body ...)))))))]
+       (init-top-σ
+        #'σ
+        (init-target-cs
+         (gen-wrap
+          #`(for/fold ([ttarget-σ vtarget-σ] ... [ttarget-cs vtarget-cs] ... voidc ...) (g)
+              (syntax-parameterize ([vtarget-σ (make-rename-transformer #'ttarget-σ)] ...
+                                    [vtarget-cs (make-rename-transformer #'ttarget-cs)] ...)
+                (let ([σ ttarget-σ] ...)
+                  (for*/fold ([ttarget-σ ttarget-σ] ... [ttarget-cs ttarget-cs] ... voidc ...) (gs ...)
+                    (let ([σ ttarget-σ] ...)
+                      (with-do
+                       (do (σ) (clauses ...) body ...)))))))))))]
 
     ;; if we don't get a store via clauses, σ is the default.
     [(_ (σ:id) ((~var joins (join-clauses #f)) clauses ...) body:expr ...+)
@@ -125,34 +135,36 @@
        #`(with-do (do (#,(attribute joins.last-σ)) (clauses ...)
                     body ...)))
      (define binds
-       (let loop ([j (reverse (attribute joins.clauses))]
-                  [full join-body])
-         (match j
-           [(cons fn js) (loop js (fn full))]
-           [_ full])))
+       (for/fold ([full join-body])
+           ([fn (in-list (reverse (attribute joins.clauses)))])
+         (fn full)))
      (init-top-σ #'σ (init-target-cs (gen-wrap binds)))]
 
     [(_ (σ:id) () body:expr ...+)
      #`(with-do
-        #,(init-top-σ #'σ
-                      (init-target-cs
-                       #`(begin body ... #,@(listy (and add-void? #'(void)))))))]
+        #,(init-top-σ
+           #'σ
+           (init-target-cs
+            (gen-wrap
+             #`(begin body ... #,@(listy (and add-void? #'(void))))))))]
 
     ;; when fold/fold doesn't cut it, we need a safe way to recur.
     [(_ (σ:id) loop:id ([args:id arg0:expr] ...) body:expr ...+)
      (define tcss (listy (and tcs #'target-cs)))
      (with-syntax ([(argps ...) (generate-temporaries #'(args ...))]
-                   [(targets ...) tσtcs]
+                   [(targets ...) (append (listy (and tσ (generate-temporary #'some-σ)))
+                                          (listy (and tcs (generate-temporary #'some-cs))))]
                    [(tvalues ...) tσtcs])
        ;; no gen-wrap or with-do since this is used in primitives, always nested dos.
        (init-top-σ
         #'σ
         (init-target-cs
          #`(let real-loop ([targets tvalues] ... [args arg0] ...)
-             ;; Make calling the loop seemless.
-             ;; Pass the accumulators if they exist.
-             (let-syntax ([loop (syntax-rules ()
-                                  [(_ σ* argps ...)
-                                   (real-loop #,@(listy (and tσ #'σ*))
-                                              #,@tcss argps ...)])])
-               body ...)))))]))
+             (syntax-parameterize ([tvalues (make-rename-transformer #'targets)] ...)
+               ;; make calling the loop seemless.
+               ;; Pass the accumulators if they exist.
+               (let-syntax ([loop (syntax-rules ()
+                                    [(_ σ* argps ...)
+                                     (real-loop #,@(listy (and tσ #'σ*))
+                                                #,@tcss argps ...)])])
+                 body ...))))))]))

@@ -10,19 +10,21 @@
 (define-syntax mk-op-struct
   (syntax-parser
     [(_ name:id (fields:id ...) (subfields:id ...)
-        (~bind [container (format-id #'name "~a-container" #'name)]
-               [name: (format-id #'name "~a:" #'name)])
-        (~optional (~seq #:expander
-                         (~or (~and #:with-first-cons
-                                    (~bind [expander
-                                            #`(syntax-rules ()
-                                                [(_ σ #,@(cdr (syntax->list #'(fields ...))))
-                                                 (cons σ (container subfields ...))])]))
-                              expander:expr)) ;; want a different match expander?
-                   #:defaults ([expander
-                                #'(syntax-rules ()
-                                    [(_ fields ...)
-                                     (container subfields ...)])])))
+        (~bind [container (format-id #'name "~a-container" #'name)])
+        (~or
+         (~optional (~seq #:expander
+                          (~or (~and #:with-first-cons
+                                     (~bind [expander
+                                             #`(syntax-rules ()
+                                                 [(_ σ #,@(cdr (syntax->list #'(fields ...))))
+                                                  (cons σ (container subfields ...))])]))
+                               expander:expr)) ;; want a different match expander?
+                    #:defaults ([expander
+                                 #'(syntax-rules ()
+                                     [(_ fields ...)
+                                      (container subfields ...)])]))
+         (~optional (~seq #:expander-id name-ex:id)
+                    #:defaults ([name-ex (format-id #'name "~a:" #'name)]))) ...)
      #:do [(define (populate fs)
              (let ([start (make-free-id-table)])
                (for ([f (in-list fs)]) (free-id-table-set! start f #t))
@@ -60,4 +62,4 @@
               ;; if I have runtime logic errors.
               (define (bad . rest)
                 (error 'bad "Not present in specialized representation")) ...
-              (define-match-expander name: expander)))]))
+              (define-match-expander name-ex expander)))]))

@@ -13,10 +13,7 @@
   (hash-set σ a
             (∪ s (hash-ref σ a ∅))))
 (define (join* σ as ss)
-  (cond [(empty? as) σ]
-        [else (join* (join σ (first as) (first ss))
-                     (rest as)
-                     (rest ss))]))
+  (for/fold ([σ σ]) ([a as] [s ss]) (join σ a s)))
 (define (join-one σ a x)
   (hash-set σ a (∪1 (hash-ref σ a ∅) x)))
 (define (join-one* σ as xs)
@@ -43,7 +40,7 @@
     ([s ss])
     (join-store σ (state-σ s))))
 
-(define ((mk-reach ref 0cfa?) σ root)
+(define (((mk-reach ref) touches) σ root)
   (define seen ∅)
   (let loop ([as root])
     (for/union #:res acc ([a (in-set as)]
@@ -51,21 +48,17 @@
                (set! seen (∪1 seen a))
                (for/union #:initial (∪1 acc a)
                           ([v (in-set (ref σ a))])
-                          (loop (touches v 0cfa?))))))
+                          (loop (touches v))))))
 
-(define (mk-restrict-to-reachable ref 0cfa?)
-  (define reach (mk-reach ref (if 0cfa? reach-0 reach-k)))
+(define ((mk-restrict-to-reachable ref) touches)
+  (define reach ((mk-reach ref) touches))
   (λ (σ v)
-     (for/hash ([a (in-set (reach σ (touches v 0cfa?)))])
+     (for/hash ([a (in-set (reach σ (touches v)))])
        (values a (hash-ref σ a)))))
 
-(define reach-0 (mk-reach hash-ref #t))
-(define reach-k (mk-reach hash-ref #f))
-(define reach/vec-0 (mk-reach vector-ref #t))
-(define reach/vec-k (mk-reach vector-ref #f))
+(define reach (mk-reach hash-ref))
+(define reach/vec (mk-reach vector-ref))
 
 
-(define restrict-to-reachable-0 (mk-restrict-to-reachable hash-ref #t))
-(define restrict-to-reachable-k (mk-restrict-to-reachable hash-ref #f))
-(define restrict-to-reachable/vector-0 (mk-restrict-to-reachable vector-ref #t))
-(define restrict-to-reachable/vector-k (mk-restrict-to-reachable vector-ref #f))
+(define restrict-to-reachable (mk-restrict-to-reachable hash-ref))
+(define restrict-to-reachable/vector (mk-restrict-to-reachable vector-ref))

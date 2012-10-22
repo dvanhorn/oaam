@@ -1,5 +1,5 @@
 #lang racket
-(require "ast.rkt")
+(require "ast.rkt" "notation.rkt" (for-syntax syntax/parse))
 (provide (all-defined-out))
 ;; A Val is one of:
 ;; - Number
@@ -11,12 +11,11 @@
 ;; - 'number
 ;; - 'string
 ;; - 'symbol
-;; - (clos Sym Exp Env)
 ;; - (primop Sym)
 ;; - (consv Addr Addr)
 ;; - (vectorv Number (listof Addr))
 ;; - (vectorv Number Addr) ;; collapsed into one addr
-(struct clos (x e ρ)   #:prefab)
+;; - (clos List[Var] Exp Env) ;; or without Env. Constructed by mk-analysis.
 (struct primop (which) #:prefab)
 (struct consv (car cdr) #:prefab)
 (struct vectorv^ (length cell) #:prefab)
@@ -32,19 +31,21 @@
       (symbol? x)
       (null? x)))
 
-(define (touches v [0cfa? #f])
-  (match v
-    [(clos xs e ρ)
-     (cond [0cfa? (free e)]
-           [else
-            (for/hash ([x (in-set (free e))]
-                       #:unless (memv x xs))
-              (hash-ref ρ x
-                        (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ))))])]
-    [(consv a d) (set a d)]
-    [(vectorv _ l) (list->set l)]
-    [(vectorv^ _ a) (set a)]
-    [_ (set)]))
+(define-simple-macro* (mk-touches touches:id clos:id 0cfa?:boolean)
+  (define (touches v)
+    (match v
+      [(clos xs e ρ fvs)
+       #,(if (syntax-e #'0cfa?)
+             #'fvs
+             #'(for/hash ([x (in-set fvs)]
+                          #:unless (memv x xs))
+                 (hash-ref ρ x
+                           (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ)))))]
+      [(consv a d) (set a d)]
+      [(vectorv _ l) (list->set l)]
+      [(vectorv^ _ a) (set a)]
+      [(? set? s) (for/union ([v (in-set s)]) (touches v))]
+      [_ (set)])))
 
 ;; A Cont is one of:
 ;; - 'mt

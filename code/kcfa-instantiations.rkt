@@ -30,12 +30,12 @@
 (define-simple-macro* (bind-join*-∆s (∆s* ∆s as vss) body)
   (let ([∆s* (map2-append cons ∆s as vss)]) #,(bind-rest #'∆s* #'body)))
 
-(define-for-syntax ((mk-bind σ-∆s? K) stx)
+(define-for-syntax ((mk-bind K) stx)
   (syntax-parse stx
     [(_ (ρ* σ* δ*) (ρ σ l δ xs v-addrs) body)
      (define vs
        (quasisyntax/loc stx
-         (map (λ (v) (getter #,(if σ-∆s? #'top-σ #'σ) v)) v-addrs)))
+         (map (λ (v) (getter σ v)) v-addrs)))
      (if (zero? K)
          (quasisyntax/loc stx
            (bind-join* (σ* σ xs #,vs) body))
@@ -47,11 +47,14 @@
 (define-syntax-rule (make-var-contour-0 x δ) x)
 (define-syntax-rule (make-var-contour-k x δ) (cons x δ))
 
-(define-syntax bind-0 (mk-bind #f 0))
-(define-syntax bind-1 (mk-bind #f 1))
-(define-syntax bind-∞ (mk-bind #f +inf.0))
-(define-syntax bind-∆s-0 (mk-bind #t 0))
-(define-syntax bind-∆s-∞ (mk-bind #t +inf.0))
+(define-syntax bind-0 (mk-bind 0))
+(define-syntax bind-1 (mk-bind 1))
+(define-syntax bind-∞ (mk-bind +inf.0))
+
+(define-syntax-rule (mk-fix name ans? ans-v)
+  (define (name step fst)
+    (define ss (fix step fst))
+    (for/set ([s ss] #:when (ans? s)) (ans-v s))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Widen set-monad fixpoint
@@ -212,11 +215,9 @@
 (define-syntax-rule (global-vector-getter σ* a)
   (vector-ref global-σ a))
 
-(define-syntax-rule (mk-prealloc^-fixpoint name ans^? ans^-v 0cfa?)
+(define-syntax-rule (mk-prealloc^-fixpoint name ans^? ans^-v touches)
   (define (name step fst)
-    (define clean-σ (if 0cfa?
-                        restrict-to-reachable/vector-0
-                        restrict-to-reachable/vector-k))
+    (define clean-σ (restrict-to-reachable/vector touches))
     (let loop ()
       (cond [(∅? todo) ;; → null?
              (define vs
@@ -232,6 +233,63 @@
              (loop)]))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Mutable global store
+(define (join-h! a vs)
+  (define prev (hash-ref global-σ a ∅))
+  (define added? (not (subset? vs prev)))
+  (when added?
+    (hash-set! global-σ a (∪ vs prev))
+    (set! unions (add1 unions))))
+
+(define (join*-h! as vss)
+  (for ([a (in-list as)]
+        [vs (in-list vss)])
+    (join-h! a vs)))
+
+(define-syntax-rule (global-hash-getter σ* a)
+  (hash-ref global-σ a (λ () (error 'global-hash-getter "Unbound address ~a" a)))) 
+
+(define-syntax-rule (bind-join-h! (σ* σ a vs) body)
+  (begin (join-h! a vs) body))
+(define-syntax-rule (bind-join*-h! (σ* σ as vss) body)
+  (begin (join*-h! as vss) body))
+
+
+(define-syntax-rule (pull-global gen cs-base)
+  (for/set #:initial cs-base
+      ([c (in-producer gen (λ (x) (eq? 'done x)))])
+    c))
+
+(define-syntax-rule (imperative/generator/wide-step-specialized step ans?)
+  (match-lambda
+   [(cons σ-count cs)
+    (define cs*
+      (for/fold ([cs* ∅])
+          ([c cs] #:unless (ans? c))
+        (pull-global (step c) cs*)))
+    (cons unions (set-union cs cs*))]))
+
+(define-syntax-rule (mk-generator/wide/imperative-fixpoint name ans? ans-v touches)
+  (define-syntax-rule (name step fst)
+    (let ()
+      (define wide-step (imperative/generator/wide-step-specialized step ans?))
+      (define clean-σ (restrict-to-reachable touches))
+      (set! global-σ (make-hash))
+      (set! unions 0)
+      (define cs (pull-global fst ∅))
+      (define fst-s (cons unions cs))
+      (define snd (wide-step fst-s))
+      (let loop ((next snd) (prev fst-s))
+        (cond [(equal? next prev)
+               (define answers (for/set ([c (cdr prev)]
+                                         #:when (ans? c))
+                                 (ans-v c)))
+               (cons (clean-σ global-σ answers)
+                     answers)]
+              [else
+               (loop (wide-step next) next)])))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Concrete semantics
 
 (define (eval-widen b)
@@ -244,20 +302,9 @@
 (define-syntax-rule (top-hash-getter σ a)
   (hash-ref top-σ a (λ () (error 'top-hash-getter "Unbound address ~a in store ~a" a σ))))
 
-(define (lazy-force σ x)
+(define-syntax-rule (lazy-force σ x)
   (match x
-    [(addr a) (hash-getter σ a)]
-    [v (set v)]))
-
-(define-syntax-rule (lazy-force-σ-∆s σ x)
-  (match x
-    [(addr a)
-     (hash-ref top-σ a (λ () (error 'getter "(force) Unbound address ~a in store ~a" a σ)))]
-    [v (set v)]))
-
-(define-syntax-rule (lazy-force! σ x)
-  (match x
-    [(addr a) (vector-ref global-σ a)]
+    [(addr a) (getter σ a)]
     [v (set v)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -308,6 +355,11 @@
    ([yield-meaning (syntax-rules () [(_ e) (begin (real-yield e) target-σ)])])
    body))
 
+(define-syntax-rule (with-global-σ-generators body)
+  (splicing-syntax-parameterize
+   ([yield-meaning (syntax-rules () [(_ e) (real-yield e)])])
+   body))
+
 (define-syntax-rule (with-mutable-worklist body)
   (splicing-syntax-parameterize
    ([yield-meaning yield!])
@@ -319,21 +371,9 @@
     [force (make-rename-transformer #'lazy-force)])
    body))
 
-(define-syntax-rule (with-lazy-σ-∆s body)
-  (splicing-syntax-parameterize
-   ([delay (make-rename-transformer #'lazy-delay)]
-    [force (make-rename-transformer #'lazy-force-σ-∆s)])
-   body))
-
 (define-syntax-rule (with-0-ctx body)
   (splicing-syntax-parameterize
    ([bind (make-rename-transformer #'bind-0)]
-    [make-var-contour (make-rename-transformer #'make-var-contour-0)])
-   body))
-
-(define-syntax-rule (with-0-σ-∆s-ctx body)
-  (splicing-syntax-parameterize
-   ([bind (make-rename-transformer #'bind-∆s-0)]
     [make-var-contour (make-rename-transformer #'make-var-contour-0)])
    body))
 
@@ -359,56 +399,55 @@
   (splicing-syntax-parameterize
    ([bind-join (make-rename-transformer #'bind-join-whole)]
     [bind-join* (make-rename-transformer #'bind-join*-whole)]
-    [getter (make-rename-transformer #'hash-getter)]
-    ;; separate out this force?
-    [force (make-rename-transformer #'lazy-force)])
+    [getter (make-rename-transformer #'hash-getter)])
+   body))
+
+(define-syntax-rule (with-prealloc-store body)
+  (splicing-syntax-parameterize
+   ([bind-join (make-rename-transformer #'bind-join!)]
+    [bind-join* (make-rename-transformer #'bind-join*!)]
+    [getter (make-rename-transformer #'global-vector-getter)])
    body))
 
 (define-syntax-rule (with-mutable-store body)
   (splicing-syntax-parameterize
-   ([bind-join (make-rename-transformer #'bind-join!)]
-    [bind-join* (make-rename-transformer #'bind-join*!)]
-    [getter (make-rename-transformer #'global-vector-getter)]
-    ;; separate out this force?
-    [force (make-rename-transformer #'lazy-force!)])
+   ([bind-join (make-rename-transformer #'bind-join-h!)]
+    [bind-join* (make-rename-transformer #'bind-join*-h!)]
+    [getter (make-rename-transformer #'global-hash-getter)])
    body))
 
 (define-syntax-rule (with-σ-∆s body)
   (splicing-syntax-parameterize
    ([bind-join (make-rename-transformer #'bind-join-∆s)]
     [bind-join* (make-rename-transformer #'bind-join*-∆s)]
-    [getter (make-rename-transformer #'top-hash-getter)]
-    [force (make-rename-transformer #'lazy-force-σ-∆s)])
+    [getter (make-rename-transformer #'top-hash-getter)])
    body))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Potpourris of evaluators
-#|
+
 ;; Compiled wide concrete store-passing set monad
-(with-lazy
+ (with-lazy
  (with-∞-ctx
   (with-whole-σ
    (with-narrow-set-monad
     (with-concrete
       (mk-analysis #:aval lazy-eval/c #:ans ans/c
-                   #:σ-passing ;; not really passing, but carried.
-                   #:set-monad #:kcfa +inf.0
+                   #:σ-passing #:set-monad #:kcfa +inf.0
                    #:compiled))))))
-(provide lazy-eval/c)
+ (provide lazy-eval/c)
 
-(with-lazy
+ (with-lazy
  (with-∞-ctx
   (with-whole-σ
    (with-narrow-set-monad
     (with-concrete
       (mk-analysis #:aval lazy-eval #:ans ans
-                   #:σ-passing
-                   #:set-monad #:kcfa +inf.0))))))
-(provide lazy-eval)
-|#
+                   #:σ-passing #:set-monad #:kcfa +inf.0))))))
+ (provide lazy-eval)
 
-(mk-set-fixpoint^ fix eval-set-fixpoint^ ans^?)
-(with-lazy
+ (mk-set-fixpoint^ fix eval-set-fixpoint^ ans^?)
+ (with-lazy
  (with-∞-ctx
   (with-whole-σ
    (with-σ-passing-set-monad
@@ -417,7 +456,7 @@
                    #:fixpoint eval-set-fixpoint^
                    #:compiled #:set-monad #:wide #:σ-passing
                    #:kcfa +inf.0))))))
-(provide lazy-eval^/c)
+ (provide lazy-eval^/c)
 
 (mk-set-fixpoint^ fix 0cfa-set-fixpoint^/c 0cfa-ans^/c?)
 (with-lazy
@@ -425,19 +464,11 @@
   (with-whole-σ
    (with-σ-passing-set-monad
     (with-abstract
-      (mk-analysis #:aval lazy-0cfa^/c #:ans 0cfa-ans^/c
-                   #:fixpoint 0cfa-set-fixpoint^/c
-                   #:σ-passing
-                   #:compiled #:wide #:set-monad))))))
-(provide lazy-0cfa^/c)
-
-(with-lazy
- (with-0-ctx
-  (with-whole-σ
-   (with-narrow-set-monad
-    (with-abstract
-      (mk-analysis #:aval lazy-0cfa #:ans 0cfa-ans #:set-monad))))))
-(provide lazy-0cfa)
+     (mk-analysis #:aval lazy-0cfa^/c #:ans 0cfa-ans^/c
+                  #:fixpoint 0cfa-set-fixpoint^/c
+                  #:σ-passing
+                  #:compiled #:wide #:set-monad))))))
+ (provide lazy-0cfa^/c)
 
 (mk-set-fixpoint^ fix 0cfa-set-fixpoint^ 0cfa-ans^?)
 (with-lazy
@@ -447,13 +478,32 @@
     (with-abstract
       (mk-analysis #:aval lazy-0cfa^ #:ans 0cfa-ans^
                    #:fixpoint 0cfa-set-fixpoint^
-                   #:σ-passing
-                   #:wide #:set-monad))))))
+                   #:σ-passing #:wide #:set-monad))))))
 (provide lazy-0cfa^)
 
+(mk-fix fix-filtered 0cfa-ans? 0cfa-ans-v)
+(with-lazy
+ (with-0-ctx
+  (with-whole-σ
+   (with-narrow-set-monad
+    (with-abstract
+      (mk-analysis #:aval lazy-0cfa #:ans 0cfa-ans #:set-monad #:fixpoint fix-filtered
+                   #:σ-passing))))))
+(provide lazy-0cfa)
+
+(with-lazy
+ (with-0-ctx
+  (with-whole-σ
+   (with-narrow-set-monad
+    (with-abstract
+      (mk-analysis #:aval lazy-0cfa/c #:ans 0cfa-ans/c #:compiled
+                   #:σ-passing
+                   #:set-monad))))))
+(provide lazy-0cfa/c)
+
 (mk-generator/wide/σ-∆s-fixpoint lazy-0cfa-gen^-fix gen-ans^?)
-(with-lazy-σ-∆s
- (with-0-σ-∆s-ctx
+(with-lazy
+ (with-0-ctx
   (with-σ-∆s
    (with-σ-passing-generators
     (with-abstract
@@ -465,8 +515,8 @@
 
 
 (mk-∆-fix^ lazy-0cfa∆^-fixpoint 0cfa∆-ans^?)
-(with-lazy-σ-∆s
- (with-0-σ-∆s-ctx
+(with-lazy
+ (with-0-ctx
   (with-σ-∆s
    (with-σ-passing-set-monad
     (with-abstract
@@ -476,27 +526,40 @@
                    #:compiled))))))
 (provide lazy-0cfa∆/c)
 
-(mk-generator/wide/σ-∆s-fixpoint lazy-0cfa-gen^-fix/c gen-ans^/c?)
-(with-lazy-σ-∆s
- (with-0-σ-∆s-ctx
+(mk-generator/wide/σ-∆s-fixpoint lazy-0cfa-σ-∆s-gen^-fix/c gen-ans^-σ-∆s/c?)
+(with-lazy
+ (with-0-ctx
   (with-σ-∆s
    (with-σ-passing-generators
     (with-abstract
-      (mk-analysis #:aval lazy-0cfa^-gen-σ-∆s/c #:ans gen-ans^/c
-                   #:fixpoint lazy-0cfa-gen^-fix/c
+      (mk-analysis #:aval lazy-0cfa-gen-σ-∆s^/c #:ans gen-ans^-σ-∆s/c
+                   #:fixpoint lazy-0cfa-σ-∆s-gen^-fix/c
                    #:σ-∆s
                    #:compiled #:wide #:generators))))))
-(provide lazy-0cfa^-gen-σ-∆s/c)
+(provide lazy-0cfa-gen-σ-∆s^/c)
 
-(mk-prealloc^-fixpoint prealloc/imperative-fixpoint prealloc-ans? prealloc-ans-v #t)
+(mk-generator/wide/imperative-fixpoint lazy-0cfa-gen^-fix/c gen-ans^/c? gen-ans^/c-v global-gen-touches-0)
+(with-lazy
+ (with-0-ctx
+  (with-mutable-store
+  (with-global-σ-generators
+    (with-abstract
+      (mk-analysis #:aval lazy-0cfa-gen^/c #:ans gen-ans^/c
+                   #:touches global-gen-touches-0
+                   #:fixpoint lazy-0cfa-gen^-fix/c
+                   #:compiled #:global-σ #:wide #:generators))))))
+(provide lazy-0cfa-gen^/c)
+
+(mk-prealloc^-fixpoint prealloc/imperative-fixpoint prealloc-ans? prealloc-ans-v prealloc-touches-0)
 (with-lazy
  (with-0-ctx/prealloc
-  (with-mutable-store
+  (with-prealloc-store
    (with-mutable-worklist
     (with-abstract
       (mk-analysis #:aval lazy-0cfa^/c!-prepared #:ans prealloc-ans
+                   #:touches prealloc-touches-0
                    #:fixpoint prealloc/imperative-fixpoint
-                   #:pre-alloc #:compiled #:imperative #:wide))))))
+                   #:global-σ #:compiled #:wide))))))
 (define (lazy-0cfa^/c! sexp)
   (lazy-0cfa^/c!-prepared (prepare-prealloc parse-prog sexp)))
 (provide lazy-0cfa^/c!)

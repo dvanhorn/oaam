@@ -129,210 +129,209 @@
 (define-syntax (mk-prims stx)
   (syntax-parse stx
     [(_ (~or (~seq (~and #:static static?) primitive?:id changes-store?:id reads-store?:id)
-             mean:id))
+             (~seq mean:id clos?:id)))
      (if (attribute static?)
          (quasisyntax/loc stx
            (mk-static-primitive-functions
             primitive? changes-store? reads-store? #,prim-table))
          (quasisyntax/loc stx
-           (mk-primitive-meaning mean #,@prim-defines #,prim-table)))]))
+           (mk-primitive-meaning mean #,@(prim-defines #'clos?) #,prim-table)))]))
 
-(define-for-syntax prim-defines
-  #'((define both '(#t #f))
-     (define-simple-macro* (yield-both)
-       ;; Do needs σ, but it's already bound by an outer do (if σ ever bound)
-       ;; If not ever bound, just give a dummy identifier.
-       (do (#,(or (and (syntax-parameter-value #'target-σ) #'target-σ)
-                  #'σ))
-           ([b (in-list '(#t #f))]) (yield b)))
-     (define-syntax-rule (yield-delay σ v)
-       (do (σ) ([v* (delay σ v)]) (yield v*)))
-     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ;; Prims that don't need the store
-     (define/basic (add1v n)
-       (if (eq? 'number n)
-           (yield 'number)
-           (yield (widen (add1 n)))))
-     (define/basic (sub1v n)
-       (if (eq? 'number n)
-           (yield 'number)
-           (yield (widen (sub1 n)))))
-     (define/basic (zero?v n)
-       (if (eq? 'number n)
-           (yield-both)
-           (yield (zero? n))))
-     (define-simple-macro* (wide-num fn vs)
-       (yield (widen (apply fn (filter-not (λ (x) (eq? x 'number)) vs)))))
-     (define-simple-macro* (*v vs) (wide-num * vs))
-     (define-simple-macro* (+v vs) (wide-num + vs))
-     (define-simple-macro* (-v vs) (wide-num - vs))
-     (define-simple-macro* (=v vs)
-       (if (memv 'number vs)
-           (yield-both)
-           (yield (apply = vs))))
-     (define/basic (vectorv*? v) (yield (or (vectorv? v) (vectorv^? v))))
-     (define/basic (consv*? v) (yield (consv? v)))
-     (define/basic (numberv? v) (yield (or (number? v) (eq? 'number v))))
-     (define/basic (stringv? v) (yield (or (string? v) (eq? 'string v))))
-     (define/basic (symbolv? v) (yield (or (symbol? v) (eq? 'symbol v))))
-     (define/basic (booleanv? v) (yield (boolean? v)))
-     (define/basic (nullv? v) (yield (null? v)))
-     (define/basic (procedurev? v) (yield (clos? v)))
-     (define/basic (voidv? v) (yield (void? v)))
-     (define-simple-macro* (errorv vs) (continue))
+(define-for-syntax (prim-defines clos?)
+  (with-syntax ([clos? clos?])
+    #'((define both '(#t #f))
+       (define-simple-macro* (yield-both σ)
+         ;; Do needs σ, but it's already bound by an outer do (if σ ever bound)
+         ;; If not ever bound, just give a dummy identifier.
+         (do (σ) ([b (in-list '(#t #f))]) (yield b)))
+       (define-syntax-rule (yield-delay σ v)
+         (do (σ) ([v* (delay σ v)]) (yield v*)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ;; Prims that don't need the store
+       (define/basic (add1v n)
+         (if (eq? 'number n)
+             (yield 'number)
+             (yield (widen (add1 n)))))
+       (define/basic (sub1v n)
+         (if (eq? 'number n)
+             (yield 'number)
+             (yield (widen (sub1 n)))))
+       (define/read (zero?v σ n)
+         (if (eq? 'number n)
+             (yield-both σ)
+             (yield (zero? n))))
+       (define-simple-macro* (wide-num fn vs)
+         (yield (widen (apply fn (filter-not (λ (x) (eq? x 'number)) vs)))))
+       (define-simple-macro* (*v vs) (wide-num * vs))
+       (define-simple-macro* (+v vs) (wide-num + vs))
+       (define-simple-macro* (-v vs) (wide-num - vs))
+       (define-simple-macro* (=v σ vs)
+         (if (memv 'number vs)
+             (yield-both σ)
+             (yield (apply = vs))))
+       (define/basic (vectorv*? v) (yield (or (vectorv? v) (vectorv^? v))))
+       (define/basic (consv*? v) (yield (consv? v)))
+       (define/basic (numberv? v) (yield (or (number? v) (eq? 'number v))))
+       (define/basic (stringv? v) (yield (or (string? v) (eq? 'string v))))
+       (define/basic (symbolv? v) (yield (or (symbol? v) (eq? 'symbol v))))
+       (define/basic (booleanv? v) (yield (boolean? v)))
+       (define/basic (nullv? v) (yield (null? v)))
+       (define/basic (procedurev? v) (yield (clos? v)))
+       (define/basic (voidv? v) (yield (void? v)))
+       (define-simple-macro* (errorv vs) (continue))
 
-     (define/basic (notv v) (yield (not v)))
-     (define/basic (voidv) (yield (void)))
-     (define/basic (vectorv-length v)
-       (match v
-         [(or (vectorv len _) (vectorv^ len _)) (yield len)]))
-     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ;; Prims that read the store
-     (define/read (equalv? σ v0 v1)
-       (define-syntax-rule (both-if pred) (if pred (yield-both) (yield #f)))
-       (match* (v0 v1)
-         [((? clos?) _) (both-if (clos? v1))] ;; FIXME: not right for concrete
-         [(_ (? clos?)) (yield #f)]           ;; first not a closure
-         [((? consv?) _) (both-if (consv? v1))] ;; FIXME: not right for concrete
-         [(_ (? consv?)) (yield #f)]            ;; first not a cons
-         [((? vectorv?) _) (both-if (vectorv? v1))] ;; FIXME: not right for concrete
-         [(_ (? vectorv?)) (yield #f)] ;; first not a vector
-         [((? primop?) _) (yield (equal? v0 v1))]
-         [(_ (? primop?)) (yield #f)] ;; first not a primop
-         [((? number?) _) (cond [(eq? 'number v1) (yield-both)]
-                                [(number? v1) (yield (= v0 v1))]
-                                [else (yield #f)])]
-         [('number _) (both-if (or (eq? 'number v1) (number? v1)))]
-         [(_ 'number) (yield #f)]
-         [((? string?) _) (cond [(eq? 'string v1) (yield-both)]
-                                [(string? v1) (yield (string=? v0 v1))]
-                                [else (yield #f)])]
-         [('string _) (both-if (or (eq? 'string v1) (string? v1)))]
-         [(_ 'string) (yield #f)]
-         [((? symbol?) _) (cond [(eq? 'symbol v1) (yield-both)]
-                                [(symbol? v1) (yield (eq? v0 v1))]
-                                [else (yield #f)])]
-         [('symbol _) (both-if (or (eq? 'symbol v1) (symbol? v1)))]
-         [((? boolean?) _) (yield (equal? v0 v1))]
-         [('() _) (yield (eq? '() v1))]
-         [(_ '()) (yield #f)]
-         [((? void?) _) (yield (void? v1))]
-         [(_ (? void?)) (yield #f)]
-         [(_ _) (error 'equalv? "Incomplete match ~a ~a" v0 v1)]))
-     (define/read (vectorv-ref σ vec z)
-       (match vec
-         [(vectorv _ l)
-          (cond [(eq? 'number z)
-                 (error 'vectorv-ref "Abstract vectors should have a single cell")]
-                [(or (< z 0) (>= z (length l))) (continue)]
-                [else (yield-delay σ (list-ref l z))])]
-         [(vectorv^ _ abs-cell) (yield-delay σ abs-cell)]))
+       (define/basic (notv v) (yield (not v)))
+       (define/basic (voidv) (yield (void)))
+       (define/basic (vectorv-length v)
+         (match v
+           [(or (vectorv len _) (vectorv^ len _)) (yield len)]))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ;; Prims that read the store
+       (define/read (equalv? σ v0 v1)
+         (define-syntax-rule (both-if pred) (if pred (yield-both σ) (yield #f)))
+         (match* (v0 v1)
+           [((? clos?) _) (both-if (clos? v1))] ;; FIXME: not right for concrete
+           [(_ (? clos?)) (yield #f)]           ;; first not a closure
+           [((? consv?) _) (both-if (consv? v1))] ;; FIXME: not right for concrete
+           [(_ (? consv?)) (yield #f)]            ;; first not a cons
+           [((? vectorv?) _) (both-if (vectorv? v1))] ;; FIXME: not right for concrete
+           [(_ (? vectorv?)) (yield #f)] ;; first not a vector
+           [((? primop?) _) (yield (equal? v0 v1))]
+           [(_ (? primop?)) (yield #f)] ;; first not a primop
+           [((? number?) _) (cond [(eq? 'number v1) (yield-both σ)]
+                                  [(number? v1) (yield (= v0 v1))]
+                                  [else (yield #f)])]
+           [('number _) (both-if (or (eq? 'number v1) (number? v1)))]
+           [(_ 'number) (yield #f)]
+           [((? string?) _) (cond [(eq? 'string v1) (yield-both σ)]
+                                  [(string? v1) (yield (string=? v0 v1))]
+                                  [else (yield #f)])]
+           [('string _) (both-if (or (eq? 'string v1) (string? v1)))]
+           [(_ 'string) (yield #f)]
+           [((? symbol?) _) (cond [(eq? 'symbol v1) (yield-both σ)]
+                                  [(symbol? v1) (yield (eq? v0 v1))]
+                                  [else (yield #f)])]
+           [('symbol _) (both-if (or (eq? 'symbol v1) (symbol? v1)))]
+           [((? boolean?) _) (yield (equal? v0 v1))]
+           [('() _) (yield (eq? '() v1))]
+           [(_ '()) (yield #f)]
+           [((? void?) _) (yield (void? v1))]
+           [(_ (? void?)) (yield #f)]
+           [(_ _) (error 'equalv? "Incomplete match ~a ~a" v0 v1)]))
+       (define/read (vectorv-ref σ vec z)
+         (match vec
+           [(vectorv _ l)
+            (cond [(eq? 'number z)
+                   (error 'vectorv-ref "Abstract vectors should have a single cell")]
+                  [(or (< z 0) (>= z (length l))) (continue)]
+                  [else (yield-delay σ (list-ref l z))])]
+           [(vectorv^ _ abs-cell) (yield-delay σ abs-cell)]))
 
-     ;; TODO?: This could be compiled to have less interpreted overhead
-     ;; Could cause too much code to be generated or cause unreadability
-     (define-simple-macro* (mk-cons-accessor name which)
-       (define-simple-macro* (name σ vs)
-         (let ([dirs '#,(cdr (reverse (cdr (string->list (symbol->string (syntax-e #'which))))))])
-           (do (σ) chase ([dirs dirs] [v (first vs)])
-               (match dirs
-                 ['() (yield v)]
-                 [(cons dir dirs)
-                  (match v
-                    [(consv a d)
-                     (define addr (case dir [(#\a) a] [(#\d) d]))
-                     (if (null? dirs)
-                         (yield-delay σ addr)
-                         (do (σ) ([v (getter σ addr)])
-                           (chase σ dirs v)))]
-                    [_ (continue)])])))))
-     (mk-cons-accessor carv car)
-     (mk-cons-accessor cdrv cdr)
-     (mk-cons-accessor caarv caar)
-     (mk-cons-accessor cadrv cadr)
-     (mk-cons-accessor cdarv cdar)
-     (mk-cons-accessor cddrv cddr)
-     (mk-cons-accessor caaarv caaar)
-     (mk-cons-accessor caadrv caadr)
-     (mk-cons-accessor cadarv cadar)
-     (mk-cons-accessor caddrv caddr)
-     (mk-cons-accessor cdaarv cdaar)
-     (mk-cons-accessor cdadrv cdadr)
-     (mk-cons-accessor cddarv cddar)
-     (mk-cons-accessor cdddrv cdddr)
-     (mk-cons-accessor caaaarv caaaar)
-     (mk-cons-accessor caaadrv caaadr)
-     (mk-cons-accessor caadarv caadar)
-     (mk-cons-accessor caaddrv caaddr)
-     (mk-cons-accessor cadaarv cadaar)
-     (mk-cons-accessor cadadrv cadadr)
-     (mk-cons-accessor caddarv caddar)
-     (mk-cons-accessor cadddrv cadddr)
-     (mk-cons-accessor cdaaarv cdaaar)
-     (mk-cons-accessor cdaadrv cdaadr)
-     (mk-cons-accessor cdadarv cdadar)
-     (mk-cons-accessor cdaddrv cdaddr)
-     (mk-cons-accessor cddaarv cddaar)
-     (mk-cons-accessor cddadrv cddadr)
-     (mk-cons-accessor cdddarv cdddar)
-     (mk-cons-accessor cddddrv cddddr)
-     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-     ;; Prims that write the store
-     (define/write (vectorv-set! σ l δ vec i val)
-       (match vec
-         [(vectorv _ addrs)
-          (cond [(eq? 'number i)
-                 (error 'vectorv-set! "Abstract vectors should have a single cell")]
-                [(or (< z 0) (>= z (length addrs))) (continue)]
-                [else (do (σ) ([σ* #:join σ (list-ref addrs i) (force σ val)])
-                        (yield (void)))])]
-         [(vectorv^ _ abs-cell)
-          (do (σ) ([σ* #:join σ abs-cell (force σ val)])
-            (yield (void)))]))
+       ;; TODO?: This could be compiled to have less interpreted overhead
+       ;; Could cause too much code to be generated or cause unreadability
+       (define-simple-macro* (mk-cons-accessor name which)
+         (define-simple-macro* (name σ vs)
+           (let ([dirs '#,(cdr (reverse (cdr (string->list (symbol->string (syntax-e #'which))))))])
+             (do (σ) chase ([dirs dirs] [v (first vs)])
+                 (match dirs
+                   ['() (yield v)]
+                   [(cons dir dirs)
+                    (match v
+                      [(consv a d)
+                       (define addr (case dir [(#\a) a] [(#\d) d]))
+                       (if (null? dirs)
+                           (yield-delay σ addr)
+                           (do (σ) ([v (getter σ addr)])
+                             (chase σ dirs v)))]
+                      [_ (continue)])])))))
+       (mk-cons-accessor carv car)
+       (mk-cons-accessor cdrv cdr)
+       (mk-cons-accessor caarv caar)
+       (mk-cons-accessor cadrv cadr)
+       (mk-cons-accessor cdarv cdar)
+       (mk-cons-accessor cddrv cddr)
+       (mk-cons-accessor caaarv caaar)
+       (mk-cons-accessor caadrv caadr)
+       (mk-cons-accessor cadarv cadar)
+       (mk-cons-accessor caddrv caddr)
+       (mk-cons-accessor cdaarv cdaar)
+       (mk-cons-accessor cdadrv cdadr)
+       (mk-cons-accessor cddarv cddar)
+       (mk-cons-accessor cdddrv cdddr)
+       (mk-cons-accessor caaaarv caaaar)
+       (mk-cons-accessor caaadrv caaadr)
+       (mk-cons-accessor caadarv caadar)
+       (mk-cons-accessor caaddrv caaddr)
+       (mk-cons-accessor cadaarv cadaar)
+       (mk-cons-accessor cadadrv cadadr)
+       (mk-cons-accessor caddarv caddar)
+       (mk-cons-accessor cadddrv cadddr)
+       (mk-cons-accessor cdaaarv cdaaar)
+       (mk-cons-accessor cdaadrv cdaadr)
+       (mk-cons-accessor cdadarv cdadar)
+       (mk-cons-accessor cdaddrv cdaddr)
+       (mk-cons-accessor cddaarv cddaar)
+       (mk-cons-accessor cddadrv cddadr)
+       (mk-cons-accessor cdddarv cdddar)
+       (mk-cons-accessor cddddrv cddddr)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ;; Prims that write the store
+       (define/write (vectorv-set! σ l δ vec i val)
+         (match vec
+           [(vectorv _ addrs)
+            (cond [(eq? 'number i)
+                   (error 'vectorv-set! "Abstract vectors should have a single cell")]
+                  [(or (< z 0) (>= z (length addrs))) (continue)]
+                  [else (do (σ) ([σ*-vec #:join σ (list-ref addrs i) (force σ val)])
+                          (yield (void)))])]
+           [(vectorv^ _ abs-cell)
+            (do (σ) ([σ*-vec^ #:join σ abs-cell (force σ val)])
+              (yield (void)))]))
 
-     (define/write (make-vectorv σ l δ size [default 0])
-       (match (widen size)
-         ['number
-          (define V-addr (make-var-contour `(V . ,l) δ))
-          (do (σ) ([σ* #:join σ V-addr (force σ default)])
-            (yield (vectorv^ size V-addr)))]
-         [_ (define V-addrs
-              (for/list ([i (in-range size)]) (make-var-contour `(V ,i . ,l) δ)))
-            (do (σ) ([σ* #:join* σ V-addrs (make-list size default)])
-              (yield (vectorv size V-addrs)))]))
+       (define/write (make-vectorv σ l δ size [default 0])
+         (match (widen size)
+           ['number
+            (define V-addr (make-var-contour `(V . ,l) δ))
+            (do (σ) ([σ*-mv^ #:join σ V-addr (force σ default)])
+              (yield (vectorv^ size V-addr)))]
+           [_ (define V-addrs
+                (for/list ([i (in-range size)]) (make-var-contour `(V ,i . ,l) δ)))
+              (do (σ) ([σ*-mv #:join* σ V-addrs (make-list size default)])
+                (yield (vectorv size V-addrs)))]))
 
-     (define/write (make-consv σ l δ v0 v1)
-       (define A-addr (make-var-contour `(A . ,l) δ))
-       (define D-addr (make-var-contour `(D . ,l) δ))
-       (do (σ) ([σ* #:join σ A-addr (force σ v0)]
-                [σ* #:join σ* D-addr (force σ* v1)])
-         (yield (consv A-addr D-addr))))
+       (define/write (make-consv σ l δ v0 v1)
+         (define A-addr (make-var-contour `(A . ,l) δ))
+         (define D-addr (make-var-contour `(D . ,l) δ))
+         (do (σ) ([σ*A #:join σ A-addr (force σ v0)]
+                  [σ*D #:join σ*A D-addr (force σ*A v1)])
+           (yield (consv A-addr D-addr))))
 
-     (define/write (set-car!v σ l δ p v)
-       (do (σ) ([σ* #:join σ (consv-car p) (force σ v)]) (yield (void))))
-     (define/write (set-cdr!v σ l δ p v)
-       (do (σ) ([σ* #:join σ (consv-cdr p) (force σ v)]) (yield (void))))
+       (define/write (set-car!v σ l δ p v)
+         (do (σ) ([σ*a! #:join σ (consv-car p) (force σ v)]) (yield (void))))
+       (define/write (set-cdr!v σ l δ p v)
+         (do (σ) ([σ*d! #:join σ (consv-cdr p) (force σ v)]) (yield (void))))
 
-     (define-simple-macro* (make-listv σ l δ vs)
-       (cond [(null? vs) (continue)]
-             [else
-              (define (laddr i)
-                (values (make-var-contour `(L ,i . ,l) δ)
-                        (make-var-contour `(L ,i D . ,l) δ)))
-              (define-values (fst-addr snd-addr) (laddr 0))
-              (define val (consv fst-addr snd-addr))
-              (do (σ) ([σ* #:join σ fst-addr (force σ (first vs))])
-                (do (σ*) loop ([last-addr snd-addr]
-                               [vs (rest vs)]
-                               [i 1])
-                    (cond
-                     [(null? vs)
-                      (do (σ*) ([σ* #:join σ* last-addr snull])
-                        (yield val))]
-                     [else
-                      (define-values (fst-addr snd-addr) (laddr i))
-                      (do (σ*) ([σ* #:join σ* fst-addr (force σ* (first vs))]
-                                [σ* #:join σ* last-addr (set (consv fst-addr snd-addr))])
-                        (loop σ* snd-addr (rest vs) (add1 i)))])))]))))
+       (define-simple-macro* (make-listv σ l δ vs)
+         (cond [(null? vs) (continue)]
+               [else
+                (define (laddr i)
+                  (values (make-var-contour `(L ,i . ,l) δ)
+                          (make-var-contour `(L ,i D . ,l) δ)))
+                (define-values (fst-addr snd-addr) (laddr 0))
+                (define val (consv fst-addr snd-addr))
+                (do (σ) ([σ*ml #:join σ fst-addr (force σ (first vs))])
+                  (do (σ*ml) loop ([last-addr snd-addr]
+                                 [vs (rest vs)]
+                                 [i 1])
+                      (cond
+                       [(null? vs)
+                        (do (σ*ml) ([σ*mll #:join σ*ml last-addr snull])
+                          (yield val))]
+                       [else
+                        (define-values (fst-addr snd-addr) (laddr i))
+                        (do (σ*ml) ([σ*mlf #:join σ*ml fst-addr (force σ*ml (first vs))]
+                                    [σ*mln #:join σ*mlf last-addr (set (consv fst-addr snd-addr))])
+                          (loop σ*mln snd-addr (rest vs) (add1 i)))])))])))))
 
 (define-for-syntax prim-table
   #'(;; Numbers
@@ -341,9 +340,9 @@
      [+    #f #f +v    (#:rest z -> z)]
      [-    #f #f -v    (#:rest z -> z)]
      [*    #f #f *v    (#:rest z -> z)]
-     [=    #f #f =v    (#:rest z -> b)]
+     [=    #t #f =v    (#:rest z -> b)]
      [number? #f #f numberv? (any -> b)]
-     [zero?   #f #f zero?v (z -> b)]
+     [zero?   #t #f zero?v (z -> b)]
      ;; Comparisons
      [equal? #t #f equalv? (any any -> b)]
      [eqv? #t #f equalv? (any any -> b)]
