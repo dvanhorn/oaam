@@ -16,8 +16,8 @@
                           (~or (~and #:with-first-cons
                                      (~bind [expander
                                              #`(syntax-rules ()
-                                                 [(_ σ #,@(cdr (syntax->list #'(fields ...))))
-                                                  (cons σ (container subfields ...))])]))
+                                                 [(_ fσ #,@(cdr (syntax->list #'(fields ...))))
+                                                  (cons fσ (container subfields ...))])]))
                                expander:expr)) ;; want a different match expander?
                     #:defaults ([expander
                                  #'(syntax-rules ()

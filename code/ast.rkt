@@ -9,13 +9,14 @@
 ;; (if Lab Exp Exp Exp)
 ;; (primr Lab Sym)
 ;; (datum Lab Atom)
-(struct exp (lab)            #:transparent)
-(struct var exp (name)       #:transparent)
-(struct lrc exp (xs es e)    #:transparent)
-(struct lam exp (var exp)    #:transparent)
-(struct app exp (rator rand) #:transparent)
-(struct ife exp (t c a)      #:transparent)
-(struct st! exp (x e)        #:transparent)
+(struct exp (lab)             #:transparent)
+(struct var exp (name)        #:transparent)
+(struct lrc exp (xs es e)     #:transparent)
+(struct lam exp (xs exp)      #:transparent)
+(struct rlm exp (xs rest exp) #:transparent)
+(struct app exp (rator rand)  #:transparent)
+(struct ife exp (t c a)       #:transparent)
+(struct st! exp (x e)         #:transparent)
 
 (struct primr exp (which)    #:transparent)
 
@@ -33,6 +34,7 @@
                   ([e (in-list es)])
          (loop* e bound*))]
       [(lam _ vars body) (loop* body (∪/l bound vars))]
+      [(rlm _ vars rest body) (loop* body (∪1 (∪/l bound vars) rest))]
       [(app _ rator rands) (for/union #:initial (loop rator)
                                       ([rand (in-list rands)])
                              (loop rand))]
