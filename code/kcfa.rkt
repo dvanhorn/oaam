@@ -325,6 +325,7 @@
                [(ans: ans-σ v) (generator (do (ans-σ) () (yield (ans ans-σ v))))]
                [_ (error 'step "Bad state ~a" state)]))
 
+#;
            (trace step)
 
            )))))]))

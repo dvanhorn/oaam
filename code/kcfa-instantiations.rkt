@@ -20,6 +20,8 @@
 
 (define-for-syntax do-body-transform-σ/cs
   (syntax-rules () [(_ e) (let-values ([(σ* cs) e])
+                            #;
+                            (log-debug "Transformed ~a ~a" cs target-cs)
                             (values σ* (∪ target-cs cs)))]))
 (define-for-syntax do-body-transform-cs
   (syntax-rules () [(_ e) (let ([cs e]) (∪ target-cs cs))]))

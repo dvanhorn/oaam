@@ -162,7 +162,7 @@
      (and rest
           #`(for/list ([v (in-list (drop vs #,(length ts)))])
               #,(type-match rest #'σderp #'v))))
-   (λ (prim)
+   (λ (prim mult-ary?)
       (with-syntax ([prim prim])
         #`(λ (#,@(if no-σ? #'() #'(σderp)) vs)
              (cond [#,(if rest
@@ -171,12 +171,18 @@
                     (define argsets #,(if rest
                                           #`(list* #,@mk-vs #,mk-rest)
                                           #`(list #,@mk-vs)))
-                    (for ([a (in-list argsets)]
-                          [i (in-naturals)]
-                          #:when (null? a))
-                      (log-info "Bad input to primitive: ~a (arg ~a)" 'prim i))
+                    #,@(listy (and (not mult-ary?)
+                                   #'(for ([a (in-list argsets)]
+                                           [i (in-naturals)]
+                                           #:when (null? a))
+                                       (log-info "Bad input to primitive: ~a (arg ~a)" 'prim i))))
                     (toSetOfLists argsets)]
-                   [else ∅])))))
+                   [else
+                    #,@(listy
+                        (and (not mult-ary?)
+                             #`(log-info "Primitive application arity mismatch (Expect: ~a, given ~a): ~a"
+                                         #,(length ts) (length vs) 'prim)))
+                    ∅])))))
 
  ;; Creates a transformer that expects pσ vs (so it can use yield-both or force if it needs to)
  ;; vs will have already been forced if necessary. Any types will have to be forced for non-abstract applications.
@@ -244,9 +250,12 @@
    (pattern ((~var fs (flat no-σ?)) ...)
             #:do [(define σs (if no-σ? #'() #'(σherderp)))]
             #:attr checker-fn
-            #`(λ (#,@σs vs)
-                 (or #,@(for/list ([f (in-list (attribute fs.checker-fn))])
-                          #`(#,f #,@σs vs))))
+            (λ (prim _)
+               #`(λ (#,@σs vs)
+                    (or #,@(for/list ([f (in-list (attribute fs.checker-fn))])
+                             #`(let ([arg (#,(f prim #t) #,@σs vs)])
+                                 (and (not (∅? arg)) arg)))
+                        ∅)))
             #:attr mk-simple
             (λ (widen?) (error 'mk-primitive-meaning "Simple primitives cannot have many arities."))))
 
@@ -263,9 +272,9 @@
             #:fail-when (and (attribute implementation) (attribute widen?))
             "Cannot specify that a simple implementation widens when giving an explicit implementation."
             #:attr checker-fn (or (let ([c (attribute t.checker-fn)])
-                                    (and c (c #'prim)))
+                                    (and c (c #'prim #f)))
                                   ;; must be a predicate
-                                  ((mk-checker no-σ? '(any) #f) #'prim))
+                                  ((mk-checker no-σ? '(any) #f) #'prim #f))
             #:attr meaning (or (attribute implementation)
                                (and (attribute p)
                                     (syntax-parser
@@ -305,6 +314,8 @@
                            [m (in-list (map ap (attribute p.meaning)))]
                            [checker (in-list (attribute p.checker-fn))])
                   #`[(#,p)
+                     #;
+                     (log-debug "Applying primitive ~a" '#,p)
                      ;; Checkers will force what they need to and keep the rest
                      ;; lazy. Forced values are exploded into possible
                      ;; argument combinations
@@ -313,8 +324,7 @@
                                    v-addrs)])
                        #,(cond [w? (m #'(pσ l δ vs))]
                                [r? (m #'(pσ vs))]
-                               [else (m #'(vs))])
-                         (continue))])))))]))
+                               [else (m #'(vs))]))])))))]))
 
 (define-simple-macro* (define/read (name:id rσ:id v:id ...) body ...+)
   ;; XXX: not capture-avoiding, so we have to be careful in our definitions
@@ -499,7 +509,7 @@
          (define A-addr (make-var-contour `(A . ,l) δ))
          (define D-addr (make-var-contour `(D . ,l) δ))
          (do (cσ) ([σ*A #:join cσ A-addr (force cσ v0)]
-                  [σ*D #:join σ*A D-addr (force σ*A v1)])
+                   [σ*D #:join σ*A D-addr (force σ*A v1)])
            (yield (consv A-addr D-addr))))
 
        (define/write (set-car!v aσ l δ p v)
