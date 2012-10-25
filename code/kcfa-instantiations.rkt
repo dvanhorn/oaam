@@ -399,7 +399,7 @@
     [(? symbol?) 'symbol]
     [(? char?) 'char]
     [(? boolean?) b]
-    [(or 'number 'string 'symbol) b]
+    [(or 'number 'string 'symbol 'char) b]
     [else (error "Unknown base value" b)]))
 
 (define-syntax-rule (lazy-delay ldσ a) (set (addr a)))
@@ -507,7 +507,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Potpourris of evaluators
-#|
+
 ;; Compiled wide concrete store-passing set monad
  (with-lazy
  (with-∞-ctx
@@ -608,7 +608,7 @@
                    #:wide #:σ-∆s #:set-monad
                    #:compiled))))))
 (provide lazy-0cfa∆/c)
-|#
+
 
 (mk-generator/wide/σ-∆s-fixpoint lazy-0cfa-σ-∆s-gen^-fix/c gen-ans^-σ-∆s/c?)
 (with-lazy

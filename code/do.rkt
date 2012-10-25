@@ -1,5 +1,5 @@
 #lang racket
-(require (for-syntax syntax/parse racket/match racket/syntax racket/trace)
+(require (for-syntax syntax/parse racket/syntax)
          racket/stxparam "notation.rkt"
          racket/generator)
 (provide continue (for-syntax mk-do listy))

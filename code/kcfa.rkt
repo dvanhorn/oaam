@@ -5,7 +5,7 @@
          (rename-in racket/generator
                     [yield real-yield]
                     [generator real-generator])
-         (for-syntax syntax/parse racket/syntax)
+         (for-syntax syntax/parse racket/syntax racket/base)
          racket/stxparam racket/splicing
          racket/trace)
 (provide yield-meaning mk-analysis)
@@ -26,8 +26,8 @@
          (~once (~seq #:aval aval:id)) ;; name the evaluator to use/provide
          (~optional (~seq #:prepare prep-fn:expr) ;; any preprocessing?
                     #:defaults ([prep-fn #'(λ (e)
-                                              (define-values (e r) (parse-prog e gensym gensym))
-                                              (add-lib e r gensym gensym))]))
+                                              (define-values (e* r) (parse-prog e gensym gensym))
+                                              (add-lib e* r gensym gensym))]))
          (~once (~seq #:ans ans:id)) ;; name the answer struct to use/provide
          (~optional (~seq #:touches touches:id)) ;; Touch relation specialized for clos
          ;; Analysis strategies flags (requires the right parameters too)
@@ -127,7 +127,8 @@
                   (do (ev-σ) ([(σ*-st! a) #:push ev-σ l δ k])
                     (yield (ev σ*-st! c ρ (sk! (lookup-env ρ x) a) δ))))]
              [(primr l which) (define p (primop which))
-              (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k p))))])))
+              (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k p))))]
+             [_ (error 'eval "Bad expr ~a" e)])))
 
        (define compile-def
          (cond [(attribute compiled?)
@@ -166,7 +167,7 @@
            (mk-op-struct ls (l n es vs ρ k δ) (l n es vs ρ-op ... k δ-op ...))
            (mk-op-struct clos (x e ρ free) (x e ρ-op ... free) #:expander-id clos:)
            (mk-op-struct rlos (x r e ρ free) (x r e ρ-op ... free) #:expander-id rlos:)
-           
+
            #,@(if (given touches)
                   #`((mk-touches touches clos: rlos: #,(zero? (attribute K))))
                   #'())
@@ -234,11 +235,12 @@
              (generator
               (do (σ₀) () (yield (ev σ₀ (compile e) (hash) (mt) '())))))
 
-           (define (aval e #:prepare [prepare prep-fn]) (fixpoint step (inj (prepare e))))
+           (define (aval e #:prepare [prepare prep-fn])
+             (fixpoint step (inj (prepare e))))
 
            #,@compile-def
-#;
-           (mk-prims #,(given global-σ?) prim-meaning clos?)
+
+           (mk-prims #,(given global-σ?) prim-meaning clos? rlos?)
            ;; [Rel State State]
            (define (step state)
              (match state
@@ -255,7 +257,7 @@
                    (define args (reverse (cons v-addr v-addrs)))
                    (generator
                     (do (co-σ) ([σ*-ls #:join co-σ v-addr (force co-σ v)]
-                             [k (getter σ*-ls a)])
+                                [k (getter σ*-ls a)])
                       (yield (ap σ*-ls l (first args) (rest args) k δ))))]
 
                   [(ls: l n (list-rest e es) v-addrs ρ a δ)
@@ -282,7 +284,8 @@
                    (generator
                     (do (co-σ) ([σ*-sk! #:join co-σ l (force co-σ v)]
                              [k* (getter σ*-sk! a)])
-                      (yield (co σ*-sk! k* (void)))))])]
+                      (yield (co σ*-sk! k* (void)))))]
+                  [_ (error 'step "Bad continuation ~a" k)])]
 
                ;; v is not a value here. It is an address.
                [(ap: ap-σ l fn-addr arg-addrs k δ)
@@ -298,7 +301,6 @@
                             [else
                              ;;(printf "Arity error on ~a~%" f)
                              (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-#;
                      [(rlos: xs r e ρ _)
                       (cond [(<= (length xs) (length arg-addrs))
                              (do (ap-σ)
@@ -308,11 +310,10 @@
                             [else
                              ;;(printf "Arity error on ~a~%" f)
                              (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-#;
                      [(primop o)
                       (with-prim-yield k (prim-meaning o ap-σ l δ arg-addrs))]
                      [_
-                      ;;(printf "Stuck (non-function) ~a~%" f)
+                      (log-info "Called non-function ~a~%" f)
                       (yield (ap ap-σ l fn-addr arg-addrs k δ))])))]
 
                ;; this code is dead when running compiled code.
@@ -322,6 +323,8 @@
                       eval)]
 
                [(ans: ans-σ v) (generator (do (ans-σ) () (yield (ans ans-σ v))))]
-               [_ (error 'step "What? ~a" state)]))
-           #;
-           (trace step))))))]))
+               [_ (error 'step "Bad state ~a" state)]))
+
+           (trace step)
+
+           )))))]))

@@ -191,43 +191,45 @@
      (map2 f a (car args)))
      (else
      (map* f (cons a args)))))))
-     #;
-     (define for-each
-     (lambda (f a . args)
-     (letrec ((map (lambda (f l)
-     (if (null? l)
-     '()
-     (cons (f (car l))
-     (map f (cdr l)))))))
-     (letrec ((for-each1 (lambda (f l)
-     (if (null? l)
-     (void)
-     (begin
-     (f (car l))
-     (for-each1 f (cdr l))))))
-     (for-each2 (lambda (f l1 l2)
-     (cond ((null? l1)
-     (void))
-     ((null? l2)
-     (error 'for-each "lists differ in length"))
-     (else
-     (f (car l1) (car l2))
-     (for-each2 f (cdr l1) (cdr l2))))))
-     (for-each* (lambda (f l*)
-     (if (null? (car l*))
-     (void)
-     (begin
-     (let ((l (map car l*)))
-     (if (null? l)
-     (f)
-     ((,special internal-apply) f l)))
-     (for-each* f (map cdr l*)))))))
-     (cond ((null? args)
-     (for-each1 f a))
-     ((null? (cdr args))
-     (for-each2 f a (car args)))
-     (else
-     (for-each* f (cons a args))))))))
+
+     (for-each .
+       (lambda (f a . args)
+         (letrec ((map (lambda (f l)
+                         (if (null? l)
+                             '()
+                             (cons (f (car l))
+                                   (map f (cdr l)))))))
+           (letrec ((for-each1 (lambda (f l)
+                                 (if (null? l)
+                                     (void)
+                                     (begin
+                                       (f (car l))
+                                       (for-each1 f (cdr l))))))
+                    (for-each2 (lambda (f l1 l2)
+                                 (cond ((null? l1)
+                                        (void))
+                                       ((null? l2)
+                                        (error 'for-each "lists differ in length"))
+                                       (else
+                                        (f (car l1) (car l2))
+                                        (for-each2 f (cdr l1) (cdr l2))))))
+                    (for-each* (lambda (f l*)
+                                 (error "Well crap")
+                                 #;
+                                 (if (null? (car l*))
+                                     (void)
+                                     (begin
+                                       (let ((l (map car l*)))
+                                         (if (null? l)
+                                             (f)
+                                             ((,special internal-apply) f l)))
+                                       (for-each* f (map cdr l*)))))))
+             (cond ((null? args)
+                    (for-each1 f a))
+                   ((null? (cdr args))
+                    (for-each2 f a (car args)))
+                   (else
+                    (for-each* f (cons a args))))))))
      #;
      (call-with-current-continuation .
      (lambda (f)

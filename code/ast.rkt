@@ -20,7 +20,13 @@
 
 (struct primr exp (which)    #:transparent)
 
+;; Unmerged data.
 (struct datum exp (val) #:transparent)
+;; Merged versions of data.
+(struct list^ exp (val) #:transparent)
+(struct improper^ exp (val last) #:transparent)
+(struct vector^ exp (val) #:transparent)
+(struct hash^ exp (val) #:transparent)
 
 (define (free e)
   (let loop* ([e e]

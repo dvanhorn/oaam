@@ -20,8 +20,11 @@
 (struct consv (car cdr) #:prefab)
 (struct vectorv^ (length cell) #:prefab)
 (struct vectorv (length cells) #:prefab)
-(struct input-port^ (name) #:prefab)
-(struct output-port^ (name) #:prefab)
+(struct input-port^ (status) #:prefab)
+(struct output-port^ (status) #:prefab)
+;; immutable vectors and immutable hashes are themselves if given as literals.
+;; Otherwise they are not yet supported.
+;; Idea:
 ;; Hashes represented as sorta-alists (have a history)
 (struct hashv (kind) #:prefab)
 (struct hash-with hashv (parent key value) #:prefab)
@@ -36,7 +39,11 @@
       (void? x)
       (string? x)
       (symbol? x)
-      (null? x)))
+      (null? x)
+      (eof-object? x)
+      ;; FIXME: Hashes and vectors only allowed to be referenced, never extended.
+      (and (immutable? x)
+           (or (hash? x) (vector? x)))))
 
 (define-simple-macro* (mk-touches touches:id clos:id rlos:id 0cfa?:boolean)
   (define (touches v)
