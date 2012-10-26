@@ -19,14 +19,18 @@
 (struct st! exp (x e)         #:transparent)
 
 (struct primr exp (which)    #:transparent)
+;; (dst Lab Sym List[Pair[Sym Boolean]] Exp)
+;; Define struct form that should die after we go to real Racket.
+(struct dst exp (name fields e) #:transparent)
+
 
 ;; Unmerged data.
 (struct datum exp (val) #:transparent)
-;; Merged versions of data.
-(struct list^ exp (val) #:transparent)
-(struct improper^ exp (val last) #:transparent)
-(struct vector^ exp (val) #:transparent)
-(struct hash^ exp (val) #:transparent)
+;; Merged versions of data that must be evaluated specially.
+(struct qlist^ exp (val) #:transparent)
+(struct qimproper^ exp (val last) #:transparent)
+(struct qvector^ exp (val) #:transparent)
+(struct qhash^ exp (val) #:transparent)
 
 (define (free e)
   (let loop* ([e e]

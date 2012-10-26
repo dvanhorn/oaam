@@ -1,17 +1,15 @@
 #lang racket
 
 (require (for-syntax racket/syntax) "data.rkt")
-(provide (all-defined-out))
+(provide macro-env define-ctx-tf
+         igensym
+         void$
+         special kwote define-ctx)
 
-;; cruddy "explicit renaming"
-(define-syntax (define-nonce stx)
-  (syntax-case stx () [(_ name) (identifier? #'name)
-                       (with-syntax ([-name (format-id #'name "-~a" #'name)])
-                         #'(begin (struct -name ())
-                                  (define name (-name))))]))
 (define-nonce special)
 (define-nonce define-ctx)
 (define-nonce kwote)
+;; Directives to make special abstract data from "large" literals.
 (define-nonce qlist^)
 (define-nonce qimproper^)
 (define-nonce qvector^)

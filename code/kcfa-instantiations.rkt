@@ -396,12 +396,12 @@
 
 (define (widen^ b)
   (match b
-    [(? number?) 'number]
-    [(? string?) 'string]
-    [(? symbol?) 'symbol]
-    [(? char?) 'char]
+    [(? number?) number^]
+    [(? string?) string^]
+    [(? symbol?) symbol^]
+    [(? char?) char^]
     [(? boolean?) b]
-    [(or 'number 'string 'symbol 'char) b]
+    [(or (== number^) (== string^) (== symbol^) (== char^)) b]
     [else (error "Unknown base value" b)]))
 
 (define-syntax-rule (lazy-delay ldσ a) (set (addr a)))
@@ -636,7 +636,7 @@
                    #:compiled #:global-σ #:wide #:generators))))))
 (provide lazy-0cfa-gen^/c)
 
-(mk-prealloc^-fixpoint prealloc/imperative-fixpoint prealloc-ans? prealloc-ans-v prealloc-touches-0)
+(mk-prealloc^-fixpoint prealloc/imperative-fixpoint/c prealloc-ans/c? prealloc-ans/c-v prealloc-touches-0/c)
 (with-lazy
  (with-0-ctx/prealloc
   (with-prealloc-store
@@ -644,8 +644,22 @@
     (with-abstract
       (mk-analysis #:aval lazy-0cfa^/c!
                    #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
+                   #:ans prealloc-ans/c
+                   #:touches prealloc-touches-0/c
+                   #:fixpoint prealloc/imperative-fixpoint/c
+                   #:global-σ #:compiled #:wide))))))
+(provide lazy-0cfa^/c!)
+
+(mk-prealloc^-fixpoint prealloc/imperative-fixpoint prealloc-ans? prealloc-ans-v prealloc-touches-0)
+(with-lazy
+ (with-0-ctx/prealloc
+  (with-prealloc-store
+   (with-mutable-worklist
+    (with-abstract
+      (mk-analysis #:aval lazy-0cfa^!
+                   #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
                    #:ans prealloc-ans
                    #:touches prealloc-touches-0
                    #:fixpoint prealloc/imperative-fixpoint
-                   #:global-σ #:compiled #:wide))))))
-(provide lazy-0cfa^/c!)
+                   #:global-σ #:wide))))))
+(provide lazy-0cfa^!)
