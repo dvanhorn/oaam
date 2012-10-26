@@ -103,6 +103,7 @@
          [(y) #'(or (symbol? v) (eq? v symbol^))]
          [(c) #'(or (char? v) (eq? v char^))]
          [(v) #'(or (vectorv? v)
+                    (vectorv-immutable? v)
                     ;; real immutable vector
                     (and (immutable? v) (vector? v))
                     (vectorv^? v)
@@ -476,13 +477,13 @@
              [(_ (or (== cons^) (? consv?))) (yield #f)] ;; first not a cons
              [((or (== vector^) (== vector-immutable^)
                    (? vector?) ;; Racket's immutable vectors
-                   (? vectorv-immutable^?) (? vectorv?)) _)
-              (both-if (or (vectorv? v1) (eq? v vector^)
-                           (eq? v vector-immutable^)
-                           (vector? v)
-                           (vectorv-immutable^? v)))] ;; FIXME: not right for concrete
+                   (? vectorv-immutable^?) (? vectorv?) (? vectorv-immutable?)) _)
+              (both-if (or (vectorv? v1) (vectorv-immutable? v1) (eq? v1 vector^)
+                           (eq? v1 vector-immutable^)
+                           (vector? v1)
+                           (vectorv-immutable^? v1)))] ;; FIXME: not right for concrete
              [(_ (or (== vector^) (== vector-immutable^)
-                     (? vectorv-immutable^?) (? vectorv?)
+                     (? vectorv-immutable^?) (? vectorv?) (? vectorv-immutable?)
                      (? vector?)))
               (yield #f)] ;; first not a vector
              [((? primop?) _) (yield (equal? v0 v1))]
@@ -575,24 +576,27 @@
             (log-info "vectorv-set! used on immutable vector")
             (continue)]))
 
-       (define-simple-macro* (prim-vectorv vσ l δ vs)
-         (match (widen (length vs))
-           [(? number^?)
-            (define V-addr (make-var-contour `(V . ,l) δ))
-            (do (vσ) loop ([v vs])
-                (match v
-                  ['() (yield (vectorv^ number^ V-addr))]
-                  [(cons v vrest)
-                   (do (vσ) ([σ*-pv^ #:join vσ V-addr (force vσ v)])
-                     (loop σ*-pv^ vrest))]))]
-           [size
-            (do (vσ) loop ([v vs] [i 0] [addrs '()])
-                (match v
-                  ['() (yield (vectorv size (reverse addrs)))]
-                  [(cons v vrest)
-                   (define addr (make-var-contour `(V ,i . ,l) δ))
-                   (do (vσ) ([σ*-pv #:join vσ addr (force vσ v)])
-                     (loop σ*-pv vrest (add1 i) (cons addr addrs)))]))]))
+       (define-simple-macro* (mk-vector-constructor name abs conc)
+         (define-simple-macro* (name vσ l δ vs)
+           (match (widen (length vs))
+             [(? number^?)
+              (define V-addr (make-var-contour `(V . ,l) δ))
+              (do (vσ) loop ([v vs])
+                  (match v
+                    ['() (yield (abs number^ V-addr))]
+                    [(cons v vrest)
+                     (do (vσ) ([σ*-pv^ #:join vσ V-addr (force vσ v)])
+                       (loop σ*-pv^ vrest))]))]
+             [size
+              (do (vσ) loop ([v vs] [i 0] [addrs '()])
+                  (match v
+                    ['() (yield (conc size (reverse addrs)))]
+                    [(cons v vrest)
+                     (define addr (make-var-contour `(V ,i . ,l) δ))
+                     (do (vσ) ([σ*-pv #:join vσ addr (force vσ v)])
+                       (loop σ*-pv vrest (add1 i) (cons addr addrs)))]))])))
+       (mk-vector-constructor prim-vectorv vectorv^ vectorv)
+       (mk-vector-constructor prim-vectorv-immutable vectorv-immutable^ vectorv-immutable)
 
        (define/write (make-vectorv vσ l δ size [default 0])
          (match (widen size)
@@ -605,13 +609,46 @@
               (do (vσ) ([σ*-mv #:join* vσ V-addrs (make-list size (force vσ default))])
                 (yield (vectorv size V-addrs)))]))
 
-       (define/write (make-consv cσ l δ v0 v1)
-         (define A-addr (make-var-contour `(A . ,l) δ))
-         (define D-addr (make-var-contour `(D . ,l) δ))
-         (do (cσ) ([σ*A #:join cσ A-addr (force cσ v0)]
-                   [σ*D #:join σ*A D-addr (force σ*A v1)])
-           (yield (consv A-addr D-addr))))
+       (define-simple-macro* (make-vector^ vσ l δ vs)
+         (let ([V-addr (make-var-contour `(V . ,l) δ)])
+           (do (vσ) loop ([v vs]) 
+               (match v
+                 ['() (yield (vectorv-immutable^ integer^ V-addr))]
+                 [(cons v vrest)
+                  (do (vσ) ([jσ #:join vσ V-addr (force vσ v)])
+                    (loop jσ vrest))]))))
 
+       (define/write (make-consv cσ l δ v0 v1)
+         (let ([A-addr (make-var-contour `(A . ,l) δ)]
+               [D-addr (make-var-contour `(D . ,l) δ)])
+           (do (cσ) ([σ*A #:join cσ A-addr (force cσ v0)]
+                     [σ*D #:join σ*A D-addr (force σ*A v1)])
+             (yield (consv A-addr D-addr)))))
+
+       (define-simple-macro* (make-list^ cσ l δ vs)
+         (let ([A-addr (make-var-contour `(A . ,l) δ)]
+               [D-addr (make-var-contour `(D . ,l) δ)])
+           (define val (consv A-addr D-addr))
+           (do (cσ) ([nilσ #:join cσ D-addr (∪1 snull val)])
+             (do (nilσ) loop ([v vs])
+                 (match v
+                   ['() (yield val)]
+                   [(cons v vrest)
+                    (do (nilσ) ([jσ #:join nilσ A-addr (force nilσ v)])
+                      (loop jσ vrest))])))))
+
+       (define-simple-macro* (make-improper^ cσ l δ vs)
+         (let ([A-addr (make-var-contour `(A . ,l) δ)]
+               [D-addr (make-var-contour `(D . ,l) δ)])
+           (define val (consv A-addr D-addr))
+           (do (cσ) ([lastσ #:join cσ D-addr (∪1 (force cσ (car vs)) val)])
+             (do (lastσ) loop ([v (cdr vs)])
+                 (match v
+                   ['() (yield val)]
+                   [(cons v vrest)
+                    (do (lastσ) ([jσ #:join lastσ A-addr (force lastσ v)])
+                      (loop jσ vrest))])))))
+       
        (define/write (set-car!v a!σ l δ p v)
          (match p
            [(consv A _)
@@ -788,6 +825,8 @@
      [eq? #t #f equalv? (any any -> b)]
      ;; Vectors
      [vector #f #t prim-vectorv (#:rest any -> v)]
+     [vector-immutable #f #t prim-vectorv-immutable (#:rest any -> v)]
+     [qvector^ #f #t make-vector^ (#:rest any -> v)]
      [make-vector #f #t make-vectorv ((z -> v)
                                       (z any -> v))]
      [vector-ref #t #f vectorv-ref (v z -> any)]
@@ -844,6 +883,8 @@
      [boolean? #:predicate b]
      ;; Pairs/lists
      [cons #f #t make-consv (any any -> p)]
+     [qlist^ #f #t make-list^ (#:rest any -> lst)]
+     [qimproper^ #f #t make-improper^ (any #:rest any -> lst)]
      [pair? #:predicate p]
      [null? #:predicate null]
      [set-car! #f #t set-car!v (p any -> !)]

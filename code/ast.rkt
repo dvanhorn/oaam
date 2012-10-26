@@ -27,10 +27,10 @@
 ;; Unmerged data.
 (struct datum exp (val) #:transparent)
 ;; Merged versions of data that must be evaluated specially.
-(struct qlist^ exp (val) #:transparent)
-(struct qimproper^ exp (val last) #:transparent)
-(struct qvector^ exp (val) #:transparent)
-(struct qhash^ exp (val) #:transparent)
+(struct mk-list^ exp (vals) #:transparent)
+(struct mk-improper^ exp (vals last) #:transparent)
+(struct mk-vector^ exp (vals) #:transparent)
+(struct mk-hash^ exp (keys vals) #:transparent)
 
 (define (free e)
   (let loop* ([e e]

@@ -10,45 +10,51 @@
 (define-nonce define-ctx)
 (define-nonce kwote)
 ;; Directives to make special abstract data from "large" literals.
-(define-nonce qlist^)
-(define-nonce qimproper^)
-(define-nonce qvector^)
-(define-nonce qhash^)
 (define-syntax (mk-specials stx)
   (syntax-case stx ()
     [(_  names ...)
      (with-syntax ([(names$ ...) (map (λ (i) (format-id i "~a$" i)) (syntax->list #'(names ...)))])
        #'(begin (define names$ (cons special 'names)) ...))]))
-(mk-specials begin car cdr cons let letrec lambda if eq? or quote void not vector)
+(mk-specials begin car cdr cons let letrec lambda if eq? or quote void not vector
+             qlist^ qimproper^ qvector^ qhash^)
 
 (define (igensym [start 'g]) (string->symbol (symbol->string (gensym start))))
 
 (define ((rename-tf to) inp) (cons to inp))
 
-(define cons-limit 8)
-
 (define (quote-tf inp)
+  (define limit (cons-limit))
+  (define (improper-length l)
+    (cond [(pair? l) (add1 (improper-length (cdr l)))]
+          [else 0]))
+  (define (split-improper l)
+    (let loop ([l l] [front '()])
+      (cond [(pair? l) (loop (cdr l) (cons (car l) front))]
+            [else (values front l)])))
   (match inp
     [`(quote ,d)
      (let loop ([d d])
        (cond [(atomic? d) `(,kwote ,d)]
              [(list? d)
-              `(,cons$ ,(loop (car d)) ,(loop (cdr d)))
-              #;
-              (if (< (length d) cons-limit)
+              (if (< (length d) limit)
                   `(,cons$ ,(loop (car d)) ,(loop (cdr d)))
-                  `(,qlist^ . ,(map loop d)))]             
+                  `(,qlist^$ . ,(map loop d)))]             
              ;; List literals get exploded into conses
              [(pair? d)
-              `(,cons$ ,(loop (car d)) ,(loop (car d)))
-             #; 
-              (if (< (improper-length d) cons-limit)
-                  `(,cons$ ,(loop (car d)) ,(loop (cdr d)))
-                  `(,qimproper^ ???))
-              ]
-             ;; XXX: technically wrong, since vector make mutable vectors
+              (cond [(< (improper-length d) limit)
+                     `(,cons$ ,(loop (car d)) ,(loop (car d)))]
+                    [else (define-values (front last) (split-improper d))
+                          `(,qimproper^$ (loop last) . ,(map loop front))])]
              [(vector? d)
-              `(,vector$ . ,(map loop (vector->list d)))]
+              (cond [(< (vector-length d) limit) `(,kwote d)]
+                    [else `(,qvector^$ . ,(map loop (vector->list d)))])]
+             [(hash? d)
+              (cond [(< (hash-count d) limit) `(,kwote d)]
+                    ;; qhash^ k v k v k v ... ....
+                    [else `(,qhash^$ . 
+                                     ,(append-map
+                                       (match-lambda [(cons k v) (list (loop k) (loop v))])
+                                       (hash->list d)))])]
              [else (error 'parse "Unsupported datum ~a" d)]))]
     [_ (error 'quote-tf "Bad input ~a" inp)]))
 

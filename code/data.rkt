@@ -1,6 +1,6 @@
 #lang racket
 (require "ast.rkt" "notation.rkt" (for-syntax syntax/parse racket/syntax))
-(provide define-nonce mk-touches
+(provide define-nonce mk-touches cons-limit
          ;; abstract values
          number^ integer^ rational^
          number^?
@@ -13,6 +13,7 @@
          (struct-out primop)
          (struct-out consv)
          (struct-out vectorv)
+         (struct-out vectorv-immutable)
          (struct-out hashv)
          (struct-out hash-with)
          (struct-out hash-without)
@@ -84,6 +85,8 @@
 ;; An Unbounded-Compound is a
 ;; - (unbounded-compoundv Compound-Datatype-Descriptor Addr Addr)
 
+(define cons-limit (make-parameter 8))
+
 (struct vectorv^ (length addr) #:prefab)
 (struct vectorv-immutable^ (length addr) #:prefab)
 
@@ -123,6 +126,7 @@
 (struct primop (which) #:prefab)
 (struct consv (car cdr) #:prefab)
 (struct vectorv (length addrs) #:prefab)
+(struct vectorv-immutable (length addrs) #:prefab)
 (struct addr (a) #:prefab)
 ;; immutable vectors and immutable hashes are themselves if given as literals.
 ;; Otherwise they are not yet supported.
@@ -142,10 +146,7 @@
       (string? x)
       (symbol? x)
       (null? x)
-      (eof-object? x)
-      ;; FIXME: Hashes and vectors only allowed to be referenced, never extended.
-      (and (immutable? x)
-           (or (hash? x) (vector? x)))))
+      (eof-object? x)))
 
 (define-simple-macro* (mk-touches touches:id clos:id rlos:id 0cfa?:boolean)
   (define (touches v)

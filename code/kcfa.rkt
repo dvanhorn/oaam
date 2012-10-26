@@ -5,7 +5,8 @@
          (rename-in racket/generator
                     [yield real-yield]
                     [generator real-generator])
-         (for-syntax syntax/parse racket/syntax racket/base)
+         (for-syntax syntax/parse racket/syntax racket/base
+                     syntax/parse/experimental/template)
          racket/stxparam racket/splicing
          racket/trace)
 (provide yield-meaning mk-analysis)
@@ -24,10 +25,6 @@
          (~optional (~seq #:fixpoint fixpoint:expr)
                     #:defaults ([fixpoint #'fix]))
          (~once (~seq #:aval aval:id)) ;; name the evaluator to use/provide
-         (~optional (~seq #:prepare prep-fn:expr) ;; any preprocessing?
-                    #:defaults ([prep-fn #'(λ (e)
-                                              (define-values (e* r) (parse-prog e gensym gensym))
-                                              (add-lib e* r gensym gensym))]))
          (~once (~seq #:ans ans:id)) ;; name the answer struct to use/provide
          (~optional (~seq #:touches touches:id)) ;; Touch relation specialized for clos
          ;; Analysis strategies flags (requires the right parameters too)
@@ -40,6 +37,7 @@
                                (~bind [K (syntax-e #'k-nat-or-∞)]))
                          (~and #:1cfa (~bind [K 1])))
                     #:defaults ([K 0]))
+         (~optional (~seq #:prepare prep-fn:expr)) ;; any preprocessing?
          (~optional (~or (~and #:generators generators?)
                          (~and #:set-monad set-monad?)))) ...)
      #:do [(define-syntax-rule (given kw) (syntax? (attribute kw)))
@@ -151,7 +149,7 @@
                           (generator body ...)))
                    (define compile values)))]))
 
-       (quasisyntax/loc stx
+       (quasitemplate/loc stx
          (begin ;; specialize representation given that 0cfa needs less
            (mk-op-struct co (rσ k v) (σ-op ... k v) expander-flags ...)
            (mk-op-struct ans (rσ v) (σ-op ... v) expander-flags ...
@@ -228,14 +226,23 @@
                      (syntax-parse sx
                        [(_ v)
                         (yield-tr (syntax/loc sx (yield (co target-σ k v))))])))
-                #`(syntax-parameterize ([yield #,new]) body)]))
+                #`(syntax-parameterize ([yield #,#'#,new]) body)]))
 
            (define (inj e)
              (define σ₀ (hash))
              (generator
               (do (σ₀) () (yield (ev σ₀ (compile e) (hash) (mt) '())))))
 
-           (define (aval e #:prepare [prepare prep-fn])
+           (define (aval e #:prepare [prepare (?? prep-fn
+                                                  (λ (e)
+                                                     ;; Don't join literals when parsing for 
+                                                     ;; concrete evaluation.
+                                                     (parameterize ([cons-limit
+                                                                     #,(if (eq? (attribute K) +inf.0)
+                                                                           #'+inf.0
+                                                                           #'(cons-limit))])
+                                                       (define-values (e* r) (parse-prog e gensym gensym))
+                                                       (add-lib e* r gensym gensym))))])
              (fixpoint step (inj (prepare e))))
 
            #,@compile-def
