@@ -276,7 +276,7 @@
   (define prev (vector-ref global-σ a))
   (define added? (not (subset? vs prev)))
   (when added?
-    (vector-set! global-σ a (∪ vs prev))
+    (vector-set! global-σ a (⊓ vs prev))
     (set! unions (add1 unions))))
 
 (define (join*! as vss)
@@ -313,7 +313,7 @@
 ;; Mutable global store
 (define (join-h! a vs)
   (define prev (hash-ref global-σ a ∅))
-  (define added? (not (subset? vs prev)))
+  (define added? (not (⊑? vs prev)))
   (when added?
     (hash-set! global-σ a (∪ vs prev))
     (set! unions (add1 unions))))
@@ -396,12 +396,14 @@
 
 (define (widen^ b)
   (match b
+    [(? integer?) integer^]
+    [(? rational?) rational^]
     [(? number?) number^]
     [(? string?) string^]
     [(? symbol?) symbol^]
     [(? char?) char^]
     [(? boolean?) b]
-    [(or (== number^) (== string^) (== symbol^) (== char^)) b]
+    [(or (? number^?) (== string^) (== symbol^) (== char^)) b]
     [else (error "Unknown base value" b)]))
 
 (define-syntax-rule (lazy-delay ldσ a) (set (addr a)))

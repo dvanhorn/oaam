@@ -65,10 +65,16 @@
                 [rlos? rlos?])
     #'((define-syntax-rule (yield-delay ydσ v)
          (do (ydσ) ([v* (delay ydσ v)]) (yield v*)))
-       (define-simple-macro* (errorv vs) (continue))
+       (define-simple-macro* (errorv vs)
+         (begin (log-info "Error reachable ~a" vs)
+                ;; Really this should be continue, but graphs.sch uses
+                ;; with-input-from-file, which Suresh cheated on.
+                (yield (void))
+                #;
+                (continue)))
 
        (define/basic (quotientv z0 z1)
-         (cond [(or (eq? z0 number^) (eq? z1 number^))
+         (cond [(or (number^? z0) (number^? z1))
                 (yield number^)]
                [(zero? z1)
                 (log-info "Quotient undefined on 0")
@@ -76,7 +82,7 @@
                [else (yield (widen (quotient z0 z1)))]))
 
        (define/basic (modulov z0 z1)
-         (cond [(or (eq? z0 number^) (eq? z1 number^))
+         (cond [(or (number^? z0) (number^? z1))
                 (yield number^)]
                [(zero? z1)
                 (log-info "Modulo undefined on 0")
@@ -84,7 +90,7 @@
                [else (yield (widen (quotient z0 z1)))]))
 
        (define/basic (remainderv z0 z1)
-         (cond [(or (eq? z0 number^) (eq? z1 number^))
+         (cond [(or (number^? z0) (number^? z1))
                 (yield number^)]
                [(zero? z1)
                 (log-info "Remainder undefined on 0")
@@ -97,7 +103,7 @@
            [(or (vectorv len _) (vectorv^ len _)) (yield len)]))
 
        (define/basic (integer->charv z)
-         (cond [(eq? z number^) (yield char^)]
+         (cond [(number^? z) (yield char^)]
                [(integer? z) (yield (widen (integer->char z)))]
                [else
                 (log-info "integer->charv on non-integer")
@@ -151,10 +157,10 @@
               (yield #f)] ;; first not a vector
              [((? primop?) _) (yield (equal? v0 v1))]
              [(_ (? primop?)) (yield #f)] ;; first not a primop
-             [((? number?) _) (cond [(eq? number^ v1) (yield-both eσ)]
+             [((? number?) _) (cond [(number^? v1) (yield-both eσ)]
                                     [(number? v1) (yield (= v0 v1))]
                                     [else (yield #f)])]
-             [((? number^?) _) (both-if (or (eq? number^ v1) (number? v1)))]
+             [((? number^?) _) (both-if (or (number^? v1) (number? v1)))]
              [(_ (? number^?)) (yield #f)]
              [((? string?) _) (cond [(eq? string^ v1) (yield-both eσ)]
                                     [(string? v1) (yield (string=? v0 v1))]
@@ -186,7 +192,7 @@
        (define/read (vectorv-ref vrσ vec z)
          (match vec
            [(vectorv _ l)
-            (cond [(eq? number^ z)
+            (cond [(number^? z)
                    (error 'vectorv-ref "Abstract vectors should have a single cell")]
                   [(or (< z 0) (>= z (length l)))
                    (log-info "vectorv-ref out of bounds")
@@ -198,7 +204,7 @@
            [(or (== vector^) (== vector-immutable^))
             (yield ●)]
            [(and (? immutable?) (? vector?))
-            (cond [(eq? z number^)
+            (cond [(number^? z)
                    (yield (list->set (map widen (vector->list vec))))]
                   [(and (<= 0 z) (< z (vector-length vec)))
                    (yield (set (vector-ref vec z)))]
@@ -223,7 +229,7 @@
        (define/write (vectorv-set! !σ l δ vec i val)
          (match vec
            [(vectorv _ addrs)
-            (cond [(eq? number^ i)
+            (cond [(number^? i)
                    (error 'vectorv-set! "Abstract vectors should have a single cell")]
                   [(or (< z 0) (>= z (length addrs)))
                    (log-info "vectorv-set! out out bounds")
@@ -246,7 +252,7 @@
               (define V-addr (make-var-contour `(V . ,l) δ))
               (do (vσ) loop ([v vs])
                   (match v
-                    ['() (yield (abs number^ V-addr))]
+                    ['() (yield (abs integer^ V-addr))]
                     [(cons v vrest)
                      (do (vσ) ([σ*-pv^ #:join vσ V-addr (force vσ v)])
                        (loop σ*-pv^ vrest))]))]
@@ -439,10 +445,10 @@
      [-    #:simple (#:rest n -> n) #:widen]
      [*    #:simple (#:rest n -> n) #:widen]
      [=    #:simple (n #:rest n -> b)]
-     [<    #:simple (z #:rest z -> b)]
-     [>    #:simple (z #:rest z -> b)]
-     [<=    #:simple (z #:rest z -> b)]
-     [>=    #:simple (z #:rest z -> b)]
+     [<    #:simple (r #:rest r -> b)]
+     [>    #:simple (r #:rest r -> b)]
+     [<=    #:simple (r #:rest r -> b)]
+     [>=    #:simple (r #:rest r -> b)]
      [quotient #f #f quotientv (z z -> z)]
      [remainder #f #f remainderv (z z -> z)]
      [modulo #f #f modulov (z z -> z)]
@@ -481,7 +487,7 @@
      [number? #:predicate n]
      [integer? #:predicate z]
      [rational? #:predicate r]
-     [zero? #:simple (z -> b)]
+     [zero? #:simple (n -> b)]
      ;; Generic Comparisons
      [equal? #t #f equalv? (any any -> b)]
      [eqv? #t #f equalv? (any any -> b)]

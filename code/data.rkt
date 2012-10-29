@@ -19,7 +19,8 @@
          (struct-out hash-without)
          (struct-out mthash)
          (struct-out addr)
-         atomic?)
+         atomic?
+         ⊑? ⊓)
 
 (define-syntax (define-nonce stx)
   (syntax-case stx () [(_ name) (identifier? #'name)
@@ -63,6 +64,33 @@
 (struct output-port^ (status) #:prefab)
 ;; Olin's black hole
 (define-nonce ●)
+
+(define (⊑? v0 v1)
+  (cond [(equal? v0 v1) #t]
+        [(set? v0)
+         (for/and ([v (in-set v0)]) (⊑? v v1))]
+        [(set? v1)
+         (for/or ([v (in-set v1)]) (⊑? v0 v))]
+        [else
+         (match* (v0 v1)
+           [((== integer^) (or (== rational^) (== number^))) #t]
+           [((== rational^) (== number^)) #t]
+           [((? integer?) (? number^?)) #t]
+           [((? rational?) (or (== rational^) (== number^))) #t]
+           [((? number?) (== number^)) #t]
+           [((? consv?) (== cons^)) #t]
+           [((or (? vectorv?) (? vectorv^?)) (== vector^)) #t]
+           [((or (? vectorv-immutable?) (? vectorv-immutable^?))
+             (== vector-immutable^)) #t]
+           [((? char?) (== char^)) #t]
+           [((? symbol?) (== symbol^)) #t]
+           [((? string?) (== string^)) #t]
+           [(_ (== ●)) #t]
+           [(_ _) #f])]))
+(define (⊓ v0 v1)
+  (for/fold ([vs v0]) ([v (in-set v1)]
+                       #:unless (⊑? v vs))
+    (∪1 vs v)))
 
 ;; No support for inspectors, guards, auto fields, struct properties,
 ;; or make-struct-type.

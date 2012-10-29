@@ -58,6 +58,12 @@
              [else (error 'parse "Unsupported datum ~a" d)]))]
     [_ (error 'quote-tf "Bad input ~a" inp)]))
 
+(module+ test
+  (require rackunit)
+  (check equal? (quote-tf '(quote (0 1 2 3 4 5 6 7 8 9)))
+         `(,qlist^$ (,kwote 0) (,kwote 1) (,kwote 2) (,kwote 3) (,kwote 4) (,kwote 5)
+                    (,kwote 6) (,kwote 7) (,kwote 8) (,kwote 9))))
+
 (define (begin-tf inp)
   (match inp
     [`(begin ,e) e]

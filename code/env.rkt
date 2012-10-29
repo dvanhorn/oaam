@@ -8,18 +8,15 @@
   (for/fold ([ρ ρ]) ([x (in-list xs)] [v (in-list vs)])
     (hash-set ρ x v)))
 (define (join eσ a s)
-  (hash-set eσ a
-            (∪ s (hash-ref eσ a ∅))))
+  (hash-set eσ a (⊓ s (hash-ref eσ a ∅))))
 (define (join* eσ as ss)
   (for/fold ([eσ eσ]) ([a as] [s ss]) (join eσ a s)))
 
 ;; Store Store -> Store
 (define (join-store eσ1 eσ2)
   (for/fold ([eσ eσ1])
-    ([k×v (in-hash-pairs eσ2)])
-    (hash-set eσ (car k×v)
-              (∪ (cdr k×v)
-                         (hash-ref eσ (car k×v) ∅)))))
+      ([(k v) (in-hash eσ2)])
+    (join eσ k v)))
 
 (define (update ∆s eσ)
   (for/fold ([eσ eσ]) ([a×vs (in-list ∆s)])

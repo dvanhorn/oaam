@@ -102,10 +102,10 @@
          [(h) #'(hashv? v)]
          ;; singleton types
          [(!) #'(void? v)]
-         [(null) #'(eq? v '())]
+         [(null ()) #'(eq? v '())]
          [(eof) #'(eof-object? v)]
-         [(true) #'(eq? v #t)]
-         [(false) #'(eq? v #f)]
+         [(true #t) #'(eq? v #t)]
+         [(false #f) #'(eq? v #f)]
          [else (error 'type->pred-stx "Not a predicate-able type ~a" t)]))
      (match t
        [(type-union (list-no-order #t #f)) #'(boolean? v)]
@@ -137,6 +137,9 @@
             [(s) (λ (arg-stx) #`(eq? string^ #,arg-stx))]
             [(y) (λ (arg-stx) #`(eq? symbol^ #,arg-stx))]
             [(c) (λ (arg-stx) #`(eq? char^ #,arg-stx))]
+            [(p) (λ (arg-stx) #`(eq? cons^ #,arg-stx))]
+            [(v) (λ (arg-stx) #`(or (eq? vector^ #,arg-stx)
+                                    (eq? vector-immutable^ #,arg-stx)))]
             [else (λ (arg-stx) #'#f)])]))
 
  (define (abs-of t)
@@ -212,15 +215,11 @@
                                             #,(op-rest #'v)))))]
                   [wrap (if widen? #'widen #'values)]
                   [op primitive])
-     (define nullary? (and (not op-rest) (null? arglist)))
      ;; mk-simple
      (λ (stx)
         (syntax-parse stx
           [(pσ vs)
-           (cond
-            [nullary? #`(yield (wrap (op)))]
-            [else
-             (with-syntax ([(force-clauses ...)
+            (with-syntax ([(force-clauses ...)
                             (for/list ([t (in-list mtypes)]
                                        [arg (in-list arglist)]
                                        #:when (eq? t 'any))
@@ -231,7 +230,7 @@
                     (do (pσ) (force-clauses ...)
                       (cond [guard #,(return-out #'pσ)]
                             [else (yield (wrap (ap ... op args ... rest ...)))]))]
-                   [_ (error 'mk-simple "Internal error ~a" vs)])))])]))))
+                   [_ (error 'mk-simple "Internal error ~a" vs)])))]))))
 
  (define-syntax-class basic #:literals (∪)
    #:attributes (type is-abs? abs-out)
@@ -246,7 +245,7 @@
             #:attr abs-out (mk-abs-out (attribute type))))
 
  (define-syntax-class (flat no-σ?) #:literals (->)
-   #:attributes (checker-fn mk-simple)
+   #:attributes (checker-fn mk-simple (ts 1))
    (pattern (ts:basic ... (~optional (~seq #:rest r:basic)) -> t:basic)
             #:attr checker-fn (mk-checker no-σ? (attribute ts.type) (attribute r.type))
             #:attr mk-simple (mk-mk-simple (attribute ts.is-abs?)
@@ -268,7 +267,9 @@
                     (or #,@(for/list ([f (in-list (attribute fs.checker-fn))])
                              #`(let ([arg (#,(f prim #t) #,@σs vs)])
                                  (and (not (∅? arg)) arg)))
-                        ∅)))
+                        (begin (log-info "Primitive application arity mismatch (Expect: ~a, given ~a): ~a"
+                                         '#,(map length (attribute fs.ts)) (length vs) 'prim)
+                               ∅))))
             #:attr mk-simple
             (λ (widen?) (error 'mk-primitive-meaning "Simple primitives cannot have many arities."))))
 
