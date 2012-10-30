@@ -84,9 +84,9 @@
          [(z) #'(or (integer? v) (number^? v))]
          [(r) #'(or (rational? v) (number^? v))]
          [(fx) #'(or (fixnum? v) (number^? v))]
-         [(s) #'(or (string? v) (eq? v string^))]
-         [(y) #'(or (symbol? v) (eq? v symbol^))]
-         [(c) #'(or (char? v) (eq? v char^))]
+         [(s) #'(or (string? v) (string^? v))]
+         [(y) #'(or (symbol? v) (symbol^? v))]
+         [(c) #'(or (char? v) (char^? v))]
          [(v) #'(or (vectorv? v)
                     (vectorv-immutable? v)
                     ;; real immutable vector
@@ -94,18 +94,18 @@
                     (vectorv^? v)
                     (vectorv-immutable^? v)
                     ;; black hole vectors
-                    (eq? v vector^)
-                    (eq? v vector-immutable^))]
-         [(p) #'(or (consv? v) (eq? v cons^))]
-         [(ip) #'(or (input-port? v) (input-port^? v))]
-         [(op) #'(or (output-port? v) (output-port^? v))]
+                    (vector^? v)
+                    (vector-immutable^? v))]
+         [(p) #'(or (consv? v) (cons^? v))]
+         [(ip) #'(or (input-port? v) (input-port^? v) (eq? v ●))]
+         [(op) #'(or (output-port? v) (output-port^? v) (eq? v ●))]
          [(h) #'(hashv? v)]
          ;; singleton types
-         [(!) #'(void? v)]
-         [(null ()) #'(eq? v '())]
-         [(eof) #'(eof-object? v)]
-         [(true #t) #'(eq? v #t)]
-         [(false #f) #'(eq? v #f)]
+         [(!) #'(or (void? v) (eq? v ●))]
+         [(null ()) #'(or (eq? v '()) (eq? v ●))]
+         [(eof) #'(or (eof-object? v) (eq? v ●))]
+         [(true #t) #'(or (eq? v #t) (eq? v ●))]
+         [(false #f) #'(or (eq? v #f) (eq? v ●))]
          [else (error 'type->pred-stx "Not a predicate-able type ~a" t)]))
      (match t
        [(type-union (list-no-order #t #f)) #'(boolean? v)]

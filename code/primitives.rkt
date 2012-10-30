@@ -100,7 +100,10 @@
        (define/basic (procedure?v v) (yield (or (clos? v) (rlos? v))))
        (define/basic (vectorv-length v)
          (match v
-           [(or (vectorv len _) (vectorv^ len _)) (yield len)]))
+           [(or (vectorv len _) (vectorv^ len _)
+                (vectorv-immutable len _)) (yield len)]
+           [(or (? vector^?) (? vector-immutable^?)) (yield number^)]
+           [_ (vector-length v)]))
 
        (define/basic (integer->charv z)
          (cond [(number^? z) (yield char^)]
@@ -121,7 +124,7 @@
          (match v
            [(? hashv? h) (yield (immutable-hash? h))]
            [(or (? vectorv-immutable^?)
-                (== vector-immutable^)
+                (? vector-immutable^?)
                 (? immutable? (? vector?)))
             (yield #t)]
            [_ (yield #f)]))
@@ -146,13 +149,15 @@
              [(_ (or (== cons^) (? consv?))) (yield #f)] ;; first not a cons
              [((or (== vector^) (== vector-immutable^)
                    (? vector?) ;; Racket's immutable vectors
-                   (? vectorv-immutable^?) (? vectorv?) (? vectorv-immutable?)) _)
+                   (? vectorv-immutable^?) (? vectorv?)
+                   (? vectorv^?) (? vectorv-immutable?)) _)
               (both-if (or (vectorv? v1) (vectorv-immutable? v1) (eq? v1 vector^)
                            (eq? v1 vector-immutable^)
                            (vector? v1)
                            (vectorv-immutable^? v1)))] ;; FIXME: not right for concrete
              [(_ (or (== vector^) (== vector-immutable^)
-                     (? vectorv-immutable^?) (? vectorv?) (? vectorv-immutable?)
+                     (? vectorv-immutable^?) (? vectorv?)
+                     (? vectorv^?) (? vectorv-immutable?)
                      (? vector?)))
               (yield #f)] ;; first not a vector
              [((? primop?) _) (yield (equal? v0 v1))]
@@ -166,6 +171,10 @@
                                     [(string? v1) (yield (string=? v0 v1))]
                                     [else (yield #f)])]
              [((== string^) _) (both-if (or (eq? string^ v1) (string? v1)))]
+             [((? char?) _) (cond [(eq? char^ v1) (yield-both eσ)]
+                                  [(char? v1) (yield (char=? v0 v1))]
+                                  [else (yield #f)])]
+             [((== char^) _) (both-if (or (eq? char^ v1) (char? v1)))]
              [(_ (== string^)) (yield #f)]
              [((? symbol?) _) (cond [(eq? symbol^ v1) (yield-both eσ)]
                                     [(symbol? v1) (yield (eq? v0 v1))]
@@ -201,7 +210,7 @@
            [(or (vectorv^ _ abs-cell)
                 (vectorv-immutable^ _ abs-cell))
             (yield-delay vrσ abs-cell)]
-           [(or (== vector^) (== vector-immutable^))
+           [(or (? vector^?) (? vector-immutable^?))
             (yield ●)]
            [(and (? immutable?) (? vector?))
             (cond [(number^? z)
@@ -210,16 +219,17 @@
                    (yield (set (vector-ref vec z)))]
                   [else
                    (log-info "Immutable vector accessed out of bounds")
-                   (continue)])]))
+                   (continue)])]
+           [_ (error 'vectorv-ref "WHAT ~a" vec)]))
 
        (define/read (carv caσ p)
          (match p
            [(consv A _) (yield-delay caσ A)]
-           [(== cons^) (yield ●)]))
+           [(? cons^?) (yield ●)]))
        (define/read (cdrv cdσ p)
          (match p
            [(consv _ D) (yield-delay cdσ D)]
-           [(== cons^) (yield ●)]))
+           [(? cons^?) (yield ●)]))
 
        (define/read (core-hashv-ref hσ h k)
          (error 'durp))
@@ -240,7 +250,7 @@
             (do (!σ) ([σ*-vec^ #:join !σ abs-cell (force !σ val)])
               (yield (void)))]
            ;; FIXME: val should "escape"
-           [(== vector^) (yield (void))]
+           [(? vector^?) (yield (void))]
            [_ 
             (log-info "vectorv-set! used on immutable vector")
             (continue)]))
@@ -299,24 +309,26 @@
                [D-addr (make-var-contour `(D . ,l) δ)])
            (define val (consv A-addr D-addr))
            (do (cσ) ([nilσ #:join cσ D-addr (∪1 snull val)])
-             (do (nilσ) loop ([v vs])
+             (do (nilσ) loop ([v vs] [J ⊥])
                  (match v
-                   ['() (yield val)]
+                   ['()
+                    (do (nilσ) ([jσ #:join nilσ A-addr (singleton J)])
+                      (yield val))]
                    [(cons v vrest)
-                    (do (nilσ) ([jσ #:join nilσ A-addr (force nilσ v)])
-                      (loop jσ vrest))])))))
+                    (loop nilσ vrest (big⊓ (force nilσ v) J))])))))
 
        (define-simple-macro* (make-improper^ cσ l δ vs)
          (let ([A-addr (make-var-contour `(A . ,l) δ)]
                [D-addr (make-var-contour `(D . ,l) δ)])
            (define val (consv A-addr D-addr))
-           (do (cσ) ([lastσ #:join cσ D-addr (∪1 (force cσ (car vs)) val)])
-             (do (lastσ) loop ([v (cdr vs)])
+           (do (cσ) ([lastσ #:join cσ D-addr (⊓1 (force cσ (car vs)) val)])
+             (do (lastσ) loop ([v (cdr vs)] [J ⊥])
                  (match v
-                   ['() (yield val)]
+                   ['()
+                    (do (lastσ) ([jσ #:join lastσ A-addr (singleton J)])
+                      (yield val))]
                    [(cons v vrest)
-                    (do (lastσ) ([jσ #:join lastσ A-addr (force lastσ v)])
-                      (loop jσ vrest))])))))
+                    (loop lastσ vrest (big⊓ (force lastσ v) J))])))))
        
        (define/write (set-car!v a!σ l δ p v)
          (match p
@@ -324,21 +336,21 @@
             (do (aσ) ([σ*a! #:join a!σ A (force a!σ v)])
               (yield (void)))]
            ;; FIXME: v should escape.
-           [(== cons^) (yield (void))]))
+           [(? cons^?) (yield (void))]))
        (define/write (set-cdr!v d!σ l δ p v)
          (match p
            [(consv _ D)
             (do (aσ) ([σ*d! #:join d!σ D (force d!σ v)])
               (yield (void)))]
            ;; FIXME: v should escape.
-           [(== cons^) (yield (void))]))
+           [(? cons^?) (yield (void))]))
 
        (define/write (hashv-set hσ l δ h k v)
          (cond [(immutable-hash? h)
                 (define P-addr (make-var-contour `(P . ,l) δ))
                 (define K-addr (make-var-contour `(K . ,l) δ))
                 (define V-addr (make-var-contour `(V . ,l) δ))
-                (do (hσ) ([σ*P #:join hσ P-addr (set h)]
+                (do (hσ) ([σ*P #:join hσ P-addr (singleton h)]
                           [σ*K #:join σ*P K-addr (force σ*P k)]
                           [σ*V #:join σ*K V-addr (force σ*K v)])
                   (yield (hash-with (hashv-kind h) P-addr K-addr V-addr)))]
@@ -351,7 +363,7 @@
          (cond [(immutable-hash? h)
                 (define P-addr (make-var-contour `(P . ,l) δ))
                 (define K-addr (make-var-contour `(K . ,l) δ))
-                (do (hσ) ([σ*P #:join hσ P-addr (set h)]
+                (do (hσ) ([σ*P #:join hσ P-addr (singleton h)]
                           [σ*K #:join σ*P K-addr (force σ*P k)])
                   (yield (hash-without (hashv-kind h) P-addr K-addr)))]
                [(hash? h) (error 'hashv-remove "Fail gracefully from literal to abstract value ~a ~a ~a" h k v)]
@@ -367,9 +379,9 @@
        (define-simple-macro* (mk-port-open name port^ open-port)
          (define/write (name ioσ l δ s)
            (match (widen s)
-             [(== string^)
+             [(? string^?)
               (define status-addr (make-var-contour `(Port . ,l) δ))
-              (do (ioσ) ([openσ #:join ioσ status-addr (set 'open)])
+              (do (ioσ) ([openσ #:join ioσ status-addr (singleton open@)])
                 (yield (port^ status-addr)))]
              [s (yield (open-port s))])))
        (mk-port-open open-input-filev input-port^ open-input-file)
@@ -379,7 +391,7 @@
          (define/write (name ioσ l δ ip)
            (match ip
              [(port^ status)
-              (do (ioσ) ([closeσ #:join ioσ status (set 'closed)])
+              (do (ioσ) ([closeσ #:join ioσ status (singleton closed@)])
                 (yield (void)))]
              [ip (close-port ip)
                  (yield (void))])))

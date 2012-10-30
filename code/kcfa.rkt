@@ -99,7 +99,7 @@
               (define cb (compile b))
               (define x (first xs))
               (define xs* (rest xs))
-              (define ss (map (λ _ ∅) xs))
+              (define ss (map (λ _ nothing) xs))
               (λ% (ev-σ ρ k δ)
                   (define as (map (λ (x) (make-var-contour x δ)) xs))
                   (define/ρ ρ* (extend* ρ xs as))
@@ -165,6 +165,7 @@
            (mk-op-struct ls (l n es vs ρ k δ) (l n es vs ρ-op ... k δ-op ...))
            (mk-op-struct clos (x e ρ free) (x e ρ-op ... free) #:expander-id clos:)
            (mk-op-struct rlos (x r e ρ free) (x r e ρ-op ... free) #:expander-id rlos:)
+           (define (kont? v) (or (ls? v) (lrk? v) (ifk? v) (mt? v)))
 
            #,@(if (given touches)
                   #`((mk-touches touches clos: rlos: #,(zero? (attribute K))))
@@ -176,7 +177,9 @@
                     #,c-passing?
                     #,(given global-σ?)
                     #,(given generators?)))
-           (splicing-syntax-parameterize ([do (make-rename-transformer #'do-macro)])
+           (mk-flatten-value flatten-value-fn clos: rlos: kont?)
+           (splicing-syntax-parameterize ([do (make-rename-transformer #'do-macro)]
+                                          [flatten-value (make-rename-transformer #'flatten-value-fn)])
 
            ;; ev is special since it can mean "apply the compiled version" or
            ;; make an actual ev state to later interpret.

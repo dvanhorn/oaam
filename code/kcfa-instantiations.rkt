@@ -64,7 +64,7 @@
               [(rvs rAs)
                (if (null? vrest)
                    (values snull ∅)
-                   (values (∪1 snull (consv rA ra))
+                   (values (⊓1 snull (consv rA ra))
                            (for/union ([a (in-list vrest)])
                              (getter sσ a))))]
               #,@(if (zero? K) #'() #'([(νρ) (extend sρ r rA)])))
@@ -274,9 +274,10 @@
 
 (define (join! a vs)
   (define prev (vector-ref global-σ a))
-  (define added? (not (subset? vs prev)))
-  (when added?
-    (vector-set! global-σ a (⊓ vs prev))
+  (define upd (⊓ vs prev))
+  (define same? (= (set-count prev) (set-count upd)))
+  (unless same?
+    (vector-set! global-σ a upd)
     (set! unions (add1 unions))))
 
 (define (join*! as vss)
@@ -315,7 +316,7 @@
   (define prev (hash-ref global-σ a ∅))
   (define added? (not (⊑? vs prev)))
   (when added?
-    (hash-set! global-σ a (∪ vs prev))
+    (hash-set! global-σ a (⊓ vs prev))
     (set! unions (add1 unions))))
 
 (define (join*-h! as vss)
@@ -344,7 +345,7 @@
       (for/fold ([cs* ∅])
           ([c cs] #:unless (ans? c))
         (pull-global (step c) cs*)))
-    (cons unions (set-union cs cs*))]))
+    (cons unions (∪ cs cs*))]))
 
 (define-syntax-rule (mk-generator/wide/imperative-fixpoint name ans? ans-v touches)
   (define-syntax-rule (name step fst)
@@ -382,7 +383,7 @@
 (define-syntax-rule (lazy-force lfσ x)
   (match x
     [(addr a) (getter lfσ a)]
-    [v (set v)]))
+    [v (singleton v)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 0CFA-style Abstract semantics
@@ -394,19 +395,7 @@
         [else
          (cons (first δ) (truncate (rest δ) (sub1 k)))]))
 
-(define (widen^ b)
-  (match b
-    [(? integer?) integer^]
-    [(? rational?) rational^]
-    [(? number?) number^]
-    [(? string?) string^]
-    [(? symbol?) symbol^]
-    [(? char?) char^]
-    [(? boolean?) b]
-    [(or (? number^?) (== string^) (== symbol^) (== char^)) b]
-    [else (error "Unknown base value" b)]))
-
-(define-syntax-rule (lazy-delay ldσ a) (set (addr a)))
+(define-syntax-rule (lazy-delay ldσ a) (singleton (addr a)))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Potpourris of common parameterizations
 
@@ -417,7 +406,7 @@
 
 (define-syntax-rule (with-abstract body)
   (splicing-syntax-parameterize
-   ([widen (make-rename-transformer #'widen^)])
+   ([widen (make-rename-transformer #'flatten-value)])
    body))
 
 (define-syntax-rule (with-narrow-set-monad body)
