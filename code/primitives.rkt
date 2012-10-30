@@ -53,10 +53,6 @@
          (do (ydσ) ([v* (delay ydσ v)]) (yield v*)))
        (define-simple-macro* (errorv vs)
          (begin (log-info "Error reachable ~a" vs)
-                ;; Really this should be continue, but graphs.sch uses
-                ;; with-input-from-file, which Suresh cheated on.
-                (yield (void))
-                #;
                 (continue)))
 
        (define/basic (quotientv z0 z1)
