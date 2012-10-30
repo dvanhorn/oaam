@@ -144,7 +144,8 @@
 
  (define (abs-of t)
    (case t
-     [(n) #'number^]
+     [(n z fx r) #'number^]
+#;#;
      [(z fx) #'integer^]
      [(r) #'rational^]
      [(s) #'string^]

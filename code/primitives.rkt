@@ -252,7 +252,7 @@
               (define V-addr (make-var-contour `(V . ,l) δ))
               (do (vσ) loop ([v vs])
                   (match v
-                    ['() (yield (abs integer^ V-addr))]
+                    ['() (yield (abs number^ V-addr))]
                     [(cons v vrest)
                      (do (vσ) ([σ*-pv^ #:join vσ V-addr (force vσ v)])
                        (loop σ*-pv^ vrest))]))]
@@ -282,7 +282,7 @@
          (let ([V-addr (make-var-contour `(V . ,l) δ)])
            (do (vσ) loop ([v vs]) 
                (match v
-                 ['() (yield (vectorv-immutable^ integer^ V-addr))]
+                 ['() (yield (vectorv-immutable^ number^ V-addr))]
                  [(cons v vrest)
                   (do (vσ) ([jσ #:join vσ V-addr (force vσ v)])
                     (loop jσ vrest))]))))

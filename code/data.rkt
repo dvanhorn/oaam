@@ -2,7 +2,7 @@
 (require "ast.rkt" "notation.rkt" (for-syntax syntax/parse racket/syntax))
 (provide define-nonce mk-touches cons-limit
          ;; abstract values
-         number^ integer^ rational^
+         number^;;integer^ rational^
          number^?
          string^ symbol^ char^ cons^ vector^ vector-immutable^ ●
          (struct-out vectorv^)
@@ -51,9 +51,10 @@
 ;; - (mthash Sym)
 ;; - (hash-with Sym Addr Addr Addr)
 ;; - (hash-without Sym Addr Addr)
-(define-nonce number^)
+(define-nonce number^) (define (number^? v) (eq? v number^))
+#|
 (define-nonce integer^) (define (number^? v) (or (eq? v integer^) (eq? v rational^) (eq? v number^)))
-(define-nonce rational^)
+(define-nonce rational^)|#
 (define-nonce string^)
 (define-nonce symbol^)
 (define-nonce char^)
@@ -73,10 +74,12 @@
          (for/or ([v (in-set v1)]) (⊑? v0 v))]
         [else
          (match* (v0 v1)
+#|
            [((== integer^) (or (== rational^) (== number^))) #t]
            [((== rational^) (== number^)) #t]
            [((? integer?) (? number^?)) #t]
            [((? rational?) (or (== rational^) (== number^))) #t]
+|#
            [((? number?) (== number^)) #t]
            [((? consv?) (== cons^)) #t]
            [((or (? vectorv?) (? vectorv^?)) (== vector^)) #t]
