@@ -61,16 +61,16 @@
 ;; - (mthash Sym)
 ;; - (hash-with Sym Addr Addr Addr)
 ;; - (hash-without Sym Addr Addr)
-(define-nonce number^) (define (number^? v) (or (eq? v number^) (eq? v ●)))
+(define-nonce number^) (define (number^? v) (or (eq? v number^) (and (eq? v ●) ●)))
 #|
 (define-nonce integer^) (define (number^? v) (or (eq? v integer^) (eq? v rational^) (eq? v number^)))
 (define-nonce rational^)|#
-(define-nonce string^) (define (string^? v) (or (eq? v string^) (eq? v ●)))
-(define-nonce symbol^) (define (symbol^? v) (or (eq? v symbol^) (eq? v ●)))
-(define-nonce char^) (define (char^? v) (or (eq? v char^) (eq? v ●)))
-(define-nonce cons^) (define (cons^? v) (or (eq? v cons^) (eq? v ●)))
-(define-nonce vector^) (define (vector^? v) (or (eq? v vector^) (eq? v ●)))
-(define-nonce vector-immutable^) (define (vector-immutable^? v) (or (eq? v vector-immutable^) (eq? v ●)))
+(define-nonce string^) (define (string^? v) (or (eq? v string^) (and (eq? v ●) ●)))
+(define-nonce symbol^) (define (symbol^? v) (or (eq? v symbol^) (and (eq? v ●) ●)))
+(define-nonce char^) (define (char^? v) (or (eq? v char^) (and (eq? v ●) ●)))
+(define-nonce cons^) (define (cons^? v) (or (eq? v cons^) (and (eq? v ●) ●)))
+(define-nonce vector^) (define (vector^? v) (or (eq? v vector^) (and (eq? v ●) ●)))
+(define-nonce vector-immutable^) (define (vector-immutable^? v) (or (eq? v vector-immutable^) (and (eq? v ●) ●)))
 (struct input-port^ (status) #:prefab)
 (struct output-port^ (status) #:prefab)
 ;; Status tokens for ports. Not values!

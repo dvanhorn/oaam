@@ -97,15 +97,15 @@
                     (vector^? v)
                     (vector-immutable^? v))]
          [(p) #'(or (consv? v) (cons^? v))]
-         [(ip) #'(or (input-port? v) (input-port^? v) (eq? v ●))]
-         [(op) #'(or (output-port? v) (output-port^? v) (eq? v ●))]
+         [(ip) #'(or (input-port? v) (input-port^? v) (and (eq? v ●) ●))]
+         [(op) #'(or (output-port? v) (output-port^? v) (and (eq? v ●) ●))]
          [(h) #'(hashv? v)]
          ;; singleton types
-         [(!) #'(or (void? v) (eq? v ●))]
-         [(null ()) #'(or (eq? v '()) (eq? v ●))]
-         [(eof) #'(or (eof-object? v) (eq? v ●))]
-         [(true #t) #'(or (eq? v #t) (eq? v ●))]
-         [(false #f) #'(or (eq? v #f) (eq? v ●))]
+         [(!) #'(or (void? v) (and (eq? v ●) ●))]
+         [(null ()) #'(or (eq? v '()) (and (eq? v ●) ●))]
+         [(eof) #'(or (eof-object? v) (and (eq? v ●) ●))]
+         [(true #t) #'(or (eq? v #t) (and (eq? v ●) ●))]
+         [(false #f) #'(or (eq? v #f) (and (eq? v ●) ●))]
          [else (error 'type->pred-stx "Not a predicate-able type ~a" t)]))
      (match t
        [(type-union (list-no-order #t #f)) #'(boolean? v)]
@@ -294,8 +294,13 @@
                                (and (attribute p)
                                     (syntax-parser
                                       [(pσ vs)
-                                       #`(do (pσ) ([v (force pσ (car vs))])
-                                           (yield #,(type->pred-stx (attribute p.type) #'v)))]))
+                                       #`(do (pσ) ([v (force pσ (car vs))]
+                                                   [res (in-list
+                                                         (let ([r #,(type->pred-stx (attribute p.type) #'v)])
+                                                           (if (eq? v ●)
+                                                               '(#t #f)
+                                                               (list r))))])
+                                           (yield res))]))
                                ((attribute t.mk-simple) #'prim (syntax? (attribute widen?)))))))
 
 (define-syntax (mk-static-primitive-functions stx)
