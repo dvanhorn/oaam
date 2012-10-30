@@ -238,9 +238,9 @@
                                                      ;; Don't join literals when parsing for 
                                                      ;; concrete evaluation.
                                                      (parameterize ([cons-limit
-                                                                     (if (eq? (attribute K) +inf.0)
-                                                                         #'+inf.0
-                                                                         #'(cons-limit))])
+                                                                     #,(if (eq? (attribute K) +inf.0)
+                                                                           #'+inf.0
+                                                                           #'(cons-limit))])
                                                        (define-values (e* r) (parse-prog e gensym gensym))
                                                        (add-lib e* r gensym gensym))))])
              (fixpoint step (inj (prepare e))))
