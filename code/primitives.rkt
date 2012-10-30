@@ -5,23 +5,9 @@
          (for-syntax syntax/parse) ;; for core syntax-classes
          racket/unsafe/ops)
 (provide primitive? changes-store? reads-store? primitive? prim-constants
-         mk-prims hash->kind
+         mk-prims
          ;; reprovide
          snull yield force getter widen delay)
-
-;; Classify different hash literals
-(define (hash->kind h)
-  (cond [(immutable? h)
-         (cond [(hash-equal? h) 'immutable-equal]
-               [(hash-eqv? h) 'immutable-eqv]
-               [(hash-eq? h) 'immutable-eq])]
-        [else
-         (cond [(hash-equal? h) 'mutable-equal]
-               [(hash-eqv? h) 'mutable-eqv]
-               [(hash-eq? h) 'mutable-eq])]))
-
-(define (immutable-hash? h)
-  (case (hashv-kind h) [(immutable-equal immutable-eqv immutable-eq) #t] [else #f]))
 
 (define-simple-macro* (define/read (name:id rσ:id v:id ...) body ...+)
   ;; XXX: not capture-avoiding, so we have to be careful in our definitions
@@ -112,17 +98,10 @@
                 (log-info "integer->charv on non-integer")
                 (continue)]))
 
-       (define/basic (hashv-equal? h)
-         (case (hashv-kind h) [(immutable-equal mutable-equal) #t] [else #f]))
-       (define/basic (hashv-eqv? h)
-         (case (hashv-kind h) [(immutable-eqv mutable-eqv) #t] [else #f]))
-       (define/basic (hashv-eq? h)
-         (case (hashv-kind h) [(immutable-eq mutable-eq) #t] [else #f]))
        ;; Not a general predicate. Only for immutable hashes, vectors, strings, byte-strings and boxes.
        ;; Currently we have only immutable hashes.
        (define/basic (immutablev? v)
          (match v
-           [(? hashv? h) (yield (immutable-hash? h))]
            [(or (? vectorv-immutable^?)
                 (? vector-immutable^?)
                 (? immutable? (? vector?)))
@@ -230,9 +209,6 @@
          (match p
            [(consv _ D) (yield-delay cdσ D)]
            [(? cons^?) (yield ●)]))
-
-       (define/read (core-hashv-ref hσ h k)
-         (error 'durp))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ;; Prims that write the store
@@ -344,35 +320,6 @@
               (yield (void)))]
            ;; FIXME: v should escape.
            [(? cons^?) (yield (void))]))
-
-       (define/write (hashv-set hσ l δ h k v)
-         (cond [(immutable-hash? h)
-                (define P-addr (make-var-contour `(P . ,l) δ))
-                (define K-addr (make-var-contour `(K . ,l) δ))
-                (define V-addr (make-var-contour `(V . ,l) δ))
-                (do (hσ) ([σ*P #:join hσ P-addr (singleton h)]
-                          [σ*K #:join σ*P K-addr (force σ*P k)]
-                          [σ*V #:join σ*K V-addr (force σ*K v)])
-                  (yield (hash-with (hashv-kind h) P-addr K-addr V-addr)))]
-               [(hash? h) (error 'hashv-set "Fail gracefully from literal to abstract value ~a ~a ~a" h k v)]
-               [else
-                (log-info "hashv-set non-hash")
-                (continue)]))
-
-       (define/write (hashv-remove hσ l δ h k)
-         (cond [(immutable-hash? h)
-                (define P-addr (make-var-contour `(P . ,l) δ))
-                (define K-addr (make-var-contour `(K . ,l) δ))
-                (do (hσ) ([σ*P #:join hσ P-addr (singleton h)]
-                          [σ*K #:join σ*P K-addr (force σ*P k)])
-                  (yield (hash-without (hashv-kind h) P-addr K-addr)))]
-               [(hash? h) (error 'hashv-remove "Fail gracefully from literal to abstract value ~a ~a ~a" h k v)]
-               [else
-                (log-info "hashv-remove non-hash")
-                (continue)]))
-
-       (define/write (hashv-set! h!σ l δ h k v) (error 'TODO-hash-set!))
-       (define/write (hashv-remove! h!σ l δ h k v) (error 'TODO-hash-remove!))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ;; I/O
@@ -593,23 +540,6 @@
      [eof-object? #:predicate eof]
      ;; time should be with time-apply, but that means supporting apply...
      [time #f #f timev (any -> any)]
-     ;; Hashes
-     [hash-equal?   #f #f hashv-equal?     (h -> b)]
-     [hash-eqv?     #f #f hashv-eqv?       (h -> b)]
-     [hash-eq?      #f #f hashv-eq?        (h -> b)]
-     [hash-set      #f #t hashv-set        (h any any -> h)]
-     [hash-remove   #f #t hashv-remove     (h any -> h)]
-#;#;#;#;#;#;#;
-     [core-hash-ref #t #f hashv-ref        (h any -> any)]
-     [hash-has-key? #t #f hashv-has-key?   (h any -> b)]
-     [hash-set!     #f #t hashv-set!       (h any any -> !)]
-     [hash-remove!  #f #t hashv-remove!    (h any -> !)]
-     [make-hash     #f #t make-hashv-equal ((-> h)
-                                            (lst -> h))]
-     [make-hasheqv  #f #t make-hashv-eqv   ((-> h)
-                                            (lst -> h))]
-     [make-hasheq   #f #t make-hashv-eq    ((-> h)
-                                            (lst -> h))]
      [immutable?    #f #f immutablev?      (any -> b)]))
 
 (define-syntax (mk-prims stx)

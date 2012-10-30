@@ -145,9 +145,6 @@
  (define (abs-of t)
    (case t
      [(n z fx r) #'number^]
-#;#;
-     [(z fx) #'integer^]
-     [(r) #'rational^]
      [(s) #'string^]
      [(y) #'symbol^]
      [(c) #'char^]
