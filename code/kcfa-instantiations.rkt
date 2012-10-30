@@ -314,9 +314,10 @@
 ;; Mutable global store
 (define (join-h! a vs)
   (define prev (hash-ref global-σ a ∅))
-  (define added? (not (⊑? vs prev)))
-  (when added?
-    (hash-set! global-σ a (⊓ vs prev))
+  (define upd (⊓ vs prev))
+  (define same? (= (set-count upd) (set-count prev)))
+  (unless same?
+    (hash-set! global-σ a upd)
     (set! unions (add1 unions))))
 
 (define (join*-h! as vss)
@@ -384,7 +385,7 @@
   (match x
     [(addr a) (getter lfσ a)]
     [v (singleton v)]))
-
+(define-syntax-rule (strict-force lfσ x) (singleton x))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 0CFA-style Abstract semantics
 
@@ -396,6 +397,7 @@
          (cons (first δ) (truncate (rest δ) (sub1 k)))]))
 
 (define-syntax-rule (lazy-delay ldσ a) (singleton (addr a)))
+(define-syntax-rule (strict-delay ldσ a) (getter ldσ a))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Potpourris of common parameterizations
 
@@ -440,6 +442,12 @@
   (splicing-syntax-parameterize
    ([delay (make-rename-transformer #'lazy-delay)]
     [force (make-rename-transformer #'lazy-force)])
+   body))
+
+(define-syntax-rule (with-strict body)
+  (splicing-syntax-parameterize
+   ([delay (make-rename-transformer #'strict-delay)]
+    [force (make-rename-transformer #'strict-force)])
    body))
 
 (define-syntax-rule (with-0-ctx body)
@@ -546,13 +554,24 @@
  (provide lazy-0cfa^/c)
 
 (mk-set-fixpoint^ fix 0cfa-set-fixpoint^ 0cfa-ans^?)
+(with-strict
+ (with-0-ctx
+  (with-whole-σ
+   (with-σ-passing-set-monad
+    (with-abstract
+      (mk-analysis #:aval 0cfa^ #:ans 0cfa-ans^
+                   #:fixpoint 0cfa-set-fixpoint^
+                   #:σ-passing #:wide #:set-monad))))))
+(provide 0cfa^)
+
+(mk-set-fixpoint^ fix lazy-0cfa-set-fixpoint^ lazy-0cfa-ans^?)
 (with-lazy
  (with-0-ctx
   (with-whole-σ
    (with-σ-passing-set-monad
     (with-abstract
-      (mk-analysis #:aval lazy-0cfa^ #:ans 0cfa-ans^
-                   #:fixpoint 0cfa-set-fixpoint^
+      (mk-analysis #:aval lazy-0cfa^ #:ans lazy-0cfa-ans^
+                   #:fixpoint lazy-0cfa-set-fixpoint^
                    #:σ-passing #:wide #:set-monad))))))
 (provide lazy-0cfa^)
 
@@ -565,7 +584,6 @@
       (mk-analysis #:aval lazy-0cfa #:ans 0cfa-ans #:set-monad #:fixpoint fix-filtered
                    #:σ-passing))))))
 (provide lazy-0cfa)
-
 
 (with-lazy
  (with-0-ctx

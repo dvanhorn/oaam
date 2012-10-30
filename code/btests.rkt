@@ -1,7 +1,7 @@
 #lang racket
 
 (require "parse.rkt" "kcfa-instantiations.rkt"
-         racket/trace)
+         racket/sandbox)
 
 (define (sch->sexp file)
   (with-input-from-file file
@@ -9,32 +9,31 @@
 
 (define (prep file) (sch->sexp file))
 
-#;#;#;#;#;
-(time (lazy-0cfa^/c (prep "../benchmarks/church.sch")))
-(time (lazy-eval^/c (prep "../benchmarks/church.sch")))
-(time (lazy-0cfa∆/c (prep "../benchmarks/church.sch")))
-(time (lazy-0cfa-gen^/c (prep "../benchmarks/church.sch")))
-(time (lazy-0cfa-gen-σ-∆s^/c (prep "../benchmarks/church.sch")))
-#;
-(time (lazy-0cfa^/c! (prep! "../benchmarks/church.sch")))
+(define-syntax-rule (log-thread kind)
+  (let ([lr (make-log-receiver (current-logger) kind)])
+    (thread (λ () (let loop () (define vs (sync lr)) (write vs) (newline) (loop))))))
 
+(define-syntax-rule (test aval e)
+  (parameterize ([current-logger (make-logger 'stuck-states)])
+    (log-thread 'info)
+    (call-with-limits 3600 4096
+                      (λ () (call-with-values
+                                (λ () (time (aval e)))
+                              (λ vs
+                                 (for ([v vs])
+                                   (display v) (newline))))))))
 
-(parameterize ([current-logger (make-logger 'stuck-states)])
-  (define lr-stuck (make-log-receiver (current-logger) 'info))
-  (define lr-debug (make-log-receiver (current-logger) 'debug))
-  (thread (λ () (let loop () (define vs (sync lr-stuck)) (write vs) (newline) (loop))))
-  (thread (λ () (let loop () (define vs (sync lr-debug)) (write vs) (newline) (loop))))
-  (time (lazy-0cfa^/c! (prep "../benchmarks/toplas98/dynamic.sch"))))
+(define to-test
+  (list "../benchmarks/church.sch"
+        "../benchmarks/toplas98/boyer.sch"
+        "../benchmarks/toplas98/graphs.sch"
+        "../benchmarks/toplas98/lattice.scm"
+        "../benchmarks/toplas98/matrix.scm"
+        "../benchmarks/toplas98/maze.sch"
+        "../benchmarks/toplas98/nbody.sch"
+        "../benchmarks/toplas98/nucleic.sch"
+        "../benchmarks/toplas98/nucleic2.sch"
+        "../benchmarks/toplas98/splay.scm"))
+(for ([t to-test]) (test 0cfa^ (prep t)))
+(for ([t to-test]) (test lazy-0cfa^/c! (prep t)))
 
-#;#;#;#;#;#;#;#;#;
-(time (lazy-0cfa^/c! (prep! "../benchmarks/toplas98/boyer.sch")))
-(time (lazy-0cfa^/c! (prep! "../benchmarks/toplas98/graphs.sch")))
-;; Uses defmacro
-;;(time (lazy-0cfa^/c! (prep! "../benchmarks/toplas98/handle.scm")))
-(time (lazy-0cfa^/c! (prep! "../benchmarks/toplas98/lattice.scm")))
-(time (lazy-0cfa^/c! (prep! "../benchmarks/toplas98/matrix.scm")))
-(time (lazy-0cfa^/c! (prep! "../benchmarks/toplas98/maze.sch")))
-(time (lazy-0cfa^/c! (prep! "../benchmarks/toplas98/nbody.sch")))
-(time (lazy-0cfa^/c! (prep! "../benchmarks/toplas98/nucleic.sch")))
-(time (lazy-0cfa^/c! (prep! "../benchmarks/toplas98/nucleic2.sch")))
-(time (lazy-0cfa^/c! (prep! "../benchmarks/toplas98/splay.scm")))
