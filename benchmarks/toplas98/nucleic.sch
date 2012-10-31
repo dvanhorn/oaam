@@ -18,33 +18,28 @@
 
 ; -- MATH UTILITIES -----------------------------------------------------------
 
-(import (rnrs base)
-        (rnrs io simple)
-        (rnrs arithmetic flonums))
 
 (define FLOATatan flatan)
 (define FLOATcos flcos)
 (define FLOATsin flsin)
-(define-syntax nuc-const
-  (syntax-rules ()
-    [(_ x* ...) '#(x* ...)]))
 
-(define constant-pi          3.14159265358979323846)
+
+(define Constant-Pi          3.14159265358979323846)
 (define constant-minus-pi   -3.14159265358979323846)
 (define constant-pi/2        1.57079632679489661923)
 (define constant-minus-pi/2 -1.57079632679489661923)
 
 (define (math-atan2 y x)
-  (cond ((fl>? x 0.0)
+  (cond ((fl> x 0.0)
          (flatan (fl/ y x)))
-        ((fl<? y 0.0)
-         (if (fl=? x 0.0)
+        ((fl< y 0.0)
+         (if (fl= x 0.0)
            constant-minus-pi/2
            (fl+ (flatan (fl/ y x)) constant-minus-pi)))
         (else
-         (if (fl=? x 0.0)
+         (if (fl= x 0.0)
            constant-pi/2
-           (fl+ (flatan (fl/ y x)) constant-pi)))))
+           (fl+ (flatan (fl/ y x)) Constant-Pi)))))
 
 ; -- POINTS -------------------------------------------------------------------
 
@@ -454,7 +449,7 @@
 ; Database of nucleotide conformations:
 
 (define rA
-  (nuc-const
+  #(
     #( -0.0018  -0.8207   0.5714  ; dgf-base-tfo
         0.2679  -0.5509  -0.7904
         0.9634   0.1517   0.2209
@@ -508,7 +503,7 @@
   ))
 
 (define rA01
-  (nuc-const
+  #(
     #( -0.0043  -0.8175   0.5759  ; dgf-base-tfo
         0.2617  -0.5567  -0.7884
         0.9651   0.1473   0.2164
@@ -562,7 +557,7 @@
   ))
 
 (define rA02
-  (nuc-const
+  #(
     #(  0.5566   0.0449   0.8296  ; dgf-base-tfo
         0.5125   0.7673  -0.3854
        -0.6538   0.6397   0.4041
@@ -616,7 +611,7 @@
   ))
 
 (define rA03
-  (nuc-const
+  #(
     #( -0.5021   0.0731   0.8617  ; dgf-base-tfo
        -0.8112   0.3054  -0.4986
        -0.2996  -0.9494  -0.0940
@@ -670,7 +665,7 @@
   ))
 
 (define rA04
-  (nuc-const
+  #(
     #( -0.5426  -0.8175   0.1929  ; dgf-base-tfo
         0.8304  -0.5567  -0.0237
         0.1267   0.1473   0.9809
@@ -724,7 +719,7 @@
   ))
 
 (define rA05
-  (nuc-const
+  #(
     #( -0.5891   0.0449   0.8068  ; dgf-base-tfo
         0.5375   0.7673   0.3498
        -0.6034   0.6397  -0.4762
@@ -778,7 +773,7 @@
   ))
 
 (define rA06
-  (nuc-const
+  #(
     #( -0.9815   0.0731  -0.1772  ; dgf-base-tfo
         0.1912   0.3054  -0.9328
        -0.0141  -0.9494  -0.3137
@@ -832,7 +827,7 @@
   ))
 
 (define rA07
-  (nuc-const
+  #(
     #(  0.2379   0.1310  -0.9624  ; dgf-base-tfo
        -0.5876  -0.7696  -0.2499
        -0.7734   0.6249  -0.1061
@@ -886,7 +881,7 @@
   ))
 
 (define rA08
-  (nuc-const
+  #(
     #(  0.1084  -0.0895  -0.9901  ; dgf-base-tfo
         0.9789  -0.1638   0.1220
        -0.1731  -0.9824   0.0698
@@ -940,7 +935,7 @@
   ))
 
 (define rA09
-  (nuc-const
+  #(
     #(  0.8467   0.4166  -0.3311  ; dgf-base-tfo
        -0.3962   0.9089   0.1303
         0.3552   0.0209   0.9346
@@ -994,7 +989,7 @@
   ))
 
 (define rA10
-  (nuc-const
+  #(
     #(  0.7063   0.6317  -0.3196  ; dgf-base-tfo
        -0.0403  -0.4149  -0.9090
        -0.7068   0.6549  -0.2676
@@ -1051,7 +1046,7 @@
   (list rA01 rA02 rA03 rA04 rA05 rA06 rA07 rA08 rA09 rA10))
 
 (define rC
-  (nuc-const
+  #(
     #( -0.0359  -0.8071   0.5894  ; dgf-base-tfo
        -0.2669   0.5761   0.7726
        -0.9631  -0.1296  -0.2361
@@ -1103,7 +1098,7 @@
   ))
 
 (define rC01
-  (nuc-const
+  #(
     #( -0.0137  -0.8012   0.5983  ; dgf-base-tfo
        -0.2523   0.5817   0.7733
        -0.9675  -0.1404  -0.2101
@@ -1155,7 +1150,7 @@
   ))
 
 (define rC02
-  (nuc-const
+  #(
     #(  0.5141   0.0246   0.8574  ; dgf-base-tfo
        -0.5547  -0.7529   0.3542
         0.6542  -0.6577  -0.3734
@@ -1207,7 +1202,7 @@
   ))
 
 (define rC03
-  (nuc-const
+  #(
     #( -0.4993   0.0476   0.8651  ; dgf-base-tfo
         0.8078  -0.3353   0.4847
         0.3132   0.9409   0.1290
@@ -1255,11 +1250,10 @@
     #(  6.4741  -7.3461   9.1662) ; H41 
     #(  7.9889  -6.4396   9.2429) ; H42 
     #(  5.0736  -7.3713   6.9922) ; H5  
-    #(  4.9784  -6.5473   4.7170) ; H6  
-  ))
+    #(  4.9784  -6.5473   4.7170))) ; H6
 
 (define rC04
-  (nuc-const
+  #(
     #( -0.5669  -0.8012   0.1918  ; dgf-base-tfo
        -0.8129   0.5817   0.0273
        -0.1334  -0.1404  -0.9811
@@ -1311,7 +1305,7 @@
   ))
 
 (define rC05
-  (nuc-const
+  #(
     #( -0.6298   0.0246   0.7763  ; dgf-base-tfo
        -0.5226  -0.7529  -0.4001
         0.5746  -0.6577   0.4870
@@ -1363,7 +1357,7 @@
   ))
 
 (define rC06
-  (nuc-const
+  #(
     #( -0.9837   0.0476  -0.1733  ; dgf-base-tfo
        -0.1792  -0.3353   0.9249
        -0.0141   0.9409   0.3384
@@ -1415,7 +1409,7 @@
   ))
 
 (define rC07
-  (nuc-const
+  #(
     #(  0.0033   0.2720  -0.9623  ; dgf-base-tfo
         0.3013  -0.9179  -0.2584
        -0.9535  -0.2891  -0.0850
@@ -1467,7 +1461,7 @@
   ))
 
 (define rC08
-  (nuc-const
+  #(
     #(  0.0797  -0.6026  -0.7941  ; dgf-base-tfo
         0.7939   0.5201  -0.3150
         0.6028  -0.6054   0.5198
@@ -1519,7 +1513,7 @@
   ))
 
 (define rC09
-  (nuc-const
+  #(
     #(  0.8727   0.4760  -0.1091  ; dgf-base-tfo
        -0.4188   0.6148  -0.6682
        -0.2510   0.6289   0.7359
@@ -1571,7 +1565,7 @@
   ))
 
 (define rC10
-  (nuc-const
+  #(
     #(  0.1549   0.8710  -0.4663  ; dgf-base-tfo
         0.6768  -0.4374  -0.5921
        -0.7197  -0.2239  -0.6572
@@ -1626,7 +1620,7 @@
   (list rC01 rC02 rC03 rC04 rC05 rC06 rC07 rC08 rC09 rC10))
 
 (define rG
-  (nuc-const
+  #(
     #( -0.0018  -0.8207   0.5714  ; dgf-base-tfo
         0.2679  -0.5509  -0.7904
         0.9634   0.1517   0.2209
@@ -1681,7 +1675,7 @@
   ))
 
 (define rG01
-  (nuc-const
+  #(
     #( -0.0043  -0.8175   0.5759  ; dgf-base-tfo
         0.2617  -0.5567  -0.7884
         0.9651   0.1473   0.2164
@@ -1736,7 +1730,7 @@
   ))
 
 (define rG02
-  (nuc-const
+  #(
     #(  0.5566   0.0449   0.8296  ; dgf-base-tfo
         0.5125   0.7673  -0.3854
        -0.6538   0.6397   0.4041
@@ -1791,7 +1785,7 @@
   ))
 
 (define rG03
-  (nuc-const
+  #(
     #( -0.5021   0.0731   0.8617  ; dgf-base-tfo
        -0.8112   0.3054  -0.4986
        -0.2996  -0.9494  -0.0940
@@ -1846,7 +1840,7 @@
   ))
 
 (define rG04
-  (nuc-const
+  #(
     #( -0.5426  -0.8175   0.1929  ; dgf-base-tfo
         0.8304  -0.5567  -0.0237
         0.1267   0.1473   0.9809
@@ -1901,7 +1895,7 @@
   ))
 
 (define rG05
-  (nuc-const
+  #(
     #( -0.5891   0.0449   0.8068  ; dgf-base-tfo
         0.5375   0.7673   0.3498
        -0.6034   0.6397  -0.4762
@@ -1956,7 +1950,7 @@
   ))
 
 (define rG06
-  (nuc-const
+  #(
     #( -0.9815   0.0731  -0.1772  ; dgf-base-tfo
         0.1912   0.3054  -0.9328
        -0.0141  -0.9494  -0.3137
@@ -2011,7 +2005,7 @@
   ))
 
 (define rG07
-  (nuc-const
+  #(
     #(  0.0894  -0.6059   0.7905  ; dgf-base-tfo
        -0.6810   0.5420   0.4924
        -0.7268  -0.5824  -0.3642
@@ -2066,7 +2060,7 @@
   ))
 
 (define rG08
-  (nuc-const
+  #(
     #(  0.2224   0.6335   0.7411  ; dgf-base-tfo
        -0.3644  -0.6510   0.6659
         0.9043  -0.4181   0.0861
@@ -2121,7 +2115,7 @@
   ))
 
 (define rG09
-  (nuc-const
+  #(
     #( -0.9699  -0.1688  -0.1753  ; dgf-base-tfo
        -0.1050  -0.3598   0.9271
        -0.2196   0.9176   0.3312
@@ -2176,7 +2170,7 @@
   ))
 
 (define rG10
-  (nuc-const
+  #(
     #( -0.0980  -0.9723   0.2122  ; dgf-base-tfo
        -0.9731   0.1383   0.1841
        -0.2083  -0.1885  -0.9597
@@ -2234,7 +2228,7 @@
   (list rG01 rG02 rG03 rG04 rG05 rG06 rG07 rG08 rG09 rG10))
 
 (define rU
-  (nuc-const
+  #(
     #( -0.0359  -0.8071   0.5894  ; dgf-base-tfo
        -0.2669   0.5761   0.7726
        -0.9631  -0.1296  -0.2361
@@ -2285,7 +2279,7 @@
   ))
 
 (define rU01
-  (nuc-const
+  #(
     #( -0.0137  -0.8012   0.5983  ; dgf-base-tfo
        -0.2523   0.5817   0.7733
        -0.9675  -0.1404  -0.2101
@@ -2336,7 +2330,7 @@
   ))
 
 (define rU02
-  (nuc-const
+  #(
     #(  0.5141   0.0246   0.8574  ; dgf-base-tfo
        -0.5547  -0.7529   0.3542
         0.6542  -0.6577  -0.3734
@@ -2387,7 +2381,7 @@
   ))
 
 (define rU03
-  (nuc-const
+  #(
     #( -0.4993   0.0476   0.8651  ; dgf-base-tfo
         0.8078  -0.3353   0.4847
         0.3132   0.9409   0.1290
@@ -2438,7 +2432,7 @@
   ))
 
 (define rU04
-  (nuc-const
+  #(
     #( -0.5669  -0.8012   0.1918  ; dgf-base-tfo
        -0.8129   0.5817   0.0273
        -0.1334  -0.1404  -0.9811
@@ -2489,7 +2483,7 @@
   ))
 
 (define rU05
-  (nuc-const
+  #(
     #( -0.6298   0.0246   0.7763  ; dgf-base-tfo
        -0.5226  -0.7529  -0.4001
         0.5746  -0.6577   0.4870
@@ -2540,7 +2534,7 @@
   ))
 
 (define rU06
-  (nuc-const
+  #(
     #( -0.9837   0.0476  -0.1733  ; dgf-base-tfo
        -0.1792  -0.3353   0.9249
        -0.0141   0.9409   0.3384
@@ -2591,7 +2585,7 @@
   ))
 
 (define rU07
-  (nuc-const
+  #(
     #( -0.9434   0.3172   0.0971  ; dgf-base-tfo
         0.2294   0.4125   0.8816
         0.2396   0.8539  -0.4619
@@ -2642,7 +2636,7 @@
   ))
 
 (define rU08
-  (nuc-const
+  #(
     #( -0.0080  -0.7928   0.6094  ; dgf-base-tfo
        -0.7512   0.4071   0.5197
        -0.6601  -0.4536  -0.5988
@@ -2693,7 +2687,7 @@
   ))
 
 (define rU09
-  (nuc-const
+  #(
     #( -0.0317   0.1374   0.9900  ; dgf-base-tfo
        -0.3422  -0.9321   0.1184
         0.9391  -0.3351   0.0765
@@ -2744,7 +2738,7 @@
   ))
 
 (define rU10
-  (nuc-const
+  #(
     #( -0.9674   0.1021  -0.2318  ; dgf-base-tfo
        -0.2514  -0.2766   0.9275
         0.0306   0.9555   0.2933
@@ -2798,7 +2792,7 @@
   (list rU01 rU02 rU03 rU04 rU05 rU06 rU07 rU08 rU09 rU10))
 
 (define rG*
-  (nuc-const
+  #(
     #( -0.2067  -0.0264   0.9780  ; dgf-base-tfo
         0.9770  -0.0586   0.2049
         0.0519   0.9979   0.0379
@@ -2853,7 +2847,7 @@
   ))
 
 (define rU*
-  (nuc-const
+  #(
     #( -0.0109   0.5907   0.8068  ; dgf-base-tfo
         0.2217  -0.7853   0.5780
         0.9751   0.1852  -0.1224
@@ -3316,7 +3310,7 @@
   (if (= (var-id v) 33)
     (let ((p   (atom-pos nuc-P (get-var 34 partial-inst))) ; P in nucleotide 34
           (o3* (atom-pos nuc-O3* v)))                      ; O3' in nucl. 33
-      (fl<=? (pt-dist p o3*) 3.0))                       ; check distance
+      (fl<= (pt-dist p o3*) 3.0))                       ; check distance
     #t))
 
 (define (anticodon)
@@ -3364,11 +3358,11 @@
     ((18)
      (let ((p   (atom-pos nuc-P (get-var 19 partial-inst)))
            (o3* (atom-pos nuc-O3* v)))
-       (fl<=? (pt-dist p o3*) 4.0)))
+       (fl<= (pt-dist p o3*) 4.0)))
     ((6)
      (let ((p   (atom-pos nuc-P (get-var 7 partial-inst)))
            (o3* (atom-pos nuc-O3* v)))
-       (fl<=? (pt-dist p o3*) 4.5)))
+       (fl<= (pt-dist p o3*) 4.5)))
     (else
      #t)))
 
@@ -3467,7 +3461,7 @@
     (if (null? l)
       m
       (let ((x (car l)))
-        (loop (if (fl>? x m) x m) (cdr l))))))
+        (loop (if (fl> x m) x m) (cdr l))))))
 
 (define (run input)
   (most-distant-atom (pseudoknot input)))
@@ -3479,11 +3473,20 @@
          (s2 (number->string count))
          (s1 input1)
          (name "nucleic"))
-    (run-r6rs-benchmark
-     (string-append name ":" s2)
-     count
-     (lambda () (run (hide count input1)))
-     (lambda (result)
-       (and (number? result)
-            (let ((x (fl/ result output)))
-              (and (fl>? x 0.999999) (fl<? x 1.000001))))))))
+    (let ([ok?
+           (lambda (result)
+             (and (number? result)
+                  (let ((x (fl/ result output)))
+                    (and (fl> x 0.999999) (fl< x 1.000001)))))]
+          [thunk (lambda () (run input1))])
+      (let loop ([i 0]
+                 [result (void)])
+        (cond [(< i count)
+               (loop (+ i 1) (thunk))]
+              [(ok? result) result]
+              [else
+               (display "ERROR: returned incorrect result: ")
+               (write result)
+               (newline)
+               result])))))
+(main)

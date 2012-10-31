@@ -256,101 +256,103 @@
                                         ; no way to switch current output in R4RS Scheme
          (error 'with-output-to-file "not supported")
          (f)))
-     #;
-     (define apply
-     (lambda (f arg0 . args)
-     (define list-copy
-     (lambda (l)
-     (if (null? l)
-     '()
-     (cons (car l) (list-copy (cdr l))))))
-     (define flatten
-     (lambda (args)
-     (if (null? (cdr args))
-     (car args)
-     (cons (car args) (flatten (cdr args))))))
-     (let ((m (flatten (cons arg0 args))))
-     (cond ((null? m) (f))
-     ((null? (cdr m)) (f (car m)))
-     ((null? (cdr (cdr m))) (f (car m) (car (cdr m))))
-     (else (let ((n (list-copy m)))
-     (if (null? n)
-     (error 'apply "can't happen")
-     ((,special internal-apply) f n))))))))
-     (make-promise .
-                   (lambda (thunk)
-                     (let ([first #t]
-                           [val #f])
-                       (lambda ()
-                         (cond [(eq? first 'forcing) (error 'force "recursive force")]
-                               [first (set! first 'forcing)
-                                      (set! val (thunk))
-                                      (set! first #f)
-                                      val]
-                               [else val])))))
-     (force . (lambda (promise) (promise)))
-     (make-list .
-                (lambda (n val)
-                  (let loop ((n n))
-                    (if (< n 1)
-                        '()
-                        (cons val (loop (- n 1)))))))
-     #;
-     (define andmap
-     (lambda (f list0 . lists)
-     (if (null? list0)
-     (and)
-     (let loop ((lists (cons list0 lists)))
-     (if (null? (cdr (car lists)))
-     (apply f (map car lists))
-     (and (apply f (map car lists))
-     (loop (map cdr lists))))))))
-     #;
-     (define ormap
-     (lambda (f list0 . lists)
-     (if (null? list0)
-     (or)
-     (let loop ((lists (cons list0 lists)))
-     (if (null? (cdr (car lists)))
-     (apply f (map car lists))
-     (or (apply f (map car lists))
-     (loop (map cdr lists))))))))
-     #;
-     (define call/cc
-     (lambda (f)
-     (letcc x (f x))))
-     (dynamic-wind .
-         (lambda (in doit out)
-           (let* ([a (in)]
-                  [b (doit)]
-                  [c (out)])
-             b)))
-     (sort .
-           (lambda (compare in)
-             in))
-     (hash-ref (λ (h k . rest)
-                  (if (null? rest)
-                      (core-hash-ref h k)
-                      (if (hash-has-key? h k)
-                          (core-hash-ref h k)
-                          (let ([fail (car rest)])
-                            (if (procedure? fail)
-                                (fail)
-                                fail))))))
-     (hash-ref! (λ (h k . rest)
-                   (if (immutable? h)
-                       (error "Shouldn'ta done that, Bill")
-                       (if (null? rest)
-                           (core-hash-ref h k)
-                           (if (hash-has-key? h k)
-                               (core-hash-ref h k)
-                               (let ([fail (car rest)])
-                                 (let ([v (if (procedure? fail)
-                                              (fail)
-                                              fail)])
-                                   (hash-set! h k v)
-                                   v)))))))
-     )))
+
+     (apply .
+       (lambda (f arg0 . args)
+         (define list-copy
+           (lambda (l)
+             (if (null? l)
+                 '()
+                 (cons (car l) (list-copy (cdr l))))))
+         (define flatten
+           (lambda (args)
+             (if (null? (cdr args))
+                 (car args)
+                 (cons (car args) (flatten (cdr args))))))
+         (let ((m (flatten (cons arg0 args))))
+           (cond ((null? m) (f))
+                 ((null? (cdr m)) (f (car m)))
+                 ((null? (cdr (cdr m))) (f (car m) (car (cdr m))))
+                 (else (let ((n (list-copy m)))
+                         (if (null? n)
+                             (error 'apply "can't happen")
+                             (error 'apply "TODO well crap")
+                             #;
+                             ((,special internal-apply) f n))))))))
+       (make-promise .
+                     (lambda (thunk)
+                       (let ([first #t]
+                             [val #f])
+                         (lambda ()
+                           (cond [(eq? first 'forcing) (error 'force "recursive force")]
+                                 [first (set! first 'forcing)
+                                        (set! val (thunk))
+                                        (set! first #f)
+                                        val]
+                                 [else val])))))
+       (force . (lambda (promise) (promise)))
+       (make-list .
+                  (lambda (n val)
+                    (let loop ((n n))
+                      (if (< n 1)
+                          '()
+                          (cons val (loop (- n 1)))))))
+       #;
+       (define andmap
+         (lambda (f list0 . lists)
+           (if (null? list0)
+               (and)
+               (let loop ((lists (cons list0 lists)))
+                 (if (null? (cdr (car lists)))
+                     (apply f (map car lists))
+                     (and (apply f (map car lists))
+                          (loop (map cdr lists))))))))
+       #;
+       (define ormap
+         (lambda (f list0 . lists)
+           (if (null? list0)
+               (or)
+               (let loop ((lists (cons list0 lists)))
+                 (if (null? (cdr (car lists)))
+                     (apply f (map car lists))
+                     (or (apply f (map car lists))
+                         (loop (map cdr lists))))))))
+       #;
+       (define call/cc
+         (lambda (f)
+           (letcc x (f x))))
+       (dynamic-wind .
+           (lambda (in doit out)
+             (let* ([a (in)]
+                    [b (doit)]
+                    [c (out)])
+               b)))
+       (sort .
+             (lambda (compare in)
+               in))
+       (hash-ref (λ (h k . rest)
+                    (if (null? rest)
+                        (core-hash-ref h k)
+                        (if (hash-has-key? h k)
+                            (core-hash-ref h k)
+                            (let ([fail (car rest)])
+                              (if (procedure? fail)
+                                  (fail)
+                                  fail))))))
+       (hash-ref! (λ (h k . rest)
+                     (if (immutable? h)
+                         (error "Shouldn'ta done that, Bill")
+                         (if (null? rest)
+                             (core-hash-ref h k)
+                             (if (hash-has-key? h k)
+                                 (core-hash-ref h k)
+                                 (let ([fail (car rest)])
+                                   (let ([v (if (procedure? fail)
+                                                (fail)
+                                                fail)])
+                                     (hash-set! h k v)
+                                     v)))))))
+       )))
 
 (define (add-lib expr renaming fresh-label! fresh-variable!)
   (define fv-raw (free expr))

@@ -3,7 +3,8 @@
 (require "data.rkt" "notation.rkt" "do.rkt"
          "primitive-maker.rkt"
          (for-syntax syntax/parse) ;; for core syntax-classes
-         racket/unsafe/ops)
+         racket/unsafe/ops
+         racket/flonum)
 (provide primitive? changes-store? reads-store? primitive? prim-constants
          mk-prims
          ;; reprovide
@@ -62,6 +63,20 @@
                 (log-info "Quotient undefined on 0")
                 (continue)]
                [else (yield (widen (quotient z0 z1)))]))
+
+       (define/basic (logv c)
+         (cond [(number^? c) (yield number^)]
+               [(>= 0 c)
+                (log-info "Log undefined <= 0")
+                (continue)]
+               [else (yield (widen (log c)))]))
+
+       (define-simple-macro* (/v vs)
+         (cond [(ormap number^? vs) (yield number^)]
+               [(memv 0 vs)
+                (log-info "/ undefined on 0")
+                (continue)]
+               [else (yield (widen (apply / vs)))]))
 
        (define/basic (modulov z0 z1)
          (cond [(or (number^? z0) (number^? z1))
@@ -349,46 +364,54 @@
            [real-port (yield (port-closed? real-port))]))
        ;; FIXME: optional argument version should be in add-lib
        (define-simple-macro* (mk-writer name writer)
-         (define/read (name ioσ any op)
-           (match op
-             [(output-port^ status-addr)
-              (do (ioσ) ([status (getter ioσ status-addr)])
-                (case status
-                  [(open) (yield (void))]
-                  [(closed) (continue)]
-                  [else (error 'name "Bad port status ~a" status)]))]
-             [real-port
-              (cond [(port-closed? real-port) (continue)]
-                    [else
-                     (do (ioσ) loop ([vs (set->list (force ioσ any))])
-                         (match vs
-                           ['() (yield (void))]
-                           [(cons v vs)
-                            (writer v real-port)
-                            (loop ioσ vs)]
-                           [_ (error 'name "What. ~a" vs)]))])])))
+         (define-simple-macro* (name ioσ vs)
+           (match vs
+             [(list any) (yield (void))] ;; fixme
+             [(list any op)
+              (match op
+                [(output-port^ status-addr)
+                 (do (ioσ) ([status (getter ioσ status-addr)])
+                   (case status
+                     [(open) (yield (void))]
+                     [(closed) (continue)]
+                     [else (error 'name "Bad port status ~a" status)]))]
+                [real-port
+                 (cond [(port-closed? real-port) (continue)]
+                       [else
+                        (do (ioσ) loop ([vs (set->list (force ioσ any))])
+                            (match vs
+                              ['() (yield (void))]
+                              [(cons v vs)
+                               (writer v real-port)
+                               (loop ioσ vs)]
+                              [_ (error 'name "What. ~a" vs)]))])])])))
        (mk-writer writev write)
        (mk-writer displayv display)
 
        ;; XXX: WHAT DO?
-       (define/read (readv rσ ip)
-         (do (rσ) ([v (in-list (list cons^ vector-immutable^
-                                     number^ string^ char^ symbol^
-                                     '() eof (void)))])
-           (yield v)))
+       (define-simple-macro* (readv rσ vs)
+         (match vs
+           [(or '() (list _))
+            (do (rσ) ([v (in-list (list cons^ vector-immutable^
+                                        number^ string^ char^ symbol^
+                                        '() eof (void)))])
+              (yield v))]))
 
-       (define/read (newlinev ioσ op)
-         (match op
-           [(output-port^ status-addr)
-            (do (ioσ) ([status (getter ioσ status-addr)])
-              (case status
-                [(open) (yield (void))]
-                [(closed) (continue)]
-                [else (error 'newlinev "Bad port status ~a" status)]))]
-           [real-port
-            (cond [(port-closed? real-port) (continue)]
-                  [else (newline op)
-                        (yield (void))])]))
+       (define-simple-macro* (newlinev ioσ vs)
+         (match vs
+           [(list) (yield (void))] ;; FIXME
+           [(list op)
+            (match op
+              [(output-port^ status-addr)
+               (do (ioσ) ([status (getter ioσ status-addr)])
+                 (case status
+                   [(open) (yield (void))]
+                   [(closed) (continue)]
+                   [else (error 'newlinev "Bad port status ~a" status)]))]
+              [real-port
+               (cond [(port-closed? real-port) (continue)]
+                     [else (newline op)
+                           (yield (void))])])]))
        ;; FIXME: remove for time-apply
        (define/basic (timev any) (yield any)))))
 
@@ -399,6 +422,7 @@
      [+    #:simple (#:rest n -> n) #:widen]
      [-    #:simple (#:rest n -> n) #:widen]
      [*    #:simple (#:rest n -> n) #:widen]
+     [/ #f #f /v (n #:rest n -> n)]
      [=    #:simple (n #:rest n -> b)]
      [<    #:simple (r #:rest r -> b)]
      [>    #:simple (r #:rest r -> b)]
@@ -407,18 +431,61 @@
      [quotient #f #f quotientv (z z -> z)]
      [remainder #f #f remainderv (z z -> z)]
      [modulo #f #f modulov (z z -> z)]
+     [numerator #:simple (q -> z)]
+     [denominator #:simple (q -> z)]
+     [make-rectangular #:simple (r r -> n)]
+     [make-polar #:simple (r r -> n)]
+     [real-part #:simple (n -> r)]
+     [imag-part #:simple (n -> r)]
+     [magnitude #:simple (n -> r)]
      [abs #:simple (r -> r)]
      [min #:simple (r #:rest r -> r)]
      [max #:simple (r #:rest r -> r)]
-     [gcd #:simple (#:rest r -> r)]
-     [lcm #:simple (#:rest r -> r)]
-     [round #:simple (r -> z)]
-     [floor #:simple (r -> z)]
-     [ceiling #:simple (r -> z)]
+     [gcd #:simple (#:rest r -> r) #:widen]
+     [lcm #:simple (#:rest r -> r) #:widen]
+     [expt #:simple (n n -> n) #:widen]
+     [exp #:simple (n -> n) #:widen]
+     [round #:simple (r -> z) #:widen]
+     [floor #:simple (r -> z) #:widen]
+     [ceiling #:simple (r -> z) #:widen]
      [even? #:simple (z -> b)]
      [odd? #:simple (z -> b)]
-     [expt #:simple (n n -> n)]
-     [sqrt #:simple (n -> n)]
+     [expt #:simple (n n -> n) #:widen]
+     [sqrt #:simple (n -> n) #:widen]
+     [atan #:simple (r r -> n) #:widen]
+     [sin #:simple (n -> n) #:widen]
+     [cos #:simple (n -> n) #:widen]
+     [asin #:simple (n -> n) #:widen]
+     [acos #:simple (n -> n) #:widen]
+     [log #f #f logv (n -> n)]
+     [fl+ #:simple (fl fl -> fl) #:widen]
+     [fl* #:simple (fl fl -> fl) #:widen]
+     [fl/ #f #f /v (fl fl -> fl)]
+     [fl- #:simple (fl fl -> fl) #:widen]
+     [fl= #:simple (fl fl -> b)]
+     [fl< #:simple (fl fl -> b)]
+     [fl> #:simple (fl fl -> b)]
+     [fl<= #:simple (fl fl -> b)]
+     [fl>= #:simple (fl fl -> b)]
+     [flmin #:simple (fl fl -> fl)]
+     [flmax #:simple (fl fl -> fl)]
+     [flabs #:simple (fl -> fl)]
+     [flround #:simple (fl -> fl) #:widen]
+     [flceiling #:simple (fl -> fl) #:widen]
+     [flfloor #:simple (fl -> fl) #:widen]
+     [fltruncate #:simple (fl -> fl) #:widen]
+     [flcos #:simple (fl -> fl) #:widen]
+     [flsin #:simple (fl -> fl) #:widen]
+     [fltan #:simple (fl -> fl) #:widen]
+     [flasin #:simple (fl -> fl) #:widen]
+     [flacos #:simple (fl -> fl) #:widen]
+     [flasin #:simple (fl -> fl) #:widen]
+     [flatan #:simple (fl -> fl) #:widen]
+     [fllog #f #f logv (fl -> fl)]
+     [flexp #:simple (fl -> fl) #:widen]
+     [flsqrt #:simple (fl -> fl) #:widen]
+     [flexpt #:simple (fl fl -> fl) #:widen]
+     [->fl #:simple (z -> fl) #:widen]
      [unsafe-fx= #:simple (fx fx -> b)]
      [unsafe-fx< #:simple (fx fx -> b)]
      [unsafe-fx> #:simple (fx fx -> b)]
@@ -440,9 +507,23 @@
      [unsafe-fxlshift #:simple (fx fx -> fx) #:widen] ;; XXX: could crash?
      [unsafe-fxrshift #:simple (fx fx -> fx) #:widen] ;; XXX: could crash?
      [number? #:predicate n]
+     [complex? #:predicate n]
      [integer? #:predicate z]
-     [rational? #:predicate r]
+     [rational? #:predicate q]
+     [fixnum? #:predicate fx]
+     [flonum? #:predicate fl]
+     [real? #:predicate r]
      [zero? #:simple (n -> b)]
+     [exact? #:simple (n -> b)]
+     [inexact? #:simple (n -> b)]
+     [exact->inexact #:simple (n -> n) #:widen]
+     [inexact->exact #:simple (n -> n) #:widen]
+     [positive? #:simple (r -> b)]
+     [negative? #:simple (r -> b)]
+     [inexact-real? #:simple (any -> b)]
+     [exact-integer? #:simple (any -> b)]
+     [exact-nonnegative-integer? #:simple (any -> b)]
+     [exact-positive-integer? #:simple (any -> b)]
      ;; Generic Comparisons
      [equal? #t #f equalv? (any any -> b)]
      [eqv? #t #f equalv? (any any -> b)]
@@ -530,7 +611,8 @@
                         (ip -> lst))]
      [write #t #f writev ((any -> !)
                           (any op -> !))]
-     [display #t #f displayv (any op -> !)]
+     [display #t #f displayv ((any -> !)
+                              (any op -> !))]
      [newline #t #f newlinev ((-> !)
                               (op -> !))]
      [eof-object? #:predicate eof]

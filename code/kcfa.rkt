@@ -322,7 +322,9 @@
                              (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
                      [(primop o)
                       (with-prim-yield k (prim-meaning o ap-σ l δ arg-addrs))]
-                     [(== ●) (error 'implement-●-call)]
+                     [(== ●) (=> fail)
+                      (log-debug "implement ●-call")
+                      (fail)]
                      [_
                       (log-info "Called non-function ~a~%" f)
                       (yield (ap ap-σ l fn-addr arg-addrs k δ))])))]

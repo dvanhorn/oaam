@@ -87,6 +87,7 @@
                       [else (mkvar)])]
                [else (mkvar)])]
         [(? atomic? d) (datum (fresh-label!) d)]
+        [(? vector? d) (parse `(,quote$ ,d))] ;; ick
         [err (error 'parse "Unknown form ~a" err)])))
   (values expr open))
 #;

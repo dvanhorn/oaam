@@ -3,7 +3,7 @@
 (require (for-syntax racket/syntax) "data.rkt")
 (provide macro-env define-ctx-tf
          igensym
-         void$
+         void$ quote$
          special kwote define-ctx)
 
 (define-nonce special)
@@ -142,6 +142,8 @@
   (match inp
     [(list e) e]
     [(list (and ds `(define ,_ . ,_)) ... es ...)
+     (when (null? es)
+       (error 'define-ctx "expected at least one expression after defines ~a" inp))
      `(,letrec$ ,(parse-defns ds) (,begin$ ,@es))]))
 
 (define (do-tf inp)
@@ -179,6 +181,11 @@
            (error 'do-tf "invalid do expression ~a" inp))]
       (_ (error 'do-tf "invalid do expression ~a" inp)))))
 
+(define (unless-tf inp)
+  (match inp
+    [`(unless ,guard . ,body)
+     `(if ,guard (,void$) (,define-ctx . ,body))]))
+
 (define macro-env
   (hasheq 'quote quote-tf
           'begin begin-tf
@@ -189,5 +196,6 @@
           'cond cond-tf
           'let let-tf
           'let* let*-tf
+          'unless unless-tf
           'λ (rename-tf 'lambda)
           'letrec* (rename-tf 'letrec)))

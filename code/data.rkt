@@ -146,6 +146,7 @@
   (or (number? x)
       (boolean? x)
       (void? x)
+      (char? x)
       (string? x)
       (symbol? x)
       (null? x)

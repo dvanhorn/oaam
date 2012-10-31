@@ -36,8 +36,9 @@
 (νlits type-abbrevs
        n ;; Number (Complex)
        z ;; Integer
-       r ;; Rational
+       q ;; Rational
        fx ;; Fixnum (Concrete only)
+       fl ;; Flonum
        s ;; String
        p ;; Pair
        v ;; Vector
@@ -48,7 +49,7 @@
        ! ;; Void
        ip op ;; input-port output-port
        ;; aliases
-       b prt lst)
+       b prt lst r)
 (begin-for-syntax
  (define-literal-set type-names (true false eof null))
  (struct type-union (abbrevs))
@@ -71,6 +72,7 @@
      [(b) (type-union '(#t #f))]
      [(lst) (type-union '(p null))]
      [(prt) (type-union '(ip op))]
+     [(r) (type-union '(q fl))]
      [else t]))
  (define type-abbrevs?
    (let ([ta (literal-set->predicate type-abbrevs)]
@@ -82,8 +84,9 @@
        (case t
          [(n) #'(or (number? v) (number^? v))]
          [(z) #'(or (integer? v) (number^? v))]
-         [(r) #'(or (rational? v) (number^? v))]
+         [(q) #'(or (rational? v) (number^? v))]
          [(fx) #'(or (fixnum? v) (number^? v))]
+         [(fl) #'(or (flonum? v) (number^? v))]
          [(s) #'(or (string? v) (string^? v))]
          [(y) #'(or (symbol? v) (symbol^? v))]
          [(c) #'(or (char? v) (char^? v))]
@@ -133,7 +136,7 @@
           (λ (arg-stx) #`(or #,@(for/list ([f (in-list each)]) (f arg-stx))))]
          [else
           (case t
-            [(n r z fx) (λ (arg-stx) #`(number^? #,arg-stx))]
+            [(n q z fx fl) (λ (arg-stx) #`(number^? #,arg-stx))]
             [(s) (λ (arg-stx) #`(eq? string^ #,arg-stx))]
             [(y) (λ (arg-stx) #`(eq? symbol^ #,arg-stx))]
             [(c) (λ (arg-stx) #`(eq? char^ #,arg-stx))]
@@ -144,7 +147,7 @@
 
  (define (abs-of t)
    (case t
-     [(n z fx r) #'number^]
+     [(n z fx fl q) #'number^]
      [(s) #'string^]
      [(y) #'symbol^]
      [(c) #'char^]

@@ -16,6 +16,7 @@
 (define-syntax-rule (test aval e)
   (parameterize ([current-logger (make-logger 'stuck-states)])
     (log-thread 'info)
+    (log-thread 'debug)
     (call-with-limits 3600 4096
                       (λ () (call-with-values
                                 (λ () (time (aval e)))
@@ -29,11 +30,14 @@
         "../benchmarks/toplas98/graphs.sch"
         "../benchmarks/toplas98/lattice.scm"
         "../benchmarks/toplas98/matrix.scm"
-        "../benchmarks/toplas98/maze.sch"
+        ;;"../benchmarks/toplas98/maze.sch" ;; call/cc
         "../benchmarks/toplas98/nbody.sch"
         "../benchmarks/toplas98/nucleic.sch"
-        "../benchmarks/toplas98/nucleic2.sch"
-        "../benchmarks/toplas98/splay.scm"))
-(for ([t to-test]) (test 0cfa^ (prep t)))
+        ;;"../benchmarks/toplas98/splay.scm" ;; old match
+        ;;"../benchmarks/toplas98/nucleic2.sch" ;; define-syntax
+        ;;"../benchmarks/toplas98/handle.scm" ;; old match and defmacro
+))
 (for ([t to-test]) (test lazy-0cfa^/c! (prep t)))
+(printf "~%~%==============BASELINE=============~%~%")
+(for ([t to-test]) (test 0cfa^ (prep t)))
 
