@@ -9,7 +9,7 @@
          symbol^ symbol^?
          char^ char^?
          cons^ cons^?
-         vector^ vector^?
+         vector^ vector^? vec0
          vector-immutable^ vector-immutable^?
          ● ⊥
          open@ closed@
@@ -62,6 +62,7 @@
 (define-nonce cons^) (define (cons^? v) (or (eq? v cons^) (and (eq? v ●) ●)))
 (define-nonce vector^) (define (vector^? v) (or (eq? v vector^) (and (eq? v ●) ●)))
 (define-nonce vector-immutable^) (define (vector-immutable^? v) (or (eq? v vector-immutable^) (and (eq? v ●) ●)))
+(define-nonce vec0) ;; 0-length vector.
 (struct input-port^ (status) #:prefab)
 (struct output-port^ (status) #:prefab)
 ;; Status tokens for ports. Not values!
