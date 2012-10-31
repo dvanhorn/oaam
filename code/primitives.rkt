@@ -279,7 +279,7 @@
        (mk-vector-constructor prim-vectorv-immutable vectorv-immutable^ vectorv-immutable)
 
        (define/write (make-vectorv vσ l δ size [default 0])
-         (cond [(zero? size) (yield vec0)]
+         (cond [(and (exact-integer? size) (= 0 size)) (yield vec0)]
                [else
                 (match (widen size)
                   [(? number^?)
