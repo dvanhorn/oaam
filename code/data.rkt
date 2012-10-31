@@ -102,16 +102,14 @@
   (let ()
     (unless (= (set-count vs0) 1)
       (error 'big⊓ "Expected singleton values for big⊓: ~a ~a" vs0 V))
-    (cond [(eq? ⊥ V)
-           (for/first ([v (in-set vs0)]) v)]
-          [else
-           (define v0 (for/first ([v (in-set vs0)]) v))
-           (if (equal? v0 V)
-               V
-               (let ([v0f (flatten-value v0)])
-                 (if (equal? v0f V)
-                     V
-                     ●)))])))
+    (define v0 (for/first ([v (in-set vs0)]) v))
+    (cond [(eq? ⊥ V) v0]
+          [else (if (equal? v0 V)
+                    V
+                    (let ([v0f (flatten-value v0)])
+                      (if (equal? v0f V)
+                          V
+                          ●)))])))
 
 (define cons-limit (make-parameter 8))
 

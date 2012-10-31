@@ -9,12 +9,8 @@
                      syntax/parse/experimental/template)
          racket/stxparam racket/splicing
          racket/trace)
-(provide yield-meaning mk-analysis)
-
-;; Yield is an overloaded term that will do some manipulation to its
-;; input. Yield-meaning is the intended meaning of yield.
-(define-syntax-parameter yield-meaning
-  (λ (stx) (raise-syntax-error #f "Must parameterize for mk-analysis" stx)))
+(provide yield-meaning #;<-reprovide
+         mk-analysis)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Machine maker
@@ -124,7 +120,7 @@
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([(σ*-st! a) #:push ev-σ l δ k])
                     (yield (ev σ*-st! c ρ (sk! (lookup-env ρ x) a) δ))))]
-             [(primr l which) (define p (primop which))
+             [(primr l which) (define p (primop (compile-primop which)))
               (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k p))))]
              [_ (error 'eval "Bad expr ~a" e)])))
 
@@ -219,18 +215,6 @@
                               (quasisyntax/loc stx
                                 (... (begin body ...)))])))])))
 
-           ;; Let primitives yield single values instead of entire states.
-           (define-syntax (with-prim-yield syn)
-             (syntax-parse syn
-               [(_ k body)
-                (define yield-tr (syntax-parameter-value #'yield-meaning))
-                (define new
-                  (λ (sx)
-                     (syntax-parse sx
-                       [(_ v)
-                        (yield-tr (syntax/loc sx (yield (co target-σ k v))))])))
-                #`(syntax-parameterize ([yield #,#'#,new]) body)]))
-
            (define (inj e)
              (define σ₀ (hash))
              (generator
@@ -250,13 +234,16 @@
 
            #,@compile-def
 
-           (mk-prims #,(given global-σ?) prim-meaning clos? rlos?)
+           (define-syntax mk-prims #,(mk-mk-prims (given global-σ?) σ-threading?
+                                                  (given σ-∆s?) (given compiled?)
+                                                  (zero? (attribute K))))
+           (mk-prims prim-meaning compile-primop co clos? rlos?)
            ;; [Rel State State]
            (define (step state)
              (match state
                [(co: co-σ k v)
                 (match k
-                  [(mt) (generator (do (co-σ) ([v (force co-σ v)])
+                  [(mt) (generator (do (co-σ) ([v #:in-force co-σ v])
                                      (yield (ans co-σ v))))]
 
                   ;; We need this intermediate step so that σ-∆s work.
@@ -266,41 +253,41 @@
                    (define v-addr (make-var-contour (cons l n) δ))
                    (define args (reverse (cons v-addr v-addrs)))
                    (generator
-                    (do (co-σ) ([σ*-ls #:join co-σ v-addr (force co-σ v)]
-                                [k (getter σ*-ls a)])
+                    (do (co-σ) ([σ*-ls #:join-forcing co-σ v-addr v]
+                                [k #:in-get σ*-ls a])
                       (yield (ap σ*-ls l (first args) (rest args) k δ))))]
 
                   [(ls: l n (list-rest e es) v-addrs ρ a δ)
                    (define v-addr (make-var-contour (cons l n) δ))
                    (generator
-                    (do (co-σ) ([σ*-lsn #:join co-σ v-addr (force co-σ v)])
+                    (do (co-σ) ([σ*-lsn #:join-forcing co-σ v-addr v])
                       (yield (ev σ*-lsn e ρ
                                  (ls l (add1 n) es (cons v-addr v-addrs) ρ a δ) δ))))]
                   [(ifk: t e ρ a δ)
                    (generator
-                    (do (co-σ) ([k* (getter co-σ a)]
-                             [v (force co-σ v)])
+                    (do (co-σ) ([k* #:in-get co-σ a]
+                                [v #:in-force co-σ v])
                       (yield (ev co-σ (if v t e) ρ k* δ))))]
                   [(lrk: x '() '() e ρ a δ)
                    (generator
-                    (do (co-σ) ([σ*-lrk #:join co-σ (lookup-env ρ x) (force co-σ v)]
-                             [k* (getter σ*-lrk a)])
+                    (do (co-σ) ([σ*-lrk #:join-forcing co-σ (lookup-env ρ x) v]
+                             [k* #:in-get σ*-lrk a])
                       (yield (ev σ*-lrk e ρ k* δ))))]
                   [(lrk: x (cons y xs) (cons e es) b ρ a δ)
                    (generator
-                    (do (co-σ) ([σ*-lrkn #:join co-σ (lookup-env ρ x) (force co-σ v)])
+                    (do (co-σ) ([σ*-lrkn #:join-forcing co-σ (lookup-env ρ x) v])
                       (yield (ev σ*-lrkn e ρ (lrk y xs es b ρ a δ) δ))))]
                   [(sk! l a)
                    (generator
-                    (do (co-σ) ([σ*-sk! #:join co-σ l (force co-σ v)]
-                             [k* (getter σ*-sk! a)])
+                    (do (co-σ) ([σ*-sk! #:join-forcing co-σ l v]
+                                [k* #:in-get σ*-sk! a])
                       (yield (co σ*-sk! k* (void)))))]
                   [_ (error 'step "Bad continuation ~a" k)])]
 
                ;; v is not a value here. It is an address.
                [(ap: ap-σ l fn-addr arg-addrs k δ)
                 (generator
-                 (do (ap-σ) ([f (getter ap-σ fn-addr)])
+                 (do (ap-σ) ([f #:in-get ap-σ fn-addr])
                    (match f
                      [(clos: xs e ρ _)
                       (cond [(= (length xs) (length arg-addrs))
@@ -320,13 +307,12 @@
                             [else
                              ;;(printf "Arity error on ~a~%" f)
                              (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-                     [(primop o)
-                      (with-prim-yield k (prim-meaning o ap-σ l δ arg-addrs))]
+                     [(primop o) (prim-meaning o ap-σ l δ k arg-addrs)]
                      [(== ●) (=> fail)
                       (log-debug "implement ●-call")
                       (fail)]
                      [_
-                      (log-info "Called non-function ~a~%" f)
+                      (log-info "Called non-function ~a" f)
                       (yield (ap ap-σ l fn-addr arg-addrs k δ))])))]
 
                ;; this code is dead when running compiled code.

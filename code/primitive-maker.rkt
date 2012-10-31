@@ -4,7 +4,7 @@
          (for-syntax syntax/parse racket/syntax
                      racket/match racket/list racket/base)
          racket/stxparam)
-(provide getter force widen delay yield snull
+(provide getter force widen delay yield yield-meaning snull
          mk-primitive-meaning mk-static-primitive-functions)
 
 (define-syntax-parameter getter #f)
@@ -14,8 +14,12 @@
 (define-syntax-parameter yield
   (λ (stx)
      (raise-syntax-error #f "Must be within the context of a generator" stx)))
+;; Yield is an overloaded term that will do some manipulation to its
+;; input. Yield-meaning is the intended meaning of yield.
+(define-syntax-parameter yield-meaning
+  (λ (stx) (raise-syntax-error #f "Must parameterize for mk-analysis" stx)))
 
-(define snull (set '()))
+(define snull (singleton '()))
 
 ;; Combinatorial combination of arguments
 (define (toSetOfLists list-of-sets)
@@ -224,7 +228,7 @@
                             (for/list ([t (in-list mtypes)]
                                        [arg (in-list arglist)]
                                        #:when (eq? t 'any))
-                              #`[#,arg (force pσ #,arg)])])
+                              #`[#,arg #:in-force pσ #,arg])])
                (quasisyntax/loc stx
                  (match vs
                    [(list-rest args ... rest-arg)
@@ -294,7 +298,7 @@
                                (and (attribute p)
                                     (syntax-parser
                                       [(pσ vs)
-                                       #`(do (pσ) ([v (force pσ (car vs))]
+                                       #`(do (pσ) ([v #:in-force pσ (car vs)]
                                                    [res (in-list
                                                          (let ([r #,(type->pred-stx (attribute p.type) #'v)])
                                                            (if (eq? v ●)
@@ -317,31 +321,69 @@
 
 (define-syntax (mk-primitive-meaning stx)
   (syntax-parse stx
-    [(_ global-σ?:boolean mean:id defines ...
-        ((~var p (prim-entry (syntax-e #'global-σ?))) ...))
-     (define ((ap m) arg-stx)
-       (if (procedure? m)
-           (m arg-stx)
-           (datum->syntax arg-stx (cons m arg-stx) arg-stx)))
-     (quasisyntax/loc stx
-       (begin
-         defines ...
-         (define-syntax-rule (mean o pσ l δ v-addrs)
-           (case o
-             #,@(for/list ([p (in-list (syntax->list #'(p.prim ...)))]
-                           [w? (in-list (syntax->datum #'(p.write-store? ...)))]
-                           [r? (in-list (syntax->datum #'(p.read-store? ...)))]
-                           [m (in-list (map ap (attribute p.meaning)))]
-                           [checker (in-list (attribute p.checker-fn))])
-                  #`[(#,p)
-                     #;
-                     (log-debug "Applying primitive ~a" '#,p)
-                     ;; Checkers will force what they need to and keep the rest
-                     ;; lazy. Forced values are exploded into possible
-                     ;; argument combinations
-                     (do (pσ) ([vs (#,checker
-                                   #,@(if (syntax-e #'global-σ?) #'() #'(pσ))
-                                   v-addrs)])
-                       #,(cond [w? (m #'(pσ l δ vs))]
-                               [r? (m #'(pσ vs))]
-                               [else (m #'(vs))]))])))))]))
+         [(_ gb?:boolean σtb?:boolean σdb?:boolean cb?:boolean 0b?:boolean
+             mean:id compile:id co:id ((~var p (prim-entry (syntax-e #'gb?))) ...) defines ...)
+          (define global-σ? (syntax-e #'gb?))
+          (define σ-threading? (syntax-e #'σtb?))
+          (define σ-∆s? (syntax-e #'σdb?))
+          (define compiled? (syntax-e #'cb?))
+          (define 0cfa? (syntax-e #'0b?))          
+          (define ((ap m) arg-stx)
+            (if (procedure? m)
+                (m arg-stx)
+                (datum->syntax arg-stx (cons m arg-stx) arg-stx)))
+          (define hidden-σ (and σ-∆s? (not global-σ?) (generate-temporary #'hidden)))
+          (with-syntax ([(σ-op ...) (if global-σ? #'() #'(pσ))]
+                        [(σ-gop ...) (if σ-threading? #'(pσ) #'())]
+                        [(top ...) (listy hidden-σ)]
+                        [topp (or hidden-σ #'pσ)]
+                        [(top-op ...) (if σ-∆s? #'(top-σ) #'())]
+                        [(δ-op ...) (if 0cfa? #'() #'(δ))])
+            (define eval
+              #`(case o
+                  #,@(for/list ([p (in-list (syntax->list #'(p.prim ...)))]
+                                [w? (in-list (syntax->datum #'(p.write-store? ...)))]
+                                [r? (in-list (syntax->datum #'(p.read-store? ...)))]
+                                [m (in-list (map ap (attribute p.meaning)))]
+                                [checker (in-list (attribute p.checker-fn))])
+                       #`[(#,p)
+                          (λP (pσ ℓ δ k v-addrs)
+                              (with-prim-yield
+                               k
+                               ;; Checkers will force what they need to and keep the rest
+                               ;; lazy. Forced values are exploded into possible
+                               ;; argument combinations
+                               (do (pσ) ([vs (#,checker σ-op ... v-addrs)])
+                                 #,(cond [w? (m #'(pσ ℓ δ vs))]
+                                         [r? (m #'(pσ vs))]
+                                         [else (m #'(vs))]))))])))
+            (quasisyntax/loc stx
+              (begin
+                ;; Let primitives yield single values instead of entire states.
+                #,#'(define-syntax (with-prim-yield syn)
+                      (syntax-parse syn
+                        [(_ k body)
+                         (define yield-tr (syntax-parameter-value #'yield-meaning))
+                         (define new
+                           (λ (sx)
+                              (syntax-parse sx
+                                [(_ v)
+                                 (yield-tr (syntax/loc sx (yield (co target-σ k v))))])))
+                         #`(syntax-parameterize ([yield #,new]) body)]))
+                defines ...
+                (define-syntax-rule (... (λP (pσ ℓ δ k v-addrs) body ...))
+                  #,(if compiled?
+                        #'(λ (top ... σ-gop ... ℓ δ-op ... k v-addrs)
+                             (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
+                                                   [target-σ (make-rename-transformer #'pσ)]
+                                                   [top-σ? #t])
+                               body (... ...)))
+                        #'(let () body (... ...))))
+                (define-syntax-rule (compile o)
+                  #,(if compiled?
+                        eval
+                        #'o))
+                (define-syntax-rule (mean o pσ ℓ δ k v-addrs)
+                  #,(if compiled?
+                        #'(o top-op ... σ-gop ... ℓ δ-op ... k v-addrs)
+                        eval)))))]))
