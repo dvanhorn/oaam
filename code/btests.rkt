@@ -17,15 +17,17 @@
 
 (define-syntax-rule (test aval e)
   (parameterize ([current-logger (make-logger 'stuck-states)])
+#;#;
     (log-thread 'info)
     (log-thread 'debug)
     (with-handlers ([exn:fail:resource?
                      (λ (e) (case (exn:fail:resource-resource e)
-                              [(time) (printf "Timeout~%")]
+                              [(time) (dump-memory-stats) (printf "Timeout~%")]
                               [(memory) (printf "Exhausted memory~%")]))])
       (with-limits 3600 10240
                    (call-with-values
-                       (λ () (time (aval e)))
+                       (λ () (begin0 (time (aval e))
+                                     (dump-memory-stats)))
                      print-values)))))
 
 (define to-test
