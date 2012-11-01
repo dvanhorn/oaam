@@ -270,6 +270,23 @@
                         [σ*-mv #:join* vσ V-addrs (make-list size d)])
                 (yield (vectorv size V-addrs)))]))
 
+       (define/write (vectorv->list vlσ l δ v)
+         (match v
+           [(== vec0) (yield '())]
+           [(vectorv len addrs) (error 'TODO "concrete vector->list")]
+           [(or (vectorv^ len addr)
+                (vectorv-immutable^ len addr))
+            (define A-addr (make-var-contour `(A . ,l) δ))
+            (define D-addr (make-var-contour `(D . ,l) δ))
+            (define val (consv A-addr D-addr))
+            (do (vlσ) ([cσ #:alias vlσ A-addr addr]
+                       [cσ* #:join cσ D-addr (⊓1 snull val)])
+              (yield val))]
+           [(or (? vectorv^?) (== vector-immutable^))
+            (do (vlσ) ([out (in-list (list cons^ '()))])
+              (yield out))]
+           [(? vector?) (error 'TODO "vector literal->list")]))
+
        (define-simple-macro* (make-vector^ vσ l δ vs)
          (let ([V-addr (make-var-contour `(V . ,l) δ)])
            (do (vσ) loop ([v vs]) 
@@ -536,6 +553,8 @@
      [vector-ref #t #f vectorv-ref (v z -> any)]
      [vector-set! #f #t vectorv-set! (v z any -> !)]
      [vector-length #f #f vectorv-length (v -> z)]
+     [vector->list #f #t vectorv->list (v -> lst)]
+#;[list->vector #f #t list->vectorv (lst -> v)]
      [vector? #:predicate v]
      ;; Strings
      [string? #:predicate s]
