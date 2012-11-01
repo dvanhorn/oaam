@@ -1,23 +1,45 @@
-\documentclass{llncs}
+\documentclass[preprint]{sigplanconf}
 \usepackage{alltt}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{stmaryrd}
-\usepackage{xltxtra}
-\setmonofont[Scale=MatchLowercase]{DejaVu Sans Mono}
+% \usepackage{xltxtra}
+% \setmonofont[Scale=MatchLowercase]{DejaVu Sans Mono}
 %
 \input{preamble}
-\begin{document}
-\title{Optimizing Abstract$^2$ Machines}
-%
-\frontmatter          % for the preliminaries
-%
-\author{J.~Ian Johnson\inst{1} \and Matthew Might\inst{2} \and David Van Horn\inst{1}}
-\institute{Northeastern University \and University of Utah}
 
-\maketitle              % typeset the title of the contribution
+\begin{document}
+
+\conferenceinfo{WXYZ '05}{date, City.} 
+\copyrightyear{2005} 
+\copyrightdata{[to be supplied]} 
+
+% \titlebanner{banner above paper title}        % These are ignored unless
+% \preprintfooter{short description of paper}   % 'preprint' option specified.
+
+\title{Optimizing Abstract$^{\text 2}$ Machines}
+
+%% \authorinfo{J. Ian Johnson}
+%%            {Northeastern University}
+%%            {ianj@ccs.neu.edu}
+%% \authorinfo{Matthew Might}
+%%            {University of Utah}
+%%            {might@cs.utah.edu}
+%% \authorinfo{David Van Horn}
+%%            {Northeastern University}
+%%            {dvanhorn@ccs.neu.edu}
+\authorinfo{}{}{}
+
+\maketitle
 
 \begin{abstract}
+Recently \emph{abstracting abstract machines} has been proposed as a
+systematic approach to designing sound and computable program analyses
+for higher-order programming languages.  The approach has been applied
+to a wide variety of languages with features widely considered
+difficult to analyze
+
+
 The abstracting abstract machines approach to program analysis makes
 it easy to design and implement sound and computable abstract
 interpretations of higher-order programs.
@@ -30,7 +52,15 @@ abstract$^2$ machine to an efficient program analyzer that is (nearly)
 three orders of magnitude faster than the starting point, yet just as
 precise (and purely functional).
 \end{abstract}
-%
+
+%% \category{CR-number}{subcategory}{third-level}
+
+%% \terms
+%% term1, term2
+
+%% \keywords
+%% keyword1, keyword2
+
 \section{Introduction}
 
 \subsection{Notation and prerequisites}
@@ -89,9 +119,9 @@ different in the following ways:
   $\mathit{push}$, $\mathit{bind}$, and $\interpdelta$.
 \end{itemize}
 
-\begin{figure}
+\begin{figure*}
 \begin{align*}
-\mathit{eval}(\mexp) &= \{ \mstate\ |\ \ev[^{\epsilon}]{\mexp,\varnothing,\varnothing,\kmt} \multimachstep \mstate \} \text{ where }
+\mathit{eval}(\mexp) &= \{ \mstate\ |\ \ev[^{\mtcntr}]{\mexp,\varnothing,\varnothing,\kmt} \multimachstep \mstate \} \text{ where }
 \\[2mm]
 %% EVAL
 \ev{\svar\mvar,\menv,\msto,\mkont} &\machstep
@@ -143,16 +173,17 @@ different in the following ways:
 \end{align*}
 \caption{Abstract$^2$ machine for ISWIM}
 \label{fig:aam}
-\end{figure}
+\end{figure*}
 
 
 \paragraph{Concrete interpretation} can be characterized by setting the implicit
 parameters of the relation given in Figure~\ref{fig:aam} as follows:
 \begin{align*}
-\mathit{push}(l,\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
+\mathit{push}(\ell,\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
 \mbox{ where }\maddr \notin\msto
 \\
 \mathit{bind}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\msto\sqcup[\maddr\mapsto\{\mval\}]
+\mbox{ where }\maddr \notin\msto
 \end{align*}
 The resulting relation is non-deterministic in its choice of
 addresses, however it must always choose a fresh address when
@@ -194,6 +225,15 @@ strategy:
 \mathit{bind} &= \dots
 \end{align*}
 
+\paragraph 0CFA
+
+\begin{align*}
+\mathit{push}(\ell,\msto,\mkont) &= \ell,\msto\sqcup[\ell\mapsto\{\mkont\}]
+\\
+\mathit{bind}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\mvar],\msto\sqcup[\mvar\mapsto\{\mval\}]
+\end{align*}
+
+
 \paragraph{Primitives}
 
 
@@ -230,38 +270,33 @@ strategy:
     (match state
       [(ev σ e ρ k)
        (match e
-         [(var l x)           (for/set ((v (lookup ρ σ x))) (co σ k v))]
-         [(num l n)           (set (co σ k n))]
-         [(bln l b)           (set (co σ k b))]
-         [(lam l x e)         (set (co σ k (clos l x e ρ)))]
-         [(rec f (lam l x e)) (set (co σ k (rlos l f x e ρ)))]
-         [(app l f e)
+         [(var\(\superscript\ell\) x)           (for/set ((v (lookup ρ σ x))) (co σ k v))]
+         [(lit\(\superscript\ell\) l)           (set (co σ k n))]
+         [(lam\(\superscript\ell\) x e)         (set (co σ k (clos x e ρ)))]
+         [(app\(\superscript\ell\) f e)
           (define-values (σ* a) (push state))
           (set (ev σ* f ρ (ar e ρ a)))]
-         [(ife l e0 e1 e2)
+         [(ife\(\superscript\ell\) e0 e1 e2)
           (define-values (σ* a) (push state))
-          (set (ev σ* e0 ρ (ifk e1 e2 ρ a)))]
-         [(1op l o e)
-          (define-values (σ* a) (push state))
-          (set (ev σ* e ρ (1opk o a)))])]
+          (set (ev σ* e0 ρ (ifk e1 e2 ρ a)))])]
       [(co σ k v)
        (match k
          ['mt (set (ans σ v))]
-         [(ar e ρ l) (set (ev σ e ρ (fn v l)))]
-         [(fn f l)   (for/set ((k (get-cont σ l))) (ap σ f v k))]
-         [(fi c a ρ l)
+         [(ar\(\superscript\ell\) e ρ) (set (ev σ e ρ (fn v l)))]
+         [(fn\(\superscript\ell\) f)   (for/set ((k (get-cont σ l))) (ap σ f v k))]
+         [(fi\(\superscript\ell\) c a ρ)
           (for/set ((k (get-cont σ l)))
-            (ev σ (if v c a) ρ k))]
-         [(oa o l)
-          (for*/set ((k (get-cont σ l))
-                     (v (delta o (list v))))
-            (co σ k v))]
+            (ev σ (if v c a) ρ k))])]
       [(ap σ fun a k)
        (match fun
          [(clos l x e ρ)
           (define-values (ρ* σ*) (bind state))
           (set (ev σ* e ρ* k))]
-         [_ (set)])]
+         [(? op? o)
+          (for*/set ((k (get-cont σ l))
+                     (v (\(\Delta\) o (list v))))
+            (co σ k v))
+         [_ (set)]))]))
 \end{alltt}
 \caption{Implementation of machine transition relation.}
 \end{figure}
@@ -269,6 +304,18 @@ strategy:
 \subsection{An example: Analyzing Church number computations}
 
 \newcommand{\church}[1]{\(\ulcorner{\tt #1}\urcorner\)}
+
+\begin{alltt}
+(define \church2 (\(\lambda\) (f) (\(\lambda\) (x) (f (f x)))))
+
+(define pred
+  (\(\lambda\) (n)
+    (\(\lambda\) (rf)
+      (\(\lambda\) (rx)
+        (((n (\(\lambda\) (g) (\(\lambda\) (h) (h (g rf)))))
+          (\(\lambda\) (i) rx))
+         (\(\lambda\) (id) id))))))
+\end{alltt}
 
 \begin{alltt}
 ;; multiplication distributes over addition
@@ -282,7 +329,14 @@ The \syntax{plus} and \syntax{mult} functions are written as usual.
 
 This program reaches $N$ states under concrete interpretation.
 
+\newpage
 \subsection{Generic fixpoint calculator}
+
+\begin{alltt}
+;; Expr \(\rightarrow\) Setof State
+(define (eval e)
+  (fix step (set (inj e))))
+\end{alltt}
 
 We compute the semantics of a program by iterating the state
 transition relation until a fixed point in the reachable states is
@@ -435,14 +489,52 @@ Compile:
 Compile + Lazy:
    cpu time: 31173 real time: 31642 gc time: 739
 
+\newpage
 \subsection{Fixed-point specialization}
 
+\begin{alltt}
+;; State^ -> State^
+;; Specialized from wide-step : State^ -> { State^ } ≈ State^ -> State^
+(define (wide-step-specialized state)
+  (match state
+    [(cons σ cs)
+     (define-values (cs* σ*)
+       (for/fold ([cs* (set)] [σ* σ])
+         ([c cs])
+         (match (step-compiled^ (cons σ c))
+           [(cons σ** cs**)
+            (values (set-union cs* cs**) (join-store σ* σ**))])))
+     (cons σ* (set-union cs cs*))]))
+\end{alltt}
 %% Should be commutted to beginning
 
 Special + Compile + Lazy:
    cpu time: 14212 real time: 14681 gc time: 823
 
 \subsection{Computing with store changes}
+
+\begin{alltt}
+;; State^ -> State^
+;; Specialized from wide-step : State^ -> { State^ } ≈ State^ -> State^
+(define (wide-step-specialized state)
+  (match state
+    [(cons σ cs)
+     (define-values (cs* ∆)
+       (for/fold ([cs* (set)] [∆* '()])
+         ([c cs])
+         (match (step-compiled^ (cons σ c))
+           [(cons ∆** cs**)
+            (values (set-union cs* cs**) (append ∆** ∆*))])))
+     (cons (update ∆ σ) (set-union cs cs*))]))
+\end{alltt}
+
+\[
+\{ \widehat{v_3}, \widehat{v_5}, \widehat{v_6} \} = 0001011
+\]
+
+\[
+\sigma = \mbox{\tt \#(0$_0$,\dots,0$_{|P|}$)}
+\]
 
 Delta Store + Special + Compile + Lazy:
    cpu time: 668 real time: 686 gc time: 41
@@ -546,6 +638,41 @@ machine interpretation of the program; the aceptability relation of
 Uniform \(k\)-CFA abstracts a program's execution as a \emph{finite
   map} that mimics the big-step evaluator: from terms to (sets of)
 values.)
+
+
+\subsection{Another problem with acceptability: Temporal ignorance}
+
+The small-step approach to static analysis brings subtle yet important temporal
+richness not found in classical analyses for higher-order programs.
+%
+Classical analyses (ultimately) compute judgments on program terms and
+contexts, e.g., at expression $e$, value $x$ may have value $v$.
+%
+The judgments do not relate the order in which expressions and context may be
+evaluated in a program, e.g., a classical analysis has nothing to say with
+regard to question like, ``Do we always evaluate $e_1$ before $e_2$?'' or ``Is
+it always the case that a file handle is opened, read and then closed in that
+order?''
+
+Small-step analyses, by their nature, encode the temporal relationships between
+abstract states.
+%
+It is sensible to make temporal queries of a small-step analysis.
+%
+Of course, this does not come for free: respecting temporal order imposes an
+order in which states and terms may be evaluated \emph{during} the analysis.
+%
+Classical analyses can (and do) evaluate expressions in any order, or in some
+cases, even in parallel~\cite{might:Prabhu:2010:EigenCFA}.
+%
+Relaxing that restriction on order affords additional optimizations that we
+have \emph{not} performed.
+
+We avoid sacrificing order not simply because we are interested in the
+questions it allows us to ask, but because considering temporal order actually
+improves the precision of the analysis itself.
+
+
 
 \section{Pushdown Analysis}
 
