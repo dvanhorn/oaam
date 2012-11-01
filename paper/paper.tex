@@ -381,6 +381,10 @@ Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 
 \section{Precision preserving recipe}
 
+The first four techniques reside in the purely functional realm. The
+following three techniques use imperative constructs to avoid allocation
+overhead.
+
 \subsection{Lazy non-determinism}
 
 Lazy:
@@ -538,6 +542,174 @@ Special + Compile + Lazy:
 
 Delta Store + Special + Compile + Lazy:
    cpu time: 668 real time: 686 gc time: 41
+
+% For David to fill in.
+\subsection{Imperative global store and worklist}
+...
+\subsection{Pre-allocated global store}
+...
+
+% Ian's sections: generators, implementation and compound data
+\section{Implementation}
+
+All the above techniques can be combined into a single implementation
+of the small step reduction relation and small variations of a general
+fixpoint combinator. We implementated all of these ideas in an
+analysis of R4RS scheme in just 3000 lines of Racket. Most lines are
+spent listing all the primitives and library functions (and their
+abstract and concrete implementations) of R4RS. Here we describe the
+unifying vocabulary for writing such a framework, and some design
+decisions related to scaling to a language with compound data.
+
+\subsection{Vocabulary of Parameterized Optimizations}
+
+We combine the interface of generators ~\cite{ianjohnson:cluhistory}
+with a special lambda form ({\tt $\lambda$\%}) that wraps the meanings
+of {\tt ev} states. We also have a special {\tt do} form that performs
+behind-the-scenes state passing and iteration much like {\tt do} in
+Haskell. In the presence of the different optimization
+techniques, {\tt generator}, {\tt yield}, {\tt $\lambda$\%} and {\tt do}
+change meaning slightly, but keep the same interface as their names
+suggest.
+
+\begin{figure}
+\begin{alltt}
+\(e-dispatch =\)
+ (match e
+    [(var\(\superscript\ell\) x)
+     (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+      (do (\(\msto\)) ((v (delay (lookup-env \(\menv\) x))))
+        (yield (co \(\msto\) k v))))]
+    [(lit\(\superscript\ell\) l)
+     (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+      (do (\(\msto\)) () (yield (co \(\msto\) k n))))]
+    [(lam\(\superscript\ell\) x e)
+     (define c (compile e))
+     (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+      (do (\(\msto\)) () (yield (co \(\msto\) k (clos x c \(\menv\))))))]
+    [(app\(\superscript\ell\) f e)
+     (define cf (compile f))
+     (define ce (compile e))
+     (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+      (define-values (\(\msto\)* a) (push state))
+      (yield (ev \(\msto\)* cf \(\menv\) (ar c \(\menv\) a))))]
+    [(ife\(\superscript\ell\) e0 e1 e2)
+      (define c0 (compile e0))
+      (define c1 (compile e1))
+      (define c2 (compile e2))
+      (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+        (do (\(\msto\)) [(\(\msto\)* a) (push state)]
+         (yield (ev \(\msto\)* c0 \(\menv\) (ifk c1 c2 \(\menv\) a)))))])
+
+  (define (step state)
+    (match state
+      [(ev \(\msto\) e \(\menv\) k) \(e-dispatch\)] ;; dead if compiled.
+      [(co \(\msto\) k v)
+       (match k
+         ['mt (generator (do (\(\msto\)) ([v <- (force \(\msto\) v)])
+           (yield (ans \(\msto\) v))))]
+         [(ar\(\superscript\ell\) e \(\menv\))
+          (generator (do (\(\msto\)) ()
+            (yield (ev \(\msto\) e \(\menv\) (fn v l)))))
+         [(fn\(\superscript\ell\) f)
+          (generator (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)])
+           (yield (ap \(\msto\) f v k))))]
+         [(fi\(\superscript\ell\) c a \(\menv\))
+          (generator
+           (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)]
+                    [v <- (force \(\msto\) v)])
+             (yield (ev \(\msto\) (if v c a) \(\menv\) k))))])]
+      [(ap \(\msto\) fun a k)
+       (match fun
+         [(clos l x e \(\menv\))
+          (generator
+           (do (\(\msto\)) ([(\(\menv\)* \(\msto\)*) (bind state)])
+             (yield (ev \(\msto\)* e \(\menv\)* k))))]
+         [(? op? o)
+          (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)]
+                   [v <- (force \(\msto\) v)]
+                   [v (\(\Delta\) o (list v))])
+            (yield (co \(\msto\) k v)))
+         [_ (generator (do (\(\msto\)) () (continue)))]))]))
+\end{alltt}
+\caption{Parameterized Abstract$^2$ machine for ISWIM}
+\label{fig:paam}
+\end{figure}
+
+\begin{figure}
+\begin{alltt}
+(define (compile e) \(e-dispatch\))
+(\(\lambda\)\% (\(\msto\) \(\menv\) k) body \ldots) \(\machstep\) (\(\lambda\) (\(\msto\) \(\menv\) k) body \ldots)
+(yield (ev \(\msto\) c . rest)) \(\longmapsto\) (c \(\msto\) . rest)
+(yield e) \(\longmapsto\) (yield-meaning e)
+\end{alltt}
+\caption{Meaning of forms if compiled}
+\label{fig:cfm}
+\end{figure}
+
+\begin{figure}
+\begin{alltt}
+(define (compile e) e)
+(\(\lambda\)\% (\(\msto\) \(\menv\) k) body \ldots) \(\longmapsto\) (let () body ...)
+(yield e) \(\longmapsto\) (yield-meaning e)
+\end{alltt}
+\caption{Meaning of forms if not compiled}
+\label{fig:ncfm}
+\end{figure}
+
+Why generators? Relations in general cannot be written as computable
+functions, but in our case we have a decidable, finitely
+non-deterministic relation. There are several implementation
+strategies for relations, some more effective than others. For
+instance, a silly implementation strategy would be defining a binary
+function that decides membership in the relation. We want the
+definition to drive the interpretor, so we might naturally decide to
+write a function that takes a state and returns a set of all the next
+states. As we described in the imperative workset section, this
+intermediate allocation is unnecessary and wasteful. What we really
+want is a way of pulling on the reduction relation for more next
+states as the fixpoint is ready for them.
+
+For intermediate sets, {\tt yield} is {\tt return} in the set
+monad. For the imperative worklist, {\tt yield} performs mutation
+behind the scenes. Indeed, we could use real generators! This is the
+only case where {\tt generator} constructs a nullary generator; in the
+other cases it evaluates to its body. Racket's generators are not
+tuned for performance, so we actually lose efficiency in this case,
+but the unifying vocabulary is instructive nonetheless.
+
+The {\tt $\lambda$\%} form constructs a real closure in the
+compilation case and evaluates to its body otherwise.
+
+The {\tt do} form has the special job of maintaining the current store
+and accumulated states (if indeed those are being passed around). It
+uses Racket's syntax parameters ~\cite{ianjohnson:eli/stxparam} to
+track the most recent bindings of these accumulators so that {\tt
+  yield-meaning} can refer to them (say {\tt $\sigma$p} and {\tt
+  statep}). In the case of state passing and set-accumulated states, its
+definition is simply
+
+\begin{center}
+\begin{alltt}
+(yield-meaning e) \(\longmapsto\) (values \(\sigma\)p (set-add statep e))
+\end{alltt}
+\end{center}
+
+The linguistic elements described above were all reusable to implement
+the various languages' abstract interpreters. One such language was
+R4RS Scheme, which has compound data (e.g. vectors and conses). 
+
+\subsection{Abstracting Compound Data}
+
+We discovered that the choice of abstract domain for literal data
+(such as the large quoted axiom database in the Boyer benchmark)
+drastically affected the performance of our analysis on the benchmark
+suite. It is worth discussing the ``obvious'' and na\"ive abstraction
+that is natural to a reader of
+~\citep{dvanhorn:VanHorn2011Abstracting}, and other easy-to-implement
+yet effective approaches.
+
+TODO: {\tt (cons A-addr D-addr)}, {\tt qpair}, {\tt opaque-atom}.
 
 \section{Evaluation}
 
