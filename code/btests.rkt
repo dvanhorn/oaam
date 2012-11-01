@@ -32,6 +32,8 @@
 
 (define to-test
   (list "../benchmarks/church.sch"
+        "../benchmarks/mbrotZ.sch"
+        "../benchmarks/earley.sch"
         "../benchmarks/toplas98/boyer.sch"
         "../benchmarks/toplas98/graphs.sch"
         "../benchmarks/toplas98/lattice.scm"

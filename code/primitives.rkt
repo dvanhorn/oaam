@@ -48,10 +48,10 @@
 (define-simple-macro* (yield-both bσ)
   (do (bσ) ([b (in-list '(#t #f))]) (yield b)))
 
-(define-for-syntax (prim-defines clos? rlos?)
+(define-for-syntax (prim-defines clos? rlos? concrete?)
   (with-syntax ([clos? clos?]
                 [rlos? rlos?])
-    #'((define-syntax-rule (yield-delay ydσ v)
+    #`((define-syntax-rule (yield-delay ydσ v)
          (do (ydσ) ([v* (delay ydσ v)]) (yield v*)))
        (define-simple-macro* (errorv vs)
          (begin (log-info "Error reachable ~a" vs)
@@ -309,6 +309,35 @@
             (do (vlσ) ([out (in-list (list cons^ '()))])
               (yield out))]
            [(? vector?) (error 'TODO "vector literal->list")]))
+
+       (define/write (list->vectorv lvσ l δ lst)
+         (match lst
+           ['() (yield vec0)]
+           [(== cons^) (yield vector^)]
+           [(== ●)
+            (do (lvσ) ([out (in-list (list vec0 vector^))])
+              (yield out))]
+           [(consv A D)
+            #,(if concrete?
+                #'(error 'TODO "concrete list->vector")
+                #'(let ([cell (make-var-contour `(V . ,l) δ)]
+                        [seen (make-hash)])
+                    (do (lvσ) loop ([todo (set lst)])
+                      (cond [(∅? todo) (yield (vectorv^ number^ cell))]
+                            [else
+                             (do (lvσ) ([val (in-set todo)])
+                               (cond [(hash-has-key? seen val) (continue)]
+                                     [else
+                                      (hash-set! seen val #t)
+                                      (match val
+                                        [(? cons^?)
+                                         (do (lvσ) ([σ* #:join lvσ cell (singleton ●)])
+                                           (loop σ* (todo . ∖1 . val)))]
+                                        [(consv A D)
+                                         (do (lvσ) ([σ* #:alias lvσ cell A]
+                                                    [more #:get σ* D])
+                                           (loop σ* (∪ (todo . ∖1 . val) more)))]
+                                        [_ (continue)])]))]))))]))
 
        (define-simple-macro* (make-vector^ vσ l δ vs)
          (cond [(null? vs) (yield vec0)]
@@ -580,7 +609,7 @@
      [vector-set! #f #t vectorv-set! (v z any -> !)]
      [vector-length #f #f vectorv-length (v -> z)]
      [vector->list #f #t vectorv->list (v -> lst)]
-#;[list->vector #f #t list->vectorv (lst -> v)]
+     [list->vector #f #t list->vectorv (lst -> v)]
      [vector? #:predicate v]
      ;; Strings
      [string? #:predicate s]
@@ -673,13 +702,13 @@
 
 (mk-static-prims primitive? changes-store? reads-store?)
 
-(define-for-syntax ((mk-mk-prims global-σ? σ-threading? σ-∆s? compiled? 0cfa?) stx)
+(define-for-syntax ((mk-mk-prims global-σ? σ-threading? σ-∆s? compiled? K) stx)
   (syntax-parse stx
     [(_ mean:id compile:id co:id clos?:id rlos?:id)
      (quasisyntax/loc stx
        (mk-primitive-meaning
-        #,global-σ? #,σ-threading? #,σ-∆s? #,compiled? #,0cfa?
-        mean compile co #,@(prim-defines #'clos? #'rlos?) 
+        #,global-σ? #,σ-threading? #,σ-∆s? #,compiled? #,(= K 0)
+        mean compile co #,@(prim-defines #'clos? #'rlos? (= K +inf.0)) 
         #,prim-table))]))
 
 (define prim-constants

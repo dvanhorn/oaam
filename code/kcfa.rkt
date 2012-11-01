@@ -234,7 +234,7 @@
 
            (define-syntax mk-prims (mk-mk-prims #,(given global-σ?) #,σ-threading?
                                                 #,(given σ-∆s?) #,(given compiled?)
-                                                #,(zero? (attribute K))))
+                                                #,(attribute K)))
            (mk-prims prim-meaning compile-primop co clos? rlos?)
            ;; [Rel State State]
            (define (step state)
