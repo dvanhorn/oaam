@@ -634,8 +634,9 @@
      (quasisyntax/loc stx
        (mk-primitive-meaning
         #,global-σ? #,σ-threading? #,σ-∆s? #,compiled? #,0cfa?
-        mean compile co #,prim-table 
-        #,@(prim-defines #'clos? #'rlos?)))]))
+        mean compile co #,@(prim-defines #'clos? #'rlos?) 
+        #,prim-table))]))
+
 (define prim-constants
   (hasheq 'eof eof
           'null '()

@@ -79,7 +79,7 @@
                     (yield (co ev-σ k v))))]
              [(datum l d) (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k d))))]
              [(primr l which)
-              (define p (primop which))
+              (define p (primop (compile-primop which)))
               (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k p))))]
              [(lam l x e*)
               (define c (compile e*))
@@ -120,8 +120,6 @@
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([(σ*-st! a) #:push ev-σ l δ k])
                     (yield (ev σ*-st! c ρ (sk! (lookup-env ρ x) a) δ))))]
-             [(primr l which) (define p (primop (compile-primop which)))
-              (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k p))))]
              [_ (error 'eval "Bad expr ~a" e)])))
 
        (define compile-def
@@ -234,9 +232,9 @@
 
            #,@compile-def
 
-           (define-syntax mk-prims #,(mk-mk-prims (given global-σ?) σ-threading?
-                                                  (given σ-∆s?) (given compiled?)
-                                                  (zero? (attribute K))))
+           (define-syntax mk-prims (mk-mk-prims #,(given global-σ?) #,σ-threading?
+                                                #,(given σ-∆s?) #,(given compiled?)
+                                                #,(zero? (attribute K))))
            (mk-prims prim-meaning compile-primop co clos? rlos?)
            ;; [Rel State State]
            (define (step state)

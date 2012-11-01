@@ -322,7 +322,7 @@
 (define-syntax (mk-primitive-meaning stx)
   (syntax-parse stx
          [(_ gb?:boolean σtb?:boolean σdb?:boolean cb?:boolean 0b?:boolean
-             mean:id compile:id co:id ((~var p (prim-entry (syntax-e #'gb?))) ...) defines ...)
+             mean:id compile:id co:id defines ... ((~var p (prim-entry (syntax-e #'gb?))) ...))
           (define global-σ? (syntax-e #'gb?))
           (define σ-threading? (syntax-e #'σtb?))
           (define σ-∆s? (syntax-e #'σdb?))
@@ -371,6 +371,7 @@
                                  (yield-tr (syntax/loc sx (yield (co target-σ k v))))])))
                          #`(syntax-parameterize ([yield #,new]) body)]))
                 defines ...
+                ;; λP very much like λ%
                 (define-syntax-rule (... (λP (pσ ℓ δ k v-addrs) body ...))
                   #,(if compiled?
                         #'(λ (top ... σ-gop ... ℓ δ-op ... k v-addrs)
@@ -379,10 +380,9 @@
                                                    [top-σ? #t])
                                body (... ...)))
                         #'(let () body (... ...))))
+                ;; Identity if not compiled.
                 (define-syntax-rule (compile o)
-                  #,(if compiled?
-                        eval
-                        #'o))
+                  #,(if compiled? eval #'o))
                 (define-syntax-rule (mean o pσ ℓ δ k v-addrs)
                   #,(if compiled?
                         #'(o top-op ... σ-gop ... ℓ δ-op ... k v-addrs)

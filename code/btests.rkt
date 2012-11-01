@@ -13,16 +13,20 @@
   (let ([lr (make-log-receiver (current-logger) kind)])
     (thread (λ () (let loop () (define vs (sync lr)) (write vs) (newline) (loop))))))
 
+(define (print-values . vs) (for ([v vs]) (display v) (newline)))
+
 (define-syntax-rule (test aval e)
   (parameterize ([current-logger (make-logger 'stuck-states)])
     (log-thread 'info)
     (log-thread 'debug)
-    (call-with-limits 3600 4096
-                      (λ () (call-with-values
-                                (λ () (time (aval e)))
-                              (λ vs
-                                 (for ([v vs])
-                                   (display v) (newline))))))))
+    (with-handlers ([exn:fail:resource?
+                     (λ (e) (case (exn:fail:resource-resource e)
+                              [(time) (printf "Timeout~%")]
+                              [(memory) (printf "Exhausted memory~%")]))])
+      (with-limits 3600 10240
+                   (call-with-values
+                       (λ () (time (aval e)))
+                     print-values)))))
 
 (define to-test
   (list "../benchmarks/church.sch"
@@ -37,7 +41,9 @@
         ;;"../benchmarks/toplas98/nucleic2.sch" ;; define-syntax
         ;;"../benchmarks/toplas98/handle.scm" ;; old match and defmacro
 ))
+
 (for ([t to-test]) (test lazy-0cfa^/c! (prep t)))
+#;#;
 (printf "~%~%==============BASELINE=============~%~%")
 (for ([t to-test]) (test 0cfa^ (prep t)))
 
