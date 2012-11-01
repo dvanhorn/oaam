@@ -46,6 +46,8 @@
         ;;"../benchmarks/toplas98/handle.scm" ;; old match and defmacro
 ))
 
+(test lazy-0cfa^/c! (prep "../benchmarks/toplas98/maze.sch"))
+#;
 (for ([t to-test]) (test lazy-0cfa^/c! (prep t)))
 #;#;
 (printf "~%~%==============BASELINE=============~%~%")

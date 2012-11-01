@@ -127,7 +127,7 @@
               (λ% (ev-σ ρ k δ)
                   (define x-addr (make-var-contour x δ))
                   (define/ρ ρ* (extend ρ x x-addr))
-                  (do (ev-σ) ([(σ*-lcc a) #:join ev-σ x-addr (singleton k)])
+                  (do (ev-σ) ([σ*-lcc #:join ev-σ x-addr (singleton k)])
                     (yield (ev σ*-lcc c ρ* k δ))))]
              [_ (error 'eval "Bad expr ~a" e)])))
 

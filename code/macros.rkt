@@ -122,10 +122,17 @@
      `(,let$ ([,x ,in]) ,(tf datumss rhsss #f))]
     [`(case . ,rst) (error 'case-tf "Bad input ~a" rst)]))
 
+;; XXX: improper handling of else and =>. Oh well.
 (define (cond-tf inp)
   (match inp
     [`(cond) `(,void$)]
     [`(cond [else . ,lasts]) `(,define-ctx . ,lasts)]
+    [`(cond [,guard => ,rhs] . ,rest)
+     (define x (igensym 'cond-proc))
+     `(,let$ ([,x ,guard])
+         (,if$ ,x
+               (,rhs ,x)
+               ,(cond-tf `(cond . ,rest))))]
     [`(cond [,guard ,rhss ...] . ,rest)
      `(,if$ ,guard (,define-ctx . ,rhss) ,(cond-tf `(cond . ,rest)))]
     [_ (error 'cond-tf "Bad input ~a" inp)]))

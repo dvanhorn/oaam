@@ -55,6 +55,7 @@
       [(st! _ x e)
        (define efs (loop e))
        (if (x . ∈ . bound) efs (∪1 efs x))]
+      [(lcc _ x e) (loop* e (∪1 bound x))]
       [(primr _ _) ∅]
       [(datum _ _) ∅]
       [_ (error 'free "Bad expr ~a" e)])))
