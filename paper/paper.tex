@@ -639,6 +639,41 @@ Uniform \(k\)-CFA abstracts a program's execution as a \emph{finite
   map} that mimics the big-step evaluator: from terms to (sets of)
 values.)
 
+
+\subsection{Another problem with acceptability: Temporal ignorance}
+
+The small-step approach to static analysis brings subtle yet important temporal
+richness not found in classical analyses for higher-order programs.
+%
+Classical analyses (ultimately) compute judgments on program terms and
+contexts, e.g., at expression $e$, value $x$ may have value $v$.
+%
+The judgments do not relate the order in which expressions and context may be
+evaluated in a program, e.g., a classical analysis has nothing to say with
+regard to question like, ``Do we always evaluate $e_1$ before $e_2$?'' or ``Is
+it always the case that a file handle is opened, read and then closed in that
+order?''
+
+Small-step analyses, by their nature, encode the temporal relationships between
+abstract states.
+%
+It is sensible to make temporal queries of a small-step analysis.
+%
+Of course, this does not come for free: respecting temporal order imposes an
+order in which states and terms may be evaluated \emph{during} the analysis.
+%
+Classical analyses can (and do) evaluate expressions in any order, or in some
+cases, even in parallel~\cite{might:Prabhu:2010:EigenCFA}.
+%
+Relaxing that restriction on order affords additional optimizations that we
+have \emph{not} performed.
+
+We avoid sacrificing order not simply because we are interested in the
+questions it allows us to ask, but because considering temporal order actually
+improves the precision of the analysis itself.
+
+
+
 \section{Pushdown Analysis}
 
 It is straightforward to instantiate a \emph{pushdown} abstraction by
