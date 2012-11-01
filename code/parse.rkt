@@ -53,6 +53,9 @@
           [`(if ,g ,t)
            (printf "Warning: If without else: ~a~%" sexp)
            (parse-core `(if ,g ,t (,void$)))]
+          [`(let/cc ,x ,e)
+           (define x-id (fresh-variable! x))
+           (lcc (fresh-label!) (parse* e (hash-set ρ x x-id)))]
           [`(,(or 'lambda 'if 'letrec 'set!) . ,rest)
            (error 'parse-core "Ill-formed core form ~a" sexp)]
           [`(,(== kwote) ,d) (datum (fresh-label!) d)]

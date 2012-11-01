@@ -7,6 +7,8 @@
 ;; (lam Lab Sym Exp)
 ;; (app Lab Exp Exp)
 ;; (if Lab Exp Exp Exp)
+;; (st! Lab Var Exp)
+;; (lcc Lab Var Exp)
 ;; (primr Lab Sym)
 ;; (datum Lab Atom)
 (struct exp (lab)             #:transparent)
@@ -17,6 +19,7 @@
 (struct app exp (rator rand)  #:transparent)
 (struct ife exp (t c a)       #:transparent)
 (struct st! exp (x e)         #:transparent)
+(struct lcc exp (x e)         #:transparent)
 
 (struct primr exp (which)    #:transparent)
 ;; (dst Lab Sym List[Pair[Sym Boolean]] Exp)

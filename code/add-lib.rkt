@@ -230,10 +230,9 @@
                     (for-each2 f a (car args)))
                    (else
                     (for-each* f (cons a args))))))))
-     #;
      (call-with-current-continuation .
-     (lambda (f)
-     (letcc x (f x))))
+                                     (lambda (f)
+                                       (let/cc x (f x))))
      (call-with-input-file .
        (lambda (s f)
          (let* ((p (open-input-file s))
@@ -317,10 +316,9 @@
                      (apply f (map car lists))
                      (or (apply f (map car lists))
                          (loop (map cdr lists))))))))
-       #;
-       (define call/cc
-         (lambda (f)
-           (letcc x (f x))))
+       (call/cc .
+                (lambda (f)
+                  (let/cc x (f x))))
        (dynamic-wind .
            (lambda (in doit out)
              (let* ([a (in)]

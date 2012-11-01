@@ -120,6 +120,15 @@
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([(σ*-st! a) #:push ev-σ l δ k])
                     (yield (ev σ*-st! c ρ (sk! (lookup-env ρ x) a) δ))))]
+             ;; let/cc is easier to add than call/cc since we make yield
+             ;; always make co states for primitives.
+             [(lcc l x e)
+              (define c (compile e))
+              (λ% (ev-σ ρ k δ)
+                  (define x-addr (make-var-contour x δ))
+                  (define/ρ ρ* (extend ρ x x-addr))
+                  (do (ev-σ) ([(σ*-lcc a) #:join ev-σ x-addr (singleton k)])
+                    (yield (ev σ*-lcc c ρ* k δ))))]
              [_ (error 'eval "Bad expr ~a" e)])))
 
        (define compile-def
@@ -159,7 +168,7 @@
            (mk-op-struct ls (l n es vs ρ k δ) (l n es vs ρ-op ... k δ-op ...))
            (mk-op-struct clos (x e ρ free) (x e ρ-op ... free) #:expander-id clos:)
            (mk-op-struct rlos (x r e ρ free) (x r e ρ-op ... free) #:expander-id rlos:)
-           (define (kont? v) (or (ls? v) (lrk? v) (ifk? v) (mt? v)))
+           (define (kont? v) (or (ls? v) (lrk? v) (ifk? v) (sk!? v) (mt? v)))
 
            #,@(if (given touches)
                   #`((mk-touches touches clos: rlos: #,(zero? (attribute K))))
@@ -306,6 +315,11 @@
                              ;;(printf "Arity error on ~a~%" f)
                              (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
                      [(primop o) (prim-meaning o ap-σ l δ k arg-addrs)]
+                     [(? kont? k)
+                      ;; continuations only get one argument.
+                      (cond [(and (pair? arg-addrs) (null? (cdr arg-addrs)))
+                             (do (ap-σ) ([v (delay ap-σ (car arg-addrs))])
+                               (yield (co ap-σ k v)))])]
                      [(== ●) (=> fail)
                       (log-debug "implement ●-call")
                       (fail)]
