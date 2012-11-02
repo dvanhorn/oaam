@@ -709,7 +709,70 @@ that is natural to a reader of
 ~\citep{dvanhorn:VanHorn2011Abstracting}, and other easy-to-implement
 yet effective approaches.
 
-TODO: {\tt (cons A-addr D-addr)}, {\tt qpair}, {\tt opaque-atom}.
+\subsubsection{Na\"ively}
+
+The uniform way they approach a simple abstraction strategy is to cut
+recursion out of the data definition by tying the recursive knot
+through the abstract store. For Scheme, the grammar for values looks like the following:
+
+\begin{alltt}
+Value ::= #t | #f | (cons Value Value) | '() | ...
+\end{alltt}
+
+Upon evaluating a {\tt cons} application, we instead allocate two
+addresses $a$ and $d$, join them to the respective values in the
+store, and return the flattened {\tt (cons $a$ $d$)} value. Since
+these addresses are all distinguished at different syntactic
+callsites, and quoted lists really are sugar for a sequence of calls
+to {\tt cons}, this abstraction explodes the value space. Analyzing a
+function that counts the number of atoms in a literal s-expression
+would actually interpret that function at least that number of times
+(more because of intermediate conses). Indeed, even in our fastest
+parameterization, this abstraction causes the analysis of Boyer to be
+430 times slower than the approach we will now describe.
+
+\subsubsection{Less na\"ively and less precisely}
+
+The number of syntactic uses of {\tt cons} versus implicit uses via
+literal lists is dramatically smaller in typical Scheme programs. We
+use the above abstraction for these syntactic uses, but choose a
+different strategy for quoted lists. Quotation is special because it
+cannot introduce function values or mutable values, which is important
+to enhancing our technique's soundness to conceptual complexity ratio.
+
+There are a few steps to consider:
+\begin{itemize}
+ \item{Define special value lattice elements for compound data domains that can be quoted
+       (e.g. {\tt Pair} for $\left\lbrace ({\tt cons} a_i d_i)\right\rbrace_i$, {\tt IVector} for immutable vectors, etc.)}
+ \item{Define a ``larger'' value lattice element for all quotable data, {\tt QData}}
+ \item{Interpret {\tt (quote (a ...))} as {\tt (qlist a ...)}, a new primitive function defined in figure \ref{fig:qlist},
+       and similar definitions for immutable vectors.}
+ \item{Extend the $\Delta$ axioms to include conservative meaning for these new values (e.g. {\tt (car QData)} = {\tt QData}, {\tt (add1 QData)} = {\tt Number} and log ``possible type error'') and allow them to allocate addresses and change the store}
+\end{itemize}
+
+\begin{figure}
+\begin{align*}
+\Delta(\msto, qlist) &= (\mbox{{\tt '()}}, \msto) \\
+\Delta(\msto, qlist, v ..._+) &= (({\tt cons}\ a\ d), \msto') \\
+\qquad \mbox{where } \msto' &= \msto\sqcup[a \mapsto \bigsqcup(v ...)] \\
+                            &\qquad \sqcup[d \mapsto \lbrace \mbox{{\tt '()}}, ({\tt cons}\ a\ d)\rbrace] \\
+\bigsqcup(v) &= v \\
+\bigsqcup(v, vs ...) &= merge(v, \bigsqcup(vs ...)) \\
+merge(v, v) &= v \\
+merge(n, m) &= {\tt Number} \\
+merge(n, v) &= {\tt QData} \\
+merge(({\tt cons}\ a\ d), ({\tt cons}\ a'\ d')) &= {\tt Pair} \\
+merge({\tt Pair}, ({\tt cons}\ a\ d)) &= {\tt Pair} \\
+merge({\tt Pair}, v) &= {\tt QData} \\
+\vdots
+\end{align*}
+\caption{Quoted list primitive}
+\label{fig:qlist}
+\end{figure}
+
+The alternative to {\tt QData} is to go higher in the lattice to
+$\top$, which has more complicated meaning (Shivers' escape semantics) and
+is overly approximate.
 
 \section{Evaluation}
 
