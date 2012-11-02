@@ -94,8 +94,8 @@
          [(s) #'(or (string? v) (string^? v))]
          [(y) #'(or (symbol? v) (symbol^? v))]
          [(c) #'(or (char? v) (char^? v))]
-         [(v) #'(or (vectorv? v)
-                    (vectorv-immutable? v)
+         [(v) #'(or (vectorv-immutable? v)
+                    (eq? v vec0)
                     ;; real immutable vector
                     (and (immutable? v) (vector? v))
                     (vectorv^? v)
@@ -141,11 +141,11 @@
          [else
           (case t
             [(n q z fx fl) (λ (arg-stx) #`(number^? #,arg-stx))]
-            [(s) (λ (arg-stx) #`(eq? string^ #,arg-stx))]
-            [(y) (λ (arg-stx) #`(eq? symbol^ #,arg-stx))]
-            [(c) (λ (arg-stx) #`(eq? char^ #,arg-stx))]
-            [(p) (λ (arg-stx) #`(eq? cons^ #,arg-stx))]
-            [(v) (λ (arg-stx) #`(or (eq? vector^ #,arg-stx)
+            [(s) (λ (arg-stx) #`(string^? #,arg-stx))]
+            [(y) (λ (arg-stx) #`(symbol^? #,arg-stx))]
+            [(c) (λ (arg-stx) #`(char^? #,arg-stx))]
+            [(p) (λ (arg-stx) #`(cons^? #,arg-stx))]
+            [(v) (λ (arg-stx) #`(or (vector^? #,arg-stx)
                                     (eq? vector-immutable^ #,arg-stx)))]
             [else (λ (arg-stx) #'#f)])]))
 

@@ -46,10 +46,11 @@
                     [else (define-values (front last) (split-improper d))
                           `(,qimproper^$ (loop last) . ,(map loop front))])]
              [(vector? d)
-              (cond [(< (vector-length d) limit) `(,kwote d)]
+              (cond [(< (vector-length d) limit)
+                     `(,kwote ,d)]
                     [else `(,qvector^$ . ,(map loop (vector->list d)))])]
              [(hash? d)
-              (cond [(< (hash-count d) limit) `(,kwote d)]
+              (cond [(< (hash-count d) limit) `(,kwote ,d)]
                     ;; qhash^ k v k v k v ... ....
                     [else `(,qhash^$ . 
                                      ,(append-map

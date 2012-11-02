@@ -303,7 +303,7 @@
                                (yield (ev σ*-clos e ρ* k δ*)))]
                             ;; Yield the same state to signal "stuckness".
                             [else
-                             ;;(printf "Arity error on ~a~%" f)
+                             (log-info "Arity error on ~a at ~a" f l)
                              (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
                      [(rlos: xs r e ρ _)
                       (cond [(<= (length xs) (length arg-addrs))
@@ -312,14 +312,18 @@
                                (yield (ev σ*-clos e ρ* k δ*)))]
                             ;; Yield the same state to signal "stuckness".
                             [else
-                             ;;(printf "Arity error on ~a~%" f)
+                             (log-info "Arity error on ~a at ~a" f l)
                              (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
                      [(primop o) (prim-meaning o ap-σ l δ k arg-addrs)]
                      [(? kont? k)
                       ;; continuations only get one argument.
                       (cond [(and (pair? arg-addrs) (null? (cdr arg-addrs)))
                              (do (ap-σ) ([v (delay ap-σ (car arg-addrs))])
-                               (yield (co ap-σ k v)))])]
+                               (yield (co ap-σ k v)))]
+                            [else
+                             (log-info "Called continuation with wrong number of arguments (~a): ~a at ~a"
+                                       (length arg-addrs) k l)
+                             (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
                      [(== ●) (=> fail)
                       (log-debug "implement ●-call")
                       (fail)]

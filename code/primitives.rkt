@@ -99,9 +99,10 @@
        (define/basic (vectorv-length v)
          (match v
            [(or (vectorv len _) (vectorv^ len _)
-                (vectorv-immutable len _)) (yield len)]
+                (vectorv-immutable len _) (vectorv-immutable^ len _)) (yield len)]
            [(or (? vector^?) (? vector-immutable^?)) (yield number^)]
-           [_ (vector-length v)]))
+           [(== vec0) (yield 0)]
+           [_ (yield (vector-length v))]))
 
        ;; Not a general predicate. Only for immutable hashes, vectors, strings, byte-strings and boxes.
        ;; Currently we have only immutable hashes.
@@ -109,14 +110,14 @@
          (match v
            [(or (? vectorv-immutable^?)
                 (? vector-immutable^?)
+                (== vec0)
                 (? immutable? (? vector?)))
             (yield #t)]
            [_ (yield #f)]))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ;; Prims that read the store
 
-       ;; TODO: add blackhole data and immutable vectors
        (define/read (equalv? eσ v0 v1)
          (define-syntax-rule (both-if pred) (if pred (yield-both eσ) (yield #f)))
          (do (eσ) ([v0 #:in-force eσ v0]
@@ -323,21 +324,23 @@
                 #'(let ([cell (make-var-contour `(V . ,l) δ)]
                         [seen (make-hash)])
                     (do (lvσ) loop ([todo (set lst)])
-                      (cond [(∅? todo) (yield (vectorv^ number^ cell))]
-                            [else
-                             (do (lvσ) ([val (in-set todo)])
-                               (cond [(hash-has-key? seen val) (continue)]
-                                     [else
-                                      (hash-set! seen val #t)
-                                      (match val
-                                        [(? cons^?)
-                                         (do (lvσ) ([σ* #:join lvσ cell (singleton ●)])
-                                           (loop σ* (todo . ∖1 . val)))]
-                                        [(consv A D)
-                                         (do (lvσ) ([σ* #:alias lvσ cell A]
-                                                    [more #:get σ* D])
-                                           (loop σ* (∪ (todo . ∖1 . val) more)))]
-                                        [_ (continue)])]))]))))]))
+                        (cond [(∅? todo) (yield (vectorv^ number^ cell))]
+                              [else
+                               (do (lvσ) ([val (in-set todo)]
+                                          #:unless (hash-has-key? seen val))
+                                 (hash-set! seen val #t)
+                                 (match val
+                                   [(? cons^?)
+                                    (do (lvσ) ([σ* #:join lvσ cell (singleton ●)])
+                                      (loop σ* (todo . ∖1 . val)))]
+                                   [(consv A D)
+                                    (do (lvσ) ([σ* #:alias lvσ cell A]
+                                               [more #:get σ* D])
+                                      (loop σ* ((∪ todo more) . ∖1 . val)))]
+                                   [_
+                                    (unless (null? val)
+                                      (log-info "list->vector input non-list. Tail: ~a" val))
+                                    (continue)]))]))))]))
 
        (define-simple-macro* (make-vector^ vσ l δ vs)
          (cond [(null? vs) (yield vec0)]
@@ -349,7 +352,6 @@
                       [(cons v vrest)
                        (do (vσ) ([jσ #:join vσ V-addr (force vσ v)])
                          (loop jσ vrest))]))]))
-
 
        (define/write (make-consv cσ l δ v0 v1)
          (let ([A-addr (make-var-contour `(A . ,l) δ)]
