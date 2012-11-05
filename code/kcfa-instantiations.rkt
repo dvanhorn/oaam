@@ -10,7 +10,7 @@
          "store-passing.rkt"
          "imperative.rkt"
          "prealloc.rkt"
-         "sparse-nonsparse.rkt"
+         "nonsparse.rkt"
          racket/splicing)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -35,7 +35,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Potpourris of evaluators
-
+#|
 ;; Compiled wide concrete store-passing set monad
 (with-nonsparse
  (with-lazy
@@ -58,7 +58,7 @@
                           #:σ-passing #:set-monad #:kcfa +inf.0)))))))
  (provide lazy-eval)
 
- (mk-set-fixpoint^ fix eval-set-fixpoint^ ans^?)
+ (mk-special-set-fixpoint^ fix eval-set-fixpoint^ ans^?)
  (with-nonsparse
   (with-lazy
    (with-∞-ctx
@@ -70,8 +70,8 @@
                           #:compiled #:set-monad #:wide #:σ-passing
                           #:kcfa +inf.0)))))))
  (provide lazy-eval^/c)
-
-(mk-set-fixpoint^ fix 0cfa-set-fixpoint^/c 0cfa-ans^/c?)
+|#
+(mk-special-set-fixpoint^ fix 0cfa-set-fixpoint^/c 0cfa-ans^/c?)
 (with-nonsparse
  (with-lazy
   (with-0-ctx
@@ -84,7 +84,19 @@
                    #:compiled #:wide #:set-monad)))))))
  (provide lazy-0cfa^/c)
 
-(mk-set-fixpoint^ fix 0cfa-set-fixpoint^ 0cfa-ans^?)
+(mk-set-fixpoint^ fix baseline-fixpoint baseline-ans?)
+(with-nonsparse
+ (with-strict
+  (with-0-ctx
+   (with-whole-σ
+    (with-σ-passing-set-monad
+     (with-abstract
+      (mk-analysis #:aval baseline #:ans baseline-ans
+                   #:fixpoint baseline-fixpoint
+                   #:σ-passing #:wide #:set-monad)))))))
+(provide baseline)
+
+(mk-special-set-fixpoint^ fix 0cfa-set-fixpoint^ 0cfa-ans^?)
 (with-nonsparse
  (with-strict
   (with-0-ctx
@@ -96,7 +108,7 @@
                    #:σ-passing #:wide #:set-monad)))))))
 (provide 0cfa^)
 
-(mk-set-fixpoint^ fix lazy-0cfa-set-fixpoint^ lazy-0cfa-ans^?)
+(mk-special-set-fixpoint^ fix lazy-0cfa-set-fixpoint^ lazy-0cfa-ans^?)
 (with-nonsparse
  (with-lazy
   (with-0-ctx
@@ -184,6 +196,21 @@
                    #:compiled #:global-σ #:wide #:generators)))))))
 (provide lazy-0cfa-gen^/c)
 
+(mk-imperative^-fixpoint imperative-fixpoint/c imperative-ans/c? imperative-ans/c-v imperative-touches-0/c)
+(with-nonsparse
+ (with-lazy
+  (with-0-ctx
+   (with-mutable-store
+    (with-mutable-worklist
+     (with-abstract
+      (mk-analysis #:aval lazy-0cfa^/c!
+                   #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
+                   #:ans imperative-ans/c
+                   #:touches imperative-touches-0/c
+                   #:fixpoint imperative-fixpoint/c
+                   #:global-σ #:compiled #:wide)))))))
+(provide lazy-0cfa^/c!)
+
 (mk-prealloc^-fixpoint prealloc/imperative-fixpoint/c prealloc-ans/c? prealloc-ans/c-v prealloc-touches-0/c)
 (with-nonsparse
  (with-lazy
@@ -191,13 +218,13 @@
    (with-prealloc-store
     (with-mutable-worklist
      (with-abstract
-      (mk-analysis #:aval lazy-0cfa^/c!
+      (mk-analysis #:aval lazy-0cfa^/c/prealloc!
                    #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
                    #:ans prealloc-ans/c
                    #:touches prealloc-touches-0/c
                    #:fixpoint prealloc/imperative-fixpoint/c
                    #:global-σ #:compiled #:wide)))))))
-(provide lazy-0cfa^/c!)
+(provide lazy-0cfa^/c/prealloc!)
 
 (mk-prealloc^-fixpoint prealloc/imperative-fixpoint prealloc-ans? prealloc-ans-v prealloc-touches-0)
 (with-nonsparse
@@ -206,10 +233,10 @@
    (with-prealloc-store
     (with-mutable-worklist
      (with-abstract
-      (mk-analysis #:aval lazy-0cfa^!
+      (mk-analysis #:aval lazy-0cfa^/prealloc!
                    #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
                    #:ans prealloc-ans
                    #:touches prealloc-touches-0
                    #:fixpoint prealloc/imperative-fixpoint
                    #:global-σ #:wide)))))))
-(provide lazy-0cfa^!)
+(provide lazy-0cfa^/prealloc!)

@@ -1,7 +1,9 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
-         "data.rkt")
+         "data.rkt" "add-lib.rkt")
 (provide reset-globals! reset-todo! inc-unions! set-global-σ!
+         mk-imperative^-fixpoint
+         prepare-imperative
          unions todo seen global-σ
          with-mutable-store
          with-mutable-worklist)
@@ -22,6 +24,15 @@
 (define (set-global-σ! v) (set! global-σ v))
 (define (reset-todo!) (set! todo ∅))
 (define (add-todo! c) (set! todo (∪1 todo c)))
+
+(define (prepare-imperative parser sexp)
+  (define-values (e renaming) (parser sexp gensym gensym))
+  (define e* (add-lib e renaming gensym gensym))
+  ;; Start with a constant factor larger store since we are likely to
+  ;; allocate some composite data. This way we don't incur a reallocation
+  ;; right up front.
+  (reset-globals! (make-hash))
+  e*)
 
 (define-for-syntax (yield! stx)
   (syntax-case stx ()
@@ -50,6 +61,23 @@
   (begin (join-h! a vs) body))
 (define-syntax-rule (bind-join*-h! (σ* jh*σ as vss) body)
   (begin (join*-h! as vss) body))
+
+(define-syntax-rule (mk-imperative^-fixpoint name ans^? ans^-v touches)
+  (define (name step fst)
+    (define clean-σ (restrict-to-reachable touches))
+    (let loop ()
+      (cond [(∅? todo) ;; → null?
+             (define vs
+               (for*/set ([(c at-unions) (in-hash seen)]
+                          #:when (ans^? c))
+                 (ans^-v c)))
+             (cons (clean-σ global-σ vs)
+                   vs)]
+            [else
+             (define todo-old todo)
+             (reset-todo!)                        ;; → '()
+             (for ([c (in-set todo-old)]) (step c)) ;; → in-list
+             (loop)]))))
 
 (define-syntax-rule (with-mutable-worklist body)
   (splicing-syntax-parameterize

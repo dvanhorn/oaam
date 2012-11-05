@@ -1,8 +1,6 @@
 #lang racket
 (require "do.rkt" "data.rkt" "primitives.rkt" racket/stxparam racket/splicing)
-(provide (struct-out use)
-         (struct-out change)
-         with-nonsparse with-sparse)
+(provide with-nonsparse)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Non-sparse analyses do not need to accumulate actions
