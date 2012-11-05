@@ -2,6 +2,7 @@
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          "data.rkt" "imperative.rkt" "context.rkt" "add-lib.rkt")
 (provide prepare-prealloc mk-prealloc^-fixpoint with-0-ctx/prealloc
+         grow-vector ;; helper
          with-prealloc-store)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -10,14 +11,16 @@
 (define contour-table #f)
 
 (define (inc-next-loc!) (set! next-loc (add1 next-loc)))
+
+(define (grow-vector σ old-size)
+  (for/vector #:length (* 2 old-size) #:fill ∅ ;; ∅ → '()
+                 ([v (in-vector σ)]
+                  [i (in-naturals)]
+                  #:when (< i old-size))
+    v))
 (define (ensure-σ-size)
   (when (= next-loc (vector-length global-σ))
-    (set-global-σ!
-     (for/vector #:length (* 2 next-loc) #:fill ∅ ;; ∅ → '()
-                 ([v (in-vector global-σ)]
-                  [i (in-naturals)]
-                  #:when (< i next-loc))
-                 v))))
+    (set-global-σ! (grow-vector global-σ next-loc))))
 
 (define-syntax-rule (get-contour-index!-0 c)
   (or (hash-ref contour-table c #f)
@@ -43,7 +46,7 @@
   (set! contour-table (make-hash))
   (reset-globals! (make-vector (* 2 nlabels) ∅)) ;; ∅ → '()
   e*)
-
+ 
 (define (join! a vs)
   (define prev (vector-ref global-σ a))
   (define upd (⊓ vs prev))

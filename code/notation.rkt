@@ -3,7 +3,7 @@
 (require (for-syntax syntax/parse))
 (provide for/union for*/union for/set for*/set
          define-simple-macro* hash-reverse
-         ∅ ∅? ∪ ∩ ∖ ∪1 ∪/l ∖1 ∖/l ∈)
+         ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
 
 ;; define-simple-macro does not have an implicit quasisyntax.
 (define-syntax (define-simple-macro* stx)
@@ -29,13 +29,14 @@
   (for/fold ([o.res o.init]) guards (append (let () body ...) o.res)))
 
 ;; Set notations
-(define-values (∅ ∅? ∪ ∩ ∖ ∪1 ∪/l ∖1 ∖/l ∈)
+(define-values (∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
   (let ([set-add*
          (λ (s xs) (for/fold ([s s]) ([x (in-list xs)]) (set-add s x)))]
         [set-remove*
          (λ (s xs) (for/fold ([s s]) ([x (in-list xs)]) (set-remove s x)))]
         [in? (λ (x s) (set-member? s x))])
-    (values (set) set-empty? set-union set-intersect set-subtract
+    (values (set) set-empty? (λ (s) (not (set-empty? s)))
+            set-union set-intersect subset? set-subtract
             set-add set-add*
             set-remove set-remove* in?)))
 

@@ -27,6 +27,7 @@
       (with-limits 3600 10240
                    (call-with-values
                        (λ () (begin0 (time (aval e))
+                                     (void)#;
                                      (dump-memory-stats)))
                      print-values)))))
 
@@ -38,7 +39,7 @@
         "../benchmarks/toplas98/graphs.sch"
         "../benchmarks/toplas98/lattice.scm"
         "../benchmarks/toplas98/matrix.scm"
-        ;;"../benchmarks/toplas98/maze.sch" ;; call/cc
+        "../benchmarks/toplas98/maze.sch" ;; call/cc
         "../benchmarks/toplas98/nbody.sch"
         "../benchmarks/toplas98/nucleic.sch"
         ;;"../benchmarks/toplas98/splay.scm" ;; old match
@@ -46,10 +47,7 @@
         ;;"../benchmarks/toplas98/handle.scm" ;; old match and defmacro
 ))
 
-(test lazy-0cfa^/c! (prep "../benchmarks/toplas98/maze.sch"))
-#;
 (for ([t to-test]) (test lazy-0cfa^/c! (prep t)))
-#;#;
 (printf "~%~%==============BASELINE=============~%~%")
 (for ([t to-test]) (test 0cfa^ (prep t)))
 
