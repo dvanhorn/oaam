@@ -11,6 +11,7 @@
          cons^ cons^?
          vector^ vector^? vec0
          vector-immutable^ vector-immutable^?
+         qdata^ qcons^ qvector^ qcons^? qvector^?
          ● ⊥
          open@ closed@
          flatten-value
@@ -55,16 +56,19 @@
 ;; - (consv Addr Addr)
 ;; - (vectorv Number (listof Addr))
 ;; - (clos List[Var] Exp Env) ;; or without Env. Constructed by mk-analysis.
-(define-nonce number^) (define (number^? v) (or (eq? v number^) (and (eq? v ●) ●)))
-(define-nonce string^) (define (string^? v) (or (eq? v string^) (and (eq? v ●) ●)))
-(define-nonce symbol^) (define (symbol^? v) (or (eq? v symbol^) (and (eq? v ●) ●)))
-(define-nonce char^) (define (char^? v) (or (eq? v char^) (and (eq? v ●) ●)))
+(define-nonce number^) (define (number^? v) (or (eq? v number^) (and (or (eq? v ●) (eq? v qdata^)) ●)))
+(define-nonce string^) (define (string^? v) (or (eq? v string^) (and (or (eq? v ●) (eq? v qdata^)) ●)))
+(define-nonce symbol^) (define (symbol^? v) (or (eq? v symbol^) (and (or (eq? v ●) (eq? v qdata^)) ●)))
+(define-nonce char^) (define (char^? v) (or (eq? v char^) (and (or (eq? v ●) (eq? v qdata^)) ●)))
 (define-nonce cons^) (define (cons^? v) (or (eq? v cons^) (and (eq? v ●) ●)))
 (define-nonce vector^) (define (vector^? v) (or (eq? v vector^) (and (eq? v ●) ●)))
 (define-nonce vector-immutable^) (define (vector-immutable^? v) (or (eq? v vector-immutable^) (and (eq? v ●) ●)))
+(define-nonce qvector^) (define (qvector^? v) (or (eq? v qvector^) (and (eq? v qdata^) ●)))
+(define-nonce qcons^) (define (qcons^? v) (or (eq? v qcons^) (and (eq? v qdata^) ●)))
 (define-nonce vec0) ;; 0-length vector.
 (struct input-port^ (status) #:prefab)
 (struct output-port^ (status) #:prefab)
+(define-nonce qdata^)
 ;; Status tokens for ports. Not values!
 (define-nonce open@)
 (define-nonce closed@)
@@ -82,9 +86,9 @@
       [(? char?) char^]
       [(or (? boolean?) '() (? void?) (? eof-object?)) v]
       [(or (? number^?) (== string^) (== symbol^) (== char^)
-           (== vector^) (== vector-immutable^) (== ●)) v]
+           (? vector^?) (== vector-immutable^)) v]
       [(? consv?) cons^]
-      [(or (? vectorv^?) (? vectorv?)) vector^]
+      [(? vectorv?) vector^]
       [(or (? vectorv-immutable^?) (? vector?)) vector-immutable^]
       [(or (? input-port^?) (? input-port?)) 'input-port]
       [(or (? output-port^?) (? output-port?)) 'output-port]
@@ -110,7 +114,7 @@
                     (let ([v0f (flatten-value v0)])
                       (if (equal? v0f V)
                           V
-                          ●)))])))
+                          qdata^)))])))
 
 (define cons-limit (make-parameter 8))
 
@@ -138,6 +142,9 @@
 (struct vectorv (length addrs) #:prefab)
 (struct vectorv-immutable (length addrs) #:prefab)
 (struct addr (a) #:prefab)
+
+;; For the lazy Krivine machine, a lazy cons (lazy in both arguments)
+(struct lconsv (car cdr) #:prefab)
 
 ;; What are the supported primitives for a datum form?
 ;; REMARK: no list literals.
@@ -170,8 +177,10 @@
                  (hash-ref ρ x
                            (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ)))))]
       [(consv a d) (set a d)]
-      [(vectorv _ l) (list->set l)]
-      [(vectorv^ _ a) (set a)]
+      [(or (vectorv _ l)
+           (vectorv-immutable _ l)) (list->set l)]
+      [(or (vectorv^ _ a)
+           (vectorv-immutable^ _ a)) (set a)]
       [(? set? s) (for/union ([v (in-set s)]) (touches v))]
       [_ (set)])))
 

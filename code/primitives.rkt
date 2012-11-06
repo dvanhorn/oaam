@@ -52,7 +52,7 @@
   (with-syntax ([clos? clos?]
                 [rlos? rlos?])
     #`((define-syntax-rule (yield-delay ydσ v)
-         (do (ydσ) ([v* (delay ydσ v)]) (yield v*)))
+         (do (ydσ) ([v* #:in-delay ydσ v]) (yield v*)))
        (define-simple-macro* (errorv vs)
          (begin (log-info "Error reachable ~a" vs)
                 (continue)))
@@ -100,7 +100,7 @@
          (match v
            [(or (vectorv len _) (vectorv^ len _)
                 (vectorv-immutable len _) (vectorv-immutable^ len _)) (yield len)]
-           [(or (? vector^?) (? vector-immutable^?)) (yield number^)]
+           [(or (? vector^?) (? vector-immutable^?) (? qvector^?)) (yield number^)]
            [(== vec0) (yield 0)]
            [_ (yield (vector-length v))]))
 
@@ -125,12 +125,21 @@
            (match* (v0 v1)
              [((== ●) _) (yield-both eσ)]
              [(_ (== ●)) (yield-both eσ)]
+             [((== qdata^) (or (== vec0) (== qvector^) (? vector?) (? vectorv-immutable^?) (? vectorv-immutable?)
+                               (== cons^) (== qcons^)
+                               (? atomic?)))
+              (yield-both eσ)]
+             [((or (== vec0) (== qvector^) (? vector?) (? vectorv-immutable^?) (? vectorv-immutable?)
+                   (== cons^) (== qcons^)
+                   (? atomic?))
+               (== qdata^))
+              (yield-both eσ)]
              [((? clos?) _) (both-if (clos? v1))]
              [(_ (? clos?)) (yield #f)] ;; first not a closure
              [((? rlos?) _) (both-if (rlos? v1))]
              [(_ (? rlos?)) (yield #f)]
-             [((or (== cons^) (? consv?)) _)
-              (both-if (or (consv? v1) (eq? v cons^)))] ;; FIXME: overapproximate for concrete
+             [((or (== cons^) (? consv?) (== qcons^)) _)
+              (both-if (or (consv? v1) (eq? v1 cons^) (eq? v1 qcons^)))] ;; FIXME: overapproximate for concrete
              [(_ (or (== cons^) (? consv?))) (yield #f)] ;; first not a cons
              ;; next 4 clauses handle 0-length vectors specifically
              [((== vec0) _) (yield (or (eq? v1 vec0)
@@ -146,14 +155,16 @@
                                             (yield (or (eq? v0 vec0) (equal? v0 v1)))
                                             (fail))]
              [((or (== vector^) (== vector-immutable^)
+                   (== qvector^)
                    (? vector?) ;; Racket's immutable vectors
                    (? vectorv-immutable^?) (? vectorv?)
                    (? vectorv^?) (? vectorv-immutable?)) _)
               (both-if (or (vectorv? v1) (vectorv-immutable? v1) (eq? v1 vector^)
+                           (eq? qvector^ v1)
                            (eq? v1 vector-immutable^)
                            (vector? v1)
                            (vectorv-immutable^? v1)))] ;; FIXME: not right for concrete
-             [(_ (or (== vector^) (== vector-immutable^)
+             [(_ (or (== vector^) (== vector-immutable^) (== qvector^)
                      (? vectorv-immutable^?) (? vectorv?)
                      (? vectorv^?) (? vectorv-immutable?)
                      (? vector?)))
@@ -208,8 +219,8 @@
            [(or (vectorv^ _ abs-cell)
                 (vectorv-immutable^ _ abs-cell))
             (yield-delay vrσ abs-cell)]
-           [(or (? vector^?) (? vector-immutable^?))
-            (yield ●)]
+           [(or (? vector^?) (? vector-immutable^?)) (yield ●)]
+           [(? qvector^?) (yield qdata^)]
            [(== vec0)
             (log-info "Cannot reference any cells in a 0-length vector")
             (continue)]
@@ -226,10 +237,12 @@
        (define/read (carv caσ p)
          (match p
            [(consv A _) (yield-delay caσ A)]
+           [(? qcons^?) (yield qdata^)]
            [(? cons^?) (yield ●)]))
        (define/read (cdrv cdσ p)
          (match p
            [(consv _ D) (yield-delay cdσ D)]
+           [(? qcons^?) (yield qdata^)]
            [(? cons^?) (yield ●)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -265,9 +278,10 @@
                      (define V-addr (make-var-contour `(V . ,l) δ))
                      (do (vσ) loop ([v vs])
                          (match v
-                           ['() (yield (abs number^ V-addr))]
+                           ['()
+                            (yield (abs number^ V-addr))]
                            [(cons v vrest)
-                            (do (vσ) ([σ*-pv^ #:join vσ V-addr (force vσ v)])
+                            (do (vσ) ([σ*-pv^ #:join-forcing vσ V-addr v])
                               (loop σ*-pv^ vrest))]))]
                     [size
                      (do (vσ) loop ([v vs] [i 0] [addrs '()])
@@ -275,7 +289,7 @@
                            ['() (yield (conc size (reverse addrs)))]
                            [(cons v vrest)
                             (define addr (make-var-contour `(V ,i . ,l) δ))
-                            (do (vσ) ([σ*-pv #:join vσ addr (force vσ v)])
+                            (do (vσ) ([σ*-pv #:join-forcing vσ addr v])
                               (loop σ*-pv vrest (add1 i) (cons addr addrs)))]))])])))
 
        (mk-vector-constructor prim-vectorv vectorv^ vectorv)
@@ -287,11 +301,12 @@
                 (match (widen size)
                   [(? number^?)
                    (define V-addr (make-var-contour `(V . ,l) δ))
-                   (do (vσ) ([σ*-mv^ #:join vσ V-addr (force vσ default)])
+                   (do (vσ) ([σ*-mv^ #:join-forcing vσ V-addr default])
                      (yield (vectorv^ size V-addr)))]
                   [_ (define V-addrs
                        (for/list ([i (in-range size)]) (make-var-contour `(V ,i . ,l) δ)))
-                     (do (vσ) ([σ*-mv #:join* vσ V-addrs (make-list size (force vσ default))])
+                     (do (vσ) ([fs #:force vσ default]
+                               [σ*-mv #:join* vσ V-addrs (make-list size fs)])
                        (yield (vectorv size V-addrs)))])]))
 
        (define/write (vectorv->list vlσ l δ v)
@@ -315,7 +330,7 @@
          (match lst
            ['() (yield vec0)]
            [(== cons^) (yield vector^)]
-           [(== ●)
+           [(or (? qcons^?) (== ●))
             (do (lvσ) ([out (in-list (list vec0 vector^))])
               (yield out))]
            [(consv A D)
@@ -332,6 +347,9 @@
                                  (match val
                                    [(? cons^?)
                                     (do (lvσ) ([σ* #:join lvσ cell (singleton ●)])
+                                      (loop σ* (todo . ∖1 . val)))]
+                                   [(? qcons^?)
+                                    (do (lvσ) ([σ* #:join lvσ cell (singleton qdata^)])
                                       (loop σ* (todo . ∖1 . val)))]
                                    [(consv A D)
                                     (do (lvσ) ([σ* #:alias lvσ cell A]
@@ -350,7 +368,7 @@
                     (match v
                       ['() (yield (vectorv-immutable^ number^ V-addr))]
                       [(cons v vrest)
-                       (do (vσ) ([jσ #:join vσ V-addr (force vσ v)])
+                       (do (vσ) ([jσ #:join-forcing vσ V-addr v])
                          (loop jσ vrest))]))]))
 
        (define/write (make-consv cσ l δ v0 v1)
@@ -395,14 +413,20 @@
             (do (aσ) ([σ*a! #:join-forcing a!σ A v])
               (yield (void)))]
            ;; FIXME: v should escape.
-           [(? cons^?) (yield (void))]))
+           [(? cons^?) (yield (void))]
+           [(? qcons^?)
+            (log-info "Cannot set! cons from quote")
+            (continue)]))
        (define/write (set-cdr!v d!σ l δ p v)
          (match p
            [(consv _ D)
             (do (aσ) ([σ*d! #:join-forcing d!σ D v])
               (yield (void)))]
            ;; FIXME: v should escape.
-           [(? cons^?) (yield (void))]))
+           [(? cons^?) (yield (void))]
+           [(? qcons^?)
+            (log-info "Cannot set! cons from quote")
+            (continue)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ;; I/O
@@ -493,7 +517,7 @@
      [add1 #:simple (n -> n) #:widen]
      [sub1 #:simple (n -> n) #:widen]
      [+    #:simple (#:rest n -> n) #:widen]
-     [-    #:simple (#:rest n -> n) #:widen]
+     [-    #:simple (n #:rest n -> n) #:widen]
      [*    #:simple (#:rest n -> n) #:widen]
      [/ #f #f /v (n #:rest n -> n)]
      [=    #:simple (n #:rest n -> b)]

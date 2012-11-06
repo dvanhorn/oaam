@@ -22,7 +22,7 @@
 
 (mk-syntax-parameters bind-join bind-join*
                       bind-alias* bind-big-alias
-                      bind-get bind-force
+                      bind-get bind-force bind-delay
                       bind bind-rest do make-var-contour
                       target-σ? target-cs? target-σ target-cs target-actions? target-actions
                       top-σ top-σ?)
@@ -50,10 +50,8 @@
   (define tas (syntax-parameter-value #'target-actions?))
   (define top? (syntax-parameter-value #'top-σ?))
   (define gen-wrap
-    (cond [(or in-do? (not generators?))
-           values]
-          [(and generators? global-σ? (not σ-∆s?))
-           (λ (stx) #`(begin #,stx 'done))]
+    (cond [(or in-do? (not generators?)) values]
+          [(and global-σ? (not σ-∆s?)) (λ (stx) #`(begin #,stx 'done))]
           [else (λ (stx) #`(begin (yield #,stx) 'done))]))
   (define add-void? (and global-σ? (not σ-∆s?) (not tas)))
   (define tσtcs
@@ -103,7 +101,8 @@
              #:attr clause
              (λ (rest) #`(bindf (σ* jσ a vs) #,rest)))
     (pattern [res:id (~or (~and #:get (~bind [bindf #'bind-get]))
-                          (~and #:force (~bind [bindf #'bind-force]))) jσ:expr a:expr]
+                          (~and #:force (~bind [bindf #'bind-force]))
+                          (~and #:delay (~bind [bindf #'bind-delay]))) jσ:expr a:expr]
              #:with new-σ #'jσ ;; XXX: not new
              #:attr clause (λ (rest) #`(bindf (res jσ a) #,rest)))
     (pattern [(ρ* σ* δ*) #:bind ρ bσ l δ xs vs]
@@ -125,7 +124,8 @@
              (λ (rest) #`(do (jσ) ([fs #:force jσ v])
                            (bind-join (σ* jσ a fs) #,rest))))
     (pattern [res:id (~or (~and #:in-get (~bind [bindf #'bind-get]))
-                          (~and #:in-force (~bind [bindf #'bind-force]))) jσ:expr a:expr]
+                          (~and #:in-force (~bind [bindf #'bind-force]))
+                          (~and #:in-delay (~bind [bindf #'bind-delay]))) jσ:expr a:expr]
              #:with new-σ #'jσ ;; XXX: not new
              #:attr clause (λ (rest) #`(bindf (res-tmp jσ a)
                                          (do (jσ) ([res (in-set res-tmp)])
@@ -200,19 +200,23 @@
      (define extras (append (listy (and tcs #'target-cs))
                             (listy (and tas #'target-actions))))
      (with-syntax ([(argps ...) (generate-temporaries #'(args ...))]
-                   [(targets ...) (append (listy (and tσ (generate-temporary #'some-σ)))
-                                          (listy (and tcs (generate-temporary #'some-cs)))
+                   [(ttarget-σ ...) (listy (and tσ (generate-temporary #'some-σ)))]
+                   [(vtarget-σ ...) (listy (and tσ #'target-σ))]
+                   [(targets ...) (append (listy (and tcs (generate-temporary #'some-cs)))
                                           (listy (and tas (generate-temporary #'some-actions))))]
-                   [(tvalues ...) tσtcs])
+                   [(tvalues ...) (append (listy (and tcs #'target-cs))
+                                          (listy (and tas #'target-actions)))])
        ;; no gen-wrap or with-do since this is used in primitives, always nested dos.
        (init-accumulators
         #'ℓσ
-        #`(let real-loop ([targets tvalues] ... [args arg0] ...)
-            (syntax-parameterize ([tvalues (make-rename-transformer #'targets)] ...)
-              ;; make calling the loop seemless.
-              ;; Pass the accumulators if they exist.
-              (let-syntax ([loop (syntax-rules ()
-                                   [(_ σ* argps ...)
-                                    (real-loop #,@(listy (and tσ #'σ*))
-                                               #,@extras argps ...)])])
-                body ...)))))]))
+        #`(let real-loop ([ttarget-σ vtarget-σ] ... [targets tvalues] ... [args arg0] ...)
+            (let ([ℓσ ttarget-σ] ...)
+              (syntax-parameterize ([vtarget-σ (make-rename-transformer #'ttarget-σ)] ...
+                                    [tvalues (make-rename-transformer #'targets)] ...)
+                ;; make calling the loop seemless.
+                ;; Pass the accumulators if they exist.
+                (let-syntax ([loop (syntax-rules ()
+                                     [(_ σ* argps ...)
+                                      (real-loop #,@(listy (and tσ #'σ*))
+                                                 #,@extras argps ...)])])
+                  body ...))))))]))

@@ -99,11 +99,12 @@
                     ;; real immutable vector
                     (and (immutable? v) (vector? v))
                     (vectorv^? v)
+                    (qvector^? v)
                     (vectorv-immutable^? v)
                     ;; black hole vectors
                     (vector^? v)
                     (vector-immutable^? v))]
-         [(p) #'(or (consv? v) (cons^? v))]
+         [(p) #'(or (consv? v) (cons^? v) (qcons^? v))]
          [(ip) #'(or (input-port? v) (input-port^? v) (and (eq? v ●) ●))]
          [(op) #'(or (output-port? v) (output-port^? v) (and (eq? v ●) ●))]
          [(h) #'(hashv? v)]
@@ -122,6 +123,7 @@
         #`(or #,@(map flat-pred others))]
        [_ (flat-pred t)])))
 
+;; FIXME: does not carry actions correctly
  (define (type-match t tmσ addr)
    #`(let ([addr #,addr])
        (let-syntax ([good
@@ -144,8 +146,10 @@
             [(s) (λ (arg-stx) #`(string^? #,arg-stx))]
             [(y) (λ (arg-stx) #`(symbol^? #,arg-stx))]
             [(c) (λ (arg-stx) #`(char^? #,arg-stx))]
-            [(p) (λ (arg-stx) #`(cons^? #,arg-stx))]
+            [(p) (λ (arg-stx) #`(or (cons^? #,arg-stx)
+                                    (qcons^? #,arg-stx)))]
             [(v) (λ (arg-stx) #`(or (vector^? #,arg-stx)
+                                    (qvector^? #,arg-stx)
                                     (eq? vector-immutable^ #,arg-stx)))]
             [else (λ (arg-stx) #'#f)])]))
 

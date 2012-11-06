@@ -76,7 +76,7 @@
            (match e
              [(var l x)
               (λ% (ev-σ ρ k δ)
-                  (do (ev-σ) ([v (delay ev-σ (lookup-env ρ x))])
+                  (do (ev-σ) ([v #:in-delay ev-σ (lookup-env ρ x)])
                     (yield (co ev-σ k v))))]
              [(datum l d) (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k d))))]
              [(primr l which)
@@ -149,7 +149,7 @@
                [else
                 ;; brittle, since other identifiers must be the same in ev:
                 (syntax/loc stx
-                  ((... (define-syntax-rule (λ% (σ% ρ k δ) body ...)
+                  ((... (define-syntax-rule (λ% (ev-σ ρ k δ) body ...)
                           (generator body ...)))
                    (define compile values)))]))
 
@@ -280,7 +280,7 @@
                   [(lrk: x '() '() e ρ a δ)
                    (generator
                     (do (co-σ) ([σ*-lrk #:join-forcing co-σ (lookup-env ρ x) v]
-                             [k* #:in-get σ*-lrk a])
+                                [k* #:in-get σ*-lrk a])
                       (yield (ev σ*-lrk e ρ k* δ))))]
                   [(lrk: x (cons y xs) (cons e es) b ρ a δ)
                    (generator
@@ -320,7 +320,7 @@
                      [(? kont? k)
                       ;; continuations only get one argument.
                       (cond [(and (pair? arg-addrs) (null? (cdr arg-addrs)))
-                             (do (ap-σ) ([v (delay ap-σ (car arg-addrs))])
+                             (do (ap-σ) ([v #:in-delay ap-σ (car arg-addrs)])
                                (yield (co ap-σ k v)))]
                             [else
                              (log-info "Called continuation with wrong number of arguments (~a): ~a at ~a"
