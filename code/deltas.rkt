@@ -31,18 +31,19 @@
      (define seen (make-hash))
      (define todo (set (cons (update ∆ (hash)) cs)))
      (let loop ()
-       (cond [(∅? todo) (for/set ([(c δσ) (in-hash seen)]
-                                  #:when (ans^? c))
-                          (cons δσ c))]
+       (cond [(∅? todo)
+              (for/fold ([last-σ (hash)] [cs ∅])
+                  ([(c δσ) (in-hash seen)]
+                   #:when (ans^? c))
+                (values (join-store last-σ δσ) (∪1 cs c)))]
              [else (define old-todo todo)
                    (set! todo ∅)
                    (for* ([σ×cs (in-set old-todo)]
                           [σp (in-value (car σ×cs))]
                           [c (in-set (cdr σ×cs))]
-                          [last-σ (in-value (hash-ref seen c (hash)))]
-                          #:unless (equal? last-σ σp))
-                     ;; This state's store monotonically increases
-                     (hash-set! seen c (join-store σp last-σ))
+                          [σc (in-value (cons σp c))]
+                          #:unless (hash-ref seen σc #f))
+                     (hash-set! seen σc #t)
                      ;; Add the updated store with next steps to workset
                      (define-values (∆ cs*) (stepper (cons σp c)))
                      (set! todo (∪1 todo (cons (update ∆ σp) cs*))))
