@@ -15,13 +15,14 @@
           (let-syntax ([add-r (syntax-rules ()
                                 [(_ (νσ νρ sσ sρ sr sδ* vrest) body*)
                                  #,r-meaning])])
-            (define vrest (let loop ([xs* xs] [vs v-addrs])
-                            (match* (xs* vs)
-                              [('() vs) vs]
-                              [((cons x xrest) (cons v vrest))
-                               (loop xrest vrest)])))
+            (define-values (vfirst vrest)
+              (let loop ([xs* xs] [axs '()] [vs v-addrs])
+                (match* (xs* vs)
+                  [('() vs) (values (reverse axs) vs)]
+                  [((cons x xrest) (cons a arest))
+                   (loop xrest (cons a axs) arest)])))
             (add-r (σ* ρ* iσ ρ r δ* vrest)
-                   (bind-alias* (σ* σ* #,as v-addrs) body))))))
+                   (bind-alias* (σ* σ* #,as vfirst) body))))))
      ;; Abstractly, rest-arg is an infinite list.
      (define abs-r
        #`(let* ([ra sr]
