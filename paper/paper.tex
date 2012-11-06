@@ -166,7 +166,7 @@ different in the following ways:
 \ev[^{\mcntr'}\!]{\mexp,\menv',\msto',\mkont}
 \text{ where }\menv',\msto',\mcntr' = \mathit{bind\,}^{ \mcntr}_\mlab(\msto,\mvar,\mval)
 \\
-\ap{\mop,\mval,\msto,\mkont} & \machstep
+\ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont} & \machstep
 \co{\mkont,\mval',\msto}
 \text{ where }\mkont\in\msto(\maddr)
 \text{ and } \mval'\in\interpdelta(\mop,\mval)
@@ -179,7 +179,7 @@ different in the following ways:
 \paragraph{Concrete interpretation} can be characterized by setting the implicit
 parameters of the relation given in Figure~\ref{fig:aam} as follows:
 \begin{align*}
-\mathit{push}(\ell,\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
+\mathit{push}(\mlab,\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
 \mbox{ where }\maddr \notin\msto
 \\
 \mathit{bind}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\msto\sqcup[\maddr\mapsto\{\mval\}]
@@ -228,7 +228,7 @@ strategy:
 \paragraph 0CFA
 
 \begin{align*}
-\mathit{push}(\ell,\msto,\mkont) &= \ell,\msto\sqcup[\ell\mapsto\{\mkont\}]
+\mathit{push}(\mlab,\msto,\mkont) &= \mlab,\msto\sqcup[\mlab\mapsto\{\mkont\}]
 \\
 \mathit{bind}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\mvar],\msto\sqcup[\mvar\mapsto\{\mval\}]
 \end{align*}
@@ -247,55 +247,60 @@ strategy:
 
 
 \begin{align*}
-\mnum+1 &\in \delta(\saddone,\mnum) &
-\mnum-1 &\in \delta(\ssubone,\mnum)\\
-\strue &\in \delta(\szerohuh,\szero) &
-\sfalse &\in \delta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
+\mnum+1 &\in \interpdelta(\saddone,\mnum) &
+\mnum-1 &\in \interpdelta(\ssubone,\mnum)\\
+\strue &\in \interpdelta(\szerohuh,\szero) &
+\sfalse &\in \interpdelta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
 \end{align*}
 
 \begin{align*}
-\sNum &\in \hat\delta(\saddone,\mnum) &
-\sNum &\in \hat\delta(\ssubone,\mnum)\\
-\strue &\in \hat\delta(\szerohuh,\sNum) &
-\sfalse &\in \hat\delta(\szerohuh,\sNum)\\
-\strue &\in \hat\delta(\szerohuh,\szero) &
-\sfalse &\in \hat\delta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
+\sNum &\in \hat\interpdelta(\saddone,\mnum) &
+\sNum &\in \hat\interpdelta(\ssubone,\mnum)\\
+\strue &\in \hat\interpdelta(\szerohuh,\sNum) &
+\sfalse &\in \hat\interpdelta(\szerohuh,\sNum)\\
+\strue &\in \hat\interpdelta(\szerohuh,\szero) &
+\sfalse &\in \hat\interpdelta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
 \end{align*}
 
+HERE: ρ
 
 \begin{figure}
 \begin{alltt}
   ;; State \(\rightarrow\) Setof State
-  (define (step state)
-    (match state
-      [(ev σ e ρ k)
-       (match e
-         [(var\(\superscript\ell\) x)           (for/set ((v (lookup ρ σ x))) (co σ k v))]
-         [(lit\(\superscript\ell\) l)           (set (co σ k n))]
-         [(lam\(\superscript\ell\) x e)         (set (co σ k (clos x e ρ)))]
-         [(app\(\superscript\ell\) f e)
-          (define-values (σ* a) (push state))
-          (set (ev σ* f ρ (ar e ρ a)))]
-         [(ife\(\superscript\ell\) e0 e1 e2)
-          (define-values (σ* a) (push state))
-          (set (ev σ* e0 ρ (ifk e1 e2 ρ a)))])]
-      [(co σ k v)
-       (match k
-         ['mt (set (ans σ v))]
-         [(ar\(\superscript\ell\) e ρ) (set (ev σ e ρ (fn v l)))]
-         [(fn\(\superscript\ell\) f)   (for/set ((k (get-cont σ l))) (ap σ f v k))]
-         [(fi\(\superscript\ell\) c a ρ)
-          (for/set ((k (get-cont σ l)))
-            (ev σ (if v c a) ρ k))])]
-      [(ap σ fun a k)
+  (define (step \(\mstate\))
+    (match \(\mstate\)
+      [(ev \(\mexp\) \(\rho\) \(\msto\) \(\mkont\))
+       (match \(\mexp\)
+         [(var\(\superscript\mlab\) \(\mvar\))
+          (for/set ((\(\mval\) (lookup \(\rho\) \(\msto\) \(\mvar\))))
+            (co \(\msto\) \(\mkont\) \(\mval\)))]
+         [(lit\(\superscript\mlab\) \(\mlit\)) (set (co \(\msto\) \(\mkont\) \(\mlit\)))]
+         [(lam\(\superscript\mlab\) \(\mvar\) \(\mexp\)) (set (co \(\msto\) \(\mkont\) (clos \(\mvar\) \(\mexp\) \(\rho\))))]
+         [(app\(\superscript\mlab\) \(\mexp\subscript0\) \(\mexp\subscript1\))
+          (define-values (\(\msto'\) \(\maddr\)) (push \(\mstate\)))
+          (set (ev \(\mexp\subscript0\) \(\rho\) \(\msto'\) (ar \(\mexp\subscript1\) \(\rho\) \(\maddr\))))]
+         [(ife\(\superscript\mlab\) \(\mexp\subscript0\) \(\mexp\subscript1\) \(\mexp\subscript2\))
+          (define-values (\(\msto'\) \(\maddr\)) (push \(\mstate\)))
+          (set (ev \(\mexp\subscript0\) \(\rho\) \(\msto'\) (ifk \(\mexp\subscript1\) \(\mexp\subscript2\) \(\rho\) \(\maddr\))))])]
+      [(co \(\msto\) \(\mkont\) \(\mval\))
+       (match \(\mkont\)
+         ['mt (set (ans \(\msto\) \(\mval\)))]
+         [(ar\(\superscript\mlab\) \(\mexp\) \(\rho\)) (set (ev \(\mexp\) \(\rho\) \(\msto\) (fn \(\mval\) l)))]
+         [(fn\(\superscript\mlab\) \(\mval'\))
+          (for/set ((\(\mkont\) (get-cont \(\msto\) l)))
+            (ap \(\msto\) \(\mval'\) \(\mval\) \(\mkont\)))]
+         [(fi\(\superscript\mlab\) c a \(\rho\))
+          (for/set ((k (get-cont \(\msto\) l)))
+            (ev (if v c \(\maddr\)) \(\rho\) \(\msto\) \(\mkont\)))])]
+      [(ap \(\msto\) fun \(\maddr\) \(\mkont\))
        (match fun
-         [(clos l x e ρ)
-          (define-values (ρ* σ*) (bind state))
-          (set (ev σ* e ρ* k))]
-         [(? op? o)
-          (for*/set ((k (get-cont σ l))
-                     (v (\(\Delta\) o (list v))))
-            (co σ k v))
+         [(clos l \(\mvar\) \(\mexp\) \(\rho\))
+          (define-values (\(\rho'\) \(\msto'\)) (bind \(\mstate\)))
+          (set (ev \(\msto'\) \(\mexp\) \(\rho'\) \(\mkont\)))]
+         [(op \(\mop\))
+          (for*/set ((\(\mkont\) (get-cont \(\msto\) l))
+                     (\(\mval\) (\(\interpdelta\) \(\mop\) \(\mval\))))
+            (co \(\msto\) \(\mkont\) \(\mval\)))]
          [_ (set)]))]))
 \end{alltt}
 \caption{Implementation of machine transition relation.}
@@ -305,23 +310,51 @@ strategy:
 
 \newcommand{\church}[1]{\(\ulcorner{\tt #1}\urcorner\)}
 
-\begin{alltt}
-(define \church2 (\(\lambda\) (f) (\(\lambda\) (x) (f (f x)))))
+%% \begin{alltt}
+%% (define \church2 (\(\lambda\) (f) (\(\lambda\) (x) (f (f x)))))
 
-(define pred
-  (\(\lambda\) (n)
-    (\(\lambda\) (rf)
-      (\(\lambda\) (rx)
-        (((n (\(\lambda\) (g) (\(\lambda\) (h) (h (g rf)))))
-          (\(\lambda\) (i) rx))
-         (\(\lambda\) (id) id))))))
-\end{alltt}
+%% (define pred
+%%   (\(\lambda\) (n)
+%%     (\(\lambda\) (rf)
+%%       (\(\lambda\) (rx)
+%%         (((n (\(\lambda\) (g) (\(\lambda\) (h) (h (g rf)))))
+%%           (\(\lambda\) (i) rx))
+%%          (\(\lambda\) (id) id))))))
+%% \end{alltt}
 
+
+%% (define \church0 (\(\lambda\) (f0) (\(\lambda\) (x0) x0)))
+%% (define \church1 (\(\lambda\) (f1) (\(\lambda\) (x1) (f1 x1))))
+%% (define \church2 (\(\lambda\) (f2) (\(\lambda\) (x2) (f2 (f2 x2)))))
+%% (define \church3 (\(\lambda\) (f3) (\(\lambda\) (x3) (f3 (f3 (f3 x3))))))
+
+\begin{figure}
 \begin{alltt}
+(define ((((plus p1) p2) pf) x)
+  ((p1 pf) ((p2 pf) x)))
+
+(define (((mult m1) m2) mf)
+  (m2 (m1 mf)))
+
+(define (((pred n) rf) rx)
+  (((n (\(\lambda\) (g) (\(\lambda\) (h) (h (g rf)))))
+    (\(\lambda\) (ignored) rx))
+   (\(\lambda\) (id) id)))
+
+(define (zero? n)
+  ((n (\(\lambda\) (zx) #f)) #t))
+
+(define ((church=? e1) e2)
+  (if (zero? e1) (zero? e2)
+      (if (zero? e2) #f
+          ((church=? (pred e1)) (pred e2)))))
+
 ;; multiplication distributes over addition
 ((church=? ((mult \church2) ((plus \church1) \church3)))
- ((plus ((mult \church2) \church1)) ((mult \church2) \church3)))))
+ ((plus ((mult \church2) \church1)) ((mult \church2) \church3)))
 \end{alltt}
+\caption{Church-numeral calculation}
+\end{figure}
 
 Where \syntax{church=?} is an equality function for Church numerals
 written in terms of recursion and an iterative \syntax{pred} function.
@@ -368,9 +401,9 @@ reached.
 ;; (State -> Setof State) -> State^ -> { State^ }
 (define ((wide-step step) state)
   (match state
-    [(cons cs σ)
+    [(cons cs \(\msto\))
      (define ss ((appl step)
-                 (for/set ([c cs]) (c->s c σ))))
+                 (for/set ([c cs]) (c->s c \(\msto\)))))
      (set (cons (for/set ([s ss]) (s->c s))
                 (join-stores ss)))]))
 \end{verbatim}
@@ -439,11 +472,14 @@ is which addresses are pushed.
 \\
 \compile{\sapp[^\mlab]{\mexpi0}{\mexpi1}} &= \lambda^\mcntr(\menv,\msto,\mkont) .
 \compile{\mexpi0}^\mcntr(\menv,\msto',\kar[_\mlab^\mcntr]{\compile{\mexpi1},\menv,\maddr})
+\\
+&
 \text{ where }\maddr,\msto' = \mathit{push}^\mcntr_\mlab(\msto,\mkont)
 \\
 \compile{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}} &= \lambda^\mcntr(\menv,\msto,\mkont) .
 \compile{\mexpi0}^\delta(\menv,\msto',\kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})
-\text{ where }\maddr,\msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)
+\\
+&\text{ where }\maddr,\msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)
 \end{align*}
 \caption{Compilation}
 \end{figure}
@@ -501,14 +537,14 @@ Compile + Lazy:
 ;; Specialized from wide-step : State^ -> { State^ } ≈ State^ -> State^
 (define (wide-step-specialized state)
   (match state
-    [(cons σ cs)
-     (define-values (cs* σ*)
-       (for/fold ([cs* (set)] [σ* σ])
+    [(cons \(\msto\) cs)
+     (define-values (cs* \(\msto\)*)
+       (for/fold ([cs* (set)] [\(\msto\)* \(\msto\)])
          ([c cs])
-         (match (step-compiled^ (cons σ c))
-           [(cons σ** cs**)
-            (values (set-union cs* cs**) (join-store σ* σ**))])))
-     (cons σ* (set-union cs cs*))]))
+         (match (step-compiled^ (cons \(\msto\) c))
+           [(cons \(\msto\)** cs**)
+            (values (set-union cs* cs**) (join-store \(\msto\)* \(\msto\)**))])))
+     (cons \(\msto\)* (set-union cs cs*))]))
 \end{alltt}
 %% Should be commutted to beginning
 
@@ -522,14 +558,14 @@ Special + Compile + Lazy:
 ;; Specialized from wide-step : State^ -> { State^ } ≈ State^ -> State^
 (define (wide-step-specialized state)
   (match state
-    [(cons σ cs)
+    [(cons \(\msto\) cs)
      (define-values (cs* ∆)
        (for/fold ([cs* (set)] [∆* '()])
          ([c cs])
-         (match (step-compiled^ (cons σ c))
-           [(cons ∆** cs**)
-            (values (set-union cs* cs**) (append ∆** ∆*))])))
-     (cons (update ∆ σ) (set-union cs cs*))]))
+         (match (step-compiled^ (cons \(\msto\) c))
+           [(cons \(\msdiff\)** cs**)
+            (values (set-union cs* cs**) (append \(\msdiff\)** \(\msdiff\)*))])))
+     (cons (update \(\msdiff\) \(\msto\)) (set-union cs cs*))]))
 \end{alltt}
 
 \[
@@ -563,7 +599,7 @@ decisions related to scaling to a language with compound data.
 
 \subsection{Vocabulary of Parameterized Optimizations}
 
-We combine the interface of generators ~\cite{ianjohnson:cluhistory}
+We combine the interface of generators~\cite{ianjohnson:cluhistory}
 with a special lambda form ({\tt $\lambda$\%}) that wraps the meanings
 of {\tt ev} states. We also have a special {\tt do} form that performs
 behind-the-scenes state passing and iteration much like {\tt do} in
@@ -575,62 +611,62 @@ suggest.
 \begin{figure}
 \begin{alltt}
 \(e-dispatch =\)
- (match e
-    [(var\(\superscript\ell\) x)
-     (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-      (do (\(\msto\)) ((v (delay (lookup-env \(\menv\) x))))
-        (yield (co \(\msto\) k v))))]
-    [(lit\(\superscript\ell\) l)
-     (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-      (do (\(\msto\)) () (yield (co \(\msto\) k n))))]
-    [(lam\(\superscript\ell\) x e)
-     (define c (compile e))
-     (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-      (do (\(\msto\)) () (yield (co \(\msto\) k (clos x c \(\menv\))))))]
-    [(app\(\superscript\ell\) f e)
-     (define cf (compile f))
-     (define ce (compile e))
-     (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-      (define-values (\(\msto\)* a) (push state))
-      (yield (ev \(\msto\)* cf \(\menv\) (ar c \(\menv\) a))))]
-    [(ife\(\superscript\ell\) e0 e1 e2)
-      (define c0 (compile e0))
-      (define c1 (compile e1))
-      (define c2 (compile e2))
-      (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-        (do (\(\msto\)) [(\(\msto\)* a) (push state)]
-         (yield (ev \(\msto\)* c0 \(\menv\) (ifk c1 c2 \(\menv\) a)))))])
+(match e
+  [(var\(\superscript\mlab\) x)
+   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+    (do (\(\msto\)) ((v (delay (lookup-env \(\menv\) x))))
+      (yield (co \(\msto\) k v))))]
+  [(lit\(\superscript\mlab\) l)
+   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+    (do (\(\msto\)) () (yield (co \(\msto\) k n))))]
+  [(lam\(\superscript\mlab\) x e)
+   (define c (compile e))
+   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+    (do (\(\msto\)) () (yield (co \(\msto\) k (clos x c \(\menv\))))))]
+  [(app\(\superscript\mlab\) f e)
+   (define cf (compile f))
+   (define ce (compile e))
+   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+    (define-values (\(\msto\)* a) (push state))
+    (yield (ev \(\msto\)* cf \(\menv\) (ar c \(\menv\) a))))]
+  [(ife\(\superscript\mlab\) e0 e1 e2)
+   (define c0 (compile e0))
+   (define c1 (compile e1))
+   (define c2 (compile e2))
+   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+     (do (\(\msto\)) [(\(\msto\)* a) (push state)]
+      (yield (ev \(\msto\)* c0 \(\menv\) (ifk c1 c2 \(\menv\) a)))))])
 
-  (define (step state)
-    (match state
-      [(ev \(\msto\) e \(\menv\) k) \(e-dispatch\)] ;; dead if compiled.
-      [(co \(\msto\) k v)
-       (match k
-         ['mt (generator (do (\(\msto\)) ([v <- (force \(\msto\) v)])
-           (yield (ans \(\msto\) v))))]
-         [(ar\(\superscript\ell\) e \(\menv\))
-          (generator (do (\(\msto\)) ()
-            (yield (ev \(\msto\) e \(\menv\) (fn v l)))))
-         [(fn\(\superscript\ell\) f)
-          (generator (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)])
-           (yield (ap \(\msto\) f v k))))]
-         [(fi\(\superscript\ell\) c a \(\menv\))
-          (generator
-           (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)]
-                    [v <- (force \(\msto\) v)])
-             (yield (ev \(\msto\) (if v c a) \(\menv\) k))))])]
-      [(ap \(\msto\) fun a k)
-       (match fun
-         [(clos l x e \(\menv\))
-          (generator
-           (do (\(\msto\)) ([(\(\menv\)* \(\msto\)*) (bind state)])
-             (yield (ev \(\msto\)* e \(\menv\)* k))))]
-         [(? op? o)
-          (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)]
-                   [v <- (force \(\msto\) v)]
-                   [v (\(\Delta\) o (list v))])
-            (yield (co \(\msto\) k v)))
-         [_ (generator (do (\(\msto\)) () (continue)))]))]))
+(define (step state)
+  (match state
+    [(ev \(\msto\) e \(\menv\) k) \(e-dispatch\)] ;; dead if compiled.
+    [(co \(\msto\) k v)
+     (match k
+       ['mt (generator (do (\(\msto\)) ([v <- (force \(\msto\) v)])
+        (yield (ans \(\msto\) v))))]
+       [(ar\(\superscript\mlab\) e \(\menv\))
+        (generator (do (\(\msto\)) ()
+          (yield (ev \(\msto\) e \(\menv\) (fn v l)))))
+       [(fn\(\superscript\mlab\) f)
+        (generator (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)])
+         (yield (ap \(\msto\) f v k))))]
+       [(fi\(\superscript\mlab\) c a \(\menv\))
+        (generator
+         (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)]
+                  [v <- (force \(\msto\) v)])
+           (yield (ev \(\msto\) (if v c a) \(\menv\) k))))])]
+    [(ap \(\msto\) fun a k)
+     (match fun
+       [(clos l x e \(\menv\))
+        (generator
+         (do (\(\msto\)) ([(\(\menv\)* \(\msto\)*) (bind state)])
+           (yield (ev \(\msto\)* e \(\menv\)* k))))]
+       [(? op? o)
+        (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)]
+                 [v <- (force \(\msto\) v)]
+                 [v (\(\interpdelta\) o (list v))])
+          (yield (co \(\msto\) k v)))
+       [_ (generator (do (\(\msto\)) () (continue)))]))]))
 \end{alltt}
 \caption{Parameterized Abstract$^2$ machine for ISWIM}
 \label{fig:paam}
@@ -658,17 +694,17 @@ suggest.
 \end{figure}
 
 Why generators? Relations in general cannot be written as computable
-functions, but in our case we have a decidable, finitely
-non-deterministic relation. There are several implementation
-strategies for relations, some more effective than others. For
-instance, a silly implementation strategy would be defining a binary
-function that decides membership in the relation. We want the
-definition to drive the interpretor, so we might naturally decide to
-write a function that takes a state and returns a set of all the next
-states. As we described in the imperative workset section, this
-intermediate allocation is unnecessary and wasteful. What we really
-want is a way of pulling on the reduction relation for more next
-states as the fixpoint is ready for them.
+functions, but in our case we have a decidable relation with finitely
+many pairs sharing the same left component. There are several
+implementation strategies for such relations, some more effective than
+others. For instance, a silly implementation strategy would be
+defining a binary function that decides membership in the relation. We
+want the definition to drive the interpreter, so we might naturally
+decide to write a function that takes a state and returns a set of all
+the next states. As we described in the imperative workset section,
+this intermediate allocation is unnecessary and wasteful. What we
+really want is a way of pulling on the reduction relation for more
+next states as the fixpoint is ready for them.
 
 For intermediate sets, {\tt yield} is {\tt return} in the set
 monad. For the imperative worklist, {\tt yield} performs mutation
@@ -743,17 +779,17 @@ to enhancing our technique's soundness to conceptual complexity ratio.
 There are a few steps to consider:
 \begin{itemize}
  \item{Define special value lattice elements for compound data domains that can be quoted
-       (e.g. {\tt Pair} for $\left\lbrace ({\tt cons} a_i d_i)\right\rbrace_i$, {\tt IVector} for immutable vectors, etc.)}
+       (e.g. {\tt QPair} for $\left\lbrace ({\tt cons} a_i d_i)\right\rbrace_i$, {\tt QVector} for immutable vectors, etc.)}
  \item{Define a ``larger'' value lattice element for all quotable data, {\tt QData}}
  \item{Interpret {\tt (quote (a ...))} as {\tt (qlist a ...)}, a new primitive function defined in figure \ref{fig:qlist},
        and similar definitions for immutable vectors.}
- \item{Extend the $\Delta$ axioms to include conservative meaning for these new values (e.g. {\tt (car QData)} = {\tt QData}, {\tt (add1 QData)} = {\tt Number} and log ``possible type error'') and allow them to allocate addresses and change the store}
+ \item{Extend the $\interpdelta$ axioms to include conservative meaning for these new values (e.g. {\tt (car QData)} = {\tt QData}, {\tt (add1 QData)} = {\tt Number} and log ``possible type error'') and allow them to allocate addresses and change the store}
 \end{itemize}
 
 \begin{figure}
 \begin{align*}
-\Delta(\msto, qlist) &= (\mbox{{\tt '()}}, \msto) \\
-\Delta(\msto, qlist, v ..._+) &= (({\tt cons}\ a\ d), \msto') \\
+\interpdelta(\msto, qlist) &= (\mbox{{\tt '()}}, \msto) \\
+\interpdelta(\msto, qlist, v ..._+) &= (({\tt cons}\ a\ d), \msto') \\
 \qquad \mbox{where } \msto' &= \msto\sqcup[a \mapsto \bigsqcup(v ...)] \\
                             &\qquad \sqcup[d \mapsto \lbrace \mbox{{\tt '()}}, ({\tt cons}\ a\ d)\rbrace] \\
 \bigsqcup(v) &= v \\
@@ -761,9 +797,9 @@ There are a few steps to consider:
 merge(v, v) &= v \\
 merge(n, m) &= {\tt Number} \\
 merge(n, v) &= {\tt QData} \\
-merge(({\tt cons}\ a\ d), ({\tt cons}\ a'\ d')) &= {\tt Pair} \\
-merge({\tt Pair}, ({\tt cons}\ a\ d)) &= {\tt Pair} \\
-merge({\tt Pair}, v) &= {\tt QData} \\
+merge(({\tt cons}\ a\ d), ({\tt cons}\ a'\ d')) &= {\tt QPair} \\
+merge({\tt QPair}, ({\tt cons}\ a\ d)) &= {\tt QPair} \\
+merge({\tt QPair}, v) &= {\tt QData} \\
 \vdots
 \end{align*}
 \caption{Quoted list primitive}
@@ -798,7 +834,7 @@ development, they also can be systematically developed into efficient
 algorithms.
 
 \bibliographystyle{splncs}
-\bibliography{dvh-bibliography}
+\bibliography{bibliography}
 
 \appendix
 \section{Relation to Uniform \(k\)-CFA (A Case Against Acceptability)}
@@ -847,7 +883,7 @@ doing is so, it actually saves work (as can be seen above).
 An Example:
 
 \begin{verbatim}
- (let ((id (lambda (x) x)))
+ (let ((id (\(\lambda\) (x) x)))
    (begin (id 1) (id 2)))
 \end{verbatim}
 

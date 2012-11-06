@@ -1,4 +1,5 @@
 \newcommand{\superscript}[1]{\ensuremath{^{#1}}}
+\newcommand{\subscript}[1]{\ensuremath{_{#1}}}
 \newcommand{\tuple}[3][\ ]{{\tt #2{#1}}({#3})}
 
 % Values
@@ -55,14 +56,12 @@
 \newcommand{\mexpf}{f}
 \newcommand{\menv}{\rho}
 \newcommand{\mkont}{\kappa}
-\newcommand{\mcntr}{{\ }}%{\delta}
 \newcommand{\msto}{\sigma}
 \newcommand{\mop}{o}
 \newcommand{\mval}{v}
 \newcommand{\mnum}{z}
 \newcommand{\mbln}{b}
 \newcommand{\mvalx}[1]{#1}
-\newcommand{\mlab}{{\ }}%{\ell}
 \newcommand\machstep{\longmapsto}
 \newcommand\multimachstep{\longmapsto\!\!\!\!\!\rightarrow}
 \newcommand{\mlit}{l}
@@ -70,7 +69,10 @@
 \newcommand{\mcomp}{k}
 \newcommand{\mcompi}[1]{\mcomp_{#1}}
 \newcommand{\interpdelta}{\Delta}
+\newcommand{\msdiff}{\Delta}
 
 \newcommand{\compile}[1]{\llbracket#1\rrbracket}
 
-\newcommand{\mtcntr}{{\ }} %{\epsilon}
+\newcommand{\mlab}{{\ell}}
+\newcommand{\mcntr}{{\delta}}
+\newcommand{\mtcntr}{{\epsilon}}
