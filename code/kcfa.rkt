@@ -26,6 +26,7 @@
          ;; Analysis strategies flags (requires the right parameters too)
          (~optional (~and #:compiled compiled?))
          (~optional (~and #:σ-∆s σ-∆s?))
+         (~optional (~and #:sparse sparse?))
          (~optional (~or (~and #:σ-passing σ-passing?)
                          (~and #:global-σ global-σ?)))
          (~optional (~and #:wide wide?))
@@ -174,7 +175,8 @@
                   #`((mk-touches touches clos: rlos: #,(zero? (attribute K))))
                   #'())
            (splicing-syntax-parameterize ([target-σ? #,σ-threading?]
-                                          [target-cs? #,c-passing?])
+                                          [target-cs? #,c-passing?]
+                                          [target-actions? #,(given sparse?)])
            (define-syntax do-macro
              (mk-do #,(given σ-∆s?)
                     #,c-passing?

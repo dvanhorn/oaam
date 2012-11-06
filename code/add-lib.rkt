@@ -1,6 +1,6 @@
 #lang racket
 
-(require "parse.rkt" "ast.rkt" "racket-to-sexp.rkt" "notation.rkt")
+(require "parse.rkt" "ast.rkt" "notation.rkt")
 (provide add-lib)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

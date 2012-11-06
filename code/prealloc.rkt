@@ -3,6 +3,7 @@
          "data.rkt" "imperative.rkt" "context.rkt" "add-lib.rkt")
 (provide prepare-prealloc mk-prealloc^-fixpoint with-0-ctx/prealloc
          grow-vector ;; helper
+         next-loc contour-table
          with-prealloc-store)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

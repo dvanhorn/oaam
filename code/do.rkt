@@ -64,7 +64,7 @@
   (define (init-target-actions body)
     (cond [(and (not in-do?) tas)
            #`(let ([actions ∅])
-               (syntax-parameterize ([target-cs (make-rename-transformer #'actions)])
+               (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
                  #,body))]
           [else body]))
 

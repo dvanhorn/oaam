@@ -4,9 +4,10 @@
 
 (define (construct-cmd which file)
   (define path (string->path file))
-  (define-values (base file dir?) (split-path path))
-  (define outfile (path-replace-suffix file (format ".~a.~a" which run-num)))
-  (format "~a --~a > ~a" which file outfile))
+  (define-values (base filename dir?) (split-path path))
+  (define outtime (path-replace-suffix filename (format ".~a.time.~a" which run-num)))
+  (define outmem (path-replace-suffix filename (format ".~a.mem.~a" which run-num)))
+  (format "racket run-benchmark.rkt --~a ~a > ~a 2> ~a" which file outtime outmem))
 
 (define to-test
   (list "../benchmarks/church.sch"
@@ -25,14 +26,15 @@
 ))
 
 (define which-analyses
-  (list "baseline"
-        "0cfa^"
-        "lazy-0cfa^"
-        "lazy-0cfa^/c"
-        "lazy-0cfa∆s/c"
-        "lazy-0cfa^/c!"
-        "lazy-0cfa^/c/prealloc!"))
+  (list  "bl"
+         "sp"
+         "ls"
+         "lc"
+         "ld"
+         "li"
+         "lp"))
 
 (for* ([which which-analyses]
        [file to-test])
+  (printf "Running ~a: ~a~%" which file)
   (system (construct-cmd which file)))

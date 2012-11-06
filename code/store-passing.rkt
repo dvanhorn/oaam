@@ -27,11 +27,12 @@
   (λ (state)
      (match state
        [(cons wsσ cs)
-        (define ss ((appl step)
-                    (for/set ([c (in-set cs)]) (cons wsσ c))))
-        (set (cons (for/set ([s (in-set ss)]) (cdr s)))
-             (for/fold ([σ (hash)]) ([s (in-set ss)])
-               (join-store σ (car s))))]
+        (define initial (for/set ([c (in-set cs)]) (cons wsσ c)))
+        (define-values (σ* cs*)
+          (for/fold ([σ (hash)] [cs ∅]) ([s (in-set initial)])
+            (define-values (σ* cs*) (step s))
+            (values (join-store σ σ*) (∪ cs cs*))))
+        (set (cons σ* cs*))]
        [_ (error 'wide-step "bad output ~a~%" state)])))
 
 
@@ -55,19 +56,15 @@
  (define-syntax-rule (name step fst)
    (let ()
      (define-values (f^σ cs) fst)
-     (define ss
-       (fix (wide-step step) 
-            (for/set ([c (in-set cs)]) (cons f^σ c))))
+     (define ss (fix (wide-step step) (set (cons f^σ cs))))
      (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
-       (match s
-         [(cons fsσ cs)
-          (define-values (σ* cs*)
-            (values (join-store last-σ fsσ)
-                    (for/set #:initial final-cs ([c (in-set cs)]
-                                                 #:when (ans^? c))
-                             c)))
-          (values σ* cs*)]
-         [_ (error 'name "bad output ~a~%" s)])))))
+               (match s
+                 [(cons fsσ cs)
+                  (values (join-store last-σ fsσ)
+                          (for/set #:initial final-cs ([c (in-set cs)]
+                                                       #:when (ans^? c))
+                                   c))]
+                 [_ (error 'name "bad output ~a~%" s)])))))
 
 (define-for-syntax do-body-transform-σ/cs
   (syntax-rules () [(_ e) (let-values ([(σ* cs) e])

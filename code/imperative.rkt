@@ -1,7 +1,7 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          "data.rkt" "add-lib.rkt")
-(provide reset-globals! reset-todo! inc-unions! set-global-σ!
+(provide reset-globals! reset-todo! add-todo! inc-unions! set-global-σ!
          mk-imperative^-fixpoint
          prepare-imperative
          unions todo seen global-σ
