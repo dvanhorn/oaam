@@ -33,7 +33,9 @@
                                (printf "Result: Timeout~%")]
                               [(memory) (printf "Result: Exhausted memory~%")]))]
                     [exn:fail? (λ (e) (printf "Barf ~a ~%" e))])
-      (with-limits 3600 2048
+      (with-limits (* 30 #;run-for-30-minutes
+                      60 #;seconds-in-minutes)
+                   2048 ;; Max memory: 2GiB
                    (begin0 (time ((aval) e))
                            (void)
                            (dump-memory-stats)

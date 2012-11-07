@@ -1,12 +1,14 @@
 #lang racket
 
-(define run-num 2)
+(define run-num (make-parameter 4))
+(define num-threads 5)
+(define run-count 5)
 
-(define (construct-cmd which file)
+(define (construct-cmd which n file)
   (define path (string->path file))
   (define-values (base filename dir?) (split-path path))
-  (define outtime (path-replace-suffix filename (format ".~a.time.~a" which run-num)))
-  (define outmem (path-replace-suffix filename (format ".~a.mem.~a" which run-num)))
+  (define outtime (path-replace-suffix filename (format ".~a.time.~a" which (+ n (run-num)))))
+  (define outmem (path-replace-suffix filename (format ".~a.mem.~a" which (+ n (run-num)))))
   (format "racket run-benchmark.rkt --~a ~a > bench/~a 2> bench/~a" which file outtime outmem))
 
 (define church "../benchmarks/church.sch")
@@ -61,11 +63,21 @@
                             ;; others complete
                             ))
 
-(for* ([which which-analyses]
-       [timeout (in-value (hash-ref known-timeout which (set)))]
-       [exhaust (in-value (hash-ref known-timeout which (set)))]
-       [file to-test]
-       #:unless (or (set-member? timeout file)
-                    (set-member? exhaust file)))
-  (printf "Running ~a: ~a~%" which file)
-  (system (construct-cmd which file)))
+(define (run whiches files)
+  (for* ([n (in-range run-count)]
+         [which whiches]
+         [timeout (in-value (hash-ref known-timeout which (set)))]
+         [exhaust (in-value (hash-ref known-timeout which (set)))]
+         [file to-test]
+         #:unless (or (set-member? timeout file)
+                      (set-member? exhaust file)))
+    (printf "Running ~a (count ~a): ~a~%" which n file)
+    (system (construct-cmd which n file))))
+
+(define running-threads
+  (for/list ([i (in-range num-threads)]
+             [which which-analyses])
+    (cond [(= i (sub1 num-threads))
+           (thread (λ () (run (drop which-analyses (add1 i)) to-test)))]
+          [else (thread (λ () (run (list which) to-test)))])))
+(for ([w running-threads]) (thread-wait w))
