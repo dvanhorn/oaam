@@ -299,7 +299,7 @@ HERE: ρ
           (set (ev \(\msto'\) \(\mexp\) \(\rho'\) \(\mkont\)))]
          [(op \(\mop\))
           (for*/set ((\(\mkont\) (get-cont \(\msto\) l))
-                     (\(\mval\) (\(\Delta\) \(\mop\) \(\mval\))))
+                     (\(\mval\) (\(\interpdelta\) \(\mop\) \(\mval\))))
             (co \(\msto\) \(\mkont\) \(\mval\)))]
          [_ (set)]))]))
 \end{alltt}
@@ -563,9 +563,9 @@ Special + Compile + Lazy:
        (for/fold ([cs* (set)] [∆* '()])
          ([c cs])
          (match (step-compiled^ (cons \(\msto\) c))
-           [(cons ∆** cs**)
-            (values (set-union cs* cs**) (append ∆** ∆*))])))
-     (cons (update ∆ \(\msto\)) (set-union cs cs*))]))
+           [(cons \(\msdiff\)** cs**)
+            (values (set-union cs* cs**) (append \(\msdiff\)** \(\msdiff\)*))])))
+     (cons (update \(\msdiff\) \(\msto\)) (set-union cs cs*))]))
 \end{alltt}
 
 \[
@@ -611,62 +611,62 @@ suggest.
 \begin{figure}
 \begin{alltt}
 \(e-dispatch =\)
- (match e
-    [(var\(\superscript\mlab\) x)
-     (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-      (do (\(\msto\)) ((v (delay (lookup-env \(\menv\) x))))
-        (yield (co \(\msto\) k v))))]
-    [(lit\(\superscript\mlab\) l)
-     (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-      (do (\(\msto\)) () (yield (co \(\msto\) k n))))]
-    [(lam\(\superscript\mlab\) x e)
-     (define c (compile e))
-     (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-      (do (\(\msto\)) () (yield (co \(\msto\) k (clos x c \(\menv\))))))]
-    [(app\(\superscript\mlab\) f e)
-     (define cf (compile f))
-     (define ce (compile e))
-     (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-      (define-values (\(\msto\)* a) (push state))
-      (yield (ev \(\msto\)* cf \(\menv\) (ar c \(\menv\) a))))]
-    [(ife\(\superscript\mlab\) e0 e1 e2)
-      (define c0 (compile e0))
-      (define c1 (compile e1))
-      (define c2 (compile e2))
-      (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-        (do (\(\msto\)) [(\(\msto\)* a) (push state)]
-         (yield (ev \(\msto\)* c0 \(\menv\) (ifk c1 c2 \(\menv\) a)))))])
+(match e
+  [(var\(\superscript\mlab\) x)
+   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+    (do (\(\msto\)) ((v (delay (lookup-env \(\menv\) x))))
+      (yield (co \(\msto\) k v))))]
+  [(lit\(\superscript\mlab\) l)
+   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+    (do (\(\msto\)) () (yield (co \(\msto\) k n))))]
+  [(lam\(\superscript\mlab\) x e)
+   (define c (compile e))
+   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+    (do (\(\msto\)) () (yield (co \(\msto\) k (clos x c \(\menv\))))))]
+  [(app\(\superscript\mlab\) f e)
+   (define cf (compile f))
+   (define ce (compile e))
+   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+    (define-values (\(\msto\)* a) (push state))
+    (yield (ev \(\msto\)* cf \(\menv\) (ar c \(\menv\) a))))]
+  [(ife\(\superscript\mlab\) e0 e1 e2)
+   (define c0 (compile e0))
+   (define c1 (compile e1))
+   (define c2 (compile e2))
+   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
+     (do (\(\msto\)) [(\(\msto\)* a) (push state)]
+      (yield (ev \(\msto\)* c0 \(\menv\) (ifk c1 c2 \(\menv\) a)))))])
 
-  (define (step state)
-    (match state
-      [(ev \(\msto\) e \(\menv\) k) \(e-dispatch\)] ;; dead if compiled.
-      [(co \(\msto\) k v)
-       (match k
-         ['mt (generator (do (\(\msto\)) ([v <- (force \(\msto\) v)])
-           (yield (ans \(\msto\) v))))]
-         [(ar\(\superscript\mlab\) e \(\menv\))
-          (generator (do (\(\msto\)) ()
-            (yield (ev \(\msto\) e \(\menv\) (fn v l)))))
-         [(fn\(\superscript\mlab\) f)
-          (generator (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)])
-           (yield (ap \(\msto\) f v k))))]
-         [(fi\(\superscript\mlab\) c a \(\menv\))
-          (generator
-           (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)]
-                    [v <- (force \(\msto\) v)])
-             (yield (ev \(\msto\) (if v c a) \(\menv\) k))))])]
-      [(ap \(\msto\) fun a k)
-       (match fun
-         [(clos l x e \(\menv\))
-          (generator
-           (do (\(\msto\)) ([(\(\menv\)* \(\msto\)*) (bind state)])
-             (yield (ev \(\msto\)* e \(\menv\)* k))))]
-         [(? op? o)
-          (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)]
-                   [v <- (force \(\msto\) v)]
-                   [v (\(\Delta\) o (list v))])
-            (yield (co \(\msto\) k v)))
-         [_ (generator (do (\(\msto\)) () (continue)))]))]))
+(define (step state)
+  (match state
+    [(ev \(\msto\) e \(\menv\) k) \(e-dispatch\)] ;; dead if compiled.
+    [(co \(\msto\) k v)
+     (match k
+       ['mt (generator (do (\(\msto\)) ([v <- (force \(\msto\) v)])
+        (yield (ans \(\msto\) v))))]
+       [(ar\(\superscript\mlab\) e \(\menv\))
+        (generator (do (\(\msto\)) ()
+          (yield (ev \(\msto\) e \(\menv\) (fn v l)))))
+       [(fn\(\superscript\mlab\) f)
+        (generator (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)])
+         (yield (ap \(\msto\) f v k))))]
+       [(fi\(\superscript\mlab\) c a \(\menv\))
+        (generator
+         (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)]
+                  [v <- (force \(\msto\) v)])
+           (yield (ev \(\msto\) (if v c a) \(\menv\) k))))])]
+    [(ap \(\msto\) fun a k)
+     (match fun
+       [(clos l x e \(\menv\))
+        (generator
+         (do (\(\msto\)) ([(\(\menv\)* \(\msto\)*) (bind state)])
+           (yield (ev \(\msto\)* e \(\menv\)* k))))]
+       [(? op? o)
+        (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)]
+                 [v <- (force \(\msto\) v)]
+                 [v (\(\interpdelta\) o (list v))])
+          (yield (co \(\msto\) k v)))
+       [_ (generator (do (\(\msto\)) () (continue)))]))]))
 \end{alltt}
 \caption{Parameterized Abstract$^2$ machine for ISWIM}
 \label{fig:paam}
@@ -694,17 +694,17 @@ suggest.
 \end{figure}
 
 Why generators? Relations in general cannot be written as computable
-functions, but in our case we have a decidable, finitely
-non-deterministic relation. There are several implementation
-strategies for relations, some more effective than others. For
-instance, a silly implementation strategy would be defining a binary
-function that decides membership in the relation. We want the
-definition to drive the interpretor, so we might naturally decide to
-write a function that takes a state and returns a set of all the next
-states. As we described in the imperative workset section, this
-intermediate allocation is unnecessary and wasteful. What we really
-want is a way of pulling on the reduction relation for more next
-states as the fixpoint is ready for them.
+functions, but in our case we have a decidable relation with finitely
+many pairs sharing the same left component. There are several
+implementation strategies for such relations, some more effective than
+others. For instance, a silly implementation strategy would be
+defining a binary function that decides membership in the relation. We
+want the definition to drive the interpreter, so we might naturally
+decide to write a function that takes a state and returns a set of all
+the next states. As we described in the imperative workset section,
+this intermediate allocation is unnecessary and wasteful. What we
+really want is a way of pulling on the reduction relation for more
+next states as the fixpoint is ready for them.
 
 For intermediate sets, {\tt yield} is {\tt return} in the set
 monad. For the imperative worklist, {\tt yield} performs mutation
@@ -779,17 +779,17 @@ to enhancing our technique's soundness to conceptual complexity ratio.
 There are a few steps to consider:
 \begin{itemize}
  \item{Define special value lattice elements for compound data domains that can be quoted
-       (e.g. {\tt Pair} for $\left\lbrace ({\tt cons} a_i d_i)\right\rbrace_i$, {\tt IVector} for immutable vectors, etc.)}
+       (e.g. {\tt QPair} for $\left\lbrace ({\tt cons} a_i d_i)\right\rbrace_i$, {\tt QVector} for immutable vectors, etc.)}
  \item{Define a ``larger'' value lattice element for all quotable data, {\tt QData}}
  \item{Interpret {\tt (quote (a ...))} as {\tt (qlist a ...)}, a new primitive function defined in figure \ref{fig:qlist},
        and similar definitions for immutable vectors.}
- \item{Extend the $\Delta$ axioms to include conservative meaning for these new values (e.g. {\tt (car QData)} = {\tt QData}, {\tt (add1 QData)} = {\tt Number} and log ``possible type error'') and allow them to allocate addresses and change the store}
+ \item{Extend the $\interpdelta$ axioms to include conservative meaning for these new values (e.g. {\tt (car QData)} = {\tt QData}, {\tt (add1 QData)} = {\tt Number} and log ``possible type error'') and allow them to allocate addresses and change the store}
 \end{itemize}
 
 \begin{figure}
 \begin{align*}
-\Delta(\msto, qlist) &= (\mbox{{\tt '()}}, \msto) \\
-\Delta(\msto, qlist, v ..._+) &= (({\tt cons}\ a\ d), \msto') \\
+\interpdelta(\msto, qlist) &= (\mbox{{\tt '()}}, \msto) \\
+\interpdelta(\msto, qlist, v ..._+) &= (({\tt cons}\ a\ d), \msto') \\
 \qquad \mbox{where } \msto' &= \msto\sqcup[a \mapsto \bigsqcup(v ...)] \\
                             &\qquad \sqcup[d \mapsto \lbrace \mbox{{\tt '()}}, ({\tt cons}\ a\ d)\rbrace] \\
 \bigsqcup(v) &= v \\
@@ -797,9 +797,9 @@ There are a few steps to consider:
 merge(v, v) &= v \\
 merge(n, m) &= {\tt Number} \\
 merge(n, v) &= {\tt QData} \\
-merge(({\tt cons}\ a\ d), ({\tt cons}\ a'\ d')) &= {\tt Pair} \\
-merge({\tt Pair}, ({\tt cons}\ a\ d)) &= {\tt Pair} \\
-merge({\tt Pair}, v) &= {\tt QData} \\
+merge(({\tt cons}\ a\ d), ({\tt cons}\ a'\ d')) &= {\tt QPair} \\
+merge({\tt QPair}, ({\tt cons}\ a\ d)) &= {\tt QPair} \\
+merge({\tt QPair}, v) &= {\tt QData} \\
 \vdots
 \end{align*}
 \caption{Quoted list primitive}
