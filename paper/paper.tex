@@ -275,7 +275,7 @@ HERE: ρ
 
 \begin{figure}
 \begin{alltt}
-  ;; State \(\rightarrow\) Setof State
+  ;; State \(\to\) Set[State]
   (define (step \(\mstate\))
     (match \(\mstate\)
       [(ev \(\mexp\) \(\rho\) \(\msto\) \(\mkont\))
@@ -375,7 +375,7 @@ This program reaches $N$ states under concrete interpretation.
 \subsection{Generic fixpoint calculator}
 
 \begin{alltt}
-;; Expr \(\rightarrow\) Setof State
+;; Expr \(\to\) Set[State]
 (define (eval e)
   (fix step (set (inj e))))
 \end{alltt}
@@ -384,15 +384,15 @@ We compute the semantics of a program by iterating the state
 transition relation until a fixed point in the reachable states is
 reached.
 
-\begin{verbatim}
-;; appl : (∀ (X) ((X -> (Setof X)) -> ((Setof X) -> (Setof X))))
+\begin{alltt}
+;; \(\forall\) (X) ((X \(\to\) Set[X]) \(\to\) (Set[X] \(\to\) Set[X]))
 (define ((appl f) s)
   (for/fold ([i (set)])
     ([x (in-set s)])
     (set-union i (f x))))
 
 ;; Calculate fixpoint of (appl f).
-;; fix : (∀ (X) ((X -> (Setof X)) (Setof X) -> (Setof X)))
+;; \(\forall\) (X) ((X \(\to\) Set[X]) Set[X] \(\to\) Set[X])
 (define (fix f s)
   (let loop ((accum (set)) (front s))
     (if (set-empty? front)
@@ -400,14 +400,14 @@ reached.
         (let ((new-front ((appl f) front)))
           (loop (set-union accum front)
                 (set-subtract new-front accum))))))
-\end{verbatim}
+\end{alltt}
 
 \subsection{Store widening}
 
-\begin{verbatim}
-;; State^ = (cons (Set Conf) Store)
+\begin{alltt}
+;; \(\widehat{State}\) = (cons (Set Conf) Store)
 
-;; (State -> Setof State) -> State^ -> { State^ }
+;; (State \(\to\) Set[State]) \(\to\) \(\widehat{State}\) \(\to\) \(\widehat{State}\)
 (define ((wide-step step) state)
   (match state
     [(cons cs \(\msto\))
@@ -415,7 +415,7 @@ reached.
                  (for/set ([c cs]) (c->s c \(\msto\)))))
      (set (cons (for/set ([s ss]) (s->c s))
                 (join-stores ss)))]))
-\end{verbatim}
+\end{alltt}
 
 \subsection{Baseline evaluation}
 
@@ -459,16 +459,25 @@ For this, we introduce a new value for a delayed lookup that acts to
 quotient the state space by the values at the delayed address.
 
 \begin{align*}
-force(\clos{x,e,\menv},\msto) &= \{\clos{x,e,\menv}\}\\
+force(\clos{\mvar,\mexp,\menv},\msto) &= \{\clos{\mvar,\mexp,\menv}\}\\
 force(\saddr\maddralt,\msto) &= \msto(\maddralt)\\
-\ev{\svar{x},\menv,\mkont,\msto} &\machstep\; 
-\co{\mkont,\saddr{\menv(x)},\msto} \\
+\ev{\svar{\mvar},\menv,\mkont,\msto} &\machstep\; 
+\co{\mkont,\saddr{\menv(\mvar)},\msto} \\
 \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},v,\msto}
 &\machstep\;
-\ev[^\mcntr]{\mexp,\menv,\msto,\kfn[^\mcntr_\mlab]{v,\maddr}} \\
-\mbox{where } &v' \in force(v,\msto)
-bind^\mcntr_\mlab(\msto,x,\menv,v) =
+\ev[^\mcntr]{\mexp,\menv,\msto,\kfn[^\mcntr_\mlab]{\mval,\maddr}} \\
+\mbox{where } &\mval' \in force(\mval,\msto) \\
+bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
+  \maddr], \msto\sqcup[\maddr \mapsto force(\mval, \msto)], \mcntr' \\
+\mbox{where } \mcntr' &= \lfloor\mlab\mcntr\rfloor_k \\
+              \maddr &= \mvar\mcntr'
 \end{align*}
+
+The force for the second rule is necessary to keep the same type for
+the \(\kfn{}\) continuation, but we would rather use an address. This
+introduces (acceptably) more imprecision, but has the same precision as an ANF
+analysis\footnote{Exercise for the reader.}.
+
 Lazy:
    cpu time: 32481 real time: 32881 gc time: 547
 
@@ -476,7 +485,7 @@ Lazy:
 
 We can eliminate the {\tt ev} states from the run-time interpretation
 of a program by specializing the machine transition relation to the
-program being analyzed.  This eliminates interpretative overhead by
+program being analyzed. This eliminates interpretative overhead by
 first compiling the program into ``byte code'' instructions.
 
 The essence of the compilation effect can be seen by consider an example
@@ -558,12 +567,12 @@ is which addresses are pushed.
 \\[2mm]
 %% APPLY
 \ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\msto,\mkont} & \machstep
-\mcomp^{\mcntr'}(\menv',\msto',\mkont)
-\text{ where }\menv',\msto',\mcntr' = \mathit{bind\,}^{ \mcntr}_\mlab(\msto,\mvar,\mval)
+\mcomp^{\mcntr'}(\menv',\msto',\mkont) \\
+\text{ where }\menv',\msto',\mcntr' &= \mathit{bind\,}^{ \mcntr}_\mlab(\msto,\mvar,\mval)
 \\
 \ap{\mop,\mval,\msto,\mkont} & \machstep
-\co{\mkont,\mval',\msto}
-\text{ where }\mkont\in\msto(\maddr)
+\co{\mkont,\mval',\msto} \\
+\text{ where }\mkont &\in\msto(\maddr)
 \text{ and } \mval'\in\interpdelta(\mop,\mval)
 \end{align*}
 \caption{Abstract$^2$ machine for compiled ISWIM}
@@ -582,18 +591,17 @@ Compile + Lazy:
 \subsection{Fixed-point specialization}
 
 \begin{alltt}
-;; State^ -> State^
-;; Specialized from wide-step : State^ -> { State^ } ≈ State^ -> State^
+;; \(\widehat{State} \to \widehat{State}\)
 (define (wide-step-specialized state)
   (match state
     [(cons \(\msto\) cs)
      (define-values (cs* \(\msto\)*)
-       (for/fold ([cs* (set)] [\(\msto\)* \(\msto\)])
+       (for/fold ([cs* \(\varnothing\)] [\(\msto\)* \(\msto\)])
          ([c cs])
          (match (step-compiled^ (cons \(\msto\) c))
            [(cons \(\msto\)** cs**)
-            (values (set-union cs* cs**) (join-store \(\msto\)* \(\msto\)**))])))
-     (cons \(\msto\)* (set-union cs cs*))]))
+            (values (\(\cup\) cs* cs**) (\(\sqcup\)-store \(\msto\)* \(\msto\)**))])))
+     (cons \(\msto\)* (\(\cup\) cs cs*))]))
 \end{alltt}
 %% Should be commutted to beginning
 
@@ -603,18 +611,17 @@ Special + Compile + Lazy:
 \subsection{Computing with store changes}
 
 \begin{alltt}
-;; State^ -> State^
-;; Specialized from wide-step : State^ -> { State^ } ≈ State^ -> State^
+;; \(\widehat{State} \to \widehat{State}\)
 (define (wide-step-specialized state)
   (match state
     [(cons \(\msto\) cs)
-     (define-values (cs* ∆)
-       (for/fold ([cs* (set)] [∆* '()])
+     (define-values (cs* \(\msdiff\))
+       (for/fold ([cs* (set)] [\(\msdiff\)* '()])
          ([c cs])
          (match (step-compiled^ (cons \(\msto\) c))
            [(cons \(\msdiff\)** cs**)
-            (values (set-union cs* cs**) (append \(\msdiff\)** \(\msdiff\)*))])))
-     (cons (update \(\msdiff\) \(\msto\)) (set-union cs cs*))]))
+            (values (\(\cup\) cs* cs**) (++ \(\msdiff\)** \(\msdiff\)*))])))
+     (cons (update \(\msdiff\) \(\msto\)) (\(\cup\) cs cs*))]))
 \end{alltt}
 
 \[
@@ -957,10 +964,10 @@ doing is so, it actually saves work (as can be seen above).
 
 An Example:
 
-\begin{verbatim}
+\begin{alltt}
  (let ((id (\(\lambda\) (x) x)))
    (begin (id 1) (id 2)))
-\end{verbatim}
+\end{alltt}
 
 Under Uniform 0-CFA, we would have:
 \[
