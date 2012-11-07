@@ -6,6 +6,8 @@
          wide-step hash-getter
          mk-set-fixpoint^
          mk-special-set-fixpoint^
+         mk-special2-set-fixpoint^
+         mk-special3-set-fixpoint^
          with-narrow-set-monad
          with-σ-passing-set-monad
          with-whole-σ)
@@ -35,36 +37,88 @@
         (set (cons σ* cs*))]
        [_ (error 'wide-step "bad output ~a~%" state)])))
 
-
 (define-syntax-rule (mk-special-set-fixpoint^ fix name ans^?)
  (define-syntax-rule (name step fst)
    (let ()
      (define-values (f^σ cs) fst)
      (define ss (fix (wide-step-specialized step) (set (cons f^σ cs))))
-     (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
-       (match s
-         [(cons fsσ cs)
-          (define-values (σ* cs*)
-            (values (join-store last-σ fsσ)
-                    (for/set #:initial final-cs ([c (in-set cs)]
-                                                 #:when (ans^? c))
-                             c)))
-          (values σ* cs*)]
-         [_ (error 'name "bad output ~a~%" s)])))))
+     (define-values (σ final-cs)
+       (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
+         (match s
+           [(cons fsσ cs) (values (join-store last-σ fsσ) (∪ final-cs cs))]
+           [_ (error 'name "bad output ~a~%" s)])))
+     ;; filter the final results
+     (values (format "State count: ~a" (set-count final-cs))
+             σ
+             (for/set ([c (in-set final-cs)]
+                       #:when (ans^? c))
+               c)))))
+
+;; stores the last seen heap for each state
+(define-syntax-rule (mk-special2-set-fixpoint^ fix name ans^?)
+ (define-syntax-rule (name step fst)
+   (let ()
+     (define-values (f^σ cs) fst)
+     (define-values (σ final-cs)
+       (let loop ([accum (hash)] [front cs] [σ f^σ])
+         (match (for/first ([c (in-set front)]) c)
+           [#f (values σ (for/set ([(c _) (in-hash accum)]) c))]
+           [c
+            (define-values (σ* cs*) (step (cons σ c)))
+            (define-values (accum* front*)
+              (for/fold ([accum* accum] [front* (front . ∖1 . c)])
+                  ([c* (in-set cs*)]
+                   #:unless (equal? σ* (hash-ref accum c* (hash))))                
+                (values (hash-set accum* c* σ*) (∪1 front* c*))))
+            (loop accum* front* σ*)])))
+     ;; filter the final results
+     (values (format "State count: ~a" (set-count final-cs))
+             σ
+             (for/set ([c (in-set final-cs)]
+                       #:when (ans^? c))
+               c)))))
+
+;; Uses counting and merges stores between stepping all states.
+(define-syntax-rule (mk-special3-set-fixpoint^ fix name ans^?)
+ (define-syntax-rule (name step fst)
+   (let ()
+     (define-values (f^σ cs) fst)
+     (define-values (σ final-cs)
+       (let loop ([accum (hash)] [front cs] [σ f^σ] [σ-count 0])
+         (match (for/first ([c (in-set front)]) c)
+           [#f (values σ (for/set ([(c _) (in-hash accum)]) c))]
+           [c
+            (define-values (σ* cs*) (step (cons σ c)))
+            (define count* (if (equal? σ σ*) σ-count (add1 σ-count)))
+            (define-values (accum* front*)
+              (for/fold ([accum accum] [front (front . ∖1 . c)])
+                  ([c* (in-set cs*)]
+                   #:unless (= count* (hash-ref accum c* -1)))
+                (values (hash-set accum c* count*) (∪1 front c*))))
+            (loop accum* front* σ* count*)])))
+     ;; filter the final results
+     (values (format "State count: ~a" (set-count final-cs))
+             σ
+             (for/set ([c (in-set final-cs)]
+                       #:when (ans^? c))
+               c)))))
 
 (define-syntax-rule (mk-set-fixpoint^ fix name ans^?)
  (define-syntax-rule (name step fst)
    (let ()
      (define-values (f^σ cs) fst)
      (define ss (fix (wide-step step) (set (cons f^σ cs))))
-     (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
-               (match s
-                 [(cons fsσ cs)
-                  (values (join-store last-σ fsσ)
-                          (for/set #:initial final-cs ([c (in-set cs)]
-                                                       #:when (ans^? c))
-                                   c))]
-                 [_ (error 'name "bad output ~a~%" s)])))))
+     (define-values (last-σ final-cs)
+       (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
+         (match s
+           [(cons fsσ cs)
+            (values (join-store last-σ fsσ)
+                    (for/set #:initial final-cs ([c (in-set cs)]
+                                                 #:when (ans^? c))
+                             c))]
+           [_ (error 'name "bad output ~a~%" s)])))
+     (values (format "State count: ~a" (for/sum ([p (in-set ss)]) (set-count (cdr p))))
+             last-σ final-cs))))
 
 (define-for-syntax do-body-transform-σ/cs
   (syntax-rules () [(_ e) (let-values ([(σ* cs) e])
