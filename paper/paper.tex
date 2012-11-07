@@ -164,7 +164,7 @@ different in the following ways:
 %% APPLY
 \ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont} & \machstep
 \ev[^{\mcntr'}\!]{\mexp,\menv',\msto',\mkont}
-\text{ where }\menv',\msto',\mcntr' = \mathit{bind\,}^{ \mcntr}_\mlab(\msto,\mvar,\mval)
+\text{ where }\menv',\msto',\mcntr' = \mathit{bind\,}^{ \mcntr}_\mlab(\menv,\msto,\mvar,\mval)
 \\
 \ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont} & \machstep
 \co{\mkont,\mval',\msto}
@@ -179,10 +179,10 @@ different in the following ways:
 \paragraph{Concrete interpretation} can be characterized by setting the implicit
 parameters of the relation given in Figure~\ref{fig:aam} as follows:
 \begin{align*}
-\mathit{push}(\mlab,\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
+\mathit{push}_\mlab^\mcntr(\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
 \mbox{ where }\maddr \notin\msto
 \\
-\mathit{bind}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\msto\sqcup[\maddr\mapsto\{\mval\}]
+\mathit{bind}(\menv,\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\msto\sqcup[\maddr\mapsto\{\mval\}]
 \mbox{ where }\maddr \notin\msto
 \end{align*}
 The resulting relation is non-deterministic in its choice of
@@ -221,17 +221,26 @@ Uniform \(k\)-CFA is one such analysis.
 strategy:
 
 \begin{align*}
-\mathit{push} &= \dots\\
-\mathit{bind} &= \dots
+\mathit{push}_\mlab^\mcntr(\msto,\mkont) &=
+  \mlab\mcntr,\msto\sqcup[\mlab\mcntr\mapsto\{\mkont\}] \\
+\mathit{bind}^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto \maddr],
+                                           \msto\sqcup[\maddr \mapsto
+                                             \{ \mval\}],
+                                           \mcntr' \\
+\mbox{where } \mcntr' &= \lfloor\mlab\mcntr\rfloor_k \\
+              \maddr &= x\mcntr' \\
+%%              \lfloor \mtcntr \rfloor_k &= \mtcntr \\
+              \lfloor \mcntr \rfloor_0 &= \mtcntr \\
+              \lfloor \mlab\mcntr \rfloor_{k+1} &= \mlab\lfloor \mcntr\rfloor_k
 \end{align*}
+%% Redundant
+%% \paragraph 0CFA
 
-\paragraph 0CFA
-
-\begin{align*}
-\mathit{push}(\mlab,\msto,\mkont) &= \mlab,\msto\sqcup[\mlab\mapsto\{\mkont\}]
-\\
-\mathit{bind}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\mvar],\msto\sqcup[\mvar\mapsto\{\mval\}]
-\end{align*}
+%% \begin{align*}
+%% \mathit{push}(\mlab,\msto,\mkont) &= \mlab,\msto\sqcup[\mlab\mapsto\{\mkont\}]
+%% \\
+%% \mathit{bind}(\menv,\msto,\mvar,\mval) &= \menv[\mvar\mapsto\mvar],\msto\sqcup[\mvar\mapsto\{\mval\}]
+%% \end{align*}
 
 
 \paragraph{Primitives}
@@ -414,12 +423,52 @@ Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 
 \section{Precision preserving recipe}
 
-The first four techniques reside in the purely functional realm. The
-following three techniques use imperative constructs to avoid allocation
-overhead.
+We discuss a variety of techniques for increasing performance by
+decreasing the interpretive overhead of abstract interpretation, all
+in the purely functional realm. These techniques are the following:
+\begin{itemize}
+ \item{shrink state space by quotients (lazy non-determinism)}
+ \item{shrink state space by removing {\tt ev} states (abstract
+   compilation)}
+ \item{decrease intermediate data structures by specializing our
+fixpoint operator to work with widened machine configurations
+(fixpoint specialization)}
+ \item{decrease intermediate data structures by operating on store
+   changes rather than whole stores (store deltas)}
+\end{itemize}
+Each technique requires minimal changes to the reduction
+relation/fixpoint, and each improves performance by integer factors.
 
 \subsection{Lazy non-determinism}
 
+The first problem that we realized with the AAM approach was that much
+of the non-determinism is spurious. For example, in a function
+application,
+\begin{alltt}
+(f x y z w)
+\end{alltt}
+where all variables have been joined with multiple values, each
+variable reference transitions to several new states that comprise the
+cartesian product of all the values of {\tt x}, {\tt y}, {\tt z} and
+{\tt w}, only to be joined back together in {\tt f}'s bindings. For
+this reason, we {\it delay} the non-determinism until it is needed in
+{\it strict contexts} (such as the guard for an {\tt if} a called
+procedure, or a numerical primitive application). 
+
+For this, we introduce a new value for a delayed lookup that acts to
+quotient the state space by the values at the delayed address.
+
+\begin{align*}
+force(\clos{x,e,\menv},\msto) &= \{\clos{x,e,\menv}\}\\
+force(\saddr\maddralt,\msto) &= \msto(\maddralt)\\
+\ev{\svar{x},\menv,\mkont,\msto} &\machstep\; 
+\co{\mkont,\saddr{\menv(x)},\msto} \\
+\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},v,\msto}
+&\machstep\;
+\ev[^\mcntr]{\mexp,\menv,\msto,\kfn[^\mcntr_\mlab]{v,\maddr}} \\
+\mbox{where } &v' \in force(v,\msto)
+bind^\mcntr_\mlab(\msto,x,\menv,v) =
+\end{align*}
 Lazy:
    cpu time: 32481 real time: 32881 gc time: 547
 
@@ -579,6 +628,29 @@ Special + Compile + Lazy:
 Delta Store + Special + Compile + Lazy:
    cpu time: 668 real time: 686 gc time: 41
 
+\section{Sacrificing precision for performance}
+
+Each step in the fixpointer for the above techniques requires joining
+several (possibly large) stores together. Even with immutable hashes
+that utilize sharing, this is memory-intensive. Worse, this
+contributes an obscene fraction of the runtime. We reuse a technique
+created in Shivers' dissertation~\cite{ianjohnson:Shivers:1991:CFA},
+timestamp approximation, that removes the need for joining whole
+stores by manipulating a global store imperatively. This loses
+precision because the starting store for each state in a machine
+configuration can change between stepping all states and introduce
+more flows than originally possible. The example in figure
+\ref{fig:timestamp} illustrates this loss in precision. {\bf TODO:}
+EXPLANATION OF LOSS. In many applications, this is acceptable for the
+performance improvement.
+
+\begin{figure}
+TODO
+\caption{Precision lossy program in timestamp approximation}
+\label{fig:timestamp}
+\end{figure}
+
+
 % For David to fill in.
 \subsection{Imperative global store and worklist}
 ...
@@ -589,13 +661,15 @@ Delta Store + Special + Compile + Lazy:
 \section{Implementation}
 
 All the above techniques can be combined into a single implementation
-of the small step reduction relation and small variations of a general
-fixpoint combinator. We implementated all of these ideas in an
-analysis of R4RS scheme in just 3000 lines of Racket. Most lines are
-spent listing all the primitives and library functions (and their
-abstract and concrete implementations) of R4RS. Here we describe the
-unifying vocabulary for writing such a framework, and some design
-decisions related to scaling to a language with compound data.
+of the small step reduction relation and simple variations of a
+general fixpoint combinator. We implementated all of these ideas in an
+analysis of core Scheme (call-by-value lambda calculus extended with
+variable-arity functions, call/cc, vectors, conses, recursive binding,
+various primitives) in just 3000 lines of Racket. Most lines are spent
+defining the primitives and expected library functions used in our
+benchmarks. Here we describe the unifying vocabulary for writing such
+a framework, and some design decisions related to scaling to a
+language with compound data.
 
 \subsection{Vocabulary of Parameterized Optimizations}
 
@@ -732,8 +806,9 @@ definition is simply
 \end{center}
 
 The linguistic elements described above were all reusable to implement
-the various languages' abstract interpreters. One such language was
-R4RS Scheme, which has compound data (e.g. vectors and conses). 
+the various languages' abstract interpreters. The language of our
+benchmarks, Scheme, has compound data (e.g. vectors and conses), which
+introduces choices for abstraction.
 
 \subsection{Abstracting Compound Data}
 
@@ -779,7 +854,7 @@ to enhancing our technique's soundness to conceptual complexity ratio.
 There are a few steps to consider:
 \begin{itemize}
  \item{Define special value lattice elements for compound data domains that can be quoted
-       (e.g. {\tt QPair} for $\left\lbrace ({\tt cons} a_i d_i)\right\rbrace_i$, {\tt QVector} for immutable vectors, etc.)}
+       (e.g. {\tt QPair} for $\left\{ ({\tt cons} a_i d_i)\right\}_i$, {\tt QVector} for immutable vectors, etc.)}
  \item{Define a ``larger'' value lattice element for all quotable data, {\tt QData}}
  \item{Interpret {\tt (quote (a ...))} as {\tt (qlist a ...)}, a new primitive function defined in figure \ref{fig:qlist},
        and similar definitions for immutable vectors.}
@@ -791,7 +866,7 @@ There are a few steps to consider:
 \interpdelta(\msto, qlist) &= (\mbox{{\tt '()}}, \msto) \\
 \interpdelta(\msto, qlist, v ..._+) &= (({\tt cons}\ a\ d), \msto') \\
 \qquad \mbox{where } \msto' &= \msto\sqcup[a \mapsto \bigsqcup(v ...)] \\
-                            &\qquad \sqcup[d \mapsto \lbrace \mbox{{\tt '()}}, ({\tt cons}\ a\ d)\rbrace] \\
+                            &\qquad \sqcup[d \mapsto \{ \mbox{{\tt '()}}, ({\tt cons}\ a\ d)\}] \\
 \bigsqcup(v) &= v \\
 \bigsqcup(v, vs ...) &= merge(v, \bigsqcup(vs ...)) \\
 merge(v, v) &= v \\
