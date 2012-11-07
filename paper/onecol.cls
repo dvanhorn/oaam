@@ -1138,6 +1138,19 @@
 \def \@seccntformata #1.#2\@mark{%
   \if \@emptyargp{#2}.\fi}
 
+
+%% dvanhorn: hack around shortcomings of onecol.cls
+\usepackage[numbers,sort&compress,square]{natbib}
+\renewcommand{\@listi}{%
+  \leftmargin = \leftmargini
+  \listparindent = 0pt}
+%%%  \itemsep = 1pt
+%%%  \parsep = 3pt}
+%%%  \listparindent = \parindent}
+
+\let \@listI = \@listi
+%% dvanhorn: DONE
+
 %                       Revision History
 %                       -------- -------
 
