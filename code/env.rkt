@@ -1,5 +1,6 @@
 #lang racket
-(provide (all-defined-out))
+(provide extend extend* join join* join-store
+         update update/change restrict-to-reachable restrict-to-reachable/vector)
 (require "data.rkt" "ast.rkt" "notation.rkt")
 
 (define (extend ρ x v)
@@ -12,6 +13,12 @@
 (define (join* eσ as ss)
   (for/fold ([eσ eσ]) ([a as] [s ss]) (join eσ a s)))
 
+;; Perform join and return if the join was idempotent
+(define (join/change eσ a s)
+  (define prev (hash-ref eσ a ∅))
+  (define s* (⊓ s prev))
+  (values (hash-set eσ a s*) (≡ prev s*)))
+
 ;; Store Store -> Store
 (define (join-store eσ1 eσ2)
   (for/fold ([eσ eσ1])
@@ -21,6 +28,11 @@
 (define (update ∆s eσ)
   (for/fold ([eσ eσ]) ([a×vs (in-list ∆s)])
     (join eσ (car a×vs) (cdr a×vs))))
+;; Like update, only returns if the update was idempotent
+(define (update/change ∆s eσ)
+  (for/fold ([eσ eσ] [same? #t]) ([a×vs (in-list ∆s)])
+    (define-values (σ* a-same?) (join/change eσ (car a×vs) (cdr a×vs)))
+    (values σ* (and same? a-same?))))
 
 (define (((mk-reach ref) touches) eσ root)
   (define seen ∅)
@@ -40,7 +52,6 @@
 
 (define reach (mk-reach hash-ref))
 (define reach/vec (mk-reach vector-ref))
-
 
 (define restrict-to-reachable (mk-restrict-to-reachable hash-ref))
 (define restrict-to-reachable/vector (mk-restrict-to-reachable vector-ref))

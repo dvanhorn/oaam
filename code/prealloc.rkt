@@ -51,8 +51,7 @@
 (define (join! a vs)
   (define prev (vector-ref global-σ a))
   (define upd (⊓ vs prev))
-  (define same? (= (set-count prev) (set-count upd)))
-  (unless same?
+  (unless (≡ prev upd)
     (vector-set! global-σ a upd)
     (inc-unions!)))
 

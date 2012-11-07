@@ -44,8 +44,7 @@
 (define (join-h! a vs)
   (define prev (hash-ref global-σ a ∅))
   (define upd (⊓ vs prev))
-  (define same? (= (set-count upd) (set-count prev)))
-  (unless same?
+  (unless (≡ prev upd)
     (hash-set! global-σ a upd)
     (inc-unions!)))
 
