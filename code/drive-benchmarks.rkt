@@ -47,8 +47,7 @@
                             specialized (set boyer graphs matrix nbody)
                             lazy        (set boyer graphs matrix nbody)
                             compiled    (set boyer graphs matrix)                            
-                            ;; Must rerun
-                            deltas      (set)
+                            deltas      (set nucleic)
                             ;; All complete
                             imperative  (set)
                             preallocated (set)))

@@ -1,7 +1,7 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          "store-passing.rkt" "context.rkt" "fix.rkt")
-(provide bind-join-∆s bind-join*-∆s mk-∆-fix^ with-σ-∆s)
+(provide bind-join-∆s bind-join*-∆s mk-∆-fix^ mk-timestamp-∆-fix^ with-σ-∆s)
 
 ;; Utility function for combining multiple σ-∆s
 (define (map2-append f acc ls0 ls1)
@@ -50,6 +50,33 @@
            [_ (error 'name "bad output ~a~%" s)])))
      (values (format "State count: ~a" (for/sum ([p (in-set ss)]) (set-count (cdr p))))
              last-σ final-cs))))
+
+;; Uses counting and merges stores between stepping all states.
+(define-syntax-rule (mk-timestamp-∆-fix^ name ans^?)
+ (define-syntax-rule (name step fst)
+   (let ()
+     (define-values (∆ cs) fst)
+     (define-values (last-σ final-cs)
+       (let loop ([accum (hash)] [front cs] [σ (update ∆ (hash))] [σ-count 0])
+         (match (for/first ([c (in-set front)]) c)
+           [#f (values σ (for/set ([(c _) (in-hash accum)]) c))]
+           [c
+            (define-values (∆ cs*) (step (cons σ c)))
+            (define-values (σ* same?) (update/change ∆ σ))
+            (define count* (if same? σ-count (add1 σ-count)))
+            (define-values (accum* front*)
+              (for/fold ([accum accum] [front (front . ∖1 . c)])
+                  ([c* (in-set cs*)]
+                   #:unless (= count* (hash-ref accum c* -1)))
+                (values (hash-set accum c* count*) (∪1 front c*))))
+            (loop accum* front* σ* count*)])))
+     ;; filter the final results
+     (values (format "State count: ~a" (set-count final-cs))
+             σ
+             (for/set ([c (in-set final-cs)]
+                       #:when (ans^? c))
+               c)))))
+
 
 (define-syntax-rule (with-σ-∆s body)
   (splicing-syntax-parameterize

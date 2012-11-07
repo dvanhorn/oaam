@@ -48,8 +48,10 @@
                  (aval 0cfa^)]
                 [("--ls") "Benchmark specialized lazy non-determinism"
                  (aval lazy-0cfa^)]
+#;
                 [("--ls2") "Benchmark specialized2 lazy non-determinism"
                  (aval lazy-0cfa^2)]
+#;
                 [("--ls3") "Benchmark specialized3 lazy non-determinism"
                  (aval lazy-0cfa^3)]
                 [("--lc") "Benchmark compiled specialized lazy non-determinism"
@@ -57,6 +59,10 @@
                 [("--ld")
                   "Benchmark compiled store-diff lazy non-determinism"
                  (aval lazy-0cfa∆/c)]
+#;
+                [("--dt")
+                 "Benchmark compiled store-diff lazy non-determinism timestamp approx."
+                 (aval lazy-0cfa∆/c/timestamp)]
                 [("--li")
                  "Benchmark compiled imperative store lazy non-determinism"
                  (aval lazy-0cfa^/c!)]
@@ -64,7 +70,7 @@
                  "Benchmark compiled preallocated store lazy non-determinism"
                  (aval lazy-0cfa^/c/prealloc!)] ;; most optimized
                 ;; Not benchmarked for paper
-                #;
+                #|
                 [("--spp")
                  "Benchmark compiled preallocated store sparse lazy non-determinism"
                  (aval sparse-lazy-0cfa^/c/prealloc!)]
@@ -86,6 +92,7 @@
                 [("--lazy-0cfa^/prealloc!")
                  "Benchmark preallocated store lazy non-determinism"
                  (aval lazy-0cfa^/prealloc!)]
+|#
                 #:args (filename)
                 filename))
 (test (prep test-file))
