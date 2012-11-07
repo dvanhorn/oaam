@@ -1,13 +1,13 @@
 #lang racket
 
-(define run-num 0)
+(define run-num 2)
 
 (define (construct-cmd which file)
   (define path (string->path file))
   (define-values (base filename dir?) (split-path path))
   (define outtime (path-replace-suffix filename (format ".~a.time.~a" which run-num)))
   (define outmem (path-replace-suffix filename (format ".~a.mem.~a" which run-num)))
-  (format "racket run-benchmark.rkt --~a ~a > ~a 2> bench/~a" which file outtime outmem))
+  (format "racket run-benchmark.rkt --~a ~a > bench/~a 2> bench/~a" which file outtime outmem))
 
 (define church "../benchmarks/church.sch")
 (define mbrotZ "../benchmarks/mbrotZ.sch")
@@ -46,13 +46,21 @@
 (define known-timeout (hash baseline    (set boyer graphs matrix nbody)
                             specialized (set boyer graphs matrix nbody)
                             lazy        (set boyer graphs matrix nbody)
-                            compiled    (set boyer graphs matrix)
-                            deltas      (set church mbrotZ)))
+                            compiled    (set boyer graphs matrix)                            
+                            ;; Must rerun
+                            deltas      (set)
+                            ;; All complete
+                            imperative  (set)
+                            preallocated (set)))
 ;; 2GB RAM
 (define known-exhaust (hash baseline (set nucleic)
                             specialized (set nucleic)
                             lazy (set nucleic)
-                            compiled (set nucleic)))
+                            compiled (set nucleic)
+                            ;; Must rerun
+                            deltas (set)
+                            ;; others complete
+                            ))
 
 (for* ([which which-analyses]
        [timeout (in-value (hash-ref known-timeout which (set)))]

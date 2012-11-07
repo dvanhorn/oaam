@@ -26,18 +26,23 @@
             (pull (step (cons gσ c)) ∆* cs*)))
         (cons (update ∆ gσ) (set-union cs cs*))])))
 
-(define-syntax-rule (mk-generator/wide/σ-∆s-fixpoint name ans?)
+(define-syntax-rule (mk-generator/wide/σ-∆s-fixpoint name ans? touches)
   (define-syntax-rule (name step fst)
     (let ()
       (define wide-step (σ-∆s/generator/wide-step-specialized step ans?))
+      (define clean-σ (restrict-to-reachable touches))
       (define-values (cs ∆) (pull fst '() ∅))
       (define fst-s (cons (update ∆ (hash)) cs))
       (define snd (wide-step fst-s))
       (let loop ((next snd) (prev fst-s))
         (cond [(equal? next prev)
-               (for/set ([c (cdr prev)]
-                         #:when (ans? c))
-                 c)]
+               (define answers 
+                       (for/set ([c (cdr prev)]
+                                 #:when (ans? c))
+                         c))
+               (values (format "State count: ~a" (set-count (cdr prev)))
+                       (clean-σ (car prev) answers)
+                       answers)]
               [else (loop (wide-step next) next)])))))
 
 (define-syntax-rule (pull-global gen cs-base)
@@ -68,8 +73,9 @@
                (define answers (for/set ([c (cdr prev)]
                                          #:when (ans? c))
                                  (ans-v c)))
-               (cons (clean-σ global-σ answers)
-                     answers)]
+               (values (format "State count: ~a" (set-count (cdr prev)))
+                       (clean-σ global-σ answers)
+                       answers)]
               [else
                (loop (wide-step next) next)])))))
 

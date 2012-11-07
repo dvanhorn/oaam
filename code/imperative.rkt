@@ -71,8 +71,9 @@
                (for*/set ([(c at-unions) (in-hash seen)]
                           #:when (ans^? c))
                  (ans^-v c)))
-             (cons (clean-σ global-σ vs)
-                   vs)]
+             (values (format "State count: ~a" (hash-count seen))
+                     (clean-σ global-σ vs)
+                     vs)]
             [else
              (define todo-old todo)
              (reset-todo!)                        ;; → '()

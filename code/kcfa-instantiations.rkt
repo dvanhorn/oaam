@@ -120,6 +120,31 @@
                    #:σ-passing #:wide #:set-monad)))))))
 (provide lazy-0cfa^)
 
+(mk-special2-set-fixpoint^ fix lazy-0cfa-set-fixpoint^2 lazy-0cfa-ans^2?)
+(with-nonsparse
+ (with-lazy
+  (with-0-ctx
+   (with-whole-σ
+    (with-σ-passing-set-monad
+     (with-abstract
+      (mk-analysis #:aval lazy-0cfa^2 #:ans lazy-0cfa-ans^2
+                   #:fixpoint lazy-0cfa-set-fixpoint^2
+                   #:σ-passing #:wide #:set-monad)))))))
+(provide lazy-0cfa^2)
+
+
+(mk-special3-set-fixpoint^ fix lazy-0cfa-set-fixpoint^3 lazy-0cfa-ans^3?)
+(with-nonsparse
+ (with-lazy
+  (with-0-ctx
+   (with-whole-σ
+    (with-σ-passing-set-monad
+     (with-abstract
+      (mk-analysis #:aval lazy-0cfa^3 #:ans lazy-0cfa-ans^3
+                   #:fixpoint lazy-0cfa-set-fixpoint^3
+                   #:σ-passing #:wide #:set-monad)))))))
+(provide lazy-0cfa^3)
+
 (mk-fix fix-filtered 0cfa-ans? 0cfa-ans-v)
 (with-nonsparse
  (with-lazy
@@ -142,35 +167,21 @@
                    #:set-monad)))))))
 (provide lazy-0cfa/c)
 
-(mk-generator/wide/σ-∆s-fixpoint lazy-0cfa-gen^-fix gen-ans^?)
+(mk-generator/wide/σ-∆s-fixpoint lazy-0cfa-gen^-fix gen-ans^? gen-touches-0)
 (with-nonsparse
  (with-lazy
   (with-0-ctx
    (with-σ-∆s
             (with-σ-passing-generators
              (with-abstract
-              (mk-analysis #:aval lazy-0cfa^-gen-σ-∆s #:ans gen-ans^
+              (mk-analysis #:aval lazy-0cfa-gen-σ-∆s^ #:ans gen-ans^
                            #:fixpoint lazy-0cfa-gen^-fix
+                           #:touches gen-touches-0
                            #:σ-∆s
                            #:wide #:generators)))))))
-(provide lazy-0cfa^-gen-σ-∆s)
+(provide lazy-0cfa-gen-σ-∆s^)
 
-
-(mk-∆-fix^ lazy-0cfa∆^-fixpoint 0cfa∆-ans^?)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx
-   (with-σ-∆s
-            (with-σ-passing-set-monad
-             (with-abstract
-              (mk-analysis #:aval lazy-0cfa∆/c #:ans 0cfa∆-ans^
-                           #:fixpoint lazy-0cfa∆^-fixpoint
-                           #:wide #:σ-∆s #:set-monad
-                           #:compiled)))))))
-(provide lazy-0cfa∆/c)
-
-
-(mk-generator/wide/σ-∆s-fixpoint lazy-0cfa-σ-∆s-gen^-fix/c gen-ans^-σ-∆s/c?)
+(mk-generator/wide/σ-∆s-fixpoint lazy-0cfa-σ-∆s-gen^-fix/c gen-ans^-σ-∆s/c? gen-touches-0/c)
 (with-nonsparse
  (with-lazy
   (with-0-ctx
@@ -178,6 +189,7 @@
             (with-σ-passing-generators
              (with-abstract
               (mk-analysis #:aval lazy-0cfa-gen-σ-∆s^/c #:ans gen-ans^-σ-∆s/c
+                           #:touches gen-touches-0/c
                            #:fixpoint lazy-0cfa-σ-∆s-gen^-fix/c
                            #:σ-∆s
                            #:compiled #:wide #:generators)))))))
@@ -195,6 +207,19 @@
                    #:fixpoint lazy-0cfa-gen^-fix/c
                    #:compiled #:global-σ #:wide #:generators)))))))
 (provide lazy-0cfa-gen^/c)
+
+(mk-∆-fix^ lazy-0cfa∆^-fixpoint 0cfa∆-ans^?)
+(with-nonsparse
+ (with-lazy
+  (with-0-ctx
+   (with-σ-∆s
+            (with-σ-passing-set-monad
+             (with-abstract
+              (mk-analysis #:aval lazy-0cfa∆/c #:ans 0cfa∆-ans^
+                           #:fixpoint lazy-0cfa∆^-fixpoint
+                           #:wide #:σ-∆s #:set-monad
+                           #:compiled)))))))
+(provide lazy-0cfa∆/c)
 
 (mk-imperative^-fixpoint imperative-fixpoint/c imperative-ans/c? imperative-ans/c-v imperative-touches-0/c)
 (with-nonsparse

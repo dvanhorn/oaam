@@ -1,6 +1,6 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
-         "store-passing.rkt" "context.rkt")
+         "store-passing.rkt" "context.rkt" "fix.rkt")
 (provide bind-join-∆s bind-join*-∆s mk-∆-fix^ with-σ-∆s)
 
 ;; Utility function for combining multiple σ-∆s
@@ -25,29 +25,31 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Wide fixpoint for σ-∆s
 
+(define-syntax-rule (∆-step step)
+  (λ (state)
+     (match state
+       [(cons σ cs)
+        (define-values (∆ cs*)
+          (for/fold ([∆ '()] [cs* ∅]) ([c (in-set cs)])
+            (define-values (∆* cs**) (step (cons σ c)))
+            (values (append ∆* ∆) (∪ cs** cs*))))
+        (set (cons (update ∆ σ) cs*))])))
+
 (define-syntax-rule (mk-∆-fix^ name ans^?)
-  (define-syntax-rule (name stepper fst)
+  (define-syntax-rule (name step fst)
     (let-values ([(∆ cs) fst])
-     (define seen (make-hash))
-     (define todo (set (cons (update ∆ (hash)) cs)))
-     (let loop ()
-       (cond [(∅? todo)
-              (for/fold ([last-σ (hash)] [cs ∅])
-                  ([(c δσ) (in-hash seen)]
-                   #:when (ans^? c))
-                (values (join-store last-σ δσ) (∪1 cs c)))]
-             [else (define old-todo todo)
-                   (set! todo ∅)
-                   (for* ([σ×cs (in-set old-todo)]
-                          [σp (in-value (car σ×cs))]
-                          [c (in-set (cdr σ×cs))]
-                          [σc (in-value (cons σp c))]
-                          #:unless (hash-ref seen σc #f))
-                     (hash-set! seen σc #t)
-                     ;; Add the updated store with next steps to workset
-                     (define-values (∆ cs*) (stepper (cons σp c)))
-                     (set! todo (∪1 todo (cons (update ∆ σp) cs*))))
-                   (loop)])))))
+     (define ss (fix (∆-step step) (set (cons (update ∆ (hash)) cs))))
+     (define-values (last-σ final-cs)
+       (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
+         (match s
+           [(cons fsσ cs)
+            (values (join-store last-σ fsσ)
+                    (for/set #:initial final-cs ([c (in-set cs)]
+                                                 #:when (ans^? c))
+                             c))]
+           [_ (error 'name "bad output ~a~%" s)])))
+     (values (format "State count: ~a" (for/sum ([p (in-set ss)]) (set-count (cdr p))))
+             last-σ final-cs))))
 
 (define-syntax-rule (with-σ-∆s body)
   (splicing-syntax-parameterize

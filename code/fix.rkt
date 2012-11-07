@@ -17,4 +17,5 @@
 (define-syntax-rule (mk-fix name ans? ans-v)
   (define (name step fst)
     (define ss (fix step fst))
-    (for/set ([s ss] #:when (ans? s)) (ans-v s))))
+    (values (format "State count: ~a" (set-count ss))
+            (for/set ([s ss] #:when (ans? s)) (ans-v s)))))

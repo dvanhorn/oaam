@@ -19,6 +19,7 @@
 
 (define (test e)
   (parameterize ([current-logger (make-logger 'stuck-states)])
+#;#;
     (log-thread 'info)
     (log-thread 'debug)
     ;; we want to make sure that we are testing the implementation and not
@@ -47,6 +48,10 @@
                  (aval 0cfa^)]
                 [("--ls") "Benchmark specialized lazy non-determinism"
                  (aval lazy-0cfa^)]
+                [("--ls2") "Benchmark specialized2 lazy non-determinism"
+                 (aval lazy-0cfa^2)]
+                [("--ls3") "Benchmark specialized3 lazy non-determinism"
+                 (aval lazy-0cfa^3)]
                 [("--lc") "Benchmark compiled specialized lazy non-determinism"
                  (aval lazy-0cfa^/c)]
                 [("--ld")
@@ -59,6 +64,7 @@
                  "Benchmark compiled preallocated store lazy non-determinism"
                  (aval lazy-0cfa^/c/prealloc!)] ;; most optimized
                 ;; Not benchmarked for paper
+                #;
                 [("--spp")
                  "Benchmark compiled preallocated store sparse lazy non-determinism"
                  (aval sparse-lazy-0cfa^/c/prealloc!)]
@@ -73,7 +79,7 @@
                  (aval lazy-0cfa-gen^/c)]
                 [("--lazy-0cfa^-gen-σ-∆s")
                  "Benchmark store-diff generators lazy non-determinism"
-                 (aval lazy-0cfa^-gen-σ-∆s)]
+                 (aval lazy-0cfa-gen-σ-∆s^)]
                 [("--lazy-0cfa-gen-σ-∆s^/c")
                  "Benchmark compiled store-diff generators lazy non-determinism"
                  (aval lazy-0cfa-gen-σ-∆s^/c)]
