@@ -1,8 +1,9 @@
-\documentclass[preprint]{sigplanconf}
+\documentclass[preprint,onecolumn,9pt]{onecol} %{sigplanconf}
 \usepackage{alltt}
 \usepackage{amsmath,amsthm}
 \usepackage{amssymb}
 \usepackage{stmaryrd}
+\usepackage{url}
 
 \newtheorem{theorem}{Theorem}
 % \usepackage{xltxtra}
@@ -35,24 +36,17 @@
 \maketitle
 
 \begin{abstract}
-Recently \emph{abstracting abstract machines} has been proposed as a
-systematic approach to designing sound and computable program analyses
-for higher-order programming languages.  The approach has been applied
-to a wide variety of languages with features widely considered
-difficult to analyze
+Abstracting abstract machines has recently been proposed as a
+lightweight approach to designing sound and computable program
+analyses.  The approach involves deriving abstract interpreters from
+existing machine semantics and has been applied to a variety of
+languages with features widely considered difficult to analyze.
+Although analyzers are straightforward to build under this approach,
+the resulting analyzer is prohibitively inefficient.
 
-
-The abstracting abstract machines approach to program analysis makes
-it easy to design and implement sound and computable abstract
-interpretations of higher-order programs.
-%
-However, the straightforward implementation is generally
-not very fast.
-%
 This article contributes a step by step process for going from a naive
-abstract$^2$ machine to an efficient program analyzer that is (nearly)
-three orders of magnitude faster than the starting point, yet just as
-precise (and purely functional).
+analyzer derived under the abstracting abstract machine approach, to
+an efficient program analyzer.
 \end{abstract}
 
 %% \category{CR-number}{subcategory}{third-level}
@@ -64,6 +58,43 @@ precise (and purely functional).
 %% keyword1, keyword2
 
 \section{Introduction}
+
+The \emph{abstracting abstract machines}
+approach~\cite{dvanhorn:VanHorn2011Abstracting,dvanhorn:VanHorn2012Systematic}
+to deriving program analyses provides a straightforward way of
+transforming a programming language semantics in the form of an
+abstract machine, into a family of abstract interpreters parameterized
+over policies for regulating the analytic precision of the control,
+environment, store, and base value domains.  By taking a
+machine-oriented view of computation, it becomes possible to design,
+verify, and implement program analyzers for realistic language
+features typically considered difficult to model.  The approach was
+originally applied to features such as higher-order functions,
+stack-inspection, exceptions, laziness, first-class continuations, and
+garbage collection.  It has since been used to verify actor-based
+parallelism~\cite{local:DOsualdo:12A} and behavioral
+contracts~\cite{FIXME:tobin-hochstadt}; it has been used to model
+Dalvik, Erlang~\cite{local:DOsualdo:12B},
+JavaScript~\cite{local:DBLP:journals/corr/abs-1109-4467}, Racket, and
+Coq~\cite{local:harvard}.
+
+The primary strength of the approach is that abstract interpreters can
+be easily derived through a small number of steps from existing
+machine models.% such as the CESK machine or the Lazy Krivine machine.
+Moreover, since the relationships between abstract machines and
+higher-level semantic models---such as definitional
+interpreters~\cite{dvanhorn:reynolds-hosc98}, structured operational
+semantics~\cite{dvanhorn:Plotkin1981Structural}, and reduction
+semantics~\cite{dvanhorn:Felleisen2009Semantics}---are well
+understood~\cite{dvanhorn:Danvy:DSc}, it is possible to navigate from
+these semantic models to sound program analyzers.
+
+%% Using this approach has also lead to new insights in pushdown
+%% abstractions of programs capable of precisely modeling the program
+%% stack, even in the presence of control effects.
+
+
+
 
 \subsection{Notation and prerequisites}
 
@@ -917,8 +948,8 @@ Abstract machines are not only a good model for rapid analysis
 development, they also can be systematically developed into efficient
 algorithms.
 
-\bibliographystyle{splncs}
-\bibliography{bibliography}
+\bibliographystyle{plain}
+\bibliography{local,bibliography}
 
 \appendix
 \section{Relation to Uniform \(k\)-CFA (A Case Against Acceptability)}
