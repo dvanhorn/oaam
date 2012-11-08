@@ -1,8 +1,10 @@
 \documentclass[preprint]{sigplanconf}
 \usepackage{alltt}
-\usepackage{amsmath}
+\usepackage{amsmath,amsthm}
 \usepackage{amssymb}
 \usepackage{stmaryrd}
+
+\newtheorem{theorem}{Theorem}
 % \usepackage{xltxtra}
 % \setmonofont[Scale=MatchLowercase]{DejaVu Sans Mono}
 %
@@ -164,7 +166,7 @@ different in the following ways:
 %% APPLY
 \ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont} & \machstep
 \ev[^{\mcntr'}\!]{\mexp,\menv',\msto',\mkont}
-\text{ where }\menv',\msto',\mcntr' = \mathit{bind\,}^{ \mcntr}_\mlab(\msto,\mvar,\mval)
+\text{ where }\menv',\msto',\mcntr' = \mathit{bind\,}^{ \mcntr}_\mlab(\menv,\msto,\mvar,\mval)
 \\
 \ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont} & \machstep
 \co{\mkont,\mval',\msto}
@@ -179,10 +181,10 @@ different in the following ways:
 \paragraph{Concrete interpretation} can be characterized by setting the implicit
 parameters of the relation given in Figure~\ref{fig:aam} as follows:
 \begin{align*}
-\mathit{push}(\mlab,\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
+\mathit{push}_\mlab^\mcntr(\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
 \mbox{ where }\maddr \notin\msto
 \\
-\mathit{bind}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\msto\sqcup[\maddr\mapsto\{\mval\}]
+\mathit{bind}(\menv,\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\msto\sqcup[\maddr\mapsto\{\mval\}]
 \mbox{ where }\maddr \notin\msto
 \end{align*}
 The resulting relation is non-deterministic in its choice of
@@ -221,17 +223,26 @@ Uniform \(k\)-CFA is one such analysis.
 strategy:
 
 \begin{align*}
-\mathit{push} &= \dots\\
-\mathit{bind} &= \dots
+\mathit{push}_\mlab^\mcntr(\msto,\mkont) &=
+  \mlab\mcntr,\msto\sqcup[\mlab\mcntr\mapsto\{\mkont\}] \\
+\mathit{bind}^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto \maddr],
+                                           \msto\sqcup[\maddr \mapsto
+                                             \{ \mval\}],
+                                           \mcntr' \\
+\mbox{where } \mcntr' &= \lfloor\mlab\mcntr\rfloor_k \\
+              \maddr &= x\mcntr' \\
+%%              \lfloor \mtcntr \rfloor_k &= \mtcntr \\
+              \lfloor \mcntr \rfloor_0 &= \mtcntr \\
+              \lfloor \mlab\mcntr \rfloor_{k+1} &= \mlab\lfloor \mcntr\rfloor_k
 \end{align*}
+%% Redundant
+%% \paragraph 0CFA
 
-\paragraph 0CFA
-
-\begin{align*}
-\mathit{push}(\mlab,\msto,\mkont) &= \mlab,\msto\sqcup[\mlab\mapsto\{\mkont\}]
-\\
-\mathit{bind}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\mvar],\msto\sqcup[\mvar\mapsto\{\mval\}]
-\end{align*}
+%% \begin{align*}
+%% \mathit{push}(\mlab,\msto,\mkont) &= \mlab,\msto\sqcup[\mlab\mapsto\{\mkont\}]
+%% \\
+%% \mathit{bind}(\menv,\msto,\mvar,\mval) &= \menv[\mvar\mapsto\mvar],\msto\sqcup[\mvar\mapsto\{\mval\}]
+%% \end{align*}
 
 
 \paragraph{Primitives}
@@ -266,7 +277,7 @@ HERE: ρ
 
 \begin{figure}
 \begin{alltt}
-  ;; State \(\rightarrow\) Setof State
+  ;; State \(\to\) Set[State]
   (define (step \(\mstate\))
     (match \(\mstate\)
       [(ev \(\mexp\) \(\rho\) \(\msto\) \(\mkont\))
@@ -366,7 +377,7 @@ This program reaches $N$ states under concrete interpretation.
 \subsection{Generic fixpoint calculator}
 
 \begin{alltt}
-;; Expr \(\rightarrow\) Setof State
+;; Expr \(\to\) Set[State]
 (define (eval e)
   (fix step (set (inj e))))
 \end{alltt}
@@ -375,15 +386,15 @@ We compute the semantics of a program by iterating the state
 transition relation until a fixed point in the reachable states is
 reached.
 
-\begin{verbatim}
-;; appl : (∀ (X) ((X -> (Setof X)) -> ((Setof X) -> (Setof X))))
+\begin{alltt}
+;; \(\forall\) (X) ((X \(\to\) Set[X]) \(\to\) (Set[X] \(\to\) Set[X]))
 (define ((appl f) s)
   (for/fold ([i (set)])
     ([x (in-set s)])
     (set-union i (f x))))
 
 ;; Calculate fixpoint of (appl f).
-;; fix : (∀ (X) ((X -> (Setof X)) (Setof X) -> (Setof X)))
+;; \(\forall\) (X) ((X \(\to\) Set[X]) Set[X] \(\to\) Set[X])
 (define (fix f s)
   (let loop ((accum (set)) (front s))
     (if (set-empty? front)
@@ -391,14 +402,14 @@ reached.
         (let ((new-front ((appl f) front)))
           (loop (set-union accum front)
                 (set-subtract new-front accum))))))
-\end{verbatim}
+\end{alltt}
 
 \subsection{Store widening}
 
-\begin{verbatim}
-;; State^ = (cons (Set Conf) Store)
+\begin{alltt}
+;; \(\widehat{State}\) = (cons (Set Conf) Store)
 
-;; (State -> Setof State) -> State^ -> { State^ }
+;; (State \(\to\) Set[State]) \(\to\) \(\widehat{State}\) \(\to\) \(\widehat{State}\)
 (define ((wide-step step) state)
   (match state
     [(cons cs \(\msto\))
@@ -406,7 +417,7 @@ reached.
                  (for/set ([c cs]) (c->s c \(\msto\)))))
      (set (cons (for/set ([s ss]) (s->c s))
                 (join-stores ss)))]))
-\end{verbatim}
+\end{alltt}
 
 \subsection{Baseline evaluation}
 
@@ -414,11 +425,60 @@ Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 
 \section{Precision preserving recipe}
 
-The first four techniques reside in the purely functional realm. The
-following three techniques use imperative constructs to avoid allocation
-overhead.
+We discuss a variety of techniques for increasing performance by
+decreasing the interpretive overhead of abstract interpretation, all
+in the purely functional realm. These techniques are the following:
+\begin{itemize}
+ \item{shrink state space by quotients (lazy non-determinism)}
+ \item{shrink state space by removing {\tt ev} states (abstract
+   compilation)}
+ \item{decrease intermediate data structures by specializing our
+fixpoint operator to work with widened machine configurations
+(fixpoint specialization)}
+ \item{decrease intermediate data structures by operating on store
+   changes rather than whole stores (store deltas)}
+\end{itemize}
+Each technique requires minimal changes to the reduction
+relation/fixpoint, and each improves performance by integer factors.
 
 \subsection{Lazy non-determinism}
+
+The first problem that we realized with the AAM approach was that much
+of the non-determinism is spurious. For example, in a function
+application,
+\begin{alltt}
+(f x y z w)
+\end{alltt}
+where all variables have been joined with multiple values, each
+variable reference transitions to several new states that comprise the
+cartesian product of all the values of {\tt x}, {\tt y}, {\tt z} and
+{\tt w}, only to be joined back together in {\tt f}'s bindings. For
+this reason, we {\it delay} the non-determinism until it is needed in
+{\it strict contexts} (such as the guard for an {\tt if} a called
+procedure, or a numerical primitive application). 
+
+For this, we introduce a new value for a delayed lookup that acts to
+quotient the state space by the values at the delayed address.
+
+\begin{align*}
+force(\clos{\mvar,\mexp,\menv},\msto) &= \{\clos{\mvar,\mexp,\menv}\}\\
+force(\saddr\maddralt,\msto) &= \msto(\maddralt)\\
+\ev{\svar{\mvar},\menv,\mkont,\msto} &\machstep\; 
+\co{\mkont,\saddr{\menv(\mvar)},\msto} \\
+\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},v,\msto}
+&\machstep\;
+\ev[^\mcntr]{\mexp,\menv,\msto,\kfn[^\mcntr_\mlab]{\mval,\maddr}} \\
+\mbox{where } &\mval' \in force(\mval,\msto) \\
+bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
+  \maddr], \msto\sqcup[\maddr \mapsto force(\mval, \msto)], \mcntr' \\
+\mbox{where } \mcntr' &= \lfloor\mlab\mcntr\rfloor_k \\
+              \maddr &= \mvar\mcntr'
+\end{align*}
+
+The force for the second rule is necessary to keep the same type for
+the \(\kfn{}\) continuation, but we would rather use an address. This
+introduces (acceptably) more imprecision, but has the same precision as an ANF
+analysis\footnote{Exercise for the reader.}.
 
 Lazy:
    cpu time: 32481 real time: 32881 gc time: 547
@@ -427,7 +487,7 @@ Lazy:
 
 We can eliminate the {\tt ev} states from the run-time interpretation
 of a program by specializing the machine transition relation to the
-program being analyzed.  This eliminates interpretative overhead by
+program being analyzed. This eliminates interpretative overhead by
 first compiling the program into ``byte code'' instructions.
 
 The essence of the compilation effect can be seen by consider an example
@@ -509,12 +569,12 @@ is which addresses are pushed.
 \\[2mm]
 %% APPLY
 \ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\msto,\mkont} & \machstep
-\mcomp^{\mcntr'}(\menv',\msto',\mkont)
-\text{ where }\menv',\msto',\mcntr' = \mathit{bind\,}^{ \mcntr}_\mlab(\msto,\mvar,\mval)
+\mcomp^{\mcntr'}(\menv',\msto',\mkont) \\
+\text{ where }\menv',\msto',\mcntr' &= \mathit{bind\,}^{ \mcntr}_\mlab(\msto,\mvar,\mval)
 \\
 \ap{\mop,\mval,\msto,\mkont} & \machstep
-\co{\mkont,\mval',\msto}
-\text{ where }\mkont\in\msto(\maddr)
+\co{\mkont,\mval',\msto} \\
+\text{ where }\mkont &\in\msto(\maddr)
 \text{ and } \mval'\in\interpdelta(\mop,\mval)
 \end{align*}
 \caption{Abstract$^2$ machine for compiled ISWIM}
@@ -533,18 +593,17 @@ Compile + Lazy:
 \subsection{Fixed-point specialization}
 
 \begin{alltt}
-;; State^ -> State^
-;; Specialized from wide-step : State^ -> { State^ } ≈ State^ -> State^
+;; \(\widehat{State} \to \widehat{State}\)
 (define (wide-step-specialized state)
   (match state
     [(cons \(\msto\) cs)
      (define-values (cs* \(\msto\)*)
-       (for/fold ([cs* (set)] [\(\msto\)* \(\msto\)])
+       (for/fold ([cs* \(\varnothing\)] [\(\msto\)* \(\msto\)])
          ([c cs])
          (match (step-compiled^ (cons \(\msto\) c))
            [(cons \(\msto\)** cs**)
-            (values (set-union cs* cs**) (join-store \(\msto\)* \(\msto\)**))])))
-     (cons \(\msto\)* (set-union cs cs*))]))
+            (values (\(\cup\) cs* cs**) (\(\sqcup\)-store \(\msto\)* \(\msto\)**))])))
+     (cons \(\msto\)* (\(\cup\) cs cs*))]))
 \end{alltt}
 %% Should be commutted to beginning
 
@@ -554,18 +613,17 @@ Special + Compile + Lazy:
 \subsection{Computing with store changes}
 
 \begin{alltt}
-;; State^ -> State^
-;; Specialized from wide-step : State^ -> { State^ } ≈ State^ -> State^
+;; \(\widehat{State} \to \widehat{State}\)
 (define (wide-step-specialized state)
   (match state
     [(cons \(\msto\) cs)
-     (define-values (cs* ∆)
-       (for/fold ([cs* (set)] [∆* '()])
+     (define-values (cs* \(\msdiff\))
+       (for/fold ([cs* (set)] [\(\msdiff\)* '()])
          ([c cs])
          (match (step-compiled^ (cons \(\msto\) c))
            [(cons \(\msdiff\)** cs**)
-            (values (set-union cs* cs**) (append \(\msdiff\)** \(\msdiff\)*))])))
-     (cons (update \(\msdiff\) \(\msto\)) (set-union cs cs*))]))
+            (values (\(\cup\) cs* cs**) (++ \(\msdiff\)** \(\msdiff\)*))])))
+     (cons (update \(\msdiff\) \(\msto\)) (\(\cup\) cs cs*))]))
 \end{alltt}
 
 \[
@@ -579,6 +637,29 @@ Special + Compile + Lazy:
 Delta Store + Special + Compile + Lazy:
    cpu time: 668 real time: 686 gc time: 41
 
+\section{Sacrificing precision for performance}
+
+Each step in the fixpointer for the above techniques requires joining
+several (possibly large) stores together. Even with immutable hashes
+that utilize sharing, this is memory-intensive. Worse, this
+contributes an obscene fraction of the runtime. We reuse a technique
+created in Shivers' dissertation~\cite{ianjohnson:Shivers:1991:CFA},
+timestamp approximation, that removes the need for joining whole
+stores by manipulating a global store imperatively. This loses
+precision because the starting store for each state in a machine
+configuration can change between stepping all states and introduce
+more flows than originally possible. The example in figure
+\ref{fig:timestamp} illustrates this loss in precision. {\bf TODO:}
+EXPLANATION OF LOSS. In many applications, this is acceptable for the
+performance improvement.
+
+\begin{figure}
+TODO
+\caption{Precision lossy program in timestamp approximation}
+\label{fig:timestamp}
+\end{figure}
+
+
 % For David to fill in.
 \subsection{Imperative global store and worklist}
 ...
@@ -589,13 +670,15 @@ Delta Store + Special + Compile + Lazy:
 \section{Implementation}
 
 All the above techniques can be combined into a single implementation
-of the small step reduction relation and small variations of a general
-fixpoint combinator. We implementated all of these ideas in an
-analysis of R4RS scheme in just 3000 lines of Racket. Most lines are
-spent listing all the primitives and library functions (and their
-abstract and concrete implementations) of R4RS. Here we describe the
-unifying vocabulary for writing such a framework, and some design
-decisions related to scaling to a language with compound data.
+of the small step reduction relation and simple variations of a
+general fixpoint combinator. We implementated all of these ideas in an
+analysis of core Scheme (call-by-value lambda calculus extended with
+variable-arity functions, call/cc, vectors, conses, recursive binding,
+various primitives) in just 3000 lines of Racket. Most lines are spent
+defining the primitives and expected library functions used in our
+benchmarks. Here we describe the unifying vocabulary for writing such
+a framework, and some design decisions related to scaling to a
+language with compound data.
 
 \subsection{Vocabulary of Parameterized Optimizations}
 
@@ -732,8 +815,9 @@ definition is simply
 \end{center}
 
 The linguistic elements described above were all reusable to implement
-the various languages' abstract interpreters. One such language was
-R4RS Scheme, which has compound data (e.g. vectors and conses). 
+the various languages' abstract interpreters. The language of our
+benchmarks, Scheme, has compound data (e.g. vectors and conses), which
+introduces choices for abstraction.
 
 \subsection{Abstracting Compound Data}
 
@@ -779,7 +863,7 @@ to enhancing our technique's soundness to conceptual complexity ratio.
 There are a few steps to consider:
 \begin{itemize}
  \item{Define special value lattice elements for compound data domains that can be quoted
-       (e.g. {\tt QPair} for $\left\lbrace ({\tt cons} a_i d_i)\right\rbrace_i$, {\tt QVector} for immutable vectors, etc.)}
+       (e.g. {\tt QPair} for $\left\{ ({\tt cons} a_i d_i)\right\}_i$, {\tt QVector} for immutable vectors, etc.)}
  \item{Define a ``larger'' value lattice element for all quotable data, {\tt QData}}
  \item{Interpret {\tt (quote (a ...))} as {\tt (qlist a ...)}, a new primitive function defined in figure \ref{fig:qlist},
        and similar definitions for immutable vectors.}
@@ -791,7 +875,7 @@ There are a few steps to consider:
 \interpdelta(\msto, qlist) &= (\mbox{{\tt '()}}, \msto) \\
 \interpdelta(\msto, qlist, v ..._+) &= (({\tt cons}\ a\ d), \msto') \\
 \qquad \mbox{where } \msto' &= \msto\sqcup[a \mapsto \bigsqcup(v ...)] \\
-                            &\qquad \sqcup[d \mapsto \lbrace \mbox{{\tt '()}}, ({\tt cons}\ a\ d)\rbrace] \\
+                            &\qquad \sqcup[d \mapsto \{ \mbox{{\tt '()}}, ({\tt cons}\ a\ d)\}] \\
 \bigsqcup(v) &= v \\
 \bigsqcup(v, vs ...) &= merge(v, \bigsqcup(vs ...)) \\
 merge(v, v) &= v \\
@@ -882,10 +966,10 @@ doing is so, it actually saves work (as can be seen above).
 
 An Example:
 
-\begin{verbatim}
+\begin{alltt}
  (let ((id (\(\lambda\) (x) x)))
    (begin (id 1) (id 2)))
-\end{verbatim}
+\end{alltt}
 
 Under Uniform 0-CFA, we would have:
 \[
@@ -964,5 +1048,158 @@ Although there are several implementations (CFA2,ICFP'12), they
 operate at speeds roughly on par with our starting point: unoptimized
 store widened
 machines. \cite{dvanhorn:Earl2012Introspective,dvanhorn:Vardoulakis2011CFA2}
+
+\appendix
+\section{Proof: laziness is precision-preserving}
+Given widened machine configurations, we can show that lazy
+non-determinism is precision-preserving in the cases that application
+positions are store-allocated and not. We first show the latter since
+it uses less cluttered transition rules. The high level is that the
+``fan-out'' of non-determinism is collapsed back in the store (in the
+store-allocated applications case) or delayed a single step by
+laziness that would have happened in a step of strictness.
+
+Details of lazy machine given as a diff from the strict machine. \\
+State space of $lazy-\widehat{CESK}^*_t$ varies just in
+$\mathit{Value}$ (storable values do not change):
+\begin{align*}
+\mval \in \mathit{Value} &::= z \mid b \mid o \mid \\saddr{\maddr} \\
+\end{align*}
+
+We define a relation between strict and lazy machines that illustrates
+the quotient that the lazy states 
+
+\newcommand{\lapprx}[3]{#1 \approx_{#2} #3}
+\newcommand{\apprx}[3]{#1 \sim_{#2} #3}
+\newcommand{\capprx}[2]{#1 \sim #2}
+
+\begin{align*}
+\ev{\mexp, \menv, \mkont, \mcntr} \in cs &\Rightarrow \lapprx{\ev{\mexp, \menv,\mkont, \mcntr}}{\msto}{cs} \\
+\co{\mkont, \mval} \in cs \mbox{ and } \mval' \in force(\msto, \mval) &\Rightarrow \lapprx{\co{\mkont, \mval}}{\msto}{cs} \\
+\ap{\mval_0, \mval_1, \mkont} \in cs \mbox{ and } \mval_i' \in force(\msto, \mval_i) &\Rightarrow \lapprx{\ap{\mval_0', \mval_1', \mkont}}{\msto}{cs} \\
+\ev{\mexp, \menv, \mkont} \in lcs &\Rightarrow \apprx{\ev{\mexp, \menv,\mkont}}{\msto}{lcs} \\
+\co{\mkont, \mval} \in lcs \mbox { and } \mval' \in force(\msto, \mval) &\Rightarrow \apprx{\co{\mkont, \mval'}}{\msto}{lcs} \\
+\ap{\mval_0, \mval_1, \mkont} \in lcs \mbox { and } \mval_i' \in force(\msto, \mval_i) &\Rightarrow \apprx{\ap{\mval_0', \mval_1', \mkont}}{\msto}{lcs} \\
+\forall lc \in lcs, \lapprx{lc}{\msto}{cs}, \mbox{ and }\forall c \in cs, \apprx{c}{\msto}{lcs}. &\Rightarrow \capprx{(lcs, \msto)}{(cs, \msto)}
+\end{align*}
+
+We also need metafunctions for adding and removing a store component
+from states. These are straightforwardly defined, so just name them
+$wn$ and $nw$ respectively.
+%% c2vc(<e^l r k d>,s) = <e^l r s k d>
+%% c2vc(<v k d>,s) = <v s k d>
+%% vc2c(<e^l r s k d>) = <e^l r k d>
+%% vc2c(<v s k d>) = <v k d>
+
+The property we show is that all states stay related through
+reduction. The main difficulty is in showing the resulting stores are
+in fact equal. We do this by showing each individual reduction takes
+equal stores to equal stores, and that the union of all these
+reductions is the full reduction.
+
+\begin{theorem}
+$\forall lcs,cs,lcs',\msto,\msto'$ if $\capprx{(lcs, \msto)}{(cs,\msto)}$
+  and $(lcs,\msto) \machstep (lcs',\msto')$ then there exists $cs'$
+  such that $(cs,\msto) \machstep (cs',\msto')$
+\end{theorem}
+\begin{proof}
+...
+\end{proof}
+
+%% --Eval
+%% <x r s k d> --> <v s k d> where v in s(r(x))  [VAR]
+%% <(e0^l0 e1^l1)^{l,lf,la} r s k d> --> <e0^l0 r s\sqcup[ld |-> {k}] ar^{l,lf,la}(e1^l1 r ld) d> [APP]
+%% <(lambda x e) r s k d> --> <clos(x e r) s k d> [CLOS]
+%% --Continue
+%% <v s ar^{l,lf,la}(e^le r a) d> --> <e^le r s\sqcup[lfd |-> {v}] fn^{l,la}(lfd, a)> [CO]
+%% --Apply
+%% <v s fn^{l,la}(fa, ka) d> --> <e^fl r[x |-> xd'] s'[xd' |-> s'(lad)] k d'> [AP]
+%%   where clos(x e^fl r) in s(fa)
+%%         k in s(ka)
+%%         s' = s\sqcup[lad |-> {v}]
+%%         d' = truncate(ld, K)
+
+%% This extra binding corresponds directly to the intermediate
+%% bindings introduced by ANF.
+%% Matt's ANF analyses likely have all the flavours of our "laziness" technique, but this is how we get our chocolate with our peanut butter as Olin would say.
+
+%% Compare this to lazyCESK^*t:
+%% v ::= clos(x e r) | addr(a)
+%% Clos ::= clos(x e r)
+%% s : a -> P(Clos)
+%% others the same
+
+%% force(s, addr(a)) = s(a)
+%% force(s, clos(x e r)) = {clos(x e r)}
+
+%% --Eval
+%% <x r s k d> --> <addr(r(x)) s k d>
+%% others the same
+%% --Continue
+%% <v s ar^{l,lf,la}(e^le r a) d> --> <e^le r s\sqcup[lfd |-> force(s,v)] fn^{l,la}(lfd, a)>
+%% --Apply
+%% <v s fn^{l,la}(fa, ka) d> --> <e^fl r[x |-> xd'] s'[xd' |-> s'(lad)] k d'>
+%%   where clos(x e^fl r) in s(fa)
+%%         k in s(ka)
+%%         s' = s\sqcup[lad |-> force(s, v)]
+%%         d' = truncate(ld, K)
+%% The same globalizing stuff applies.
+
+%% Let us relate the state spaces of the two abstract machines for the lambda calculus in the following way
+
+%% Then we can show that if lazyconf ~ conf and lazyconf ==> lazyconf' then there exists a conf' such that conf ==> conf' and lazyconf' ~ conf'
+%% Let lc in lazyconf.cs be arbitrary (call lazyconf.s, s)
+%% By cases on lc:
+%% <x r k d>:
+%% Premises:
+%% <x r k d> in conf.cs
+%% Thus:
+%% Since
+%% <x r s k d> -->lazy   <addr(r(x)) s k d>
+%% <x r s k d> -->strict <v s k d> where v in s(r(x))
+%% By definition of force, v in force(addr(r(x)), s)
+%% Thus the first rule of ~_s applies and the second rule of l~_s applies.
+
+%% <(lambda x e) r k d>:
+%% Trivial
+
+%% <(e0^l0 e1^l1)^{l,lf,la} r k d>:
+%% Premises:
+%% <(e0^l0 e1^l1)^{l,lf,la} r k d> in conf.cs
+%% Thus:
+%% <(e0^l0 e1^l1)^{l,lf,la} r s k d> -->lazy   <e0^l0 r s\sqcup[ld |-> {k}] ar^{l,lf,la}(e1^l1 r ld) d>
+%% <(e0^l0 e1^l1)^{l,lf,la} r s k d> -->strict <e0^l0 r s\sqcup[ld |-> {k}] ar^{l,lf,la}(e1^l1 r ld) d>
+
+%% Stores are same in this case.
+
+%% <v ar^{l,lf,la}(e^le r a) d>:
+%% Premises:
+%% For all v' in force(v, s),
+%%   <v' ar^{l,lf,la}(e^le r a) d> in conf.cs
+%% Thus:
+%% <v ar^{l,lf,la}(e^le r ka) d> -->lazy   <e^le r s\sqcup[lfd |-> force(v, s)] fn^{l,la}(lfd ka) d>
+%% for all v' in force(v, s),
+%% <v' ar^{l,lf,la}(e^le r ka) d> -->strict <e^le r s\sqcup[lfd |-> {v'}] fn^{l,la}(lfd ka) d>
+%% Thus the union of all the strict stores will equal the lazy store.
+
+%% <v fn^{l,la}(fa ka) d>:
+%% Premises:
+%% For all v' in force(v, s),
+%%   <v' fn^{l,la}(fa ka) d> in conf.cs
+%% Thus
+%% <v fn^{l,la}(fa ka) d> -->lazy <e^fl r[x |-> xd'] s'\sqcup[xd' |-> s'(lad)] k d'>
+%% where k in s(ka)
+%%       clos(x e^fl r) in s(fa)
+%%       d' = truncate(ld, K)
+%%       s' = s\sqcup[lad |-> force(v, s)]
+%% For all v' in force(v,s),
+%% <v' fn^{l,la}(fa ka) d> -->strict <e^fl r[x |-> xd'] s'\sqcup[xd' |-> s'(lad)] k d'>
+%% where k in s(ka)
+%%       clos(x e^fl r) in s(fa)
+%%       d' = truncate(ld, K)
+%%       s' = s\sqcup[lad |-> {v'}]
+
+%% Thus the union of all the strict stores will equal the lazy store.
+
 
 \end{document}
