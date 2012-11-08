@@ -1,8 +1,10 @@
 \documentclass[preprint]{sigplanconf}
 \usepackage{alltt}
-\usepackage{amsmath}
+\usepackage{amsmath,amsthm}
 \usepackage{amssymb}
 \usepackage{stmaryrd}
+
+\newtheorem{theorem}{Theorem}
 % \usepackage{xltxtra}
 % \setmonofont[Scale=MatchLowercase]{DejaVu Sans Mono}
 %
@@ -1046,5 +1048,158 @@ Although there are several implementations (CFA2,ICFP'12), they
 operate at speeds roughly on par with our starting point: unoptimized
 store widened
 machines. \cite{dvanhorn:Earl2012Introspective,dvanhorn:Vardoulakis2011CFA2}
+
+\appendix
+\section{Proof: laziness is precision-preserving}
+Given widened machine configurations, we can show that lazy
+non-determinism is precision-preserving in the cases that application
+positions are store-allocated and not. We first show the latter since
+it uses less cluttered transition rules. The high level is that the
+``fan-out'' of non-determinism is collapsed back in the store (in the
+store-allocated applications case) or delayed a single step by
+laziness that would have happened in a step of strictness.
+
+Details of lazy machine given as a diff from the strict machine. \\
+State space of $lazy-\widehat{CESK}^*_t$ varies just in
+$\mathit{Value}$ (storable values do not change):
+\begin{align*}
+\mval \in \mathit{Value} &::= z \mid b \mid o \mid \\saddr{\maddr} \\
+\end{align*}
+
+We define a relation between strict and lazy machines that illustrates
+the quotient that the lazy states 
+
+\newcommand{\lapprx}[3]{#1 \approx_{#2} #3}
+\newcommand{\apprx}[3]{#1 \sim_{#2} #3}
+\newcommand{\capprx}[2]{#1 \sim #2}
+
+\begin{align*}
+\ev{\mexp, \menv, \mkont, \mcntr} \in cs &\Rightarrow \lapprx{\ev{\mexp, \menv,\mkont, \mcntr}}{\msto}{cs} \\
+\co{\mkont, \mval} \in cs \mbox{ and } \mval' \in force(\msto, \mval) &\Rightarrow \lapprx{\co{\mkont, \mval}}{\msto}{cs} \\
+\ap{\mval_0, \mval_1, \mkont} \in cs \mbox{ and } \mval_i' \in force(\msto, \mval_i) &\Rightarrow \lapprx{\ap{\mval_0', \mval_1', \mkont}}{\msto}{cs} \\
+\ev{\mexp, \menv, \mkont} \in lcs &\Rightarrow \apprx{\ev{\mexp, \menv,\mkont}}{\msto}{lcs} \\
+\co{\mkont, \mval} \in lcs \mbox { and } \mval' \in force(\msto, \mval) &\Rightarrow \apprx{\co{\mkont, \mval'}}{\msto}{lcs} \\
+\ap{\mval_0, \mval_1, \mkont} \in lcs \mbox { and } \mval_i' \in force(\msto, \mval_i) &\Rightarrow \apprx{\ap{\mval_0', \mval_1', \mkont}}{\msto}{lcs} \\
+\forall lc \in lcs, \lapprx{lc}{\msto}{cs}, \mbox{ and }\forall c \in cs, \apprx{c}{\msto}{lcs}. &\Rightarrow \capprx{(lcs, \msto)}{(cs, \msto)}
+\end{align*}
+
+We also need metafunctions for adding and removing a store component
+from states. These are straightforwardly defined, so just name them
+$wn$ and $nw$ respectively.
+%% c2vc(<e^l r k d>,s) = <e^l r s k d>
+%% c2vc(<v k d>,s) = <v s k d>
+%% vc2c(<e^l r s k d>) = <e^l r k d>
+%% vc2c(<v s k d>) = <v k d>
+
+The property we show is that all states stay related through
+reduction. The main difficulty is in showing the resulting stores are
+in fact equal. We do this by showing each individual reduction takes
+equal stores to equal stores, and that the union of all these
+reductions is the full reduction.
+
+\begin{theorem}
+$\forall lcs,cs,lcs',\msto,\msto'$ if $\capprx{(lcs, \msto)}{(cs,\msto)}$
+  and $(lcs,\msto) \machstep (lcs',\msto')$ then there exists $cs'$
+  such that $(cs,\msto) \machstep (cs',\msto')$
+\end{theorem}
+\begin{proof}
+...
+\end{proof}
+
+%% --Eval
+%% <x r s k d> --> <v s k d> where v in s(r(x))  [VAR]
+%% <(e0^l0 e1^l1)^{l,lf,la} r s k d> --> <e0^l0 r s\sqcup[ld |-> {k}] ar^{l,lf,la}(e1^l1 r ld) d> [APP]
+%% <(lambda x e) r s k d> --> <clos(x e r) s k d> [CLOS]
+%% --Continue
+%% <v s ar^{l,lf,la}(e^le r a) d> --> <e^le r s\sqcup[lfd |-> {v}] fn^{l,la}(lfd, a)> [CO]
+%% --Apply
+%% <v s fn^{l,la}(fa, ka) d> --> <e^fl r[x |-> xd'] s'[xd' |-> s'(lad)] k d'> [AP]
+%%   where clos(x e^fl r) in s(fa)
+%%         k in s(ka)
+%%         s' = s\sqcup[lad |-> {v}]
+%%         d' = truncate(ld, K)
+
+%% This extra binding corresponds directly to the intermediate
+%% bindings introduced by ANF.
+%% Matt's ANF analyses likely have all the flavours of our "laziness" technique, but this is how we get our chocolate with our peanut butter as Olin would say.
+
+%% Compare this to lazyCESK^*t:
+%% v ::= clos(x e r) | addr(a)
+%% Clos ::= clos(x e r)
+%% s : a -> P(Clos)
+%% others the same
+
+%% force(s, addr(a)) = s(a)
+%% force(s, clos(x e r)) = {clos(x e r)}
+
+%% --Eval
+%% <x r s k d> --> <addr(r(x)) s k d>
+%% others the same
+%% --Continue
+%% <v s ar^{l,lf,la}(e^le r a) d> --> <e^le r s\sqcup[lfd |-> force(s,v)] fn^{l,la}(lfd, a)>
+%% --Apply
+%% <v s fn^{l,la}(fa, ka) d> --> <e^fl r[x |-> xd'] s'[xd' |-> s'(lad)] k d'>
+%%   where clos(x e^fl r) in s(fa)
+%%         k in s(ka)
+%%         s' = s\sqcup[lad |-> force(s, v)]
+%%         d' = truncate(ld, K)
+%% The same globalizing stuff applies.
+
+%% Let us relate the state spaces of the two abstract machines for the lambda calculus in the following way
+
+%% Then we can show that if lazyconf ~ conf and lazyconf ==> lazyconf' then there exists a conf' such that conf ==> conf' and lazyconf' ~ conf'
+%% Let lc in lazyconf.cs be arbitrary (call lazyconf.s, s)
+%% By cases on lc:
+%% <x r k d>:
+%% Premises:
+%% <x r k d> in conf.cs
+%% Thus:
+%% Since
+%% <x r s k d> -->lazy   <addr(r(x)) s k d>
+%% <x r s k d> -->strict <v s k d> where v in s(r(x))
+%% By definition of force, v in force(addr(r(x)), s)
+%% Thus the first rule of ~_s applies and the second rule of l~_s applies.
+
+%% <(lambda x e) r k d>:
+%% Trivial
+
+%% <(e0^l0 e1^l1)^{l,lf,la} r k d>:
+%% Premises:
+%% <(e0^l0 e1^l1)^{l,lf,la} r k d> in conf.cs
+%% Thus:
+%% <(e0^l0 e1^l1)^{l,lf,la} r s k d> -->lazy   <e0^l0 r s\sqcup[ld |-> {k}] ar^{l,lf,la}(e1^l1 r ld) d>
+%% <(e0^l0 e1^l1)^{l,lf,la} r s k d> -->strict <e0^l0 r s\sqcup[ld |-> {k}] ar^{l,lf,la}(e1^l1 r ld) d>
+
+%% Stores are same in this case.
+
+%% <v ar^{l,lf,la}(e^le r a) d>:
+%% Premises:
+%% For all v' in force(v, s),
+%%   <v' ar^{l,lf,la}(e^le r a) d> in conf.cs
+%% Thus:
+%% <v ar^{l,lf,la}(e^le r ka) d> -->lazy   <e^le r s\sqcup[lfd |-> force(v, s)] fn^{l,la}(lfd ka) d>
+%% for all v' in force(v, s),
+%% <v' ar^{l,lf,la}(e^le r ka) d> -->strict <e^le r s\sqcup[lfd |-> {v'}] fn^{l,la}(lfd ka) d>
+%% Thus the union of all the strict stores will equal the lazy store.
+
+%% <v fn^{l,la}(fa ka) d>:
+%% Premises:
+%% For all v' in force(v, s),
+%%   <v' fn^{l,la}(fa ka) d> in conf.cs
+%% Thus
+%% <v fn^{l,la}(fa ka) d> -->lazy <e^fl r[x |-> xd'] s'\sqcup[xd' |-> s'(lad)] k d'>
+%% where k in s(ka)
+%%       clos(x e^fl r) in s(fa)
+%%       d' = truncate(ld, K)
+%%       s' = s\sqcup[lad |-> force(v, s)]
+%% For all v' in force(v,s),
+%% <v' fn^{l,la}(fa ka) d> -->strict <e^fl r[x |-> xd'] s'\sqcup[xd' |-> s'(lad)] k d'>
+%% where k in s(ka)
+%%       clos(x e^fl r) in s(fa)
+%%       d' = truncate(ld, K)
+%%       s' = s\sqcup[lad |-> {v'}]
+
+%% Thus the union of all the strict stores will equal the lazy store.
+
 
 \end{document}
