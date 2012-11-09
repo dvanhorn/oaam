@@ -73,6 +73,10 @@
                 [("--pt")
                  "Benchmark compiled preallocated store lazy non-determinism timestamp approx"
                  (aval lazy-0cfa^/c/prealloc/timestamp!)] ;; most optimized
+                ;; Continuation-mark enabled analyses
+                [("--cb")
+                 "Benchmark baseline continuation marks"
+                 (aval baseline/cm)]
                 ;; Not benchmarked for paper
                 #|
                 [("--ls2") "Benchmark specialized2 lazy non-determinism"

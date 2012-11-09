@@ -14,6 +14,7 @@
          qdata^ qcons^ qvector^ qcons^? qvector^?
          ● ⊥
          open@ closed@
+         fail ;; for continuation marks
          flatten-value
          (struct-out vectorv^)
          (struct-out vectorv-immutable^)
@@ -75,6 +76,9 @@
 ;; Olin's black hole
 (define-nonce ●)
 (define-nonce ⊥)
+
+;; Continutation marks fail token
+(define-nonce fail)
 
 (define-syntax-parameter flatten-value #f)
 (define-simple-macro* (mk-flatten-value name clos rlos kont?)

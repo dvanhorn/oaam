@@ -194,6 +194,22 @@
                    #:global-σ #:compiled #:wide)))))))
 (provide lazy-0cfa^/c/prealloc/timestamp!)
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Evaluators for CM-extended Scheme
+(mk-set-fixpoint^ fix baseline/cm-fixpoint baseline/cm-ans?)
+(with-nonsparse
+ (with-strict
+  (with-0-ctx
+   (with-whole-σ
+    (with-σ-passing-set-monad
+     (with-abstract
+      (mk-analysis #:aval baseline/cm #:ans baseline/cm-ans
+                   #:fixpoint baseline/cm-fixpoint
+                   #:CM (set 'A 'S)
+                   #:σ-passing #:wide #:set-monad)))))))
+(provide baseline/cm)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Evaluators not in the paper
 #|

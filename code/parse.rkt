@@ -56,7 +56,20 @@
           [`(let/cc ,x ,e)
            (define x-id (fresh-variable! x))
            (lcc (fresh-label!) x-id (parse* e (hash-set ρ x x-id)))]
-          [`(,(or 'lambda 'if 'letrec 'set!) . ,rest)
+          ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+          ;; Continuation marks forms
+          [`(test (,(? symbol? Rs) ...) ,t ,e)
+           (tst (fresh-label!) (list->set Rs) (parse t) (parse e))]
+          [`(grant (,(? symbol? Rs) ...) ,e)
+           (grt (fresh-label!) (list->set Rs) (parse e))]
+          ['(fail) (fal (fresh-label!))]
+          [`(frame (,(? symbol? Rs) ...) ,e)
+           (frm (fresh-label!) (list->set Rs) (parse e))]
+          ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+          ;; End Continuation marks forms
+          [`(,(or 'lambda 'if 'letrec 'set!
+                  #;for-continuation-marks
+                  'test 'grant 'fail 'frame) . ,rest)
            (error 'parse-core "Ill-formed core form ~a" sexp)]
           [`(,(== kwote) ,d) (datum (fresh-label!) d)]
           [`(,(== define-ctx) . ,forms) (parse-seq forms)]
@@ -83,12 +96,11 @@
                [else (parse-core sexp)])]
         [(? symbol? s)
          (define (mkvar) (var (fresh-label!) (rename s)))
-         (cond [(not (hash-has-key? ρ s))
-                (cond [(primitive? s) (primr (fresh-label!) s)]
-                      [(hash-ref prim-constants s #f) =>
-                       (λ (d) (datum (fresh-label!) d))]
-                      [else (mkvar)])]
-               [else (mkvar)])]
+         (cond [(hash-has-key? ρ s) (mkvar)]
+               [(primitive? s) (primr (fresh-label!) s)]
+               [(hash-ref prim-constants s #f) =>
+                (λ (d) (datum (fresh-label!) d))]
+               [else (mkvar)])] ;; will error
         [(? atomic? d) (datum (fresh-label!) d)]
         [(? vector? d) (parse `(,quote$ ,d))] ;; ick
         [err (error 'parse "Unknown form ~a" err)])))

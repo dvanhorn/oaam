@@ -20,6 +20,11 @@
 (struct ife exp (t c a)       #:transparent)
 (struct st! exp (x e)         #:transparent)
 (struct lcc exp (x e)         #:transparent)
+;; Stack inspection forms
+(struct grt exp (r e)         #:transparent) ;; Grant
+(struct fal exp ()            #:transparent) ;; Fail
+(struct frm exp (r e)         #:transparent) ;; Frame
+(struct tst exp (r t e)       #:transparent) ;; Test
 
 (struct primr exp (which)    #:transparent)
 ;; (dst Lab Sym List[Pair[Sym Boolean]] Exp)
@@ -58,4 +63,9 @@
       [(lcc _ x e) (loop* e (∪1 bound x))]
       [(primr _ _) ∅]
       [(datum _ _) ∅]
+      ;; Continuation mark forms
+      [(grt _ _ e) (loop e)]
+      [(frm _ _ e) (loop e)]
+      [(fal _) ∅]
+      [(tst _ _ t e) (∪ (loop t) (loop e))]
       [_ (error 'free "Bad expr ~a" e)])))
