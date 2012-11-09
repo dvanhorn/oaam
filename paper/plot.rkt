@@ -1,13 +1,17 @@
 #lang racket
-(require plot "proctime.rkt" "procmem.rkt")
+(require plot "proctime.rkt")
 
+(define (adjusted-length v)
+  (for/sum ([i v] #:when (number? i)) 1))
 (define (average v) ;; 'unset means no average
-  (and (number? (vector-ref v 0))
-       (/ (for/sum ([i v]) i) (vector-length v))))
+  (define sum (for/sum ([i v] #:when (number? i)) i))
+  (define len (adjusted-length v))
+  (and (not (zero? len)) (/ sum len)))
 (define (variance v)
   (define avg (average v))
+  (define len (adjusted-length v))
   (and avg
-       (/ (for/sum ([i v]) (sqr (- i avg))) (vector-length v))))
+       (/ (for/sum ([i v]) (sqr (- i avg))) len)))
 (define (stddev v)
   (define var (variance v))
   (and var (sqrt var)))
@@ -17,9 +21,13 @@
     ("sp" . "specialized")
     ("ls" . "lazy")
     ("lc" . "compiled")
-    ;("ld" . "deltas")
-    ("li" . "imperative")
-    ("lp" . "preallocated")))
+    ("ld" . "functional deltas")
+    ("ia" . "imperative accumulated deltas")
+    ("id" . "imperative deltas")
+    ("pa" . "preallocated accumulated deltas")
+    ("pd" . "preallocated deltas")
+    ("li" . "imperative timestamp")
+    ("lp" . "preallocated timestamp")))
 
 (define (c x) (- (sub1 x))) ;; neg for B/W, pos for color
 (define (next x) (sub1 x))
@@ -28,15 +36,13 @@
 (plot-height (* 3/2 (plot-height)))
 
 (define (p)
-  (let ([which run])
+  (let ([which numbers-state-rate])
     (plot (for/list ([(name numbers) (in-hash timings)]
                      [i (in-naturals)])
-            (define (scale x) (if (number? x) x (* 30 60 1000)))
-            (define baseline (scale (average (which (hash-ref numbers "bl")))))
+            (define (scale x) (if (number? x) x 0))
             (define numbers* (for*/list ([(tag algo) (in-dict algo-name)]
-                                         #:unless (string=? tag "bl")
                                          [n (in-value (hash-ref numbers tag))])
-                               (vector algo (/ (scale (average (which n))) baseline))))
+                               (vector algo (scale (average (which n))))))
             (discrete-histogram numbers*
                                 #:label name
                                 #:skip 10.5 #:x-min i
@@ -57,7 +63,6 @@
                [interval-line1-color  "black"]
                [interval-line2-color  "black"])
   (p))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The following are other examples of presentation from David

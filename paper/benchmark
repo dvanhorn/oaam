@@ -1,0 +1,1646 @@
+./graphs.pd.time.10:cpu time: 6656 real time: 6662 gc time: 200
+./matrix.id.time.10:cpu time: 5488 real time: 5495 gc time: 180
+./mbrotZ.id.time.10:cpu time: 120 real time: 123 gc time: 0
+./lattice.pa.time.10:cpu time: 452 real time: 454 gc time: 12
+./earley.ls.time.10:cpu time: 857041 real time: 857745 gc time: 38063
+./matrix.pd.time.10:cpu time: 4708 real time: 4710 gc time: 148
+./church.sp.time.10:cpu time: 41882 real time: 41921 gc time: 712
+./nucleic.pd.time.10:cpu time: 58971 real time: 59019 gc time: 9964
+./lattice.sp.time.10:cpu time: 352910 real time: 353193 gc time: 10820
+./maze.id.time.10:cpu time: 4476 real time: 4482 gc time: 112
+./mbrotZ.pa.time.10:cpu time: 116 real time: 116 gc time: 0
+./church.ia.time.10:cpu time: 188 real time: 190 gc time: 8
+./earley.sp.time.10:cpu time: 948995 real time: 949677 gc time: 42581
+./earley.lc.time.10:cpu time: 151353 real time: 151478 gc time: 7684
+./earley.ia.time.10:cpu time: 816 real time: 815 gc time: 24
+./earley.bl.time.10:cpu time: 1167593 real time: 1168466 gc time: 22677
+./matrix.pa.time.10:cpu time: 4904 real time: 4908 gc time: 160
+./church.lc.time.10:cpu time: 7288 real time: 7292 gc time: 168
+./maze.ia.time.10:cpu time: 4508 real time: 4513 gc time: 112
+./mbrotZ.ls.time.10:cpu time: 328248 real time: 328531 gc time: 13717
+./nbody.pa.time.10:cpu time: 37690 real time: 37720 gc time: 3128
+./nbody.pd.time.10:cpu time: 38214 real time: 38246 gc time: 3064
+./matrix.ia.time.10:cpu time: 5668 real time: 5673 gc time: 196
+./earley.id.time.10:cpu time: 800 real time: 800 gc time: 16
+./lattice.bl.time.10:cpu time: 429366 real time: 429655 gc time: 5936
+./lattice.lc.time.10:cpu time: 64692 real time: 64731 gc time: 2516
+./nucleic.id.time.10:cpu time: 66928 real time: 66975 gc time: 10005
+./nucleic.ia.time.10:cpu time: 67512 real time: 67570 gc time: 9973
+./nucleic.pa.time.10:cpu time: 58599 real time: 58648 gc time: 9960
+./lattice.pd.time.10:cpu time: 452 real time: 452 gc time: 16
+./lattice.ia.time.10:cpu time: 500 real time: 502 gc time: 16
+./mbrotZ.bl.time.10:cpu time: 431931 real time: 432216 gc time: 7862
+./graphs.id.time.10:cpu time: 6968 real time: 6974 gc time: 192
+./church.bl.time.10:cpu time: 64052 real time: 64091 gc time: 592
+./church.pa.time.10:cpu time: 188 real time: 189 gc time: 4
+./maze.pd.time.10:cpu time: 4104 real time: 4106 gc time: 112
+./lattice.id.time.10:cpu time: 500 real time: 497 gc time: 16
+./earley.pd.time.10:cpu time: 756 real time: 759 gc time: 20
+./mbrotZ.pd.time.10:cpu time: 116 real time: 115 gc time: 0
+./mbrotZ.ia.time.10:cpu time: 124 real time: 124 gc time: 0
+./church.ls.time.10:cpu time: 27485 real time: 27509 gc time: 428
+./earley.pa.time.10:cpu time: 744 real time: 741 gc time: 24
+./mbrotZ.sp.time.10:cpu time: 416534 real time: 416894 gc time: 17417
+./nbody.ia.time.10:cpu time: 42310 real time: 42339 gc time: 3441
+./church.id.time.10:cpu time: 188 real time: 190 gc time: 4
+./mbrotZ.lc.time.10:cpu time: 52387 real time: 52429 gc time: 1940
+./lattice.ls.time.10:cpu time: 306723 real time: 306943 gc time: 10048
+./nbody.id.time.10:cpu time: 43426 real time: 43459 gc time: 3468
+./graphs.pa.time.10:cpu time: 6380 real time: 6384 gc time: 192
+./church.pd.time.10:cpu time: 176 real time: 178 gc time: 8
+./graphs.ia.time.10:cpu time: 7040 real time: 7046 gc time: 188
+./maze.pa.time.10:cpu time: 3900 real time: 3904 gc time: 100
+./graphs.pd.time.10:"State count: 522966"
+./matrix.id.time.10:"State count: 337018"
+./mbrotZ.id.time.10:"State count: 3501"
+./lattice.pa.time.10:"State count: 31873"
+./earley.ls.time.10:"State count: 258388"
+./matrix.pd.time.10:"State count: 337018"
+./church.sp.time.10:"State count: 31803"
+./nucleic.pd.time.10:"State count: 431637"
+./lattice.sp.time.10:"State count: 132654"
+./maze.id.time.10:"State count: 318967"
+./mbrotZ.pa.time.10:"State count: 3501"
+./church.ia.time.10:"State count: 7637"
+./earley.sp.time.10:"State count: 287002"
+./earley.lc.time.10:"State count: 74922"
+./earley.ia.time.10:"State count: 30850"
+./earley.bl.time.10:"State count: 287002"
+./matrix.pa.time.10:"State count: 337018"
+./church.lc.time.10:"State count: 9369"
+./maze.ia.time.10:"State count: 318967"
+./mbrotZ.ls.time.10:"State count: 162716"
+./nbody.pa.time.10:"State count: 2040277"
+./nbody.pd.time.10:"State count: 2040277"
+./matrix.ia.time.10:"State count: 337018"
+./earley.id.time.10:"State count: 30850"
+./lattice.bl.time.10:"State count: 132654"
+./lattice.lc.time.10:"State count: 39971"
+./nucleic.id.time.10:"State count: 431637"
+./nucleic.ia.time.10:"State count: 431637"
+./nucleic.pa.time.10:"State count: 431637"
+./lattice.pd.time.10:"State count: 31873"
+./lattice.ia.time.10:"State count: 31873"
+./mbrotZ.bl.time.10:"State count: 200537"
+./graphs.id.time.10:"State count: 522966"
+./church.bl.time.10:"State count: 31803"
+./church.pa.time.10:"State count: 7642"
+./maze.pd.time.10:"State count: 318967"
+./lattice.id.time.10:"State count: 31873"
+./earley.pd.time.10:"State count: 30850"
+./mbrotZ.pd.time.10:"State count: 3501"
+./mbrotZ.ia.time.10:"State count: 3501"
+./church.ls.time.10:"State count: 21187"
+./earley.pa.time.10:"State count: 30850"
+./mbrotZ.sp.time.10:"State count: 200537"
+./nbody.ia.time.10:"State count: 2040277"
+./church.id.time.10:"State count: 7637"
+./mbrotZ.lc.time.10:"State count: 35561"
+./lattice.ls.time.10:"State count: 117920"
+./nbody.id.time.10:"State count: 2040277"
+./graphs.pa.time.10:"State count: 522966"
+./church.pd.time.10:"State count: 7642"
+./graphs.ia.time.10:"State count: 522966"
+./maze.pa.time.10:"State count: 318967"
+./graphs.pd.time.10:"Point count: 2407"
+./matrix.id.time.10:"Point count: 2423"
+./mbrotZ.id.time.10:"Point count: 349"
+./lattice.pa.time.10:"Point count: 604"
+./earley.ls.time.10:"Point count: 1166"
+./matrix.pd.time.10:"Point count: 2423"
+./church.sp.time.10:"Point count: 893"
+./nucleic.pd.time.10:"Point count: 16659"
+./lattice.sp.time.10:"Point count: 1323"
+./maze.id.time.10:"Point count: 2272"
+./mbrotZ.pa.time.10:"Point count: 349"
+./church.ia.time.10:"Point count: 292"
+./earley.sp.time.10:"Point count: 1287"
+./earley.lc.time.10:"Point count: 628"
+./earley.ia.time.10:"Point count: 628"
+./earley.bl.time.10:"Point count: 1287"
+./matrix.pa.time.10:"Point count: 2423"
+./church.lc.time.10:"Point count: 292"
+./maze.ia.time.10:"Point count: 2272"
+./mbrotZ.ls.time.10:"Point count: 622"
+./nbody.pa.time.10:"Point count: 4694"
+./nbody.pd.time.10:"Point count: 4694"
+./matrix.ia.time.10:"Point count: 2423"
+./earley.id.time.10:"Point count: 628"
+./lattice.bl.time.10:"Point count: 1323"
+./lattice.lc.time.10:"Point count: 604"
+./nucleic.id.time.10:"Point count: 16659"
+./nucleic.ia.time.10:"Point count: 16659"
+./nucleic.pa.time.10:"Point count: 16659"
+./lattice.pd.time.10:"Point count: 604"
+./lattice.ia.time.10:"Point count: 604"
+./mbrotZ.bl.time.10:"Point count: 759"
+./graphs.id.time.10:"Point count: 2407"
+./church.bl.time.10:"Point count: 893"
+./church.pa.time.10:"Point count: 292"
+./maze.pd.time.10:"Point count: 2272"
+./lattice.id.time.10:"Point count: 604"
+./earley.pd.time.10:"Point count: 628"
+./mbrotZ.pd.time.10:"Point count: 349"
+./mbrotZ.ia.time.10:"Point count: 349"
+./church.ls.time.10:"Point count: 574"
+./earley.pa.time.10:"Point count: 628"
+./mbrotZ.sp.time.10:"Point count: 759"
+./nbody.ia.time.10:"Point count: 4694"
+./church.id.time.10:"Point count: 292"
+./mbrotZ.lc.time.10:"Point count: 349"
+./lattice.ls.time.10:"Point count: 1181"
+./nbody.id.time.10:"Point count: 4694"
+./graphs.pa.time.10:"Point count: 2407"
+./church.pd.time.10:"Point count: 292"
+./graphs.ia.time.10:"Point count: 2407"
+./maze.pa.time.10:"Point count: 2272"
+./graphs.pd.time.10:States/second: 78523.42342342342
+./matrix.id.time.10:States/second: 61365.2585579024
+./mbrotZ.id.time.10:States/second: 28696.72131147541
+./lattice.pa.time.10:States/second: 70359.8233995585
+./earley.ls.time.10:States/second: 302.4859081144677
+./matrix.pd.time.10:States/second: 71584.11214953271
+./church.sp.time.10:States/second: 764.1094639725138
+./nucleic.pd.time.10:States/second: 7314.021858849445
+./lattice.sp.time.10:States/second: 377.5959830577948
+./maze.id.time.10:States/second: 71182.10220932828
+./mbrotZ.pa.time.10:States/second: 30181.03448275862
+./church.ia.time.10:States/second: 40622.34042553192
+./earley.sp.time.10:States/second: 303.35399367506045
+./earley.lc.time.10:States/second: 498.15159574468083
+./earley.ia.time.10:States/second: 37852.76073619632
+./earley.bl.time.10:States/second: 246.3813527529705
+./matrix.pa.time.10:States/second: 68709.07237512742
+./church.lc.time.10:States/second: 1306.5123413749825
+./maze.ia.time.10:States/second: 70693.04078014185
+./mbrotZ.ls.time.10:States/second: 498.05480818970136
+./nbody.pa.time.10:States/second: 54092.926454212844
+./nbody.pd.time.10:States/second: 53347.54869917636
+./matrix.ia.time.10:States/second: 59438.80070546737
+./earley.id.time.10:States/second: 38610.763454317894
+./lattice.bl.time.10:States/second: 309.81040595266455
+./lattice.lc.time.10:States/second: 621.7586759375923
+./nucleic.id.time.10:States/second: 6445.132968001075
+./nucleic.ia.time.10:States/second: 6388.281261562597
+./nucleic.pa.time.10:States/second: 7360.292613055044
+./lattice.pd.time.10:States/second: 70671.84035476718
+./lattice.ia.time.10:States/second: 63746.0
+./mbrotZ.bl.time.10:States/second: 466.149386679188
+./graphs.id.time.10:States/second: 75009.46643717728
+./church.bl.time.10:States/second: 498.60466574689576
+./church.pa.time.10:States/second: 40866.310160427805
+./maze.pd.time.10:States/second: 77721.00389863548
+./lattice.id.time.10:States/second: 64130.7847082495
+./earley.pd.time.10:States/second: 40645.58629776021
+./mbrotZ.pd.time.10:States/second: 30710.526315789473
+./mbrotZ.ia.time.10:States/second: 28463.414634146342
+./church.ls.time.10:States/second: 777.5045871559633
+./earley.pa.time.10:States/second: 41689.18918918919
+./mbrotZ.sp.time.10:States/second: 483.38475630333124
+./nbody.ia.time.10:States/second: 48192.48393801965
+./church.id.time.10:States/second: 40622.34042553192
+./mbrotZ.lc.time.10:States/second: 684.0758694983072
+./lattice.ls.time.10:States/second: 385.8335732795854
+./nbody.id.time.10:States/second: 46948.24888397993
+./graphs.pa.time.10:States/second: 81943.90473205892
+./church.pd.time.10:States/second: 43175.141242937854
+./graphs.ia.time.10:States/second: 74242.7597955707
+./maze.pa.time.10:States/second: 81744.49000512558
+./nbody.lc.time.10:Result: Timeout
+./boyer.ia.time.10:Result: Timeout
+./nucleic.ld.time.10:Result: Timeout
+./boyer.sp.time.10:Result: Exhausted memory
+./nbody.ld.time.10:Result: Exhausted memory
+./boyer.lc.time.10:Result: Exhausted memory
+./nucleic.lc.time.10:Result: Exhausted memory
+./nucleic.bl.time.10:Result: Exhausted memory
+./boyer.ls.time.10:Result: Exhausted memory
+./nucleic.ls.time.10:Result: Exhausted memory
+./nucleic.sp.time.10:Result: Exhausted memory
+./boyer.bl.time.10:Result: Exhausted memory
+./earley.id.mem.10:Peak memory use after a collection: 50393712
+./maze.ia.mem.10:Peak memory use after a collection: 57220360
+./mbrotZ.pd.mem.10:Peak memory use after a collection: 47476104
+./nbody.ia.mem.10:Peak memory use after a collection: 122233192
+./lattice.pa.mem.10:Peak memory use after a collection: 49102608
+./earley.ls.mem.10:Peak memory use after a collection: 406248488
+./earley.sp.mem.10:Peak memory use after a collection: 429557032
+./maze.pd.mem.10:Peak memory use after a collection: 56435008
+./matrix.pd.mem.10:Peak memory use after a collection: 61655056
+./matrix.ia.mem.10:Peak memory use after a collection: 64108504
+./nucleic.ia.mem.10:Peak memory use after a collection: 136294608
+./graphs.pa.mem.10:Peak memory use after a collection: 63033160
+./earley.ia.mem.10:Peak memory use after a collection: 50388968
+./church.pd.mem.10:Peak memory use after a collection: 48157016
+./boyer.ia.mem.10:Peak memory use after a collection: 121032864
+./maze.id.mem.10:Peak memory use after a collection: 57201328
+./lattice.ia.mem.10:Peak memory use after a collection: 49158064
+./lattice.lc.mem.10:Peak memory use after a collection: 140469552
+./church.ls.mem.10:Peak memory use after a collection: 74583896
+./church.sp.mem.10:Peak memory use after a collection: 86219304
+./mbrotZ.ia.mem.10:Peak memory use after a collection: 47475624
+./mbrotZ.bl.mem.10:Peak memory use after a collection: 260691232
+./mbrotZ.ls.mem.10:Peak memory use after a collection: 290466008
+./church.lc.mem.10:Peak memory use after a collection: 61180088
+./matrix.pa.mem.10:Peak memory use after a collection: 62134976
+./lattice.sp.mem.10:Peak memory use after a collection: 231816088
+./church.id.mem.10:Peak memory use after a collection: 48151496
+./nbody.pd.mem.10:Peak memory use after a collection: 121100768
+./earley.pa.mem.10:Peak memory use after a collection: 50029984
+./graphs.id.mem.10:Peak memory use after a collection: 64917264
+./nucleic.pd.mem.10:Peak memory use after a collection: 133822352
+./church.ia.mem.10:Peak memory use after a collection: 48151848
+./mbrotZ.pa.mem.10:Peak memory use after a collection: 47476744
+./nbody.pa.mem.10:Peak memory use after a collection: 121274880
+./mbrotZ.lc.mem.10:Peak memory use after a collection: 141922904
+./mbrotZ.id.mem.10:Peak memory use after a collection: 47476104
+./nbody.id.mem.10:Peak memory use after a collection: 121512440
+./lattice.pd.mem.10:Peak memory use after a collection: 49109256
+./nucleic.id.mem.10:Peak memory use after a collection: 141264680
+./graphs.pd.mem.10:Peak memory use after a collection: 63078792
+./earley.bl.mem.10:Peak memory use after a collection: 435439648
+./nucleic.pa.mem.10:Peak memory use after a collection: 133979856
+./earley.pd.mem.10:Peak memory use after a collection: 50037440
+./lattice.id.mem.10:Peak memory use after a collection: 49163488
+./graphs.ia.mem.10:Peak memory use after a collection: 64724336
+./lattice.ls.mem.10:Peak memory use after a collection: 230861888
+./earley.lc.mem.10:Peak memory use after a collection: 254846432
+./maze.pa.mem.10:Peak memory use after a collection: 56541736
+./nucleic.ld.mem.10:Peak memory use after a collection: 2137373600
+./mbrotZ.sp.mem.10:Peak memory use after a collection: 285926640
+./church.pa.mem.10:Peak memory use after a collection: 48152600
+./matrix.id.mem.10:Peak memory use after a collection: 64244264
+./lattice.bl.mem.10:Peak memory use after a collection: 217003904
+./church.bl.mem.10:Peak memory use after a collection: 81691840
+./nbody.lc.mem.10:Peak memory use after a collection: 624299928
+./earley.id.mem.10:Current memory use: 64221392
+./maze.ia.mem.10:Current memory use: 79445352
+./mbrotZ.pd.mem.10:Current memory use: 62718296
+./nbody.ia.mem.10:Current memory use: 75557160
+./lattice.pa.mem.10:Current memory use: 50202064
+./earley.ls.mem.10:Current memory use: 388125640
+./earley.sp.mem.10:Current memory use: 341276712
+./maze.pd.mem.10:Current memory use: 72996056
+./matrix.pd.mem.10:Current memory use: 91585408
+./matrix.ia.mem.10:Current memory use: 88973128
+./nucleic.ia.mem.10:Current memory use: 120184664
+./graphs.pa.mem.10:Current memory use: 64062760
+./earley.ia.mem.10:Current memory use: 64231296
+./church.pd.mem.10:Current memory use: 57643376
+./boyer.ia.mem.10:Current memory use: 58661664
+./maze.id.mem.10:Current memory use: 79301064
+./lattice.ia.mem.10:Current memory use: 51007136
+./lattice.lc.mem.10:Current memory use: 147218392
+./church.ls.mem.10:Current memory use: 95237920
+./church.sp.mem.10:Current memory use: 119408768
+./mbrotZ.ia.mem.10:Current memory use: 63077152
+./mbrotZ.bl.mem.10:Current memory use: 283476336
+./mbrotZ.ls.mem.10:Current memory use: 273992064
+./church.lc.mem.10:Current memory use: 61724192
+./matrix.pa.mem.10:Current memory use: 92208792
+./lattice.sp.mem.10:Current memory use: 138362984
+./church.id.mem.10:Current memory use: 57605632
+./nbody.pd.mem.10:Current memory use: 132177032
+./earley.pa.mem.10:Current memory use: 64168504
+./graphs.id.mem.10:Current memory use: 87579600
+./nucleic.pd.mem.10:Current memory use: 145947688
+./church.ia.mem.10:Current memory use: 57625128
+./mbrotZ.pa.mem.10:Current memory use: 62713576
+./nbody.pa.mem.10:Current memory use: 102841464
+./mbrotZ.lc.mem.10:Current memory use: 137803816
+./mbrotZ.id.mem.10:Current memory use: 63072312
+./nbody.id.mem.10:Current memory use: 74477304
+./lattice.pd.mem.10:Current memory use: 50196360
+./nucleic.id.mem.10:Current memory use: 131229424
+./graphs.pd.mem.10:Current memory use: 64013296
+./earley.bl.mem.10:Current memory use: 256553128
+./nucleic.pa.mem.10:Current memory use: 146118624
+./earley.pd.mem.10:Current memory use: 64173000
+./lattice.id.mem.10:Current memory use: 50993280
+./graphs.ia.mem.10:Current memory use: 89555408
+./lattice.ls.mem.10:Current memory use: 192519520
+./earley.lc.mem.10:Current memory use: 175645800
+./maze.pa.mem.10:Current memory use: 73198000
+./nucleic.ld.mem.10:Current memory use: 2139593088
+./mbrotZ.sp.mem.10:Current memory use: 307777920
+./church.pa.mem.10:Current memory use: 57650152
+./matrix.id.mem.10:Current memory use: 88990984
+./lattice.bl.mem.10:Current memory use: 203177944
+./church.bl.mem.10:Current memory use: 109390536
+./nbody.lc.mem.10:Current memory use: 368290712
+./graphs.id.time.11:cpu time: 6928 real time: 6937 gc time: 184
+./maze.id.time.11:cpu time: 4468 real time: 4474 gc time: 104
+./earley.sp.time.11:cpu time: 946763 real time: 947622 gc time: 40576
+./lattice.bl.time.11:cpu time: 424866 real time: 425175 gc time: 5708
+./graphs.pd.time.11:cpu time: 6424 real time: 6430 gc time: 184
+./matrix.ia.time.11:cpu time: 5728 real time: 5735 gc time: 184
+./nbody.pa.time.11:cpu time: 38074 real time: 38101 gc time: 3052
+./maze.pd.time.11:cpu time: 4020 real time: 4022 gc time: 104
+./church.bl.time.11:cpu time: 64536 real time: 64575 gc time: 660
+./maze.pa.time.11:cpu time: 3760 real time: 3759 gc time: 100
+./nucleic.id.time.11:cpu time: 68028 real time: 68086 gc time: 10025
+./lattice.sp.time.11:cpu time: 341405 real time: 341635 gc time: 11228
+./earley.bl.time.11:cpu time: 1198662 real time: 1199766 gc time: 22589
+./nbody.ia.time.11:cpu time: 42990 real time: 43017 gc time: 3448
+./earley.ia.time.11:cpu time: 800 real time: 799 gc time: 16
+./lattice.ls.time.11:cpu time: 308423 real time: 308667 gc time: 9952
+./mbrotZ.ia.time.11:cpu time: 124 real time: 124 gc time: 0
+./mbrotZ.ls.time.11:cpu time: 333748 real time: 334021 gc time: 13496
+./church.ls.time.11:cpu time: 27093 real time: 27112 gc time: 440
+./earley.lc.time.11:cpu time: 151601 real time: 151721 gc time: 7816
+./matrix.id.time.11:cpu time: 5408 real time: 5411 gc time: 176
+./nucleic.pd.time.11:cpu time: 58891 real time: 58940 gc time: 9728
+./nbody.pd.time.11:cpu time: 38214 real time: 38246 gc time: 3000
+./church.lc.time.11:cpu time: 6816 real time: 6824 gc time: 108
+./graphs.ia.time.11:cpu time: 7088 real time: 7096 gc time: 180
+./lattice.pa.time.11:cpu time: 448 real time: 451 gc time: 16
+./graphs.pa.time.11:cpu time: 6432 real time: 6433 gc time: 184
+./mbrotZ.id.time.11:cpu time: 124 real time: 123 gc time: 0
+./earley.pd.time.11:cpu time: 744 real time: 743 gc time: 24
+./lattice.ia.time.11:cpu time: 492 real time: 490 gc time: 16
+./earley.pa.time.11:cpu time: 748 real time: 748 gc time: 16
+./lattice.id.time.11:cpu time: 496 real time: 498 gc time: 12
+./church.ia.time.11:cpu time: 192 real time: 195 gc time: 8
+./nucleic.pa.time.11:cpu time: 59643 real time: 59694 gc time: 10020
+./nucleic.ia.time.11:cpu time: 67400 real time: 67456 gc time: 9860
+./lattice.pd.time.11:cpu time: 460 real time: 461 gc time: 16
+./church.pd.time.11:cpu time: 180 real time: 179 gc time: 4
+./mbrotZ.lc.time.11:cpu time: 50063 real time: 50102 gc time: 2116
+./matrix.pd.time.11:cpu time: 4876 real time: 4883 gc time: 172
+./nbody.id.time.11:cpu time: 43482 real time: 43515 gc time: 3444
+./earley.ls.time.11:cpu time: 857989 real time: 858689 gc time: 37694
+./church.sp.time.11:cpu time: 43762 real time: 43785 gc time: 776
+./mbrotZ.pa.time.11:cpu time: 116 real time: 117 gc time: 0
+./church.id.time.11:cpu time: 192 real time: 192 gc time: 4
+./church.pa.time.11:cpu time: 180 real time: 177 gc time: 4
+./matrix.pa.time.11:cpu time: 5004 real time: 5009 gc time: 168
+./mbrotZ.bl.time.11:cpu time: 436923 real time: 437299 gc time: 7616
+./earley.id.time.11:cpu time: 804 real time: 804 gc time: 16
+./maze.ia.time.11:cpu time: 4392 real time: 4392 gc time: 100
+./lattice.lc.time.11:cpu time: 65308 real time: 65350 gc time: 2460
+./mbrotZ.pd.time.11:cpu time: 112 real time: 115 gc time: 0
+./mbrotZ.sp.time.11:cpu time: 411049 real time: 411403 gc time: 17516
+./graphs.id.time.11:"State count: 522966"
+./maze.id.time.11:"State count: 318967"
+./earley.sp.time.11:"State count: 287002"
+./lattice.bl.time.11:"State count: 132654"
+./graphs.pd.time.11:"State count: 522966"
+./matrix.ia.time.11:"State count: 337018"
+./nbody.pa.time.11:"State count: 2040277"
+./maze.pd.time.11:"State count: 318967"
+./church.bl.time.11:"State count: 31803"
+./maze.pa.time.11:"State count: 318967"
+./nucleic.id.time.11:"State count: 431637"
+./lattice.sp.time.11:"State count: 132654"
+./earley.bl.time.11:"State count: 287002"
+./nbody.ia.time.11:"State count: 2040277"
+./earley.ia.time.11:"State count: 30850"
+./lattice.ls.time.11:"State count: 117920"
+./mbrotZ.ia.time.11:"State count: 3501"
+./mbrotZ.ls.time.11:"State count: 162716"
+./church.ls.time.11:"State count: 21187"
+./earley.lc.time.11:"State count: 74922"
+./matrix.id.time.11:"State count: 337018"
+./nucleic.pd.time.11:"State count: 431637"
+./nbody.pd.time.11:"State count: 2040277"
+./church.lc.time.11:"State count: 9369"
+./graphs.ia.time.11:"State count: 522966"
+./lattice.pa.time.11:"State count: 31873"
+./graphs.pa.time.11:"State count: 522966"
+./mbrotZ.id.time.11:"State count: 3501"
+./earley.pd.time.11:"State count: 30850"
+./lattice.ia.time.11:"State count: 31873"
+./earley.pa.time.11:"State count: 30850"
+./lattice.id.time.11:"State count: 31873"
+./church.ia.time.11:"State count: 7637"
+./nucleic.pa.time.11:"State count: 431637"
+./nucleic.ia.time.11:"State count: 431637"
+./lattice.pd.time.11:"State count: 31873"
+./church.pd.time.11:"State count: 7642"
+./mbrotZ.lc.time.11:"State count: 35561"
+./matrix.pd.time.11:"State count: 337018"
+./nbody.id.time.11:"State count: 2040277"
+./earley.ls.time.11:"State count: 258388"
+./church.sp.time.11:"State count: 31803"
+./mbrotZ.pa.time.11:"State count: 3501"
+./church.id.time.11:"State count: 7637"
+./church.pa.time.11:"State count: 7642"
+./matrix.pa.time.11:"State count: 337018"
+./mbrotZ.bl.time.11:"State count: 200537"
+./earley.id.time.11:"State count: 30850"
+./maze.ia.time.11:"State count: 318967"
+./lattice.lc.time.11:"State count: 39971"
+./mbrotZ.pd.time.11:"State count: 3501"
+./mbrotZ.sp.time.11:"State count: 200537"
+./graphs.id.time.11:"Point count: 2407"
+./maze.id.time.11:"Point count: 2272"
+./earley.sp.time.11:"Point count: 1287"
+./lattice.bl.time.11:"Point count: 1323"
+./graphs.pd.time.11:"Point count: 2407"
+./matrix.ia.time.11:"Point count: 2423"
+./nbody.pa.time.11:"Point count: 4694"
+./maze.pd.time.11:"Point count: 2272"
+./church.bl.time.11:"Point count: 893"
+./maze.pa.time.11:"Point count: 2272"
+./nucleic.id.time.11:"Point count: 16659"
+./lattice.sp.time.11:"Point count: 1323"
+./earley.bl.time.11:"Point count: 1287"
+./nbody.ia.time.11:"Point count: 4694"
+./earley.ia.time.11:"Point count: 628"
+./lattice.ls.time.11:"Point count: 1181"
+./mbrotZ.ia.time.11:"Point count: 349"
+./mbrotZ.ls.time.11:"Point count: 622"
+./church.ls.time.11:"Point count: 574"
+./earley.lc.time.11:"Point count: 628"
+./matrix.id.time.11:"Point count: 2423"
+./nucleic.pd.time.11:"Point count: 16659"
+./nbody.pd.time.11:"Point count: 4694"
+./church.lc.time.11:"Point count: 292"
+./graphs.ia.time.11:"Point count: 2407"
+./lattice.pa.time.11:"Point count: 604"
+./graphs.pa.time.11:"Point count: 2407"
+./mbrotZ.id.time.11:"Point count: 349"
+./earley.pd.time.11:"Point count: 628"
+./lattice.ia.time.11:"Point count: 604"
+./earley.pa.time.11:"Point count: 628"
+./lattice.id.time.11:"Point count: 604"
+./church.ia.time.11:"Point count: 292"
+./nucleic.pa.time.11:"Point count: 16659"
+./nucleic.ia.time.11:"Point count: 16659"
+./lattice.pd.time.11:"Point count: 604"
+./church.pd.time.11:"Point count: 292"
+./mbrotZ.lc.time.11:"Point count: 349"
+./matrix.pd.time.11:"Point count: 2423"
+./nbody.id.time.11:"Point count: 4694"
+./earley.ls.time.11:"Point count: 1166"
+./church.sp.time.11:"Point count: 893"
+./mbrotZ.pa.time.11:"Point count: 349"
+./church.id.time.11:"Point count: 292"
+./church.pa.time.11:"Point count: 292"
+./matrix.pa.time.11:"Point count: 2423"
+./mbrotZ.bl.time.11:"Point count: 759"
+./earley.id.time.11:"Point count: 628"
+./maze.ia.time.11:"Point count: 2272"
+./lattice.lc.time.11:"Point count: 604"
+./mbrotZ.pd.time.11:"Point count: 349"
+./mbrotZ.sp.time.11:"Point count: 759"
+./graphs.id.time.11:States/second: 75420.53648687626
+./maze.id.time.11:States/second: 71325.35778175313
+./earley.sp.time.11:States/second: 303.98567993814413
+./lattice.bl.time.11:States/second: 313.0699518549986
+./graphs.pd.time.11:States/second: 81344.8436770882
+./matrix.ia.time.11:States/second: 58785.627071341354
+./nbody.pa.time.11:States/second: 53550.577427821525
+./maze.pd.time.11:States/second: 79345.0248756219
+./church.bl.time.11:States/second: 494.88819382848607
+./maze.pa.time.11:States/second: 84876.79616817457
+./nucleic.id.time.11:States/second: 6340.050821815191
+./lattice.sp.time.11:States/second: 390.4125917140259
+./earley.bl.time.11:States/second: 239.9413443644274
+./nbody.ia.time.11:States/second: 47431.75636405905
+./earley.ia.time.11:States/second: 38659.14786967418
+./lattice.ls.time.11:States/second: 383.67931281317107
+./mbrotZ.ia.time.11:States/second: 28233.870967741936
+./mbrotZ.ls.time.11:States/second: 489.8694010753789
+./church.ls.time.11:States/second: 788.6469383956821
+./earley.lc.time.11:States/second: 497.2622105409872
+./matrix.id.time.11:States/second: 62306.89591421704
+./nucleic.pd.time.11:States/second: 7323.701579652849
+./nbody.pd.time.11:States/second: 53347.54869917636
+./church.lc.time.11:States/second: 1397.1070682970474
+./graphs.ia.time.11:States/second: 73719.48125176206
+./lattice.pa.time.11:States/second: 70828.88888888889
+./graphs.pa.time.11:States/second: 81319.54594930804
+./mbrotZ.id.time.11:States/second: 28696.72131147541
+./earley.pd.time.11:States/second: 41576.819407008086
+./lattice.ia.time.11:States/second: 65313.524590163935
+./earley.pa.time.11:States/second: 41298.527443105755
+./lattice.id.time.11:States/second: 64130.7847082495
+./church.ia.time.11:States/second: 39569.9481865285
+./nucleic.pa.time.11:States/second: 7231.311777517172
+./nucleic.ia.time.11:States/second: 6399.172745063156
+./lattice.pd.time.11:States/second: 69138.82863340565
+./church.pd.time.11:States/second: 42932.58426966292
+./mbrotZ.lc.time.11:States/second: 715.8155357394472
+./matrix.pd.time.11:States/second: 69046.91661544766
+./nbody.id.time.11:States/second: 46888.906763495965
+./earley.ls.time.11:States/second: 302.1481109019259
+./church.sp.time.11:States/second: 731.4229203560176
+./mbrotZ.pa.time.11:States/second: 30181.03448275862
+./church.id.time.11:States/second: 39984.293193717276
+./church.pa.time.11:States/second: 43668.57142857143
+./matrix.pa.time.11:States/second: 67295.92651757189
+./mbrotZ.bl.time.11:States/second: 460.7186344108255
+./earley.id.time.11:States/second: 38418.43088418431
+./maze.ia.time.11:States/second: 72674.18546365915
+./lattice.lc.time.11:States/second: 615.7910953628101
+./mbrotZ.pd.time.11:States/second: 30443.478260869564
+./mbrotZ.sp.time.11:States/second: 489.7967657396032
+./boyer.ia.time.11:Result: Timeout
+./nbody.lc.time.11:Result: Timeout
+./nucleic.ls.time.11:Result: Exhausted memory
+./nucleic.sp.time.11:Result: Exhausted memory
+./boyer.ls.time.11:Result: Exhausted memory
+./boyer.bl.time.11:Result: Exhausted memory
+./nucleic.bl.time.11:Result: Exhausted memory
+./boyer.lc.time.11:Result: Exhausted memory
+./boyer.sp.time.11:Result: Exhausted memory
+./nbody.ld.time.11:Result: Exhausted memory
+./nucleic.lc.time.11:Result: Exhausted memory
+./lattice.bl.mem.11:Peak memory use after a collection: 216943944
+./graphs.pa.mem.11:Peak memory use after a collection: 63033320
+./earley.lc.mem.11:Peak memory use after a collection: 255291176
+./graphs.ia.mem.11:Peak memory use after a collection: 64724656
+./mbrotZ.id.mem.11:Peak memory use after a collection: 47475784
+./nbody.ia.mem.11:Peak memory use after a collection: 121950952
+./lattice.pd.mem.11:Peak memory use after a collection: 49108680
+./nbody.id.mem.11:Peak memory use after a collection: 121499448
+./mbrotZ.ls.mem.11:Peak memory use after a collection: 292742848
+./earley.pa.mem.11:Peak memory use after a collection: 50030080
+./nbody.pa.mem.11:Peak memory use after a collection: 121326640
+./church.lc.mem.11:Peak memory use after a collection: 61177408
+./earley.pd.mem.11:Peak memory use after a collection: 50037920
+./maze.pa.mem.11:Peak memory use after a collection: 56542216
+./church.ia.mem.11:Peak memory use after a collection: 48152304
+./matrix.pa.mem.11:Peak memory use after a collection: 62134632
+./church.bl.mem.11:Peak memory use after a collection: 81693040
+./earley.ls.mem.11:Peak memory use after a collection: 402654376
+./earley.id.mem.11:Peak memory use after a collection: 50393872
+./maze.id.mem.11:Peak memory use after a collection: 57196960
+./maze.pd.mem.11:Peak memory use after a collection: 56434320
+./maze.ia.mem.11:Peak memory use after a collection: 57224208
+./church.ls.mem.11:Peak memory use after a collection: 74577016
+./church.sp.mem.11:Peak memory use after a collection: 86222832
+./lattice.lc.mem.11:Peak memory use after a collection: 140539752
+./mbrotZ.lc.mem.11:Peak memory use after a collection: 142064208
+./graphs.id.mem.11:Peak memory use after a collection: 64700672
+./church.pa.mem.11:Peak memory use after a collection: 48152032
+./mbrotZ.sp.mem.11:Peak memory use after a collection: 285261224
+./graphs.pd.mem.11:Peak memory use after a collection: 63080648
+./matrix.ia.mem.11:Peak memory use after a collection: 64108184
+./matrix.pd.mem.11:Peak memory use after a collection: 61653456
+./nucleic.pa.mem.11:Peak memory use after a collection: 147216136
+./nucleic.id.mem.11:Peak memory use after a collection: 141165408
+./earley.ia.mem.11:Peak memory use after a collection: 50389768
+./earley.sp.mem.11:Peak memory use after a collection: 428334824
+./church.id.mem.11:Peak memory use after a collection: 48152064
+./lattice.ia.mem.11:Peak memory use after a collection: 49157776
+./mbrotZ.pa.mem.11:Peak memory use after a collection: 47475944
+./lattice.ls.mem.11:Peak memory use after a collection: 230579136
+./lattice.pa.mem.11:Peak memory use after a collection: 49102408
+./mbrotZ.bl.mem.11:Peak memory use after a collection: 260540768
+./church.pd.mem.11:Peak memory use after a collection: 48156928
+./mbrotZ.pd.mem.11:Peak memory use after a collection: 47476104
+./mbrotZ.ia.mem.11:Peak memory use after a collection: 47475944
+./nucleic.ia.mem.11:Peak memory use after a collection: 143746152
+./nbody.pd.mem.11:Peak memory use after a collection: 121103888
+./earley.bl.mem.11:Peak memory use after a collection: 429187464
+./nucleic.pd.mem.11:Peak memory use after a collection: 137805120
+./nbody.lc.mem.11:Peak memory use after a collection: 617798360
+./boyer.ia.mem.11:Peak memory use after a collection: 121271800
+./lattice.sp.mem.11:Peak memory use after a collection: 231147224
+./lattice.id.mem.11:Peak memory use after a collection: 49162944
+./matrix.id.mem.11:Peak memory use after a collection: 64244736
+./lattice.bl.mem.11:Current memory use: 203174904
+./graphs.pa.mem.11:Current memory use: 64062920
+./earley.lc.mem.11:Current memory use: 175436240
+./graphs.ia.mem.11:Current memory use: 89555728
+./mbrotZ.id.mem.11:Current memory use: 63071000
+./nbody.ia.mem.11:Current memory use: 78694792
+./lattice.pd.mem.11:Current memory use: 50195624
+./nbody.id.mem.11:Current memory use: 74428816
+./mbrotZ.ls.mem.11:Current memory use: 274312952
+./earley.pa.mem.11:Current memory use: 64168456
+./nbody.pa.mem.11:Current memory use: 102836376
+./church.lc.mem.11:Current memory use: 61721352
+./earley.pd.mem.11:Current memory use: 64173640
+./maze.pa.mem.11:Current memory use: 73198640
+./church.ia.mem.11:Current memory use: 57624032
+./matrix.pa.mem.11:Current memory use: 92208448
+./church.bl.mem.11:Current memory use: 109391736
+./earley.ls.mem.11:Current memory use: 396270520
+./earley.id.mem.11:Current memory use: 64221392
+./maze.id.mem.11:Current memory use: 79296696
+./maze.pd.mem.11:Current memory use: 72995368
+./maze.ia.mem.11:Current memory use: 79448736
+./church.ls.mem.11:Current memory use: 95231360
+./church.sp.mem.11:Current memory use: 119412296
+./lattice.lc.mem.11:Current memory use: 147288592
+./mbrotZ.lc.mem.11:Current memory use: 138040160
+./graphs.id.mem.11:Current memory use: 89459632
+./church.pa.mem.11:Current memory use: 57649424
+./mbrotZ.sp.mem.11:Current memory use: 307112504
+./graphs.pd.mem.11:Current memory use: 64015024
+./matrix.ia.mem.11:Current memory use: 88972808
+./matrix.pd.mem.11:Current memory use: 91583808
+./nucleic.pa.mem.11:Current memory use: 90745552
+./nucleic.id.mem.11:Current memory use: 131232328
+./earley.ia.mem.11:Current memory use: 64232096
+./earley.sp.mem.11:Current memory use: 350169464
+./church.id.mem.11:Current memory use: 57606320
+./lattice.ia.mem.11:Current memory use: 51007240
+./mbrotZ.pa.mem.11:Current memory use: 62712160
+./lattice.ls.mem.11:Current memory use: 192819448
+./lattice.pa.mem.11:Current memory use: 50202024
+./mbrotZ.bl.mem.11:Current memory use: 283325872
+./church.pd.mem.11:Current memory use: 57643288
+./mbrotZ.pd.mem.11:Current memory use: 62719880
+./mbrotZ.ia.mem.11:Current memory use: 63075664
+./nucleic.ia.mem.11:Current memory use: 123982816
+./nbody.pd.mem.11:Current memory use: 132176272
+./earley.bl.mem.11:Current memory use: 257750056
+./nucleic.pd.mem.11:Current memory use: 138519184
+./nbody.lc.mem.11:Current memory use: 470721208
+./boyer.ia.mem.11:Current memory use: 82108656
+./lattice.sp.mem.11:Current memory use: 138146224
+./lattice.id.mem.11:Current memory use: 50992576
+./matrix.id.mem.11:Current memory use: 88991456
+./lattice.lc.time.12:cpu time: 60215 real time: 60261 gc time: 2448
+./earley.lc.time.12:cpu time: 156305 real time: 156420 gc time: 8100
+./church.bl.time.12:cpu time: 64776 real time: 64815 gc time: 632
+./earley.bl.time.12:cpu time: 1181653 real time: 1182727 gc time: 21989
+./nucleic.ia.time.12:cpu time: 66784 real time: 66836 gc time: 9885
+./maze.ia.time.12:cpu time: 4448 real time: 4449 gc time: 108
+./matrix.pd.time.12:cpu time: 4916 real time: 4921 gc time: 168
+./nucleic.pa.time.12:cpu time: 58947 real time: 58994 gc time: 9912
+./lattice.pa.time.12:cpu time: 456 real time: 454 gc time: 8
+./lattice.ls.time.12:cpu time: 309991 real time: 310230 gc time: 9961
+./mbrotZ.pd.time.12:cpu time: 116 real time: 116 gc time: 0
+./church.lc.time.12:cpu time: 7136 real time: 7145 gc time: 132
+./graphs.id.time.12:cpu time: 7352 real time: 7353 gc time: 196
+./church.ia.time.12:cpu time: 192 real time: 194 gc time: 8
+./mbrotZ.lc.time.12:cpu time: 50347 real time: 50386 gc time: 2188
+./nbody.id.time.12:cpu time: 43474 real time: 43506 gc time: 3512
+./earley.id.time.12:cpu time: 796 real time: 797 gc time: 20
+./lattice.id.time.12:cpu time: 500 real time: 500 gc time: 20
+./nucleic.id.time.12:cpu time: 67376 real time: 67434 gc time: 9908
+./nucleic.pd.time.12:cpu time: 59407 real time: 59457 gc time: 10112
+./matrix.pa.time.12:cpu time: 4924 real time: 4927 gc time: 164
+./nbody.ia.time.12:cpu time: 43258 real time: 43288 gc time: 3508
+./mbrotZ.pa.time.12:cpu time: 116 real time: 115 gc time: 0
+./church.sp.time.12:cpu time: 43242 real time: 43261 gc time: 692
+./maze.pa.time.12:cpu time: 3752 real time: 3756 gc time: 100
+./mbrotZ.ia.time.12:cpu time: 124 real time: 124 gc time: 0
+./maze.pd.time.12:cpu time: 4104 real time: 4108 gc time: 100
+./nbody.pa.time.12:cpu time: 38194 real time: 38224 gc time: 3040
+./mbrotZ.id.time.12:cpu time: 124 real time: 123 gc time: 0
+./lattice.bl.time.12:cpu time: 426718 real time: 427048 gc time: 5984
+./graphs.pa.time.12:cpu time: 6676 real time: 6681 gc time: 200
+./church.id.time.12:cpu time: 184 real time: 186 gc time: 4
+./earley.sp.time.12:cpu time: 950803 real time: 951622 gc time: 41139
+./matrix.id.time.12:cpu time: 5664 real time: 5670 gc time: 172
+./nbody.pd.time.12:cpu time: 37866 real time: 37893 gc time: 3080
+./earley.ls.time.12:cpu time: 866934 real time: 867644 gc time: 36874
+./maze.id.time.12:cpu time: 4564 real time: 4565 gc time: 108
+./church.pa.time.12:cpu time: 184 real time: 183 gc time: 8
+./church.ls.time.12:cpu time: 26585 real time: 26602 gc time: 476
+./graphs.pd.time.12:cpu time: 6504 real time: 6508 gc time: 168
+./mbrotZ.bl.time.12:cpu time: 434855 real time: 435223 gc time: 7868
+./lattice.ia.time.12:cpu time: 488 real time: 491 gc time: 16
+./earley.pa.time.12:cpu time: 748 real time: 747 gc time: 24
+./earley.ia.time.12:cpu time: 800 real time: 801 gc time: 24
+./church.pd.time.12:cpu time: 180 real time: 181 gc time: 4
+./lattice.pd.time.12:cpu time: 448 real time: 451 gc time: 12
+./mbrotZ.ls.time.12:cpu time: 332540 real time: 332811 gc time: 13680
+./lattice.sp.time.12:cpu time: 336213 real time: 336470 gc time: 10923
+./graphs.ia.time.12:cpu time: 6928 real time: 6931 gc time: 184
+./matrix.ia.time.12:cpu time: 5496 real time: 5499 gc time: 172
+./mbrotZ.sp.time.12:cpu time: 413333 real time: 413686 gc time: 17049
+./earley.pd.time.12:cpu time: 740 real time: 741 gc time: 20
+./lattice.lc.time.12:"State count: 39971"
+./earley.lc.time.12:"State count: 74922"
+./church.bl.time.12:"State count: 31803"
+./earley.bl.time.12:"State count: 287002"
+./nucleic.ia.time.12:"State count: 431637"
+./maze.ia.time.12:"State count: 318967"
+./matrix.pd.time.12:"State count: 337018"
+./nucleic.pa.time.12:"State count: 431637"
+./lattice.pa.time.12:"State count: 31873"
+./lattice.ls.time.12:"State count: 117920"
+./mbrotZ.pd.time.12:"State count: 3501"
+./church.lc.time.12:"State count: 9369"
+./graphs.id.time.12:"State count: 522966"
+./church.ia.time.12:"State count: 7637"
+./mbrotZ.lc.time.12:"State count: 35561"
+./nbody.id.time.12:"State count: 2040277"
+./earley.id.time.12:"State count: 30850"
+./lattice.id.time.12:"State count: 31873"
+./nucleic.id.time.12:"State count: 431637"
+./nucleic.pd.time.12:"State count: 431637"
+./matrix.pa.time.12:"State count: 337018"
+./nbody.ia.time.12:"State count: 2040277"
+./mbrotZ.pa.time.12:"State count: 3501"
+./church.sp.time.12:"State count: 31803"
+./maze.pa.time.12:"State count: 318967"
+./mbrotZ.ia.time.12:"State count: 3501"
+./maze.pd.time.12:"State count: 318967"
+./nbody.pa.time.12:"State count: 2040277"
+./mbrotZ.id.time.12:"State count: 3501"
+./lattice.bl.time.12:"State count: 132654"
+./graphs.pa.time.12:"State count: 522966"
+./church.id.time.12:"State count: 7637"
+./earley.sp.time.12:"State count: 287002"
+./matrix.id.time.12:"State count: 337018"
+./nbody.pd.time.12:"State count: 2040277"
+./earley.ls.time.12:"State count: 258388"
+./maze.id.time.12:"State count: 318967"
+./church.pa.time.12:"State count: 7642"
+./church.ls.time.12:"State count: 21187"
+./graphs.pd.time.12:"State count: 522966"
+./mbrotZ.bl.time.12:"State count: 200537"
+./lattice.ia.time.12:"State count: 31873"
+./earley.pa.time.12:"State count: 30850"
+./earley.ia.time.12:"State count: 30850"
+./church.pd.time.12:"State count: 7642"
+./lattice.pd.time.12:"State count: 31873"
+./mbrotZ.ls.time.12:"State count: 162716"
+./lattice.sp.time.12:"State count: 132654"
+./graphs.ia.time.12:"State count: 522966"
+./matrix.ia.time.12:"State count: 337018"
+./mbrotZ.sp.time.12:"State count: 200537"
+./earley.pd.time.12:"State count: 30850"
+./lattice.lc.time.12:"Point count: 604"
+./earley.lc.time.12:"Point count: 628"
+./church.bl.time.12:"Point count: 893"
+./earley.bl.time.12:"Point count: 1287"
+./nucleic.ia.time.12:"Point count: 16659"
+./maze.ia.time.12:"Point count: 2272"
+./matrix.pd.time.12:"Point count: 2423"
+./nucleic.pa.time.12:"Point count: 16659"
+./lattice.pa.time.12:"Point count: 604"
+./lattice.ls.time.12:"Point count: 1181"
+./mbrotZ.pd.time.12:"Point count: 349"
+./church.lc.time.12:"Point count: 292"
+./graphs.id.time.12:"Point count: 2407"
+./church.ia.time.12:"Point count: 292"
+./mbrotZ.lc.time.12:"Point count: 349"
+./nbody.id.time.12:"Point count: 4694"
+./earley.id.time.12:"Point count: 628"
+./lattice.id.time.12:"Point count: 604"
+./nucleic.id.time.12:"Point count: 16659"
+./nucleic.pd.time.12:"Point count: 16659"
+./matrix.pa.time.12:"Point count: 2423"
+./nbody.ia.time.12:"Point count: 4694"
+./mbrotZ.pa.time.12:"Point count: 349"
+./church.sp.time.12:"Point count: 893"
+./maze.pa.time.12:"Point count: 2272"
+./mbrotZ.ia.time.12:"Point count: 349"
+./maze.pd.time.12:"Point count: 2272"
+./nbody.pa.time.12:"Point count: 4694"
+./mbrotZ.id.time.12:"Point count: 349"
+./lattice.bl.time.12:"Point count: 1323"
+./graphs.pa.time.12:"Point count: 2407"
+./church.id.time.12:"Point count: 292"
+./earley.sp.time.12:"Point count: 1287"
+./matrix.id.time.12:"Point count: 2423"
+./nbody.pd.time.12:"Point count: 4694"
+./earley.ls.time.12:"Point count: 1166"
+./maze.id.time.12:"Point count: 2272"
+./church.pa.time.12:"Point count: 292"
+./church.ls.time.12:"Point count: 574"
+./graphs.pd.time.12:"Point count: 2407"
+./mbrotZ.bl.time.12:"Point count: 759"
+./lattice.ia.time.12:"Point count: 604"
+./earley.pa.time.12:"Point count: 628"
+./earley.ia.time.12:"Point count: 628"
+./church.pd.time.12:"Point count: 292"
+./lattice.pd.time.12:"Point count: 604"
+./mbrotZ.ls.time.12:"Point count: 622"
+./lattice.sp.time.12:"Point count: 1323"
+./graphs.ia.time.12:"Point count: 2407"
+./matrix.ia.time.12:"Point count: 2423"
+./mbrotZ.sp.time.12:"Point count: 759"
+./earley.pd.time.12:"Point count: 628"
+./lattice.lc.time.12:States/second: 668.1208838966336
+./earley.lc.time.12:States/second: 482.3346123142688
+./church.bl.time.12:States/second: 492.9856923625428
+./earley.bl.time.12:States/second: 243.40954175716718
+./nucleic.ia.time.12:States/second: 6458.537826191046
+./maze.ia.time.12:States/second: 71710.20683453238
+./matrix.pd.time.12:States/second: 68513.51900792844
+./nucleic.pa.time.12:States/second: 7317.12154602475
+./lattice.pa.time.12:States/second: 70359.8233995585
+./lattice.ls.time.12:States/second: 381.7540224675451
+./mbrotZ.pd.time.12:States/second: 30710.526315789473
+./church.lc.time.12:States/second: 1333.285897253451
+./graphs.id.time.12:States/second: 71132.48095756257
+./church.ia.time.12:States/second: 39776.041666666664
+./mbrotZ.lc.time.12:States/second: 711.7751846440224
+./nbody.id.time.12:States/second: 46898.60702464141
+./earley.id.time.12:States/second: 38756.281407035174
+./lattice.id.time.12:States/second: 63873.74749498998
+./nucleic.id.time.12:States/second: 6401.16563598345
+./nucleic.pd.time.12:States/second: 7260.1382604746605
+./matrix.pa.time.12:States/second: 68430.05076142131
+./nbody.ia.time.12:States/second: 47133.71219996766
+./mbrotZ.pa.time.12:States/second: 30982.300884955752
+./church.sp.time.12:States/second: 740.086567997766
+./maze.pa.time.12:States/second: 84967.23494938732
+./mbrotZ.ia.time.12:States/second: 28463.414634146342
+./maze.pd.time.12:States/second: 77702.0706455542
+./nbody.pa.time.12:States/second: 53378.25393087931
+./mbrotZ.id.time.12:States/second: 28696.72131147541
+./lattice.bl.time.12:States/second: 311.68776242425383
+./graphs.pa.time.12:States/second: 78300.04491690373
+./church.id.time.12:States/second: 41505.434782608696
+./earley.sp.time.12:States/second: 302.7329102134199
+./matrix.id.time.12:States/second: 59449.28558828717
+./nbody.pd.time.12:States/second: 53845.95286479639
+./earley.ls.time.12:States/second: 299.02142314885106
+./maze.id.time.12:States/second: 69887.5985977213
+./church.pa.time.12:States/second: 41989.01098901099
+./church.ls.time.12:States/second: 803.9691875687778
+./graphs.pd.time.12:States/second: 80369.75564776394
+./mbrotZ.bl.time.12:States/second: 462.9276096335813
+./lattice.ia.time.12:States/second: 65046.93877551021
+./earley.pa.time.12:States/second: 41353.887399463805
+./earley.ia.time.12:States/second: 38610.763454317894
+./church.pd.time.12:States/second: 42455.555555555555
+./lattice.pd.time.12:States/second: 70986.63697104677
+./mbrotZ.ls.time.12:States/second: 491.6381391498246
+./lattice.sp.time.12:States/second: 396.42348047228705
+./graphs.ia.time.12:States/second: 75474.96031173329
+./matrix.ia.time.12:States/second: 61309.44151355285
+./mbrotZ.sp.time.12:States/second: 487.1186358336572
+./earley.pd.time.12:States/second: 41689.18918918919
+./nbody.lc.time.12:Result: Timeout
+./nucleic.ld.time.12:Result: Timeout
+./boyer.ia.time.12:Result: Timeout
+./nucleic.bl.time.12:Result: Exhausted memory
+./boyer.sp.time.12:Result: Exhausted memory
+./boyer.ls.time.12:Result: Exhausted memory
+./nucleic.ls.time.12:Result: Exhausted memory
+./nucleic.sp.time.12:Result: Exhausted memory
+./boyer.lc.time.12:Result: Exhausted memory
+./nucleic.lc.time.12:Result: Exhausted memory
+./nbody.ld.time.12:Result: Exhausted memory
+./lattice.id.mem.12:Peak memory use after a collection: 49163400
+./lattice.ia.mem.12:Peak memory use after a collection: 49157376
+./nucleic.ld.mem.12:Peak memory use after a collection: 2273303320
+./mbrotZ.bl.mem.12:Peak memory use after a collection: 260433776
+./church.bl.mem.12:Peak memory use after a collection: 81688656
+./church.ia.mem.12:Peak memory use after a collection: 48152072
+./mbrotZ.sp.mem.12:Peak memory use after a collection: 286623864
+./nucleic.pa.mem.12:Peak memory use after a collection: 133057792
+./lattice.lc.mem.12:Peak memory use after a collection: 140305608
+./lattice.bl.mem.12:Peak memory use after a collection: 216996496
+./earley.pa.mem.12:Peak memory use after a collection: 50029984
+./lattice.sp.mem.12:Peak memory use after a collection: 231756856
+./matrix.pa.mem.12:Peak memory use after a collection: 62134904
+./church.lc.mem.12:Peak memory use after a collection: 61176376
+./nucleic.pd.mem.12:Peak memory use after a collection: 138368016
+./matrix.id.mem.12:Peak memory use after a collection: 64243968
+./graphs.pa.mem.12:Peak memory use after a collection: 63033640
+./lattice.pd.mem.12:Peak memory use after a collection: 49108040
+./nbody.pd.mem.12:Peak memory use after a collection: 121229216
+./lattice.pa.mem.12:Peak memory use after a collection: 49101648
+./nucleic.ia.mem.12:Peak memory use after a collection: 132466272
+./mbrotZ.ia.mem.12:Peak memory use after a collection: 47476104
+./earley.pd.mem.12:Peak memory use after a collection: 50037408
+./church.ls.mem.12:Peak memory use after a collection: 74577504
+./nbody.pa.mem.12:Peak memory use after a collection: 121298128
+./boyer.ia.mem.12:Peak memory use after a collection: 121505888
+./mbrotZ.pd.mem.12:Peak memory use after a collection: 47475624
+./matrix.pd.mem.12:Peak memory use after a collection: 61636376
+./matrix.ia.mem.12:Peak memory use after a collection: 64108504
+./mbrotZ.ls.mem.12:Peak memory use after a collection: 290094512
+./graphs.id.mem.12:Peak memory use after a collection: 64917584
+./mbrotZ.id.mem.12:Peak memory use after a collection: 47475944
+./maze.pd.mem.12:Peak memory use after a collection: 56521288
+./lattice.ls.mem.12:Peak memory use after a collection: 230242912
+./earley.sp.mem.12:Peak memory use after a collection: 423303160
+./nbody.lc.mem.12:Peak memory use after a collection: 632196192
+./graphs.ia.mem.12:Peak memory use after a collection: 64725432
+./maze.id.mem.12:Peak memory use after a collection: 57201208
+./maze.pa.mem.12:Peak memory use after a collection: 56541896
+./church.pd.mem.12:Peak memory use after a collection: 48156856
+./mbrotZ.pa.mem.12:Peak memory use after a collection: 47476264
+./graphs.pd.mem.12:Peak memory use after a collection: 63080168
+./earley.ls.mem.12:Peak memory use after a collection: 402600760
+./church.pa.mem.12:Peak memory use after a collection: 48152136
+./earley.lc.mem.12:Peak memory use after a collection: 254908472
+./earley.ia.mem.12:Peak memory use after a collection: 50389608
+./church.id.mem.12:Peak memory use after a collection: 48151392
+./maze.ia.mem.12:Peak memory use after a collection: 57223888
+./earley.id.mem.12:Peak memory use after a collection: 50394104
+./nucleic.id.mem.12:Peak memory use after a collection: 143901656
+./mbrotZ.lc.mem.12:Peak memory use after a collection: 142070432
+./nbody.id.mem.12:Peak memory use after a collection: 121515456
+./church.sp.mem.12:Peak memory use after a collection: 86214152
+./earley.bl.mem.12:Peak memory use after a collection: 426559808
+./nbody.ia.mem.12:Peak memory use after a collection: 121930312
+./lattice.id.mem.12:Current memory use: 50990480
+./lattice.ia.mem.12:Current memory use: 51006840
+./nucleic.ld.mem.12:Current memory use: 2056611416
+./mbrotZ.bl.mem.12:Current memory use: 283218880
+./church.bl.mem.12:Current memory use: 109387352
+./church.ia.mem.12:Current memory use: 57624280
+./mbrotZ.sp.mem.12:Current memory use: 305629728
+./nucleic.pa.mem.12:Current memory use: 125015096
+./lattice.lc.mem.12:Current memory use: 147054928
+./lattice.bl.mem.12:Current memory use: 203210864
+./earley.pa.mem.12:Current memory use: 64168664
+./lattice.sp.mem.12:Current memory use: 138461232
+./matrix.pa.mem.12:Current memory use: 92208880
+./church.lc.mem.12:Current memory use: 61720320
+./nucleic.pd.mem.12:Current memory use: 109551432
+./matrix.id.mem.12:Current memory use: 88990800
+./graphs.pa.mem.12:Current memory use: 64063240
+./lattice.pd.mem.12:Current memory use: 50195144
+./nbody.pd.mem.12:Current memory use: 132170984
+./lattice.pa.mem.12:Current memory use: 50201264
+./nucleic.ia.mem.12:Current memory use: 129528480
+./mbrotZ.ia.mem.12:Current memory use: 63077536
+./earley.pd.mem.12:Current memory use: 64173128
+./church.ls.mem.12:Current memory use: 95231848
+./nbody.pa.mem.12:Current memory use: 102844520
+./boyer.ia.mem.12:Current memory use: 94449040
+./mbrotZ.pd.mem.12:Current memory use: 62717040
+./matrix.pd.mem.12:Current memory use: 91572480
+./matrix.ia.mem.12:Current memory use: 88973128
+./mbrotZ.ls.mem.12:Current memory use: 273026992
+./graphs.id.mem.12:Current memory use: 87579920
+./mbrotZ.id.mem.12:Current memory use: 63070632
+./maze.pd.mem.12:Current memory use: 73091520
+./lattice.ls.mem.12:Current memory use: 192868160
+./earley.sp.mem.12:Current memory use: 352502976
+./nbody.lc.mem.12:Current memory use: 524131280
+./graphs.ia.mem.12:Current memory use: 89556632
+./maze.id.mem.12:Current memory use: 79300944
+./maze.pa.mem.12:Current memory use: 73198320
+./church.pd.mem.12:Current memory use: 57643376
+./mbrotZ.pa.mem.12:Current memory use: 62722432
+./graphs.pd.mem.12:Current memory use: 64014672
+./earley.ls.mem.12:Current memory use: 397418488
+./church.pa.mem.12:Current memory use: 57649048
+./earley.lc.mem.12:Current memory use: 175396352
+./earley.ia.mem.12:Current memory use: 64231936
+./church.id.mem.12:Current memory use: 57605360
+./maze.ia.mem.12:Current memory use: 79448416
+./earley.id.mem.12:Current memory use: 64223112
+./nucleic.id.mem.12:Current memory use: 134215368
+./mbrotZ.lc.mem.12:Current memory use: 137754336
+./nbody.id.mem.12:Current memory use: 74477200
+./church.sp.mem.12:Current memory use: 119403616
+./earley.bl.mem.12:Current memory use: 262168912
+./nbody.ia.mem.12:Current memory use: 78724224
+./nbody.pa.time.13:cpu time: 38918 real time: 38944 gc time: 3149
+./mbrotZ.pa.time.13:cpu time: 100 real time: 100 gc time: 0
+./lattice.ls.time.13:cpu time: 311231 real time: 311472 gc time: 10200
+./earley.lc.time.13:cpu time: 157369 real time: 157460 gc time: 8060
+./earley.pd.time.13:cpu time: 744 real time: 747 gc time: 16
+./lattice.lc.time.13:cpu time: 63676 real time: 63718 gc time: 2408
+./mbrotZ.id.time.13:cpu time: 124 real time: 124 gc time: 0
+./earley.bl.time.13:cpu time: 1168161 real time: 1169235 gc time: 21381
+./maze.pd.time.13:cpu time: 4080 real time: 4083 gc time: 84
+./mbrotZ.pd.time.13:cpu time: 116 real time: 116 gc time: 0
+./nbody.id.time.13:cpu time: 42530 real time: 42561 gc time: 3448
+./nucleic.ia.time.13:cpu time: 67588 real time: 67645 gc time: 10000
+./graphs.pd.time.13:cpu time: 6828 real time: 6831 gc time: 196
+./lattice.pd.time.13:cpu time: 448 real time: 447 gc time: 12
+./earley.id.time.13:cpu time: 796 real time: 798 gc time: 20
+./mbrotZ.bl.time.13:cpu time: 428754 real time: 429138 gc time: 7656
+./mbrotZ.ls.time.13:cpu time: 329484 real time: 329756 gc time: 13929
+./earley.pa.time.13:cpu time: 748 real time: 746 gc time: 20
+./nucleic.pa.time.13:cpu time: 59123 real time: 59173 gc time: 10024
+./matrix.ia.time.13:cpu time: 5660 real time: 5663 gc time: 196
+./church.ia.time.13:cpu time: 196 real time: 192 gc time: 4
+./maze.pa.time.13:cpu time: 3832 real time: 3833 gc time: 88
+./church.lc.time.13:cpu time: 6432 real time: 6436 gc time: 140
+./earley.ls.time.13:cpu time: 874882 real time: 875530 gc time: 38404
+./nbody.pd.time.13:cpu time: 38110 real time: 38137 gc time: 3080
+./graphs.id.time.13:cpu time: 7364 real time: 7366 gc time: 204
+./maze.id.time.13:cpu time: 4588 real time: 4592 gc time: 112
+./church.ls.time.13:cpu time: 28077 real time: 28099 gc time: 468
+./lattice.ia.time.13:cpu time: 492 real time: 493 gc time: 20
+./church.id.time.13:cpu time: 192 real time: 192 gc time: 8
+./matrix.id.time.13:cpu time: 5484 real time: 5490 gc time: 180
+./graphs.ia.time.13:cpu time: 7072 real time: 7077 gc time: 188
+./matrix.pd.time.13:cpu time: 4840 real time: 4840 gc time: 152
+./lattice.bl.time.13:cpu time: 432871 real time: 433215 gc time: 5933
+./nbody.ia.time.13:cpu time: 43306 real time: 43340 gc time: 3448
+./mbrotZ.lc.time.13:cpu time: 50655 real time: 50696 gc time: 2212
+./matrix.pa.time.13:cpu time: 4932 real time: 4936 gc time: 152
+./church.sp.time.13:cpu time: 43146 real time: 43180 gc time: 733
+./earley.ia.time.13:cpu time: 792 real time: 795 gc time: 20
+./lattice.id.time.13:cpu time: 508 real time: 505 gc time: 16
+./church.pd.time.13:cpu time: 180 real time: 181 gc time: 8
+./church.bl.time.13:cpu time: 65808 real time: 65843 gc time: 552
+./lattice.sp.time.13:cpu time: 338917 real time: 339195 gc time: 10433
+./earley.sp.time.13:cpu time: 945831 real time: 946673 gc time: 39186
+./mbrotZ.ia.time.13:cpu time: 120 real time: 124 gc time: 0
+./maze.ia.time.13:cpu time: 4456 real time: 4457 gc time: 96
+./nucleic.pd.time.13:cpu time: 58927 real time: 58976 gc time: 10105
+./graphs.pa.time.13:cpu time: 6476 real time: 6480 gc time: 172
+./lattice.pa.time.13:cpu time: 456 real time: 457 gc time: 16
+./nucleic.id.time.13:cpu time: 67848 real time: 67904 gc time: 9856
+./mbrotZ.sp.time.13:cpu time: 412281 real time: 412627 gc time: 17660
+./church.pa.time.13:cpu time: 184 real time: 183 gc time: 8
+./nbody.pa.time.13:"State count: 2040277"
+./mbrotZ.pa.time.13:"State count: 3501"
+./lattice.ls.time.13:"State count: 117920"
+./earley.lc.time.13:"State count: 74922"
+./earley.pd.time.13:"State count: 30850"
+./lattice.lc.time.13:"State count: 39971"
+./mbrotZ.id.time.13:"State count: 3501"
+./earley.bl.time.13:"State count: 287002"
+./maze.pd.time.13:"State count: 318967"
+./mbrotZ.pd.time.13:"State count: 3501"
+./nbody.id.time.13:"State count: 2040277"
+./nucleic.ia.time.13:"State count: 431637"
+./graphs.pd.time.13:"State count: 522966"
+./lattice.pd.time.13:"State count: 31873"
+./earley.id.time.13:"State count: 30850"
+./mbrotZ.bl.time.13:"State count: 200537"
+./mbrotZ.ls.time.13:"State count: 162716"
+./earley.pa.time.13:"State count: 30850"
+./nucleic.pa.time.13:"State count: 431637"
+./matrix.ia.time.13:"State count: 337018"
+./church.ia.time.13:"State count: 7637"
+./maze.pa.time.13:"State count: 318967"
+./church.lc.time.13:"State count: 9369"
+./earley.ls.time.13:"State count: 258388"
+./nbody.pd.time.13:"State count: 2040277"
+./graphs.id.time.13:"State count: 522966"
+./maze.id.time.13:"State count: 318967"
+./church.ls.time.13:"State count: 21187"
+./lattice.ia.time.13:"State count: 31873"
+./church.id.time.13:"State count: 7637"
+./matrix.id.time.13:"State count: 337018"
+./graphs.ia.time.13:"State count: 522966"
+./matrix.pd.time.13:"State count: 337018"
+./lattice.bl.time.13:"State count: 132654"
+./nbody.ia.time.13:"State count: 2040277"
+./mbrotZ.lc.time.13:"State count: 35561"
+./matrix.pa.time.13:"State count: 337018"
+./church.sp.time.13:"State count: 31803"
+./earley.ia.time.13:"State count: 30850"
+./lattice.id.time.13:"State count: 31873"
+./church.pd.time.13:"State count: 7642"
+./church.bl.time.13:"State count: 31803"
+./lattice.sp.time.13:"State count: 132654"
+./earley.sp.time.13:"State count: 287002"
+./mbrotZ.ia.time.13:"State count: 3501"
+./maze.ia.time.13:"State count: 318967"
+./nucleic.pd.time.13:"State count: 431637"
+./graphs.pa.time.13:"State count: 522966"
+./lattice.pa.time.13:"State count: 31873"
+./nucleic.id.time.13:"State count: 431637"
+./mbrotZ.sp.time.13:"State count: 200537"
+./church.pa.time.13:"State count: 7642"
+./nbody.pa.time.13:"Point count: 4694"
+./mbrotZ.pa.time.13:"Point count: 349"
+./lattice.ls.time.13:"Point count: 1181"
+./earley.lc.time.13:"Point count: 628"
+./earley.pd.time.13:"Point count: 628"
+./lattice.lc.time.13:"Point count: 604"
+./mbrotZ.id.time.13:"Point count: 349"
+./earley.bl.time.13:"Point count: 1287"
+./maze.pd.time.13:"Point count: 2272"
+./mbrotZ.pd.time.13:"Point count: 349"
+./nbody.id.time.13:"Point count: 4694"
+./nucleic.ia.time.13:"Point count: 16659"
+./graphs.pd.time.13:"Point count: 2407"
+./lattice.pd.time.13:"Point count: 604"
+./earley.id.time.13:"Point count: 628"
+./mbrotZ.bl.time.13:"Point count: 759"
+./mbrotZ.ls.time.13:"Point count: 622"
+./earley.pa.time.13:"Point count: 628"
+./nucleic.pa.time.13:"Point count: 16659"
+./matrix.ia.time.13:"Point count: 2423"
+./church.ia.time.13:"Point count: 292"
+./maze.pa.time.13:"Point count: 2272"
+./church.lc.time.13:"Point count: 292"
+./earley.ls.time.13:"Point count: 1166"
+./nbody.pd.time.13:"Point count: 4694"
+./graphs.id.time.13:"Point count: 2407"
+./maze.id.time.13:"Point count: 2272"
+./church.ls.time.13:"Point count: 574"
+./lattice.ia.time.13:"Point count: 604"
+./church.id.time.13:"Point count: 292"
+./matrix.id.time.13:"Point count: 2423"
+./graphs.ia.time.13:"Point count: 2407"
+./matrix.pd.time.13:"Point count: 2423"
+./lattice.bl.time.13:"Point count: 1323"
+./nbody.ia.time.13:"Point count: 4694"
+./mbrotZ.lc.time.13:"Point count: 349"
+./matrix.pa.time.13:"Point count: 2423"
+./church.sp.time.13:"Point count: 893"
+./earley.ia.time.13:"Point count: 628"
+./lattice.id.time.13:"Point count: 604"
+./church.pd.time.13:"Point count: 292"
+./church.bl.time.13:"Point count: 893"
+./lattice.sp.time.13:"Point count: 1323"
+./earley.sp.time.13:"Point count: 1287"
+./mbrotZ.ia.time.13:"Point count: 349"
+./maze.ia.time.13:"Point count: 2272"
+./nucleic.pd.time.13:"Point count: 16659"
+./graphs.pa.time.13:"Point count: 2407"
+./lattice.pa.time.13:"Point count: 604"
+./nucleic.id.time.13:"Point count: 16659"
+./mbrotZ.sp.time.13:"Point count: 759"
+./church.pa.time.13:"Point count: 292"
+./nbody.pa.time.13:States/second: 52391.36686952726
+./mbrotZ.pa.time.13:States/second: 35363.63636363636
+./lattice.ls.time.13:States/second: 380.2202904532205
+./earley.lc.time.13:States/second: 479.1113782717407
+./earley.pd.time.13:States/second: 41409.395973154365
+./lattice.lc.time.13:States/second: 631.5930853585311
+./mbrotZ.id.time.13:States/second: 28463.414634146342
+./earley.bl.time.13:States/second: 246.213317045049
+./maze.pd.time.13:States/second: 78139.88241058304
+./mbrotZ.pd.time.13:States/second: 30443.478260869564
+./nbody.id.time.13:States/second: 47939.96569468267
+./nucleic.ia.time.13:States/second: 6381.292411407283
+./graphs.pd.time.13:States/second: 76580.17279250256
+./lattice.pd.time.13:States/second: 71464.12556053812
+./earley.id.time.13:States/second: 38707.65370138018
+./mbrotZ.bl.time.13:States/second: 469.4833592418482
+./mbrotZ.ls.time.13:States/second: 496.1912603299485
+./earley.pa.time.13:States/second: 41409.395973154365
+./nucleic.pa.time.13:States/second: 7294.985549865639
+./matrix.ia.time.13:States/second: 59522.78346873896
+./church.ia.time.13:States/second: 39984.293193717276
+./maze.pa.time.13:States/second: 83237.73486430063
+./church.lc.time.13:States/second: 1480.796586059744
+./earley.ls.time.13:States/second: 296.3250093179277
+./nbody.pd.time.13:States/second: 53501.42913334208
+./graphs.id.time.13:States/second: 71006.92464358453
+./maze.id.time.13:States/second: 69491.7211328976
+./church.ls.time.13:States/second: 760.9453004345796
+./lattice.ia.time.13:States/second: 64651.11561866126
+./church.id.time.13:States/second: 39984.293193717276
+./matrix.id.time.13:States/second: 61421.17732823036
+./graphs.ia.time.13:States/second: 73907.00960994912
+./matrix.pd.time.13:States/second: 69646.20789419301
+./lattice.bl.time.13:States/second: 307.2479611996785
+./nbody.ia.time.13:States/second: 47077.15914072775
+./mbrotZ.lc.time.13:States/second: 707.442258340462
+./matrix.pa.time.13:States/second: 68305.22902310498
+./church.sp.time.13:States/second: 741.5706757449983
+./earley.ia.time.13:States/second: 38805.03144654088
+./lattice.id.time.13:States/second: 63114.851485148516
+./church.pd.time.13:States/second: 42692.737430167595
+./church.bl.time.13:States/second: 485.34932698470834
+./lattice.sp.time.13:States/second: 392.7300502702991
+./earley.sp.time.13:States/second: 304.3312288321609
+./mbrotZ.ia.time.13:States/second: 28696.72131147541
+./maze.ia.time.13:States/second: 71581.4631956912
+./nucleic.pd.time.13:States/second: 7319.354948110968
+./graphs.pa.time.13:States/second: 80717.0859700571
+./lattice.pa.time.13:States/second: 70050.54945054946
+./nucleic.id.time.13:States/second: 6356.951399116348
+./mbrotZ.sp.time.13:States/second: 488.3654101390793
+./church.pa.time.13:States/second: 42220.99447513812
+./nucleic.ld.time.13:Result: Timeout
+./nbody.lc.time.13:Result: Timeout
+./boyer.ia.time.13:Result: Timeout
+./nucleic.sp.time.13:Result: Exhausted memory
+./nbody.ld.time.13:Result: Exhausted memory
+./boyer.sp.time.13:Result: Exhausted memory
+./nucleic.bl.time.13:Result: Exhausted memory
+./boyer.ls.time.13:Result: Exhausted memory
+./boyer.lc.time.13:Result: Exhausted memory
+./boyer.bl.time.13:Result: Exhausted memory
+./nucleic.ls.time.13:Result: Exhausted memory
+./nucleic.lc.time.13:Result: Exhausted memory
+./earley.lc.mem.13:Peak memory use after a collection: 254074400
+./graphs.pd.mem.13:Peak memory use after a collection: 63080112
+./mbrotZ.pa.mem.13:Peak memory use after a collection: 47475784
+./maze.id.mem.13:Peak memory use after a collection: 57196328
+./church.ia.mem.13:Peak memory use after a collection: 48152464
+./mbrotZ.id.mem.13:Peak memory use after a collection: 47475944
+./lattice.lc.mem.13:Peak memory use after a collection: 140866688
+./earley.bl.mem.13:Peak memory use after a collection: 429100344
+./nucleic.ld.mem.13:Peak memory use after a collection: 2272491656
+./nucleic.ia.mem.13:Peak memory use after a collection: 145638048
+./earley.pa.mem.13:Peak memory use after a collection: 50030608
+./nucleic.pa.mem.13:Peak memory use after a collection: 132667944
+./nucleic.id.mem.13:Peak memory use after a collection: 138595840
+./boyer.ia.mem.13:Peak memory use after a collection: 120119008
+./mbrotZ.ia.mem.13:Peak memory use after a collection: 47476744
+./church.bl.mem.13:Peak memory use after a collection: 81698048
+./mbrotZ.pd.mem.13:Peak memory use after a collection: 47476104
+./church.ls.mem.13:Peak memory use after a collection: 74581224
+./nbody.ia.mem.13:Peak memory use after a collection: 121928856
+./mbrotZ.bl.mem.13:Peak memory use after a collection: 260495168
+./lattice.ls.mem.13:Peak memory use after a collection: 230581712
+./graphs.ia.mem.13:Peak memory use after a collection: 64724528
+./nucleic.pd.mem.13:Peak memory use after a collection: 132109128
+./maze.pa.mem.13:Peak memory use after a collection: 56542704
+./lattice.id.mem.13:Peak memory use after a collection: 49162624
+./mbrotZ.lc.mem.13:Peak memory use after a collection: 142105528
+./graphs.pa.mem.13:Peak memory use after a collection: 63033376
+./nbody.pa.mem.13:Peak memory use after a collection: 121274560
+./church.pd.mem.13:Peak memory use after a collection: 48157248
+./earley.ls.mem.13:Peak memory use after a collection: 400770424
+./maze.pd.mem.13:Peak memory use after a collection: 56443096
+./earley.id.mem.13:Peak memory use after a collection: 50393392
+./lattice.bl.mem.13:Peak memory use after a collection: 217149488
+./earley.sp.mem.13:Peak memory use after a collection: 429400312
+./lattice.ia.mem.13:Peak memory use after a collection: 49157568
+./church.pa.mem.13:Peak memory use after a collection: 48152440
+./matrix.pd.mem.13:Peak memory use after a collection: 61635920
+./matrix.ia.mem.13:Peak memory use after a collection: 64108920
+./maze.ia.mem.13:Peak memory use after a collection: 57221360
+./mbrotZ.sp.mem.13:Peak memory use after a collection: 287445024
+./mbrotZ.ls.mem.13:Peak memory use after a collection: 290624648
+./graphs.id.mem.13:Peak memory use after a collection: 64916560
+./earley.ia.mem.13:Peak memory use after a collection: 50389128
+./matrix.pa.mem.13:Peak memory use after a collection: 62135672
+./nbody.lc.mem.13:Peak memory use after a collection: 628603816
+./lattice.pa.mem.13:Peak memory use after a collection: 49102896
+./lattice.sp.mem.13:Peak memory use after a collection: 232479144
+./nbody.id.mem.13:Peak memory use after a collection: 121515296
+./earley.pd.mem.13:Peak memory use after a collection: 50037120
+./lattice.pd.mem.13:Peak memory use after a collection: 49108032
+./matrix.id.mem.13:Peak memory use after a collection: 63991728
+./church.id.mem.13:Peak memory use after a collection: 48151232
+./church.sp.mem.13:Peak memory use after a collection: 86220256
+./church.lc.mem.13:Peak memory use after a collection: 61180944
+./nbody.pd.mem.13:Peak memory use after a collection: 121213720
+./earley.lc.mem.13:Current memory use: 175519168
+./graphs.pd.mem.13:Current memory use: 64014488
+./mbrotZ.pa.mem.13:Current memory use: 62721768
+./maze.id.mem.13:Current memory use: 79296064
+./church.ia.mem.13:Current memory use: 57624352
+./mbrotZ.id.mem.13:Current memory use: 63071904
+./lattice.lc.mem.13:Current memory use: 147615848
+./earley.bl.mem.13:Current memory use: 260860000
+./nucleic.ld.mem.13:Current memory use: 2134398320
+./nucleic.ia.mem.13:Current memory use: 133924872
+./earley.pa.mem.13:Current memory use: 64169392
+./nucleic.pa.mem.13:Current memory use: 123798696
+./nucleic.id.mem.13:Current memory use: 137259960
+./boyer.ia.mem.13:Current memory use: 98982232
+./mbrotZ.ia.mem.13:Current memory use: 63078000
+./church.bl.mem.13:Current memory use: 109396744
+./mbrotZ.pd.mem.13:Current memory use: 62754640
+./church.ls.mem.13:Current memory use: 95235568
+./nbody.ia.mem.13:Current memory use: 78655952
+./mbrotZ.bl.mem.13:Current memory use: 283280272
+./lattice.ls.mem.13:Current memory use: 192826568
+./graphs.ia.mem.13:Current memory use: 89555600
+./nucleic.pd.mem.13:Current memory use: 140420352
+./maze.pa.mem.13:Current memory use: 73199128
+./lattice.id.mem.13:Current memory use: 50992416
+./mbrotZ.lc.mem.13:Current memory use: 137833528
+./graphs.pa.mem.13:Current memory use: 64063144
+./nbody.pa.mem.13:Current memory use: 102841144
+./church.pd.mem.13:Current memory use: 57643608
+./earley.ls.mem.13:Current memory use: 388788480
+./maze.pd.mem.13:Current memory use: 73004624
+./earley.id.mem.13:Current memory use: 64220912
+./lattice.bl.mem.13:Current memory use: 203169544
+./earley.sp.mem.13:Current memory use: 349094936
+./lattice.ia.mem.13:Current memory use: 51008440
+./church.pa.mem.13:Current memory use: 57649832
+./matrix.pd.mem.13:Current memory use: 91571800
+./matrix.ia.mem.13:Current memory use: 88973992
+./maze.ia.mem.13:Current memory use: 79445888
+./mbrotZ.sp.mem.13:Current memory use: 309296304
+./mbrotZ.ls.mem.13:Current memory use: 274183336
+./graphs.id.mem.13:Current memory use: 87579056
+./earley.ia.mem.13:Current memory use: 64231456
+./matrix.pa.mem.13:Current memory use: 92209816
+./nbody.lc.mem.13:Current memory use: 389792256
+./lattice.pa.mem.13:Current memory use: 50202512
+./lattice.sp.mem.13:Current memory use: 218373000
+./nbody.id.mem.13:Current memory use: 74477040
+./earley.pd.mem.13:Current memory use: 64172680
+./lattice.pd.mem.13:Current memory use: 50195136
+./matrix.id.mem.13:Current memory use: 88723888
+./church.id.mem.13:Current memory use: 57605560
+./church.sp.mem.13:Current memory use: 119409720
+./church.lc.mem.13:Current memory use: 61724888
+./nbody.pd.mem.13:Current memory use: 132185976
+./lattice.bl.time.14:cpu time: 423386 real time: 423741 gc time: 5836
+./lattice.ls.time.14:cpu time: 318435 real time: 318671 gc time: 9909
+./mbrotZ.pd.time.14:cpu time: 116 real time: 116 gc time: 0
+./nucleic.pa.time.14:cpu time: 59091 real time: 59142 gc time: 9921
+./lattice.pa.time.14:cpu time: 460 real time: 459 gc time: 12
+./church.pa.time.14:cpu time: 180 real time: 182 gc time: 4
+./maze.pa.time.14:cpu time: 4036 real time: 4041 gc time: 100
+./earley.pa.time.14:cpu time: 744 real time: 747 gc time: 12
+./maze.ia.time.14:cpu time: 4524 real time: 4529 gc time: 108
+./nbody.ia.time.14:cpu time: 43106 real time: 43134 gc time: 3428
+./mbrotZ.lc.time.14:cpu time: 51275 real time: 51315 gc time: 2076
+./mbrotZ.pa.time.14:cpu time: 116 real time: 116 gc time: 0
+./lattice.pd.time.14:cpu time: 452 real time: 452 gc time: 12
+./maze.pd.time.14:cpu time: 4012 real time: 4014 gc time: 108
+./mbrotZ.ls.time.14:cpu time: 331188 real time: 331462 gc time: 13817
+./mbrotZ.ia.time.14:cpu time: 124 real time: 124 gc time: 0
+./earley.sp.time.14:cpu time: 938686 real time: 939557 gc time: 41687
+./church.ls.time.14:cpu time: 26997 real time: 27001 gc time: 444
+./earley.ls.time.14:cpu time: 869738 real time: 870452 gc time: 39091
+./mbrotZ.bl.time.14:cpu time: 436447 real time: 436608 gc time: 7320
+./graphs.pa.time.14:cpu time: 6368 real time: 6371 gc time: 180
+./nucleic.ia.time.14:cpu time: 67652 real time: 67706 gc time: 9825
+./earley.bl.time.14:cpu time: 1187286 real time: 1188376 gc time: 22677
+./church.lc.time.14:cpu time: 6592 real time: 6596 gc time: 136
+./earley.ia.time.14:cpu time: 804 real time: 804 gc time: 20
+./lattice.lc.time.14:cpu time: 63288 real time: 63338 gc time: 2308
+./mbrotZ.id.time.14:cpu time: 124 real time: 125 gc time: 0
+./graphs.pd.time.14:cpu time: 6736 real time: 6745 gc time: 204
+./matrix.pa.time.14:cpu time: 5008 real time: 5012 gc time: 156
+./church.id.time.14:cpu time: 188 real time: 186 gc time: 8
+./earley.id.time.14:cpu time: 800 real time: 799 gc time: 20
+./nucleic.pd.time.14:cpu time: 58867 real time: 58917 gc time: 9956
+./nbody.pd.time.14:cpu time: 38650 real time: 38677 gc time: 2996
+./graphs.id.time.14:cpu time: 7248 real time: 7253 gc time: 188
+./lattice.ia.time.14:cpu time: 496 real time: 498 gc time: 12
+./church.pd.time.14:cpu time: 176 real time: 178 gc time: 8
+./matrix.pd.time.14:cpu time: 4892 real time: 4896 gc time: 164
+./graphs.ia.time.14:cpu time: 7628 real time: 7635 gc time: 216
+./matrix.ia.time.14:cpu time: 5628 real time: 5632 gc time: 164
+./nbody.pa.time.14:cpu time: 38466 real time: 38497 gc time: 3077
+./matrix.id.time.14:cpu time: 5632 real time: 5640 gc time: 184
+./nucleic.id.time.14:cpu time: 68824 real time: 68883 gc time: 10028
+./nbody.id.time.14:cpu time: 42934 real time: 42961 gc time: 3489
+./earley.lc.time.14:cpu time: 155533 real time: 155637 gc time: 8066
+./church.ia.time.14:cpu time: 188 real time: 188 gc time: 4
+./church.sp.time.14:cpu time: 44994 real time: 45028 gc time: 712
+./earley.pd.time.14:cpu time: 740 real time: 740 gc time: 20
+./lattice.sp.time.14:cpu time: 351370 real time: 351562 gc time: 10872
+./church.bl.time.14:cpu time: 64868 real time: 64906 gc time: 580
+./mbrotZ.sp.time.14:cpu time: 406685 real time: 407026 gc time: 17536
+./lattice.id.time.14:cpu time: 500 real time: 500 gc time: 16
+./maze.id.time.14:cpu time: 4416 real time: 4417 gc time: 100
+./lattice.bl.time.14:"State count: 132654"
+./lattice.ls.time.14:"State count: 117920"
+./mbrotZ.pd.time.14:"State count: 3501"
+./nucleic.pa.time.14:"State count: 431637"
+./lattice.pa.time.14:"State count: 31873"
+./church.pa.time.14:"State count: 7642"
+./maze.pa.time.14:"State count: 318967"
+./earley.pa.time.14:"State count: 30850"
+./maze.ia.time.14:"State count: 318967"
+./nbody.ia.time.14:"State count: 2040277"
+./mbrotZ.lc.time.14:"State count: 35561"
+./mbrotZ.pa.time.14:"State count: 3501"
+./lattice.pd.time.14:"State count: 31873"
+./maze.pd.time.14:"State count: 318967"
+./mbrotZ.ls.time.14:"State count: 162716"
+./mbrotZ.ia.time.14:"State count: 3501"
+./earley.sp.time.14:"State count: 287002"
+./church.ls.time.14:"State count: 21187"
+./earley.ls.time.14:"State count: 258388"
+./mbrotZ.bl.time.14:"State count: 200537"
+./graphs.pa.time.14:"State count: 522966"
+./nucleic.ia.time.14:"State count: 431637"
+./earley.bl.time.14:"State count: 287002"
+./church.lc.time.14:"State count: 9369"
+./earley.ia.time.14:"State count: 30850"
+./lattice.lc.time.14:"State count: 39971"
+./mbrotZ.id.time.14:"State count: 3501"
+./graphs.pd.time.14:"State count: 522966"
+./matrix.pa.time.14:"State count: 337018"
+./church.id.time.14:"State count: 7637"
+./earley.id.time.14:"State count: 30850"
+./nucleic.pd.time.14:"State count: 431637"
+./nbody.pd.time.14:"State count: 2040277"
+./graphs.id.time.14:"State count: 522966"
+./lattice.ia.time.14:"State count: 31873"
+./church.pd.time.14:"State count: 7642"
+./matrix.pd.time.14:"State count: 337018"
+./graphs.ia.time.14:"State count: 522966"
+./matrix.ia.time.14:"State count: 337018"
+./nbody.pa.time.14:"State count: 2040277"
+./matrix.id.time.14:"State count: 337018"
+./nucleic.id.time.14:"State count: 431637"
+./nbody.id.time.14:"State count: 2040277"
+./earley.lc.time.14:"State count: 74922"
+./church.ia.time.14:"State count: 7637"
+./church.sp.time.14:"State count: 31803"
+./earley.pd.time.14:"State count: 30850"
+./lattice.sp.time.14:"State count: 132654"
+./church.bl.time.14:"State count: 31803"
+./mbrotZ.sp.time.14:"State count: 200537"
+./lattice.id.time.14:"State count: 31873"
+./maze.id.time.14:"State count: 318967"
+./lattice.bl.time.14:"Point count: 1323"
+./lattice.ls.time.14:"Point count: 1181"
+./mbrotZ.pd.time.14:"Point count: 349"
+./nucleic.pa.time.14:"Point count: 16659"
+./lattice.pa.time.14:"Point count: 604"
+./church.pa.time.14:"Point count: 292"
+./maze.pa.time.14:"Point count: 2272"
+./earley.pa.time.14:"Point count: 628"
+./maze.ia.time.14:"Point count: 2272"
+./nbody.ia.time.14:"Point count: 4694"
+./mbrotZ.lc.time.14:"Point count: 349"
+./mbrotZ.pa.time.14:"Point count: 349"
+./lattice.pd.time.14:"Point count: 604"
+./maze.pd.time.14:"Point count: 2272"
+./mbrotZ.ls.time.14:"Point count: 622"
+./mbrotZ.ia.time.14:"Point count: 349"
+./earley.sp.time.14:"Point count: 1287"
+./church.ls.time.14:"Point count: 574"
+./earley.ls.time.14:"Point count: 1166"
+./mbrotZ.bl.time.14:"Point count: 759"
+./graphs.pa.time.14:"Point count: 2407"
+./nucleic.ia.time.14:"Point count: 16659"
+./earley.bl.time.14:"Point count: 1287"
+./church.lc.time.14:"Point count: 292"
+./earley.ia.time.14:"Point count: 628"
+./lattice.lc.time.14:"Point count: 604"
+./mbrotZ.id.time.14:"Point count: 349"
+./graphs.pd.time.14:"Point count: 2407"
+./matrix.pa.time.14:"Point count: 2423"
+./church.id.time.14:"Point count: 292"
+./earley.id.time.14:"Point count: 628"
+./nucleic.pd.time.14:"Point count: 16659"
+./nbody.pd.time.14:"Point count: 4694"
+./graphs.id.time.14:"Point count: 2407"
+./lattice.ia.time.14:"Point count: 604"
+./church.pd.time.14:"Point count: 292"
+./matrix.pd.time.14:"Point count: 2423"
+./graphs.ia.time.14:"Point count: 2407"
+./matrix.ia.time.14:"Point count: 2423"
+./nbody.pa.time.14:"Point count: 4694"
+./matrix.id.time.14:"Point count: 2423"
+./nucleic.id.time.14:"Point count: 16659"
+./nbody.id.time.14:"Point count: 4694"
+./earley.lc.time.14:"Point count: 628"
+./church.ia.time.14:"Point count: 292"
+./church.sp.time.14:"Point count: 893"
+./earley.pd.time.14:"Point count: 628"
+./lattice.sp.time.14:"Point count: 1323"
+./church.bl.time.14:"Point count: 893"
+./mbrotZ.sp.time.14:"Point count: 759"
+./lattice.id.time.14:"Point count: 604"
+./maze.id.time.14:"Point count: 2272"
+./lattice.bl.time.14:States/second: 314.12563699395685
+./lattice.ls.time.14:States/second: 371.6380185188687
+./mbrotZ.pd.time.14:States/second: 30443.478260869564
+./nucleic.pa.time.14:States/second: 7298.80956407048
+./lattice.pa.time.14:States/second: 69591.70305676856
+./church.pa.time.14:States/second: 42455.555555555555
+./maze.pa.time.14:States/second: 78971.77519187918
+./earley.pa.time.14:States/second: 41409.395973154365
+./maze.ia.time.14:States/second: 70443.24204946996
+./nbody.ia.time.14:States/second: 47301.99615143857
+./mbrotZ.lc.time.14:States/second: 698.9327620432791
+./mbrotZ.pa.time.14:States/second: 30181.03448275862
+./lattice.pd.time.14:States/second: 70671.84035476718
+./maze.pd.time.14:States/second: 79523.0615806532
+./mbrotZ.ls.time.14:States/second: 493.6577137430866
+./mbrotZ.ia.time.14:States/second: 28463.414634146342
+./earley.sp.time.14:States/second: 306.6241028369476
+./church.ls.time.14:States/second: 791.9189653883532
+./earley.ls.time.14:States/second: 298.04771984058783
+./mbrotZ.bl.time.14:States/second: 461.4161597010667
+./graphs.pa.time.14:States/second: 82111.16344795101
+./nucleic.ia.time.14:States/second: 6375.5428200053175
+./earley.bl.time.14:States/second: 242.2505680609623
+./church.lc.time.14:States/second: 1444.9413942011104
+./earley.ia.time.14:States/second: 38418.43088418431
+./lattice.lc.time.14:States/second: 635.428589596846
+./mbrotZ.id.time.14:States/second: 28463.414634146342
+./graphs.pd.time.14:States/second: 77556.87379504672
+./matrix.pa.time.14:States/second: 67282.49151527252
+./church.id.time.14:States/second: 41281.08108108108
+./earley.id.time.14:States/second: 38659.14786967418
+./nucleic.pd.time.14:States/second: 7326.809478544269
+./nbody.pd.time.14:States/second: 52753.05098769262
+./graphs.id.time.14:States/second: 72113.34804191947
+./lattice.ia.time.14:States/second: 64130.7847082495
+./church.pd.time.14:States/second: 43175.141242937854
+./matrix.pd.time.14:States/second: 68849.4382022472
+./graphs.ia.time.14:States/second: 68513.82156426045
+./matrix.ia.time.14:States/second: 59871.735654645585
+./nbody.pa.time.14:States/second: 53002.467917077985
+./matrix.id.time.14:States/second: 59776.16175948918
+./nucleic.id.time.14:States/second: 6266.597947124668
+./nbody.id.time.14:States/second: 47492.481378026074
+./earley.lc.time.14:States/second: 484.6591239884337
+./church.ia.time.14:States/second: 40839.57219251337
+./church.sp.time.14:States/second: 711.190124781967
+./earley.pd.time.14:States/second: 41802.16802168022
+./lattice.sp.time.14:States/second: 379.33223526182144
+./church.bl.time.14:States/second: 492.2988808222783
+./mbrotZ.sp.time.14:States/second: 495.12130085475997
+./lattice.id.time.14:States/second: 64002.00803212851
+./maze.id.time.14:States/second: 72229.84601449275
+./boyer.ia.time.14:Result: Timeout
+./nucleic.ld.time.14:Result: Timeout
+./nbody.lc.time.14:Result: Timeout
+./nucleic.lc.time.14:Result: Exhausted memory
+./nucleic.sp.time.14:Result: Exhausted memory
+./nucleic.bl.time.14:Result: Exhausted memory
+./boyer.ls.time.14:Result: Exhausted memory
+./nucleic.ls.time.14:Result: Exhausted memory
+./boyer.bl.time.14:Result: Exhausted memory
+./nbody.ld.time.14:Result: Exhausted memory
+./boyer.sp.time.14:Result: Exhausted memory
+./boyer.lc.time.14:Result: Exhausted memory
+./mbrotZ.bl.mem.14:Peak memory use after a collection: 260414424
+./graphs.id.mem.14:Peak memory use after a collection: 64916864
+./maze.id.mem.14:Peak memory use after a collection: 57201688
+./matrix.ia.mem.14:Peak memory use after a collection: 64108640
+./church.ia.mem.14:Peak memory use after a collection: 48152712
+./lattice.ls.mem.14:Peak memory use after a collection: 230437640
+./nucleic.pa.mem.14:Peak memory use after a collection: 132653016
+./earley.ls.mem.14:Peak memory use after a collection: 405199832
+./mbrotZ.id.mem.14:Peak memory use after a collection: 47475784
+./nucleic.ld.mem.14:Peak memory use after a collection: 2253918984
+./maze.pa.mem.14:Peak memory use after a collection: 56542664
+./lattice.sp.mem.14:Peak memory use after a collection: 230082944
+./earley.pd.mem.14:Peak memory use after a collection: 50038880
+./church.ls.mem.14:Peak memory use after a collection: 74578208
+./church.id.mem.14:Peak memory use after a collection: 48151480
+./nbody.id.mem.14:Peak memory use after a collection: 121478776
+./lattice.ia.mem.14:Peak memory use after a collection: 49159088
+./church.pa.mem.14:Peak memory use after a collection: 48152760
+./nbody.pd.mem.14:Peak memory use after a collection: 121234128
+./lattice.bl.mem.14:Peak memory use after a collection: 217064032
+./matrix.pa.mem.14:Peak memory use after a collection: 62143528
+./church.bl.mem.14:Peak memory use after a collection: 81691744
+./nucleic.ia.mem.14:Peak memory use after a collection: 143796712
+./nucleic.id.mem.14:Peak memory use after a collection: 138937520
+./church.lc.mem.14:Peak memory use after a collection: 61178480
+./graphs.ia.mem.14:Peak memory use after a collection: 64724848
+./earley.ia.mem.14:Peak memory use after a collection: 50389768
+./lattice.lc.mem.14:Peak memory use after a collection: 140399544
+./lattice.pd.mem.14:Peak memory use after a collection: 49108512
+./mbrotZ.ia.mem.14:Peak memory use after a collection: 47475784
+./maze.ia.mem.14:Peak memory use after a collection: 57224720
+./mbrotZ.sp.mem.14:Peak memory use after a collection: 286844904
+./nbody.lc.mem.14:Peak memory use after a collection: 620127608
+./nucleic.pd.mem.14:Peak memory use after a collection: 138378632
+./church.sp.mem.14:Peak memory use after a collection: 86222888
+./nbody.ia.mem.14:Peak memory use after a collection: 121928280
+./earley.pa.mem.14:Peak memory use after a collection: 50030048
+./nbody.pa.mem.14:Peak memory use after a collection: 121152224
+./earley.id.mem.14:Peak memory use after a collection: 50393864
+./earley.bl.mem.14:Peak memory use after a collection: 433013560
+./lattice.pa.mem.14:Peak memory use after a collection: 49103664
+./church.pd.mem.14:Peak memory use after a collection: 48155944
+./earley.lc.mem.14:Peak memory use after a collection: 255295360
+./mbrotZ.pa.mem.14:Peak memory use after a collection: 47476104
+./boyer.ia.mem.14:Peak memory use after a collection: 121034528
+./matrix.pd.mem.14:Peak memory use after a collection: 61654616
+./mbrotZ.lc.mem.14:Peak memory use after a collection: 142091048
+./maze.pd.mem.14:Peak memory use after a collection: 56521816
+./mbrotZ.pd.mem.14:Peak memory use after a collection: 47475944
+./earley.sp.mem.14:Peak memory use after a collection: 423475784
+./mbrotZ.ls.mem.14:Peak memory use after a collection: 290247072
+./lattice.id.mem.14:Peak memory use after a collection: 49163240
+./graphs.pd.mem.14:Peak memory use after a collection: 63079976
+./matrix.id.mem.14:Peak memory use after a collection: 64244744
+./graphs.pa.mem.14:Peak memory use after a collection: 63034912
+./mbrotZ.bl.mem.14:Current memory use: 283199528
+./graphs.id.mem.14:Current memory use: 87579360
+./maze.id.mem.14:Current memory use: 79301424
+./matrix.ia.mem.14:Current memory use: 88973264
+./church.ia.mem.14:Current memory use: 57624440
+./lattice.ls.mem.14:Current memory use: 192860336
+./nucleic.pa.mem.14:Current memory use: 123772824
+./earley.ls.mem.14:Current memory use: 393022680
+./mbrotZ.id.mem.14:Current memory use: 63069400
+./nucleic.ld.mem.14:Current memory use: 2124272296
+./maze.pa.mem.14:Current memory use: 73199088
+./lattice.sp.mem.14:Current memory use: 138354824
+./earley.pd.mem.14:Current memory use: 64174600
+./church.ls.mem.14:Current memory use: 95232232
+./church.id.mem.14:Current memory use: 57604016
+./nbody.id.mem.14:Current memory use: 74421448
+./lattice.ia.mem.14:Current memory use: 51008176
+./church.pa.mem.14:Current memory use: 57650312
+./nbody.pd.mem.14:Current memory use: 132196064
+./lattice.bl.mem.14:Current memory use: 203204384
+./matrix.pa.mem.14:Current memory use: 92217504
+./church.bl.mem.14:Current memory use: 109390440
+./nucleic.ia.mem.14:Current memory use: 124005696
+./nucleic.id.mem.14:Current memory use: 137223896
+./church.lc.mem.14:Current memory use: 61722424
+./graphs.ia.mem.14:Current memory use: 89556048
+./earley.ia.mem.14:Current memory use: 64232096
+./lattice.lc.mem.14:Current memory use: 147148384
+./lattice.pd.mem.14:Current memory use: 50195456
+./mbrotZ.ia.mem.14:Current memory use: 63076856
+./maze.ia.mem.14:Current memory use: 79449408
+./mbrotZ.sp.mem.14:Current memory use: 305772200
+./nbody.lc.mem.14:Current memory use: 505159768
+./nucleic.pd.mem.14:Current memory use: 109541256
+./church.sp.mem.14:Current memory use: 119412352
+./nbody.ia.mem.14:Current memory use: 78655376
+./earley.pa.mem.14:Current memory use: 64168568
+./nbody.pa.mem.14:Current memory use: 102848472
+./earley.id.mem.14:Current memory use: 64222872
+./earley.bl.mem.14:Current memory use: 257224576
+./lattice.pa.mem.14:Current memory use: 50203120
+./church.pd.mem.14:Current memory use: 57640128
+./earley.lc.mem.14:Current memory use: 175499944
+./mbrotZ.pa.mem.14:Current memory use: 62714632
+./boyer.ia.mem.14:Current memory use: 73384248
+./matrix.pd.mem.14:Current memory use: 91584968
+./mbrotZ.lc.mem.14:Current memory use: 137690656
+./maze.pd.mem.14:Current memory use: 73092048
+./mbrotZ.pd.mem.14:Current memory use: 62718408
+./earley.sp.mem.14:Current memory use: 345825784
+./mbrotZ.ls.mem.14:Current memory use: 272876136
+./lattice.id.mem.14:Current memory use: 50990320
+./graphs.pd.mem.14:Current memory use: 64014352
+./matrix.id.mem.14:Current memory use: 88991576
+./graphs.pa.mem.14:Current memory use: 64064680
