@@ -1,9 +1,10 @@
-\documentclass[preprint,onecolumn,9pt]{onecol} %{sigplanconf}
+\documentclass[preprint,onecolumn,9pt]{sigplanconf} %{onecol} 
 \usepackage{alltt}
 \usepackage{amsmath,amsthm}
 \usepackage{amssymb}
 \usepackage{stmaryrd}
 \usepackage{url}
+\usepackage{graphicx}
 
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}{Lemma}
@@ -72,11 +73,13 @@ verify, and implement program analyzers for realistic language
 features typically considered difficult to model.  The approach was
 originally applied to features such as higher-order functions,
 stack-inspection, exceptions, laziness, first-class continuations, and
-garbage collection.  It has since been used to verify actor-based
-parallelism~\cite{local:DOsualdo:12A} and behavioral
-contracts~\cite{FIXME:tobin-hochstadt}; it has been used to model
-Dalvik, Erlang~\cite{local:DOsualdo:12B},
-JavaScript~\cite{local:DBLP:journals/corr/abs-1109-4467}, Racket, and
+garbage collection.  It has since been used to verify actor-
+\cite{local:DOsualdo:12A} and
+thread-based~\cite{dvanhorn:Might2011Family} parallelism and
+behavioral contracts~\cite{dvanhorn:TobinHochstadt2012Higherorder}; it
+has been used to model Dalvik, Erlang~\cite{local:DOsualdo:12B},
+JavaScript~\cite{local:DBLP:journals/corr/abs-1109-4467},
+Racket~\cite{dvanhorn:TobinHochstadt2012Higherorder}, and
 Coq~\cite{local:harvard}.
 
 The primary strength of the approach is that abstract interpreters can
@@ -927,6 +930,14 @@ $\top$, which has more complicated meaning (Shivers' escape semantics) and
 is overly approximate.
 
 \section{Evaluation}
+
+
+\begin{figure*}
+\begin{center}
+\includegraphics[width=6in]{rel-time.ps}
+\end{center}
+\end{figure*}
+
 
 \cite{dvanhorn:Earl2012Introspective}
 
