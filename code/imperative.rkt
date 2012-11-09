@@ -3,6 +3,7 @@
          (only-in "store-passing.rkt" bind-rest) "data.rkt" "deltas.rkt" "add-lib.rkt"
          "handle-limits.rkt")
 (provide reset-globals! reset-todo! add-todo! inc-unions! set-global-σ!
+         saw-change!
          mk-mk-imperative/timestamp^-fixpoint
          mk-mk-imperative/∆s/acc^-fixpoint
          mk-mk-imperative/∆s^-fixpoint
@@ -31,7 +32,8 @@
 (define-for-syntax (yield! stx)
   (syntax-case stx ()
     [(_ e) #'(let ([c e])
-               (unless (= unions (hash-ref seen c -1))
+               (when (or saw-change?
+                         (not (= unions (hash-ref seen c -1))))
                  (hash-set! seen c unions)
                  (add-todo! c)))])) ;; ∪1 → cons
 
@@ -39,6 +41,7 @@
   (define prev (hash-ref global-σ a ∅))
   (define upd (⊓ vs prev))
   (unless (≡ prev upd)
+    (saw-change!)
     (hash-set! global-σ a upd)
     (inc-unions!)))
 (define-syntax-rule (bind-join-h! (σ* jhσ a vs) body)
@@ -74,8 +77,9 @@
                   [else
                    (define todo-old todo)
                    (reset-todo!) ;; → '()
+                   (set! state-count (+ state-count (set-count todo-old)))
                    (for ([c (in-set todo-old)])
-                     (set! state-count (add1 state-count))
+                     (reset-saw-change?!)
                      (step c)) ;; → in-list
                    (loop)])))))))
 (mk-mk-imperative/timestamp^-fixpoint
