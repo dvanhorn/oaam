@@ -17,7 +17,7 @@
     ("sp" . "specialized")
     ("ls" . "lazy")
     ("lc" . "compiled")
-    ("ld" . "deltas")
+    ;("ld" . "deltas")
     ("li" . "imperative")
     ("lp" . "preallocated")))
 
@@ -26,23 +26,30 @@
 (plot-width (* 2 (plot-width)))
 (plot-height (* 2 (plot-height)))
 
-(let ([which run])
-  (plot (for/list ([(name numbers) (in-hash timings)]
-                   [i (in-naturals)])
-          (define (scale x) (if (number? x) x (* 30 60 1000)))
-          (define baseline (scale (average (which (hash-ref numbers "bl")))))
-          (define numbers* (for*/list ([(tag algo) (in-dict algo-name)]
-                                       #:unless (string=? tag "bl")
-                                       [n (in-value (hash-ref numbers tag))])
-                             (vector algo (/ (scale (average (which n))) baseline))))
-          (discrete-histogram numbers*
-                              #:label name
-                              #:skip 7.5 #:x-min i
-                              #:color (c (add1 i)) #:line-color (c (add1 i))))
+(define (p)
+  (let ([which run])
+    (plot (for/list ([(name numbers) (in-hash timings)]
+                     [i (in-naturals)])
+            (define (scale x) (if (number? x) x (* 30 60 1000)))
+            (define baseline (scale (average (which (hash-ref numbers "bl")))))
+            (define numbers* (for*/list ([(tag algo) (in-dict algo-name)]
+                                         #:unless (string=? tag "bl")
+                                         [n (in-value (hash-ref numbers tag))])
+                               (vector algo (/ (scale (average (which n))) baseline))))
+            (discrete-histogram numbers*
+                                #:label name
+                                #:skip 10.5 #:x-min i
+                                #:color (c (add1 i)) #:line-color (c (add1 i))))
+          
+          #:y-label "Time relative to baseline (smaller is better)"
+          #:x-label "Optimization technique (cumulative, left to right)"
+          #:legend-anchor 'top-right)))
 
-        #:y-label "Time relative to baseline (smaller is better)"
-        #:x-label "Optimization technique (cumulative, left to right)"
-        #:legend-anchor 'top-right))
+(p)
+(parameterize ([plot-y-transform (axis-transform-bound log-transform 0.0001 1)]
+               #;[plot-y-ticks     (log-ticks)])
+  (p))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The following are other examples of presentation from David
