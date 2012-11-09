@@ -1,4 +1,4 @@
-\documentclass[preprint,onecolumn,9pt]{sigplanconf} %{onecol} 
+\documentclass[preprint,onecolumn,9pt]{sigplanconf} %{onecol}
 \usepackage{alltt}
 \usepackage{amsmath,amsthm}
 \usepackage{amssymb}
@@ -15,9 +15,9 @@
 
 \begin{document}
 
-\conferenceinfo{WXYZ '05}{date, City.} 
-\copyrightyear{2005} 
-\copyrightdata{[to be supplied]} 
+\conferenceinfo{WXYZ '05}{date, City.}
+\copyrightyear{2005}
+\copyrightdata{[to be supplied]}
 
 % \titlebanner{banner above paper title}        % These are ignored unless
 % \preprintfooter{short description of paper}   % 'preprint' option specified.
@@ -84,7 +84,7 @@ Coq~\cite{local:harvard}.
 
 The primary strength of the approach is that abstract interpreters can
 be easily derived through a small number of steps from existing
-machine models.% such as the CESK machine or the Lazy Krivine machine.
+machine models. % such as the CESK machine or the Lazy Krivine machine.
 Moreover, since the relationships between abstract machines and
 higher-level semantic models---such as definitional
 interpreters~\cite{dvanhorn:reynolds-hosc98}, structured operational
@@ -205,8 +205,7 @@ different in the following ways:
 \\
 \ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont} & \machstep
 \co{\mkont,\mval',\msto}
-\text{ where }\mkont\in\msto(\maddr)
-\text{ and } \mval'\in\interpdelta(\mop,\mval)
+\text{ where } \mval'\in\interpdelta(\mop,\mval)
 \end{align*}
 \caption{Abstract$^2$ machine for ISWIM}
 \label{fig:aam}
@@ -426,7 +425,7 @@ reached.
 (define ((appl f) s)
   (for/fold ([i (set)])
     ([x (in-set s)])
-    (set-union i (f x))))
+    (\(\cup\) i (f x))))
 
 ;; Calculate fixpoint of (appl f).
 ;; \(\forall\) (X) ((X \(\to\) Set[X]) Set[X] \(\to\) Set[X])
@@ -435,8 +434,8 @@ reached.
     (if (set-empty? front)
         accum
         (let ((new-front ((appl f) front)))
-          (loop (set-union accum front)
-                (set-subtract new-front accum))))))
+          (loop (\(\cup\) accum front)
+                (new-front . \(\setminus\) . accum))))))
 \end{alltt}
 
 \subsection{Store widening}
@@ -451,7 +450,7 @@ reached.
      (define ss ((appl step)
                  (for/set ([c cs]) (c->s c \(\msto\)))))
      (set (cons (for/set ([s ss]) (s->c s))
-                (join-stores ss)))]))
+                (\(\sqcup\)-stores ss)))]))
 \end{alltt}
 
 \subsection{Baseline evaluation}
@@ -490,7 +489,7 @@ cartesian product of all the values of {\tt x}, {\tt y}, {\tt z} and
 {\tt w}, only to be joined back together in {\tt f}'s bindings. For
 this reason, we {\it delay} the non-determinism until it is needed in
 {\it strict contexts} (such as the guard for an {\tt if} a called
-procedure, or a numerical primitive application). 
+procedure, or a numerical primitive application).
 
 For this, we introduce a new value for a delayed lookup that acts to
 quotient the state space by the values at the delayed address.
@@ -498,7 +497,7 @@ quotient the state space by the values at the delayed address.
 \begin{align*}
 force(\msto,\clos{\mvar,\mexp,\menv}) &= \{\clos{\mvar,\mexp,\menv}\}\\
 force(\msto,\saddr\maddralt) &= \msto(\maddralt)\\
-\ev{\svar{\mvar},\menv,\mkont,\msto} &\machstep\; 
+\ev{\svar{\mvar},\menv,\mkont,\msto} &\machstep\;
 \co{\mkont,\saddr{\menv(\mvar)},\msto} \\
 \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},v,\msto}
 &\machstep\;
@@ -1110,7 +1109,7 @@ $\mathit{Value}$ (storable values do not change):
 \end{align*}
 
 We define a relation between strict and lazy machines that illustrates
-the quotient that the lazy states 
+the quotient that the lazy states
 
 \newcommand{\lapprx}[3]{#1 \approx_{#2} #3}
 \newcommand{\apprx}[3]{#1 \sim_{#2} #3}
@@ -1120,9 +1119,11 @@ the quotient that the lazy states
 \ev{\mexp, \menv, \mkont, \mcntr} \in cs &\Rightarrow \lapprx{\ev{\mexp, \menv,\mkont, \mcntr}}{\msto}{cs} \\
 \co{\mkont, \mval} \in cs \mbox{ and } \mval' \in force(\msto, \mval) &\Rightarrow \lapprx{\co{\mkont, \mval}}{\msto}{cs} \\
 \ap{\mval_0, \mval_1, \mkont} \in cs \mbox{ and } \mval_i' \in force(\msto, \mval_i) &\Rightarrow \lapprx{\ap{\mval_0', \mval_1', \mkont}}{\msto}{cs} \\
+\ans{\mval'} \in cs \mbox{ and } \mval' \in force(\msto, \mval) &\Rightarrow \lapprx{\ans{\mval}}{\msto}{cs} \\
 \ev{\mexp, \menv, \mkont} \in lcs &\Rightarrow \apprx{\ev{\mexp, \menv,\mkont}}{\msto}{lcs} \\
 \co{\mkont, \mval} \in lcs \mbox { and } \mval' \in force(\msto, \mval) &\Rightarrow \apprx{\co{\mkont, \mval'}}{\msto}{lcs} \\
 \ap{\mval_0, \mval_1, \mkont} \in lcs \mbox { and } \mval_i' \in force(\msto, \mval_i) &\Rightarrow \apprx{\ap{\mval_0', \mval_1', \mkont}}{\msto}{lcs} \\
+\ans{\mval} \in lcs \mbox{ and } \mval' \in force(\msto, \mval) &\Rightarrow \apprx{\ans{\mval'}}{\msto}{lcs} \\
 \forall lc \in lcs, \lapprx{lc}{\msto}{cs}, \mbox{ and }\forall c \in cs, \apprx{c}{\msto}{lcs}. &\Rightarrow \capprx{(lcs, \msto)}{(cs, \msto)}
 \end{align*}
 
@@ -1142,48 +1143,83 @@ stores equal the lazy store. Also for strict equality, every strict
 reduction corresponds to a lazy reduction (immediate from the relation).
 
 \begin{lemma}[Partition step]
-$\forall lc, lc', cs, \msto, \msto'.$ if $\lapprx{lc}{\msto}{cs}$ and $wn(lc,\msto) \machstep wn(lc', \msto')$ then
-$\exists cs'. \forall c \in cs. \exists c' \in cs', \msto^c. wn(c,\msto) \machstep wn(c', \msto^c)$ and $\msto' = \bigcup\limits_{c \in cs}{\msto^c}$ and $\lapprx{lc'}{\msto'}{cs'}$.
+$\forall lc, lcs', cs, \msto, \msto'.$
+ if  $\capprx{(\{lc\},\msto)}{(cs,\msto)}$
+ and $\forall lc' \in lcs'. wn(lc,\msto) \machstep wn(lc', \msto')$ then
+ $\exists cs'. \forall c \in cs. \exists c' \in cs', \msto^c$
+ such that $wn(c,\msto) \machstep wn(c', \msto^c)$
+ and       $\msto' = \bigcup\limits_{c \in cs}{\msto^c}$
+ and       $\capprx{(lcs',\msto')}{(cs',\msto')}$.
 \end{lemma}
 \begin{proof}
+Let $lc' \in lcs'$ be arbitrary.
 By cases on $wn(lc,\msto) \machstep wn(lc', \msto')$:
 \begin{itemize}
-\item{Case $\ev{\svar{\mvar}, \menv, \mkont} \machstep
-            \co{\mkont, \maddr{\menv(\mvar)}, \msto}$: \\
-      If $\mvar \in dom(\menv)$ and $\menv(x) \in dom(\msto)$, then $wn(lc, \msto)$ steps
-      \begin{itemize} 
-       \item{lazily to $\co{\saddr{\menv(\mvar)}, \msto, \mkont}$}
-       \item{strictly to each of $\{\co{\mval, \msto, \mkont} \mid \mval \in \msto(\menv(\mvar))\}$}
-      \end{itemize}
-      By definition of ...}
-\item{Case $\ev{\slit{\mlit}, \menv, \msto, \mkont} \machstep
+\item{Case $\ev{\svar{\mvar}, \menv, \mkont, \msto} \machstep \co{\mkont,
+    \saddr{\menv(\mvar)}, \msto}$: \\ By definition of $\machstep$,
+  $wn(lc,\msto)$ steps strictly to each of $cs' = \{\co{\mval, \mkont} \mid \mval \in \msto(\menv(\mvar))\}$.  By definition of
+  $\capprx{}{}$, $cs = \{lc\}$. The stores are the same, and by
+  definition of $\lapprx{}{\msto}{}$, $\lapprx{lc'}{\msto}{cs'}$.}
+\item{Case $\ev{\slit{\mlit}, \menv, \msto, \mkont, \msto} \machstep
             \co{\mkont, \mlit, \msto}$: \\
       Immeditate.}
-\item{Case $\ev{\slam{\mvar}{\mexp}, \menv, \mkont} \machstep
+\item{Case $\ev{\slam{\mvar}{\mexp}, \menv, \mkont, \msto} \machstep
             \co{\mkont, \clos{\mvar, \mexp, \menv}, \msto}$: \\
       Immediate}
-\item{Case $\ev[^\mcntr]{\sapp[^\mlab]{\mexp_0}{\mexp_1}, \menv, \mkont} \machstep
-            \ev[^\mcntr]{\mexp_0, \menv, \msto', \kar[^\mcntr_\mlab]{\mexp_1, \menv, \maddr}}$: \\
-      Where $a, \msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)$
-      ...}
-\item{Case $\ev[^\mcntr]{\sif[^\mlab]{\mexp_0}{\mexp_1}{\mexp_2}, \menv, \mkont} \machstep
-            \ev[^\mcntr]{\mexp_0, \menv, \msto', \kif[^\mcntr]{\mexp_1, \mexp_2, \menv, \maddr}}$: \\
-      Where $a, \msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)$            
-      ...}
+\item{Case $\ev[^\mcntr]{\sapp[^\mlab]{\mexp_0}{\mexp_1}, \menv, \mkont, \msto} \machstep
+            \ev[^\mcntr]{\mexp_0, \menv, \msto', \kar[^\mcntr_\mlab]{\mexp_1, \menv, \maddr}, \msto'}$: \\
+      Where $\maddr, \msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)$ \\
+      Immediate.}
+\item{Case $\ev[^\mcntr]{\sif[^\mlab]{\mexp_0}{\mexp_1}{\mexp_2}, \menv, \mkont, \msto} \machstep
+            \ev[^\mcntr]{\mexp_0, \menv, \msto', \kif[^\mcntr]{\mexp_1, \mexp_2, \menv, \maddr}, \msto'}$: \\
+      Where $\maddr, \msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)$ \\
+      Immediate.}
 \item{Case $\co{\kmt, \mval, \msto} \machstep \ans{\msto, \mval'}$: \\
-      Where $\mval' \in force(\msto, \mval)$
+      Where $\mval' \in force(\msto, \mval)$ \\
+      By definition of $\capprx{}{}$, $cs = \{\co{\kmt, \mval'} \mid \mval \in force(\msto, \mval)\}$.
+      By definition of $\machstep$, $wn(lc,\msto)$ steps strictly to
+      each of $cs' = \{\ans{\mval}\}$. The stores are the same.
+      By definition of $\lapprx{}{\msto}{}$, $\forall lc' \in lcs'. \lapprx{lc'}{\msto}{cs'}$.
+      By definition of $\apprx{}{\msto}{}$, $\forall c' \in cs'. \apprx{c'}{\msto}{lcs'}$.
+      Thus $\capprx{(lcs',\msto)}{(cs',\msto)}$.}
+\item{Case $\co{\kar[^\mcntr_\mlab]{\mexp, \menv, \maddr}, \mval, \msto} \machstep
+            \ev[^\mcntr]{\mexp, \menv, \kfn[^\mcntr_\mlab]{\mval',\maddr}, \msto}$: \\
+      Where $v' \in force(\msto, \mval)$. \\
+      By definition of $\apprx{}{\msto}{}$, 
+        $cs = \{\co{\kar[^\mcntr_\mlab]{\mexp, \menv, \maddr}, \mval'} \mid \mval \in force(\msto, \mval)\}$.
+      By definition of $\machstep, \lapprx{}{\msto}{}$,
+        $cs' = \{\ev[^\mcntr]{\mexp, \menv, \kfn[^\mcntr_\mlab]{\mval',\maddr}}
+            \mid \co{\kar[^\mcntr_\mlab]{\mexp, \menv, \maddr}, \mval'} \in cs\}$.
+      The stores are the same, and the previous imply $\capprx{(lcs',\msto)}{(cs',\msto)}$.}
+\item{Case $\co{\kfn[^\mcntr_\mlab]{\mvalx{u}, \maddr}, \mval, \msto} \machstep
+            \ap{\mvalx{u}, \mval, \mkont, \msto}$: \\
+      Where $\mkont \in \msto(\maddr)$. \\
+      Immediate.}
+\item{Case $\co{\kif[^\mcntr]{\mexp_0, \mexp_1, \menv, \maddr}, \mval, \msto} \machstep
+            \ev{\mexp_i, \menv, \mkont, \msto}$: \\
+      Where $\mkont \in \msto(\maddr)$. \\
+      By cases on $\{\strue, \sfalse\} \cap force(\msto, \mval)$: \\
+ \begin{itemize}
+  \item{Case $\{\strue, \sfalse\}$:}
+  \item{Case $\{\strue\}$:}
+  \item{Case $\{\sfalse\}$:}
+ \end{itemize}
+ ...}
+%% \item{Case $\co{\kif[^\mcntr]{\mexp_0, \mexp_1, \menv, \maddr}, \mval, \msto} \machstep
+%%             \ev{\mexp_1, \menv, \mkont, \msto}$: \\
+%%       Where $\sfalse \in force(\msto, \mval)$ and $\mkont \in \msto(\maddr)$. \\
+%%       ...}
+\item{Case $\ap[^\mcntr_\mlab]{\mvalx{u}, \mval, \mkont,\msto} \machstep
+            \ev[^{\mcntr'}]{\mexp, \menv', \mkont, \msto'}$: \\
+      {\bf BREAKDOWN}
+      Where $\clos{\mvar, \mexp, \menv} \in force(\msto, \mvalx{u})$
+        and $\menv', \msto', \mcntr' = \mathit{bind}^\mcntr_\mlab(\menv, \msto, \mvar, \mval)$
       ...}
-\item{Case $\co{\kar[^\mcntr_\mlab]{\mexp, \menv, \maddr}, \mval}$: \\
-      ...}
-\item{Case $\co{\kfn[^\mcntr_\mlab]{\mvalx{u}, \maddr}, \mval}$: \\
-      ...}
-\item{Case $\co{\kif[^\mcntr]{\mexp_0, \mexp_1, \menv, \maddr}, \strue}$: \\
-      ...}
-\item{Case $\co{\kif[^\mcntr]{\mexp_0, \mexp_1, \menv, \maddr}, \sfalse}$: \\
-      ...}
-\item{Case $\ap[^\mcntr_\mlab]{\clos{\mvar, \mexp, \menv}, \mval, \mkont}$: \\
-      ...}
-\item{Case $\ap[^\mcntr_\mlab]{\mop, \mval, \mkont}$: \\
+\item{Case $\ap[^\mcntr_\mlab]{\mvalx{u}, \mval, \mkont,\msto} \machstep
+            \co{\mval'', \mkont, \msto}$: \\
+      {\bf BREAKDOWN}
+      Where $\mop \in force(\msto, \mvalx{u})$, $\mval' \in force(\msto, \mval)$
+        and $\mval'' \in\interpdelta(\mop,\mval')$. \\
       ...}
 \end{itemize}
 \end{proof}
