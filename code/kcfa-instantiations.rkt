@@ -136,7 +136,7 @@
 (with-nonsparse
  (with-lazy
   (with-0-ctx/prealloc
-   (with-σ-∆s/acc!
+   (with-σ-∆s/acc/prealloc!
     (with-abstract
       (mk-analysis #:aval lazy-0cfa^/c/∆s/acc/prealloc!
                    #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
@@ -152,7 +152,7 @@
 (with-nonsparse
  (with-lazy
   (with-0-ctx/prealloc
-   (with-σ-∆s!
+   (with-σ-∆s/prealloc!
     (with-abstract
       (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc!
                    #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))

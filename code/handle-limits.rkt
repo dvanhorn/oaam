@@ -3,9 +3,13 @@
 (provide with-limit-handler state-rate)
 
 (define (state-rate start-time-in-ms state-count)
-  (define time-taken-in-seconds (/ (- start-time-in-ms (current-milliseconds))
+  (define time-taken-in-seconds (/ (- (current-milliseconds) start-time-in-ms)
                                    1000))
-  (printf "States/second: ~a~%" (/ state-count time-taken-in-seconds)))
+  (printf "States/second: ~a~%" (exact->inexact ;; for decimal places
+                                 (/ (if (box? state-count)
+                                       (unbox state-count)
+                                       state-count)
+                                   time-taken-in-seconds))))
 
 (define-syntax-rule (with-limit-handler (start-time state-count) body ...)
   (with-handlers ([exn:fail:resource?

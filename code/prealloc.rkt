@@ -95,19 +95,31 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Accumulated deltas
+(define-syntax-rule (vector-ref-ignore-third v a ignore) (vector-ref v a))
+
+(mk-add-∆/s add-∆/acc/prealloc add-∆s/acc/prealloc bind-join/∆s/acc/prealloc bind-join*/∆s/acc/prealloc
+             vector-ref-ignore-third)
+
 (define-syntax-rule (with-σ-∆s/acc/prealloc! body)
   (with-σ-∆s/acc!
    (splicing-syntax-parameterize
-    ([getter (make-rename-transformer #'global-vector-getter)])
+    ([bind-join (make-rename-transformer #'bind-join/∆s/acc/prealloc)]
+     [bind-join* (make-rename-transformer #'bind-join*/∆s/acc/prealloc)]
+     [getter (make-rename-transformer #'global-vector-getter)])
     body)))
 (mk-mk-imperative/∆s/acc^-fixpoint
-  mk-prealloc/∆s/acc^-fixpoint restrict-to-reachable/vector)
+  mk-prealloc/∆s/acc^-fixpoint restrict-to-reachable/vector join! vector-set! vector-ref-ignore-third)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Imperative deltas
+(mk-add-∆/s! add-∆/prealloc! add-∆s/prealloc! bind-join/∆s/prealloc bind-join*/∆s/prealloc
+             vector-ref-ignore-third)
+
 (define-syntax-rule (with-σ-∆s/prealloc! body)
   (with-σ-∆s!
    (splicing-syntax-parameterize
-    ([getter (make-rename-transformer #'global-vector-getter)])
+    ([bind-join (make-rename-transformer #'bind-join/∆s/prealloc)]
+     [bind-join* (make-rename-transformer #'bind-join*/∆s/prealloc)]
+     [getter (make-rename-transformer #'global-vector-getter)])
     body)))
 (mk-mk-imperative/∆s^-fixpoint
-  mk-prealloc/∆s^-fixpoint restrict-to-reachable/vector)
+  mk-prealloc/∆s^-fixpoint restrict-to-reachable/vector join! vector-set! vector-ref-ignore-third)
