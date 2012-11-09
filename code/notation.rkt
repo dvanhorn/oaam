@@ -1,7 +1,7 @@
 #lang racket
 
 (require (for-syntax syntax/parse))
-(provide for/union for*/union for/set for*/set
+(provide for/append for/union for*/union for/set for*/set
          define-simple-macro* hash-reverse
          ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
 

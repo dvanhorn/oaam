@@ -24,7 +24,7 @@
                       bind-alias* bind-big-alias
                       bind-get bind-force bind-delay
                       bind bind-rest do make-var-contour
-                      target-σ? target-cs? target-σ target-cs target-actions? target-actions
+                      target-σ? target-σ target-cs? target-cs target-actions? target-actions
                       top-σ top-σ?)
 ;; default: do nothing to the body of a do.
 (define-syntax-parameter do-body-transformer (syntax-rules () [(_ e) e]))
@@ -78,7 +78,11 @@
   ;; to track the top level store. While we're at it, create the target store
   ;; binding (in σ-∆s it starts off at '())
   (define (init-top-σ tσ body)
-    (cond [(or top? in-do? global-σ?) body]
+    (cond [(or top? in-do? (and (not σ-∆s?) global-σ?)) body]
+          [(and σ-∆s? global-σ?)
+           #`(let ([#,tσ '()])
+               (syntax-parameterize ([target-σ (make-rename-transformer #'#,tσ)])
+                 #,body))]
           [else
            (define σ-id (generate-temporary #'hidden-top))
            #`(let ([#,σ-id #,tσ]

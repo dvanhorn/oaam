@@ -28,7 +28,7 @@
 (define (update ∆s eσ)
   (for/fold ([eσ eσ]) ([a×vs (in-list ∆s)])
     (join eσ (car a×vs) (cdr a×vs))))
-;; Like update, only returns if the update was idempotent
+
 (define (update/change ∆s eσ)
   (for/fold ([eσ eσ] [same? #t]) ([a×vs (in-list ∆s)])
     (define-values (σ* a-same?) (join/change eσ (car a×vs) (cdr a×vs)))

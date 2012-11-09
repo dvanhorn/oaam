@@ -1,10 +1,16 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
-         "data.rkt" "imperative.rkt" "context.rkt" "add-lib.rkt")
-(provide prepare-prealloc mk-prealloc^-fixpoint with-0-ctx/prealloc
+         "data.rkt" "imperative.rkt" "context.rkt" "add-lib.rkt"
+         "deltas.rkt")
+(provide prepare-prealloc with-0-ctx/prealloc
+         mk-prealloc/timestamp^-fixpoint
+         mk-prealloc/∆s/acc^-fixpoint
+         mk-prealloc/∆s^-fixpoint
+         with-σ-∆s/acc/prealloc!
+         with-σ-∆s/prealloc!
          grow-vector ;; helper
          next-loc contour-table
-         with-prealloc-store)
+         with-prealloc/timestamp-store)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mutable pre-allocated store
@@ -47,7 +53,19 @@
   (set! contour-table (make-hash))
   (reset-globals! (make-vector (* 2 nlabels) ∅)) ;; ∅ → '()
   e*)
- 
+
+(define-syntax-rule (global-vector-getter σ* a)
+  (vector-ref global-σ a))
+
+(define-syntax-rule (with-0-ctx/prealloc body)
+  (splicing-syntax-parameterize
+   ([bind (make-rename-transformer #'bind-0)]
+    [bind-rest (make-rename-transformer #'bind-rest-0)]
+    [make-var-contour (make-rename-transformer #'make-var-contour-0-prealloc)])
+   body))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Timestamp approximation
 (define (join! a vs)
   (define prev (vector-ref global-σ a))
   (define upd (⊓ vs prev))
@@ -65,37 +83,31 @@
 (define-syntax-rule (bind-join*! (σ* j*!σ as vss) body)
   (begin (join*! as vss) body))
 
-(define-syntax-rule (global-vector-getter σ* a)
-  (vector-ref global-σ a))
+(mk-mk-imperative/timestamp^-fixpoint
+ mk-prealloc/timestamp^-fixpoint restrict-to-reachable/vector)
 
-(define-syntax-rule (mk-prealloc^-fixpoint name ans^? ans^-v touches)
-  (define (name step fst)
-    (define clean-σ (restrict-to-reachable/vector touches))
-    (let loop ()
-      (cond [(∅? todo) ;; → null?
-             (define vs
-               (for*/set ([(c at-unions) (in-hash seen)]
-                          #:when (ans^? c))
-                 (ans^-v c)))
-             (values (format "State count: ~a" (hash-count seen))
-                     (clean-σ global-σ vs)
-                     vs)]
-            [else
-             (define todo-old todo)
-             (reset-todo!)                        ;; → '()
-             (for ([c (in-set todo-old)]) (step c)) ;; → in-list
-             (loop)]))))
-
-(define-syntax-rule (with-0-ctx/prealloc body)
-  (splicing-syntax-parameterize
-   ([bind (make-rename-transformer #'bind-0)]
-    [bind-rest (make-rename-transformer #'bind-rest-0)]
-    [make-var-contour (make-rename-transformer #'make-var-contour-0-prealloc)])
-   body))
-
-(define-syntax-rule (with-prealloc-store body)
+(define-syntax-rule (with-prealloc/timestamp-store body)
   (splicing-syntax-parameterize
    ([bind-join (make-rename-transformer #'bind-join!)]
     [bind-join* (make-rename-transformer #'bind-join*!)]
     [getter (make-rename-transformer #'global-vector-getter)])
    body))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Accumulated deltas
+(define-syntax-rule (with-σ-∆s/acc/prealloc! body)
+  (with-σ-∆s/acc!
+   (splicing-syntax-parameterize
+    ([getter (make-rename-transformer #'global-vector-getter)])
+    body)))
+(mk-mk-imperative/∆s/acc^-fixpoint
+  mk-prealloc/∆s/acc^-fixpoint restrict-to-reachable/vector)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Imperative deltas
+(define-syntax-rule (with-σ-∆s/prealloc! body)
+  (with-σ-∆s!
+   (splicing-syntax-parameterize
+    ([getter (make-rename-transformer #'global-vector-getter)])
+    body)))
+(mk-mk-imperative/∆s^-fixpoint
+  mk-prealloc/∆s^-fixpoint restrict-to-reachable/vector)

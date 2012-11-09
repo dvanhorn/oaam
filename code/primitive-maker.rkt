@@ -341,7 +341,7 @@
                         [(σ-gop ...) (if σ-threading? #'(pσ) #'())]
                         [(top ...) (listy hidden-σ)]
                         [topp (or hidden-σ #'pσ)]
-                        [(top-op ...) (if σ-∆s? #'(top-σ) #'())]
+                        [(top-op ...) (if (and σ-∆s? (not global-σ?)) #'(top-σ) #'())]
                         [(δ-op ...) (if 0cfa? #'() #'(δ))])
             (define eval
               #`(case o
@@ -383,7 +383,8 @@
                                                    [target-σ (make-rename-transformer #'pσ)]
                                                    [top-σ? #t])
                                body (... ...)))
-                        #'(let () body (... ...))))
+                        #'(syntax-parameterize ([target-σ (make-rename-transformer #'pσ)])
+                            body (... ...))))
                 ;; Identity if not compiled.
                 (define-syntax-rule (compile o)
                   #,(if compiled? eval #'o))

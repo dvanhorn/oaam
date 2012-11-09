@@ -1,14 +1,14 @@
 #lang racket
 
-(define run-num (make-parameter 4))
-(define num-threads 5)
-(define run-count 5)
+(define base-num 0)
+(define run-num (make-parameter 1))
+(define num-threads 2)
 
 (define (construct-cmd which n file)
   (define path (string->path file))
   (define-values (base filename dir?) (split-path path))
-  (define outtime (path-replace-suffix filename (format ".~a.time.~a" which (+ n (run-num)))))
-  (define outmem (path-replace-suffix filename (format ".~a.mem.~a" which (+ n (run-num)))))
+  (define outtime (path-replace-suffix filename (format ".~a.time.~a" which (+ n base-num))))
+  (define outmem (path-replace-suffix filename (format ".~a.mem.~a" which (+ n base-num))))
   (format "racket run-benchmark.rkt --~a ~a > bench/~a 2> bench/~a" which file outtime outmem))
 
 (define church "../benchmarks/church.sch")
@@ -45,39 +45,49 @@
         imperative
         preallocated))
 
-(define known-timeout (hash baseline    (set boyer graphs matrix nbody)
-                            specialized (set boyer graphs matrix nbody)
-                            lazy        (set boyer graphs matrix nbody)
-                            compiled    (set boyer graphs matrix)                            
-                            deltas      (set nucleic)
+(define known-timeout (hash baseline    (set maze graphs matrix nbody)
+                            specialized (set maze graphs matrix nbody)
+                            lazy        (set maze graphs matrix nbody)
+                            compiled    (set maze graphs matrix)                            
+                            deltas      (set boyer)
                             ;; All complete
                             imperative  (set)
                             preallocated (set)))
 ;; 2GB RAM
 (define known-exhaust (hash baseline (set nucleic)
-                            specialized (set nucleic)
-                            lazy (set nucleic)
-                            compiled (set nucleic)
+                            specialized (set nucleic boyer)
+                            lazy (set nucleic boyer)
+                            compiled (set nucleic boyer)
                             ;; Must rerun
                             deltas (set)
                             ;; others complete
                             ))
 
-(define (run whiches files)
-  (for* ([n (in-range run-count)]
-         [which whiches]
+(define (run which file)
+  (for* ([n (in-range (run-num))]
          [timeout (in-value (hash-ref known-timeout which (set)))]
          [exhaust (in-value (hash-ref known-timeout which (set)))]
-         [file to-test]
          #:unless (or (set-member? timeout file)
                       (set-member? exhaust file)))
     (printf "Running ~a (count ~a): ~a~%" which n file)
     (system (construct-cmd which n file))))
 
+(define (distribute-threads work)
+  (define num (length work))
+  (define even (quotient num num-threads))
+  (let loop ([w work] [per-thread '()] [thread-num 1])
+    (cond [(= thread-num num-threads)
+           (cons w per-thread)]
+          [else
+           (define-values (this rest) (split-at w even))
+           (loop rest (cons this per-thread) (add1 thread-num))])))
+
 (define running-threads
-  (for/list ([i (in-range num-threads)]
-             [which which-analyses])
-    (cond [(= i (sub1 num-threads))
-           (thread (λ () (run (drop which-analyses (add1 i)) to-test)))]
-          [else (thread (λ () (run (list which) to-test)))])))
+  (let ([distributed (distribute-threads
+                      (for*/list ([file (in-list to-test)]
+                                  [which (reverse which-analyses)])
+                        (cons which file)))])
+  (for/list ([work-for-thread distributed])
+    (thread (λ () (for ([work (in-list work-for-thread)])
+                    (run (car work) (cdr work))))))))
 (for ([w running-threads]) (thread-wait w))

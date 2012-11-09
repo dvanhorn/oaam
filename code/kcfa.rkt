@@ -133,7 +133,7 @@
              [_ (error 'eval "Bad expr ~a" e)])))
 
        (define compile-def
-         (cond [(attribute compiled?)
+         (cond [(given compiled?)
                 (define hidden-σ (and (given σ-∆s?) (not (given global-σ?)) (generate-temporary #'hidden)))
                 (with-syntax ([(top ...) (listy hidden-σ)]
                               [topp (or hidden-σ #'gσ)])
@@ -174,7 +174,7 @@
            #,@(if (given touches)
                   #`((mk-touches touches clos: rlos: #,(zero? (attribute K))))
                   #'())
-           (splicing-syntax-parameterize ([target-σ? #,σ-threading?]
+           (splicing-syntax-parameterize ([target-σ? (and #,σ-threading? 'threading)]
                                           [target-cs? #,c-passing?]
                                           [target-actions? #,(given sparse?)])
            (define-syntax do-macro
@@ -194,7 +194,7 @@
                        (syntax-case syn ()
                          ;; gσ only optional if it's global
                          [(_ gσ e ρ k δ)
-                          #'(e #,@(listy (and (given σ-∆s?) #'top-σ))
+                          #'(e #,@(listy (and (given σ-∆s?) (not (given global-σ?)) #'top-σ))
                                σ-gop ... ρ-op ... k δ-op ...)]))
                      (define-match-expander ev: ;; inert, but introduces bindings
                        (syntax-rules () [(_ . args) (list . args)]))))
