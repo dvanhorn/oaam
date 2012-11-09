@@ -178,3 +178,11 @@
 ./matrix.lp.time.6:cpu time: 5200 real time: 5205 gc time: 200
 ./nucleic.lp.time.6:cpu time: 98606 real time: 98657 gc time: 17076
 ./lattice.sp.time.8:cpu time: 305379 real time: 305608 gc time: 10237
+./nbody.ld.time.4:cpu time: 192140 real time: 192218 gc time: 42119
+./graphs.ld.time.4:cpu time: 28209 real time: 28216 gc time: 5144
+./lattice.ld.time.4:cpu time: 1428 real time: 1432 gc time: 132
+./mbrotZ.ld.time.4:cpu time: 1296 real time: 1296 gc time: 108
+./maze.ld.time.4:cpu time: 26661 real time: 26684 gc time: 4280
+./church.ld.time.4:cpu time: 648 real time: 648 gc time: 40
+./matrix.ld.time.4:cpu time: 22681 real time: 22686 gc time: 4013
+./earley.ld.time.4:cpu time: 3108 real time: 3109 gc time: 476
