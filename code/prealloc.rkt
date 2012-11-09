@@ -70,7 +70,6 @@
   (define prev (vector-ref global-σ a))
   (define upd (⊓ vs prev))
   (unless (≡ prev upd)
-    (saw-change!)
     (vector-set! global-σ a upd)
     (inc-unions!)))
 
