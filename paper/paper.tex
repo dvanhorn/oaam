@@ -6,6 +6,7 @@
 \usepackage{url}
 
 \newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
 % \usepackage{xltxtra}
 % \setmonofont[Scale=MatchLowercase]{DejaVu Sans Mono}
 %
@@ -492,16 +493,16 @@ For this, we introduce a new value for a delayed lookup that acts to
 quotient the state space by the values at the delayed address.
 
 \begin{align*}
-force(\clos{\mvar,\mexp,\menv},\msto) &= \{\clos{\mvar,\mexp,\menv}\}\\
-force(\saddr\maddralt,\msto) &= \msto(\maddralt)\\
+force(\msto,\clos{\mvar,\mexp,\menv}) &= \{\clos{\mvar,\mexp,\menv}\}\\
+force(\msto,\saddr\maddralt) &= \msto(\maddralt)\\
 \ev{\svar{\mvar},\menv,\mkont,\msto} &\machstep\; 
 \co{\mkont,\saddr{\menv(\mvar)},\msto} \\
 \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},v,\msto}
 &\machstep\;
 \ev[^\mcntr]{\mexp,\menv,\msto,\kfn[^\mcntr_\mlab]{\mval,\maddr}} \\
-\mbox{where } &\mval' \in force(\mval,\msto) \\
+\mbox{where } &\mval' \in force(\msto,\mval) \\
 bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
-  \maddr], \msto\sqcup[\maddr \mapsto force(\mval, \msto)], \mcntr' \\
+  \maddr], \msto\sqcup[\maddr \mapsto force(\msto, \mval)], \mcntr' \\
 \mbox{where } \mcntr' &= \lfloor\mlab\mcntr\rfloor_k \\
               \maddr &= \mvar\mcntr'
 \end{align*}
@@ -1094,7 +1095,7 @@ Details of lazy machine given as a diff from the strict machine. \\
 State space of $lazy-\widehat{CESK}^*_t$ varies just in
 $\mathit{Value}$ (storable values do not change):
 \begin{align*}
-\mval \in \mathit{Value} &::= z \mid b \mid o \mid \\saddr{\maddr} \\
+\mval \in \mathit{Value} &::= z \mid b \mid o \mid \saddr{\maddr} \\
 \end{align*}
 
 We define a relation between strict and lazy machines that illustrates
@@ -1124,16 +1125,67 @@ $wn$ and $nw$ respectively.
 
 The property we show is that all states stay related through
 reduction. The main difficulty is in showing the resulting stores are
-in fact equal. We do this by showing each individual reduction takes
-equal stores to equal stores, and that the union of all these
-reductions is the full reduction.
+in fact equal. We do this by showing each lazy reduction corresponds
+to a set of strict reductions, for which the union of their output
+stores equal the lazy store. Also for strict equality, every strict
+reduction corresponds to a lazy reduction (immediate from the relation).
 
-\begin{theorem}
+\begin{lemma}[Partition step]
+$\forall lc, lc', cs, \msto, \msto'.$ if $\lapprx{lc}{\msto}{cs}$ and $wn(lc,\msto) \machstep wn(lc', \msto')$ then
+$\exists cs'. \forall c \in cs. \exists c' \in cs', \msto^c. wn(c,\msto) \machstep wn(c', \msto^c)$ and $\msto' = \bigcup\limits_{c \in cs}{\msto^c}$ and $\lapprx{lc'}{\msto'}{cs'}$.
+\end{lemma}
+\begin{proof}
+By cases on $wn(lc,\msto) \machstep wn(lc', \msto')$:
+\begin{itemize}
+\item{Case $\ev{\svar{\mvar}, \menv, \mkont} \machstep
+            \co{\mkont, \maddr{\menv(\mvar)}, \msto}$: \\
+      If $\mvar \in dom(\menv)$ and $\menv(x) \in dom(\msto)$, then $wn(lc, \msto)$ steps
+      \begin{itemize} 
+       \item{lazily to $\co{\saddr{\menv(\mvar)}, \msto, \mkont}$}
+       \item{strictly to each of $\{\co{\mval, \msto, \mkont} \mid \mval \in \msto(\menv(\mvar))\}$}
+      \end{itemize}
+      By definition of ...}
+\item{Case $\ev{\slit{\mlit}, \menv, \msto, \mkont} \machstep
+            \co{\mkont, \mlit, \msto}$: \\
+      Immeditate.}
+\item{Case $\ev{\slam{\mvar}{\mexp}, \menv, \mkont} \machstep
+            \co{\mkont, \clos{\mvar, \mexp, \menv}, \msto}$: \\
+      Immediate}
+\item{Case $\ev[^\mcntr]{\sapp[^\mlab]{\mexp_0}{\mexp_1}, \menv, \mkont} \machstep
+            \ev[^\mcntr]{\mexp_0, \menv, \msto', \kar[^\mcntr_\mlab]{\mexp_1, \menv, \maddr}}$: \\
+      Where $a, \msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)$
+      ...}
+\item{Case $\ev[^\mcntr]{\sif[^\mlab]{\mexp_0}{\mexp_1}{\mexp_2}, \menv, \mkont} \machstep
+            \ev[^\mcntr]{\mexp_0, \menv, \msto', \kif[^\mcntr]{\mexp_1, \mexp_2, \menv, \maddr}}$: \\
+      Where $a, \msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)$            
+      ...}
+\item{Case $\co{\kmt, \mval, \msto} \machstep \ans{\msto, \mval'}$: \\
+      Where $\mval' \in force(\msto, \mval)$
+      ...}
+\item{Case $\co{\kar[^\mcntr_\mlab]{\mexp, \menv, \maddr}, \mval}$: \\
+      ...}
+\item{Case $\co{\kfn[^\mcntr_\mlab]{\mvalx{u}, \maddr}, \mval}$: \\
+      ...}
+\item{Case $\co{\kif[^\mcntr]{\mexp_0, \mexp_1, \menv, \maddr}, \strue}$: \\
+      ...}
+\item{Case $\co{\kif[^\mcntr]{\mexp_0, \mexp_1, \menv, \maddr}, \sfalse}$: \\
+      ...}
+\item{Case $\ap[^\mcntr_\mlab]{\clos{\mvar, \mexp, \menv}, \mval, \mkont}$: \\
+      ...}
+\item{Case $\ap[^\mcntr_\mlab]{\mop, \mval, \mkont}$: \\
+      ...}
+\end{itemize}
+\end{proof}
+
+
+\begin{theorem}[Laziness preserves precision]
 $\forall lcs,cs,lcs',\msto,\msto'$ if $\capprx{(lcs, \msto)}{(cs,\msto)}$
   and $(lcs,\msto) \machstep (lcs',\msto')$ then there exists $cs'$
   such that $(cs,\msto) \machstep (cs',\msto')$
 \end{theorem}
 \begin{proof}
+Let $lc \in lcs$ be arbitrary and let $\hat{c} \subseteq cs$ be the
+smallest set such that $\lapprx{lc}{\msto}{\hat{c}}$. \\
 ...
 \end{proof}
 
@@ -1188,7 +1240,7 @@ $\forall lcs,cs,lcs',\msto,\msto'$ if $\capprx{(lcs, \msto)}{(cs,\msto)}$
 %% Since
 %% <x r s k d> -->lazy   <addr(r(x)) s k d>
 %% <x r s k d> -->strict <v s k d> where v in s(r(x))
-%% By definition of force, v in force(addr(r(x)), s)
+%% By definition of force, v in force(s, addr(r(x)))
 %% Thus the first rule of ~_s applies and the second rule of l~_s applies.
 
 %% <(lambda x e) r k d>:
@@ -1205,25 +1257,25 @@ $\forall lcs,cs,lcs',\msto,\msto'$ if $\capprx{(lcs, \msto)}{(cs,\msto)}$
 
 %% <v ar^{l,lf,la}(e^le r a) d>:
 %% Premises:
-%% For all v' in force(v, s),
+%% For all v' in force(s, v),
 %%   <v' ar^{l,lf,la}(e^le r a) d> in conf.cs
 %% Thus:
-%% <v ar^{l,lf,la}(e^le r ka) d> -->lazy   <e^le r s\sqcup[lfd |-> force(v, s)] fn^{l,la}(lfd ka) d>
-%% for all v' in force(v, s),
+%% <v ar^{l,lf,la}(e^le r ka) d> -->lazy   <e^le r s\sqcup[lfd |-> force(s, v)] fn^{l,la}(lfd ka) d>
+%% for all v' in force(s,v),
 %% <v' ar^{l,lf,la}(e^le r ka) d> -->strict <e^le r s\sqcup[lfd |-> {v'}] fn^{l,la}(lfd ka) d>
 %% Thus the union of all the strict stores will equal the lazy store.
 
 %% <v fn^{l,la}(fa ka) d>:
 %% Premises:
-%% For all v' in force(v, s),
+%% For all v' in force(s,v),
 %%   <v' fn^{l,la}(fa ka) d> in conf.cs
 %% Thus
 %% <v fn^{l,la}(fa ka) d> -->lazy <e^fl r[x |-> xd'] s'\sqcup[xd' |-> s'(lad)] k d'>
 %% where k in s(ka)
 %%       clos(x e^fl r) in s(fa)
 %%       d' = truncate(ld, K)
-%%       s' = s\sqcup[lad |-> force(v, s)]
-%% For all v' in force(v,s),
+%%       s' = s\sqcup[lad |-> force(s,v)]
+%% For all v' in force(s,v),
 %% <v' fn^{l,la}(fa ka) d> -->strict <e^fl r[x |-> xd'] s'\sqcup[xd' |-> s'(lad)] k d'>
 %% where k in s(ka)
 %%       clos(x e^fl r) in s(fa)
