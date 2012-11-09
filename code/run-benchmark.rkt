@@ -50,29 +50,35 @@
                  (aval 0cfa^)]
                 [("--ls") "Benchmark specialized lazy non-determinism"
                  (aval lazy-0cfa^)]
-#;
-                [("--ls2") "Benchmark specialized2 lazy non-determinism"
-                 (aval lazy-0cfa^2)]
-#;
-                [("--ls3") "Benchmark specialized3 lazy non-determinism"
-                 (aval lazy-0cfa^3)]
                 [("--lc") "Benchmark compiled specialized lazy non-determinism"
                  (aval lazy-0cfa^/c)]
                 [("--ld")
                   "Benchmark compiled store-diff lazy non-determinism"
-                 (aval lazy-0cfa∆/c)]
-#;
-                [("--dt")
-                 "Benchmark compiled store-diff lazy non-determinism timestamp approx."
-                 (aval lazy-0cfa∆/c/timestamp)]
-                [("--li")
-                 "Benchmark compiled imperative store lazy non-determinism"
-                 (aval lazy-0cfa^/c!)]
-                [("--lp")
-                 "Benchmark compiled preallocated store lazy non-determinism"
-                 (aval lazy-0cfa^/c/prealloc!)] ;; most optimized
+                 (aval lazy-0cfa^/c/∆s)]
+                [("--ia")
+                 "Benchmark compiled imperative accumulated store-diff lazy non-determinism"
+                 (aval lazy-0cfa^/c/∆s/acc!)]
+                [("--id")
+                 "Benchmark compiled imperative store-diff lazy non-determinism"
+                 (aval lazy-0cfa^/c/∆s!)]
+                [("--pa")
+                 "Benchmark compiled preallocated accumulated store-diff lazy non-determinism"
+                 (aval lazy-0cfa^/c/∆s/acc/prealloc!)]
+                [("--pd")
+                 "Benchmark compiled preallocated store-diff lazy non-determinism"
+                 (aval lazy-0cfa^/c/∆s/prealloc!)]
+                [("--it")
+                 "Benchmark compiled imperative store lazy non-determinism timestap approx"
+                 (aval lazy-0cfa^/c/timestamp!)]
+                [("--pt")
+                 "Benchmark compiled preallocated store lazy non-determinism timestamp approx"
+                 (aval lazy-0cfa^/c/prealloc/timestamp!)] ;; most optimized
                 ;; Not benchmarked for paper
                 #|
+                [("--ls2") "Benchmark specialized2 lazy non-determinism"
+                 (aval lazy-0cfa^2)]
+                [("--ls3") "Benchmark specialized3 lazy non-determinism"
+                 (aval lazy-0cfa^3)]
                 [("--spp")
                  "Benchmark compiled preallocated store sparse lazy non-determinism"
                  (aval sparse-lazy-0cfa^/c/prealloc!)]

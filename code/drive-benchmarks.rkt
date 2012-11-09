@@ -1,8 +1,8 @@
 #lang racket
 
-(define base-num 0)
-(define run-num (make-parameter 1))
-(define num-threads 2)
+(define base-num 10)
+(define run-num (make-parameter 5))
+(define num-threads 5)
 
 (define (construct-cmd which n file)
   (define path (string->path file))
@@ -33,17 +33,25 @@
 (define lazy "ls")
 (define compiled "lc")
 (define deltas "ld")
+(define deltasia "ia")
+(define deltasid "id")
+(define deltaspa "pa")
+(define deltaspd "pd")
 (define imperative "li")
 (define preallocated "lp")
 
 (define which-analyses
-  (list baseline 
+  (list deltas
+        deltasia
+        deltasid
+        deltaspa
+        deltaspd
+        imperative
+        preallocated
+        baseline 
         specialized
         lazy
-        compiled
-        deltas
-        imperative
-        preallocated))
+        compiled))
 
 (define known-timeout (hash baseline    (set maze graphs matrix nbody)
                             specialized (set maze graphs matrix nbody)
