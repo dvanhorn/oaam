@@ -1,5 +1,5 @@
 \documentclass[preprint,onecolumn,9pt]{sigplanconf} %{onecol}
-\usepackage{alltt}
+\usepackage{alltt,mathpartir}
 \usepackage{amsmath,amsthm}
 \usepackage{amssymb}
 \usepackage{stmaryrd}
@@ -1109,23 +1109,41 @@ $\mathit{Value}$ (storable values do not change):
 \end{align*}
 
 We define a relation between strict and lazy machines that illustrates
-the quotient that the lazy states
+the quotient that the lazy states embody.
 
+\newcommand{\vapprx}[3]{#1 \cong_{#2} #3}
+\newcommand{\kapprx}[3]{#1 \cong_{#2} #3}
 \newcommand{\lapprx}[3]{#1 \approx_{#2} #3}
 \newcommand{\apprx}[3]{#1 \sim_{#2} #3}
 \newcommand{\capprx}[2]{#1 \sim #2}
 
-\begin{align*}
-\ev{\mexp, \menv, \mkont, \mcntr} \in cs &\Rightarrow \lapprx{\ev{\mexp, \menv,\mkont, \mcntr}}{\msto}{cs} \\
-\co{\mkont, \mval} \in cs \mbox{ and } \mval' \in force(\msto, \mval) &\Rightarrow \lapprx{\co{\mkont, \mval}}{\msto}{cs} \\
-\ap{\mval_0, \mval_1, \mkont} \in cs \mbox{ and } \mval_i' \in force(\msto, \mval_i) &\Rightarrow \lapprx{\ap{\mval_0', \mval_1', \mkont}}{\msto}{cs} \\
-\ans{\mval'} \in cs \mbox{ and } \mval' \in force(\msto, \mval) &\Rightarrow \lapprx{\ans{\mval}}{\msto}{cs} \\
-\ev{\mexp, \menv, \mkont} \in lcs &\Rightarrow \apprx{\ev{\mexp, \menv,\mkont}}{\msto}{lcs} \\
-\co{\mkont, \mval} \in lcs \mbox { and } \mval' \in force(\msto, \mval) &\Rightarrow \apprx{\co{\mkont, \mval'}}{\msto}{lcs} \\
-\ap{\mval_0, \mval_1, \mkont} \in lcs \mbox { and } \mval_i' \in force(\msto, \mval_i) &\Rightarrow \apprx{\ap{\mval_0', \mval_1', \mkont}}{\msto}{lcs} \\
-\ans{\mval} \in lcs \mbox{ and } \mval' \in force(\msto, \mval) &\Rightarrow \apprx{\ans{\mval'}}{\msto}{lcs} \\
-\forall lc \in lcs, \lapprx{lc}{\msto}{cs}, \mbox{ and }\forall c \in cs, \apprx{c}{\msto}{lcs}. &\Rightarrow \capprx{(lcs, \msto)}{(cs, \msto)}
-\end{align*}
+\begin{mathpar}
+\inferrule{\mval' \in force(\msto, \mval)}
+          {\vapprx{\mval}{\msto}{\mval'}} \quad
+\inferrule{\ans{\mval} \in cs}{\lapprx{\ans{\mval}}{\msto}{cs}} \quad
+\inferrule{\ev{\mexp, \menv, \mkont, \mcntr} \in cs}
+          {\lapprx{\ev{\mexp, \menv,\mkont, \mcntr}}{\msto}{cs}} \\
+\inferrule{\co{\mkont, \mval'} \in cs \\
+           \vapprx{\mval}{\msto}{\mval'}}
+          {\lapprx{\co{\mkont, \mval}}{\msto}{cs}} \quad
+\inferrule{\ap{\mval_0, \mval_1, \mkont} \in cs \\
+           \vapprx{\mval_1}{\msto}{\mval_1'}}
+          {\lapprx{\ap{\mval_0, \mval_1', \mkont}}{\msto}{cs}} \\
+\inferrule{\ev{\mexp, \menv, \mkont} \in lcs}
+          {\apprx{\ev{\mexp, \menv,\mkont}}{\msto}{lcs}} \quad
+\inferrule{\ans{\mval} \in lcs \\
+           \vapprx{\mval}{\msto}{\mval'}}
+          {\apprx{\ans{\mval'}}{\msto}{lcs}} \\
+\inferrule{\co{\mkont, \mval} \in lcs \\
+           \vapprx{\mval}{\msto}{\mval'}}
+          {\apprx{\co{\mkont, \mval'}}{\msto}{lcs}} \quad
+\inferrule{\ap{\mval_0, \mval_1, \mkont} \in lcs \\
+           \vapprx{\mval_1}{\msto}{\mval_1'}}
+          {\apprx{\ap{\mval_0, \mval_1', \mkont}}{\msto}{lcs}} \\
+\inferrule{\forall lc \in lcs, \lapprx{lc}{\msto}{cs} \\
+           \forall c \in cs, \apprx{c}{\msto}{lcs}}
+          {\capprx{(lcs, \msto)}{(cs, \msto)}}
+\end{mathpar}
 
 We also need metafunctions for adding and removing a store component
 from states. These are straightforwardly defined, so just name them
@@ -1196,31 +1214,33 @@ By cases on $wn(lc,\msto) \machstep wn(lc', \msto')$:
       Where $\mkont \in \msto(\maddr)$. \\
       Immediate.}
 \item{Case $\co{\kif[^\mcntr]{\mexp_0, \mexp_1, \menv, \maddr}, \mval, \msto} \machstep
-            \ev{\mexp_i, \menv, \mkont, \msto}$: \\
+            \ev{\mexp_0, \menv, \mkont, \msto}$: \\
       Where $\mkont \in \msto(\maddr)$. \\
-      By cases on $\{\strue, \sfalse\} \cap force(\msto, \mval)$: \\
- \begin{itemize}
-  \item{Case $\{\strue, \sfalse\}$:}
-  \item{Case $\{\strue\}$:}
-  \item{Case $\{\sfalse\}$:}
- \end{itemize}
- ...}
-%% \item{Case $\co{\kif[^\mcntr]{\mexp_0, \mexp_1, \menv, \maddr}, \mval, \msto} \machstep
-%%             \ev{\mexp_1, \menv, \mkont, \msto}$: \\
-%%       Where $\sfalse \in force(\msto, \mval)$ and $\mkont \in \msto(\maddr)$. \\
-%%       ...}
-\item{Case $\ap[^\mcntr_\mlab]{\mvalx{u}, \mval, \mkont,\msto} \machstep
+      By definition of $\machstep$, $\strue \in force(\msto, \mval)$, thus by definition of
+      $\capprx{}{}$, the strict machine takes the same step.}
+\item{Case $\co{\kif[^\mcntr]{\mexp_0, \mexp_1, \menv, \maddr}, \mval, \msto} \machstep
+            \ev{\mexp_1, \menv, \mkont, \msto}$: \\
+      Where $\mkont \in \msto(\maddr)$. \\
+      By definition of $\machstep$, $\sfalse \in force(\msto, \mval)$, thus by definition of
+      $\capprx{}{}$, the strict machine takes the same step.}
+\item{Case $\ap[^\mcntr_\mlab]{\clos{\mvar, \mexp, \menv}, \mval, \mkont,\msto} \machstep
             \ev[^{\mcntr'}]{\mexp, \menv', \mkont, \msto'}$: \\
-      {\bf BREAKDOWN}
-      Where $\clos{\mvar, \mexp, \menv} \in force(\msto, \mvalx{u})$
-        and $\menv', \msto', \mcntr' = \mathit{bind}^\mcntr_\mlab(\menv, \msto, \mvar, \mval)$
-      ...}
-\item{Case $\ap[^\mcntr_\mlab]{\mvalx{u}, \mval, \mkont,\msto} \machstep
+      Where $\menv', \msto', \mcntr' = \mathit{bind}^\mcntr_\mlab(\menv, \msto, \mvar, \mval)$
+      By definition of $\apprx{}{\msto}{}$,
+        $cs = \{\ap[^\mcntr_\mlab]{\clos{\mvar, \mexp, \menv}, \mval', \mkont} \mid
+                \mval' \in force(\msto, \mval)\}$.
+      Thus $cs' = \{\ev[^{\mcntr'}]{\mexp, \menv', \mkont}\}$ (clearly $\lapprx{lc'}{\msto'}{cs'}$)  and
+      for all $c \in cs$, $wn(c,\msto) \machstep wn(c',\msto\sqcup[\mvar\mcntr' \mapsto \{c.\mval\}])$.
+      Thus the union of these stores is equal to $\msto'$.}
+\item{Case $\ap[^\mcntr_\mlab]{\mop, \mval, \mkont,\msto} \machstep
             \co{\mval'', \mkont, \msto}$: \\
-      {\bf BREAKDOWN}
-      Where $\mop \in force(\msto, \mvalx{u})$, $\mval' \in force(\msto, \mval)$
+      Where $\mval' \in force(\msto, \mval)$
         and $\mval'' \in\interpdelta(\mop,\mval')$. \\
-      ...}
+      By definition of $\capprx{}{}$ and $\interpdelta$,
+        $cs = \{\ap[^\mcntr_\mlab]{\mop, \mvalx{u}, \mkont} \mid
+                \mvalx{u} \in force(\msto, \mval), 
+                \mval'' \in\interpdelta(\mop,\mvalx{u})\}$.
+      Thus the strict machine takes the same step.}
 \end{itemize}
 \end{proof}
 
@@ -1231,9 +1251,15 @@ $\forall lcs,cs,lcs',\msto,\msto'$ if $\capprx{(lcs, \msto)}{(cs,\msto)}$
   such that $(cs,\msto) \machstep (cs',\msto')$
 \end{theorem}
 \begin{proof}
-Let $lc \in lcs$ be arbitrary and let $\hat{c} \subseteq cs$ be the
-smallest set such that $\lapprx{lc}{\msto}{\hat{c}}$. \\
-...
+By definition of $\machstep$,
+$lcs' = \{lc' \mid \exists \msto^{lc}. wn(lc,\msto) \machstep wn(lc', \msto^{lc}), lc \in lcs\}$
+For each $lc \in lcs$ let $\hat{c}^{lc} \subseteq cs$ be the
+smallest set such that $\lapprx{lc}{\msto}{\hat{c}^{lc}}$. \\ By the
+previous lemma, there exists a $\hat{c}^{lc}{}'$ such that $\capprx{(\{lc' \mid wn(lc,\msto) \machstep
+  wn(lc', \msto^{lc})\}, \msto^{lc})}{(\hat{c}',\msto^{lc})}$. Let
+$cs' = \bigcup\limits_{lc \in lcs}{\hat{c}^{lc}{}'}$ and $\msto' = \bigcup\limits_{lc \in lcs}{\msto^{lc}}$.
+Since each step individually is related, the union is related: $\capprx{lcs'}{\msto'}{cs'}$.
+By definition of $\machstep$, $(cs, \msto) \machstep (cs', \msto')$ and $(lcs, \msto) \machstep (lcs', \msto')$.
 \end{proof}
 
 %% --Eval
