@@ -460,20 +460,28 @@ Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 \section{Precision preserving recipe}
 
 We discuss a variety of techniques for increasing performance by
-decreasing the interpretive overhead of abstract interpretation, all
-in the purely functional realm. These techniques are the following:
+decreasing the interpretive overhead of abstract interpretation. They
+come in two flavors: decreasing the size of the represented state
+space [SS], and decreasing intermediate data structures [DS].
+
 \begin{itemize}
- \item{shrink state space by quotients (lazy non-determinism)}
- \item{shrink state space by removing {\tt ev} states (abstract
-   compilation)}
- \item{decrease intermediate data structures by specializing our
-fixpoint operator to work with widened machine configurations
-(fixpoint specialization)}
- \item{decrease intermediate data structures by operating on store
-   changes rather than whole stores (store deltas)}
+ \item{[SS] quotient by sets of values (lazy non-determinism)}
+ \item{[SS] remove {\tt ev} states (abstract compilation)}
+ \item{[DS] specialize the fixpoint operator to work with widened
+   machine configurations (fixpoint specialization)}
+ \item{[DS] operate on store changes rather than whole stores (store deltas)}
+ \item{[DS] represent the store as a global, mutable hash and
+   determine a state's store by the number of changes made to the
+   global store at the time of visiting (timestamp)}
+ \item{[DS] use a global mutable workset}
+ \item{[DS] represent the global store as a global, mutable vector in
+   the 0-CFA case. (preallocation)}
 \end{itemize}
 Each technique requires minimal changes to the reduction
-relation/fixpoint, and each improves performance by integer factors.
+relation/fixpoint, and each improves performance by integer
+factors. The first four remain in the purely functional realm. The
+final three use mutation in small, localized places, so they do not
+increase conceptual complexity drastically.
 
 \subsection{Lazy non-determinism}
 
@@ -644,7 +652,7 @@ Compile + Lazy:
 Special + Compile + Lazy:
    cpu time: 14212 real time: 14681 gc time: 823
 
-\subsection{Computing with store changes}
+\subsection{Store deltas}
 
 \begin{alltt}
 ;; \(\widehat{State} \to \widehat{State}\)
@@ -695,7 +703,7 @@ TODO
 
 
 % For David to fill in.
-\subsection{Imperative global store and worklist}
+\subsection{Timestamp}
 ...
 \subsection{Pre-allocated global store}
 ...
