@@ -6,8 +6,8 @@
 
 (module data racket/base
   (provide (all-defined-out))
-  (define start-run 10)
-  (define end-run 14)
+  (define start-run 15)
+  (define end-run 19)
   (define algos '("bl" "sp" "ls" "lc" "ld" "ia" "id" "pa" "pd" "li" "lp"))
   (define names '("church" "mbrotZ" "earley" "boyer" "graphs"
                   "lattice" "matrix" "maze" "nbody" "nucleic")))
