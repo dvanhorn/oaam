@@ -26,8 +26,8 @@
     ("id" . "imperative deltas")
     ("pa" . "preallocated accumulated deltas")
     ("pd" . "preallocated deltas")
-    ("li" . "imperative timestamp")
-    ("lp" . "preallocated timestamp")))
+    #;("li" . "imperative timestamp") ;; Breaks if uncommented.
+    #;("lp" . "preallocated timestamp")))
 
 (define (c x) (- (sub1 x))) ;; neg for B/W, pos for color
 (define (next x) (sub1 x))
@@ -35,7 +35,7 @@
 (plot-width (* 2 (plot-width)))
 (plot-height (* 3/2 (plot-height)))
 
-(define (p)
+(define (states-per-second)
   (let ([which numbers-state-rate])
     (plot (for/list ([(name numbers) (in-hash timings)]
                      [i (in-naturals)])
@@ -50,19 +50,79 @@
                                 #:color -7 #;(c (next i)) #:line-color "black" 
                                 #:line-style i))
           
-          #:y-label "Time relative to baseline on log scale (smaller is better)"
+          #:y-label "States-per-second (bigger is better)"
           #:x-label "Optimization technique (cumulative, left to right)"
-          #:legend-anchor 'top-right
-          #:out-file "rel-time.ps")))
+          #:legend-anchor 'top-left
+          #:out-file "state-per-sec.ps")))
 
-(parameterize ([plot-y-transform (axis-transform-bound log-transform 0.0001 1)]
+(parameterize (#;[plot-y-transform (axis-transform-bound log-transform 90000 1)]
                #;[plot-y-ticks     (log-ticks)]
-               [plot-font-size 20]
+               [plot-font-size 30]
                [line-color  "black"]
                [interval-color  "black"]
                [interval-line1-color  "black"]
                [interval-line2-color  "black"])
-  (p))
+  (states-per-second))
+
+
+(define (abs-time)
+  (let ([which numbers-run])
+    (plot (for/list ([(name numbers) (in-hash timings)]
+                     [i (in-naturals)])
+            (define (scale x) (if (number? x) x (* 30 60 1000)))
+            (define numbers* (for*/list ([(tag algo) (in-dict algo-name)]
+                                         [n (in-value (hash-ref numbers tag))])
+                               (vector algo (scale (average (which n))))))
+            (discrete-histogram numbers*
+                                #:label name
+                                #:skip 10.5 #:x-min i
+                                #:style i
+                                #:color -7 #;(c (next i)) #:line-color "black" 
+                                #:line-style i))
+          
+          #:y-label "Analysis time (smaller is better)"
+          #:x-label "Optimization technique (cumulative, left to right)"
+          #:legend-anchor 'top-right
+          #:out-file "abs-time.ps")))
+
+(parameterize (#;[plot-y-transform (axis-transform-bound log-transform .0001 1)]
+               #;[plot-y-ticks     (log-ticks)]
+               [plot-font-size 30]
+               [line-color  "black"]
+               [interval-color  "black"]
+               [interval-line1-color  "black"]
+               [interval-line2-color  "black"])
+  (abs-time))
+
+
+(define (peak-mem)
+  (let ([which numbers-peak-mem])
+    (plot (for/list ([(name numbers) (in-hash timings)]
+                     [i (in-naturals)])
+            (define (scale x) (if (number? x) x 0))
+            (define numbers* (for*/list ([(tag algo) (in-dict algo-name)]
+                                         [n (in-value (hash-ref numbers tag))])
+                               (vector algo (scale (average (which n))))))
+            (discrete-histogram numbers*
+                                #:label name
+                                #:skip 10.5 #:x-min i
+                                #:style i
+                                #:color -7 #;(c (next i)) #:line-color "black" 
+                                #:line-style i))
+          
+          #:y-label "Peak memory (smaller is better)"
+          #:x-label "Optimization technique (cumulative, left to right)"
+          #:legend-anchor 'top-right
+          #:out-file "peak-mem.ps")))
+
+(parameterize (#;[plot-y-transform (axis-transform-bound log-transform .0001 1)]
+               #;[plot-y-ticks     (log-ticks)]
+               [plot-font-size 30]
+               [line-color  "black"]
+               [interval-color  "black"]
+               [interval-line1-color  "black"]
+               [interval-line2-color  "black"])
+  (peak-mem))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The following are other examples of presentation from David

@@ -2,7 +2,7 @@
 (require parser-tools/lex)
 (provide timings (struct-out numbers))
 
-(struct numbers (cpu run gc state-rate peak-mem current-mem states points timeout? exhaust?))
+(struct numbers (cpu run gc state-rate peak-mem current-mem states points timeout? exhaust?) #:transparent)
 
 (module data racket/base
   (provide (all-defined-out))
