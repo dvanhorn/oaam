@@ -454,9 +454,8 @@ projects the store out of a state $c$. Formally,
 
 \begin{align*}
 (cs, \msto) &\widehat{\machstep} (cs', \msto') \\
-\mbox{where } CS' &= lift(\machstep)(\{ wn(c, \msto) \mid c \in cs\}) \\
-              cs' &= \{nw(C') \mid C' \in CS'\} \\
-              \msto' &= \bigcup\{C'.\msto \mid C' \in CS'\}
+\mbox{where } cs' &= \{c' \mid wn(c, \msto) \machstep wn(c, \msto^c), c \in cs\} \\
+              \msto' &= \bigcup\{\msto^c \mid wn(c,\msto)\machstep wn(c', \msto^c), c \in cs\}
 \end{align*}
 
 \subsection{Baseline evaluation}
@@ -509,8 +508,6 @@ space [SS], and decreasing intermediate data structures [DS].
 \begin{itemize}
  \item{[SS] quotient by sets of values (lazy non-determinism)}
  \item{[SS] remove {\tt ev} states (abstract compilation)}
- \item{[DS] specialize the fixpoint operator to work with widened
-   machine configurations (fixpoint specialization)}
  \item{[DS] operate on store changes rather than whole stores (store deltas)}
  \item{[DS] represent the store as a global, mutable hash and
    determine a state's store by the number of changes made to the
@@ -521,7 +518,7 @@ space [SS], and decreasing intermediate data structures [DS].
 \end{itemize}
 Each technique requires minimal changes to the reduction
 relation/fixpoint, and each improves performance by integer
-factors. The first four remain in the purely functional realm. The
+factors. The first three remain in the purely functional realm. The
 final three use mutation in small, localized places, so they do not
 increase conceptual complexity drastically.
 
@@ -676,25 +673,6 @@ Compile + Lazy:
    cpu time: 31173 real time: 31642 gc time: 739
 
 \newpage
-\subsection{Fixed-point specialization}
-
-\begin{alltt}
-;; \(\widehat{State} \to \widehat{State}\)
-(define (wide-step-specialized state)
-  (match state
-    [(cons \(\msto\) cs)
-     (define-values (cs* \(\msto\)*)
-       (for/fold ([cs* \(\varnothing\)] [\(\msto\)* \(\msto\)])
-         ([c cs])
-         (match (step-compiled^ (cons \(\msto\) c))
-           [(cons \(\msto\)** cs**)
-            (values (\(\cup\) cs* cs**) (\(\sqcup\)-store \(\msto\)* \(\msto\)**))])))
-     (cons \(\msto\)* (\(\cup\) cs cs*))]))
-\end{alltt}
-%% Should be commutted to beginning
-
-Special + Compile + Lazy:
-   cpu time: 14212 real time: 14681 gc time: 823
 
 \subsection{Store deltas}
 
