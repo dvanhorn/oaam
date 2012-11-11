@@ -113,21 +113,123 @@ feasible implementation of an abstract machine based analyzer.
 %% stack, even in the presence of control effects.
 
 
-\includegraphics[width=2.5in]{rel-time-church.ps}
+%% \subsection{Notation and prerequisites}
 
-\subsection{Notation and prerequisites}
-
-Prereqs: Semantics Engineering \cite{dvanhorn:Felleisen2009Semantics},
-AAM \cite{dvanhorn:VanHorn2011Abstracting}
-\cite{dvanhorn:VanHorn2012Systematic}.
+%% Prereqs: Semantics Engineering \cite{dvanhorn:Felleisen2009Semantics},
+%% AAM \cite{dvanhorn:VanHorn2011Abstracting}
+%% \cite{dvanhorn:VanHorn2012Systematic}.
 
 %% Notation: concrete examples of programs under analysis is given in
 %% (monochrome) Scheme notation.  Code is given in (syntax colored)
 %% Racket.
 
-\newpage
-\section{Starting point}
-\subsection{An abstract$^2$ machine for ISWIM}
+\section{At a Glance}
+
+In the following sections, we develop an analyzer for a core
+functional language and follow a series of steps of abstraction and
+optimization.  At each step we evaluate the implementation on an
+example that computes with Church numerals, shown in
+figure~\ref{fig:church}.
+%% \footnote{It is
+%%   written here using Scheme notation and makes use of the shorthands:
+%% %
+%% \begin{alltt}
+%%    (define (((f x) y) z) ...) \(\equiv\)
+%%
+%%    (define f (\(\lambda\) (x) (\(\lambda\) (y) (\(\lambda\) (z) ...))))
+%% \end{alltt}
+%%
+%% \begin{alltt}
+%%    \church{n} \(\equiv\) (\(\lambda\) (s) (\(\lambda\) (z) (s\(\subscript1\) (s\(\subscript2\) ... (s\(\subscript{n}\) z)))))
+%% \end{alltt}}
+The example, while small, is informative:
+\begin{enumerate}
+\item it can be written in most modern programming languages, and
+%
+\item it stresses an analyzer's ability to deal with complicated
+environment and control structure arising from the use of higher-order
+functions to model arithmetic.
+\end{enumerate}
+
+We start, in section~\ref{sec:aam}, by developing an abstract
+interpreter according to the abstracting abstract machines approach
+and observe the resulting implementation cannot analyze the example in
+under 30 minutes.  In section~\ref{sec:baseline}, we perform a further
+abstraction by widening the store.  The resulting analyzer sacrifices
+precision for speed and is able to analyze the example in about 1
+minute.  Without this abstraction step the analysis is exponential due
+to per-state store variance.  This step is described by Van Horn and
+Might and is necessary to make even small examples feasible.  We
+therefore take the widened interpreter as the baseline for our
+evaluation.
+
+In section~\ref{sec:opt} we give a series of simple abstractions and
+implementation techniques that, in total, drop the analysis time to
+only 138 milliseconds, a speedup of 475 times.
+Figure~\ref{fig:churchtime} shows the step-wise improvement of the
+analysis time for this example.
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=2.5in]{rel-time-church.ps}
+\end{center}
+\caption{Relative run-time of
+optimized analyers to baseline for Church numeral example.}
+\label{fig:churchtime}
+\end{figure}
+
+In section~\ref{sec:impl}, we describe a more complete implementation
+scaled up and capable of analyzing Scheme benchmark programs.
+
+In section~\ref{sec:eval} we evaluate this implementation against a
+set of benchmark programs drawn from the literature.  Many benchmarks
+cause the baseline analyzer to take longer than 30 minutes or to
+consume more 1 gigabit of memory, at which point the analysis is
+stopped.  This is the case for the largest benchmark program, which is
+3,500 lines of code and takes under a minute in the most optimized
+analyer.  For those benchmarks that did complete on the baseline, the
+optimized analyzer outperformed the baseline by a factor of
+% 475
+two to
+% 4,382
+three orders of magnitude.
+
+
+\newcommand{\church}[1]{\(\ulcorner{\tt #1}\urcorner\)}
+
+\begin{figure}
+\begin{alltt}
+(define (zero? n) ((n (\(\lambda\) (zx) #f)) #t))
+(define (((mult m1) m2) mf) (m2 (m1 mf)))
+(define ((((plus p1) p2) pf) x)
+  ((p1 pf) ((p2 pf) x)))
+
+(define (((pred n) rf) rx)
+  (((n (\(\lambda\) (g) (\(\lambda\) (h) (h (g rf)))))
+    (\(\lambda\) (ignored) rx))
+   (\(\lambda\) (id) id)))
+
+(define ((church=? e1) e2)
+  (if (zero? e1) (zero? e2)
+      (if (zero? e2) #f
+          ((church=? (pred e1)) (pred e2)))))
+
+;; multiplication distributes over addition
+((church=? ((mult \church2) ((plus \church1) \church3)))
+ ((plus ((mult \church2) \church1)) ((mult \church2) \church3)))
+\end{alltt}
+\caption{Church-numeral calculation}
+\label{fig:church}
+\end{figure}
+
+Section~\ref{sec:related} relates this work to the literature and
+section~\ref{sec:conclusion} concludes.
+
+
+
+\section{An abstract$^{\text 2}$ machine for ISWIM}
+\label{sec:aam}
+
 
 ISWIM is a family of programming languages parameterized by a set of
 base values and operations.  To make things concrete, we consider a
@@ -284,24 +386,8 @@ strategy:
               \lfloor \mcntr \rfloor_0 &= \mtcntr \\
               \lfloor \mlab\mcntr \rfloor_{k+1} &= \mlab\lfloor \mcntr\rfloor_k
 \end{align*}
-%% Redundant
-%% \paragraph 0CFA
-
-%% \begin{align*}
-%% \mathit{push}(\mlab,\msto,\mkont) &= \mlab,\msto\sqcup[\mlab\mapsto\{\mkont\}]
-%% \\
-%% \mathit{bind}(\menv,\msto,\mvar,\mval) &= \menv[\mvar\mapsto\mvar],\msto\sqcup[\mvar\mapsto\{\mval\}]
-%% \end{align*}
 
 \paragraph{Primitives}
-
-%% \begin{align*}
-%% \widehat{\mathit{push}}(\maddr,\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
-%% % \mbox{ where }\maddr \notin\msto
-%% \\
-%% \widehat{\mathit{bind}}(\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\msto\sqcup[\maddr\mapsto\{\mval\}]
-%% \end{align*}
-
 
 \begin{align*}
 \mnum+1 &\in \interpdelta(\saddone,\mnum) &
@@ -361,63 +447,14 @@ strategy:
 \caption{Implementation of machine transition relation.}
 \end{figure}
 
-\subsection{An example: Analyzing Church number computations}
-
-\newcommand{\church}[1]{\(\ulcorner{\tt #1}\urcorner\)}
-
-\begin{figure}
-\begin{alltt}
-(define (zero? n) ((n (\(\lambda\) (zx) #f)) #t))
-(define (((mult m1) m2) mf) (m2 (m1 mf)))
-(define ((((plus p1) p2) pf) x)
-  ((p1 pf) ((p2 pf) x)))
-
-(define (((pred n) rf) rx)
-  (((n (\(\lambda\) (g) (\(\lambda\) (h) (h (g rf)))))
-    (\(\lambda\) (ignored) rx))
-   (\(\lambda\) (id) id)))
-
-(define ((church=? e1) e2)
-  (if (zero? e1) (zero? e2)
-      (if (zero? e2) #f
-          ((church=? (pred e1)) (pred e2)))))
-
-;; multiplication distributes over addition
-((church=? ((mult \church2) ((plus \church1) \church3)))
- ((plus ((mult \church2) \church1)) ((mult \church2) \church3)))
-\end{alltt}
-\caption{Church-numeral calculation}
-\label{fig:church}
-\end{figure}
-
-Figure~\ref{fig:church} gives a small example of computing with Church
-numerals.  The example, while small, is informative: (1) it can be
-written in almost any modern programming language\footnote{It is
-  written here using Scheme notation and makes use of the shorthands:
-%
-\begin{alltt}
-   (define (((f x) y) z) ...) \(\equiv\)
-
-   (define f (\(\lambda\) (x) (\(\lambda\) (y) (\(\lambda\) (z) ...))))
-\end{alltt}
-
-\begin{alltt}
-   \church{n} \(\equiv\) (\(\lambda\) (s) (\(\lambda\) (z) (s\(\subscript1\) (s\(\subscript2\) ... (s\(\subscript{n}\) z)))))
-\end{alltt}
-},
-%
-and (2) it stresses an analyzer's ability to deal with complicated
-environment and control structure arising from the use of higher-order
-functions to model arithmetic.
-
-Our baseline analyzer takes NN:NN minutes to analyze this program
-(without store widening it times out after 30 minutes).  This is on
-par with the performance of Sergey,~et al.'s analyzer, which takes
-NN:NN minutes.
 
 
 \newpage
+\section{Baseline analyzer}
+\label{sec:baseline}
+
 \subsection{Generic fixpoint calculator}
+\label{sec:fixpoint}
 
 We compute the semantics of a program by iterating the state
 transition relation until a fixed point in the reachable states is
@@ -435,10 +472,10 @@ $\machstep$ on the state space, however, so we must lift it to work on
 sets of states. The lifting is a natural one:
 
 \begin{align*}
-lift(f)(X) &= \bigcup\{f(x) \mid x \in X\}
+\lift(f)(X) &= \bigcup\{f(x) \mid x \in X\}
 \end{align*}
 
-Then $eval(e) = {\mathcal F}(lift(\machstep))(\{\ev[^\mtcntr]{e, \varnothing, \varnothing, \kmt}\})$.
+Then $\eval(e) = {\mathcal F}(\lift(\machstep))(\{\ev[^\mtcntr]{e, \varnothing, \varnothing, \kmt}\})$.
 
 If we run this on our Church numeral example, we must be
 patient. Indeed, the state space is finite, but it is exponential in
@@ -448,6 +485,7 @@ complexity baseline by lifting the store out so that there is one
 shared amongst all states.
 
 \subsection{Store widening}
+\label{sec:storewiden}
 
 A common technique to faster convergence in flow analyses is to share
 a common store that is monotonically updated as interpretation
@@ -471,6 +509,7 @@ projects the store out of a state $c$. Formally,
 \end{align*}
 
 \subsection{Baseline evaluation}
+\label{sec:baselineeval}
 
 The final approximation we make to get to our baseline analysis is
 store-allocating results of application sub-expressions. Notice that
@@ -511,6 +550,7 @@ either ANF or CPS.
 Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 
 \section{Precision preserving recipe}
+\label{sec:opt}
 
 We discuss a variety of techniques for increasing performance by
 decreasing the interpretive overhead of abstract interpretation. They
@@ -742,6 +782,7 @@ TODO
 
 % Ian's sections: generators, implementation and compound data
 \section{Implementation}
+\label{sec:impl}
 
 All the above techniques can be combined into a single implementation
 of the small step reduction relation and simple variations of a
@@ -973,6 +1014,7 @@ $\top$, which has more complicated meaning (Shivers' escape semantics) and
 is overly approximate.
 
 \section{Evaluation}
+\label{sec:eval}
 
 
 \begin{figure*}
@@ -989,6 +1031,7 @@ is overly approximate.
 Other benchmarks
 
 \section{Related work}
+\label{sec:related}
 
 Boucher and Feeley \cite{dvanhorn:Boucher1996Abstract} introduced the
 idea of \emph{abstract compilation}, which used closure generation
@@ -1037,6 +1080,7 @@ approach to within a factor of performant constraint-based analyses.
 
 
 \section{Conclusion}
+\label{sec:conclusion}
 
 Abstract machines are not only a good model for rapid analysis
 development, they also can be systematically developed into efficient
