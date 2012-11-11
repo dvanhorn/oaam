@@ -386,6 +386,16 @@ strategy:
               \lfloor \mcntr \rfloor_0 &= \mtcntr \\
               \lfloor \mlab\mcntr \rfloor_{k+1} &= \mlab\lfloor \mcntr\rfloor_k
 \end{align*}
+For the duration of this paper, $\sqcup$ is a pointwise lifting of $\cup$:
+\begin{align*}
+\msto\sqcup \varnothing &= \msto \\
+\msto\sqcup \msto'[\maddr \mapsto S] &= \lambda \maddralt. \left\{ 
+  \begin{array}{ll}
+    \msto(\maddr)\cup S & \mbox{if } \maddralt = \maddr, \maddr\in dom(\msto) \\
+    S & \mbox{if } \maddralt = \maddr, \maddr\notin dom(\msto) \\
+    (\msto\sqcup\msto')(\maddralt) & \mbox{otherwise}
+  \end{array}\right.
+\end{align*}
 
 \paragraph{Primitives}
 
@@ -505,7 +515,7 @@ projects the store out of a state $c$. Formally,
 \begin{align*}
 (cs, \msto) &\widehat{\machstep} (cs', \msto') \\
 \mbox{where } cs' &= \{c' \mid wn(c, \msto) \machstep wn(c, \msto^c), c \in cs\} \\
-              \msto' &= \bigcup\{\msto^c \mid wn(c,\msto)\machstep wn(c', \msto^c), c \in cs\}
+              \msto' &= \bigsqcup\{\msto^c \mid wn(c,\msto)\machstep wn(c', \msto^c), c \in cs\}
 \end{align*}
 
 \subsection{Baseline evaluation}
