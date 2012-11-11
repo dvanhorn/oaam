@@ -8,7 +8,7 @@
   (provide (all-defined-out))
   (define start-run 15)
   (define end-run 19)
-  (define algos '("bl" "sp" "ls" "lc" "ld" "ia" "id" "pa" "pd" "li" "lp"))
+  (define algos '("bl" "sp" "ls" "lc" "ld" "ia" "id" "pa" "pd" "it" "pt"))
   (define names '("church" "mbrotZ" "earley" "boyer" "graphs"
                   "lattice" "matrix" "maze" "nbody" "nucleic")))
 (require 'data (for-syntax 'data))

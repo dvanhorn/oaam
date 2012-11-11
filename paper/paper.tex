@@ -202,7 +202,7 @@ different in the following ways:
 \ev[^\mcntr]{\mexp,\menv,\msto,\kfn[^\mcntr_\mlab]{\mval,\maddr}}
 \\
 \co{\kfn[^\mcntr_\mlab]{{\mvalx{u}},\maddr},\mval,\msto} & \machstep
-\ap[^\mcntr_\mlab]{\mval,\mvalx{u},\mkont,\msto}
+\ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont,\msto}
 \text{ where }\mkont \in \msto(\maddr)
 \\
 \co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto} & \machstep
@@ -293,10 +293,7 @@ strategy:
 %% \mathit{bind}(\menv,\msto,\mvar,\mval) &= \menv[\mvar\mapsto\mvar],\msto\sqcup[\mvar\mapsto\{\mval\}]
 %% \end{align*}
 
-
 \paragraph{Primitives}
-
-
 
 %% \begin{align*}
 %% \widehat{\mathit{push}}(\maddr,\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
@@ -321,8 +318,6 @@ strategy:
 \strue &\in \hat\interpdelta(\szerohuh,\szero) &
 \sfalse &\in \hat\interpdelta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
 \end{align*}
-
-HERE: ρ
 
 \begin{figure}
 \begin{alltt}
@@ -424,70 +419,120 @@ NN:NN minutes.
 \newpage
 \subsection{Generic fixpoint calculator}
 
-\begin{alltt}
-;; Expr \(\to\) \(\Set(\)State\()\)
-(define (eval e)
-  (fix step (set (inj e))))
-\end{alltt}
-
 We compute the semantics of a program by iterating the state
 transition relation until a fixed point in the reachable states is
-reached.
+reached. We begin with a generic fixpoint combinator, ${\mathcal F}$:
 
-\begin{alltt}
-;; \(\forall\) (X) ((X \(\to\) \(\Set(\)X\()\)) \(\to\) (\(\Set(\)X\()\) \(\to\) \(\Set(\)X\()\)))
-(define ((appl f) s)
-  (for/fold ([i (set)])
-    ([x (in-set s)])
-    (\(\cup\) i (f x))))
+\begin{align*}
+{\mathcal F}(f)(X) &= {\mathcal G}(f, X, \varnothing) \\
+{\mathcal G}(f, \varnothing, S) &= S \\
+{\mathcal G}(f, X, S) &= {\mathcal G}(f, f(X) \setminus S, S \cup f(X)) \\
+\end{align*}
 
-;; Calculate fixpoint of (appl f).
-;; \(\forall\) (X) ((X \(\to\) Set[X]) Set[X] \(\to\) Set[X])
-(define (fix f s)
-  (let loop ((accum (set)) (front s))
-    (if (set-empty? front)
-        accum
-        (let ((new-front ((appl f) front)))
-          (loop (\(\cup\) accum front)
-                (new-front . \(\setminus\) . accum))))))
-\end{alltt}
+The $\machstep$ relation is most naturally written as a function from
+a state to a set of all next states. We want to find a fixpoint of
+$\machstep$ on the state space, however, so we must lift it to work on
+sets of states. The lifting is a natural one:
+
+\begin{align*}
+lift(f)(X) &= \bigcup\{f(x) \mid x \in X\}
+\end{align*}
+
+Then $eval(e) = {\mathcal F}(lift(\machstep))(\{\ev[^\mtcntr]{e, \varnothing, \varnothing, \kmt}\})$.
+
+If we run this on our Church numeral example, we must be
+patient. Indeed, the state space is finite, but it is exponential in
+the size of the program. With $k = 0$, the store can be in one of ${\mathcal
+  O}(2^n)$ many configurations! We take a step toward a polynomial
+complexity baseline by lifting the store out so that there is one
+shared amongst all states.
 
 \subsection{Store widening}
 
-\begin{alltt}
-;; \(\widehat{State}\) = (cons (Set Conf) Store)
+A common technique to faster convergence in flow analyses is to share
+a common store that is monotonically updated as interpretation
+continues. In the ISWIM language with only unary operators, this makes
+our 0-CFA quartic in the size of the program. Not great, but
+polynomial.
 
-;; (State \(\to\) \(\Set(\)State\()\)) \(\to\) \(\widehat{State}\) \(\to\) \(\widehat{State}\)
-(define ((wide-step step) state)
-  (match state
-    [(cons cs \(\msto\))
-     (define ss ((appl step)
-                 (for/set ([c cs]) (c->s c \(\msto\)))))
-     (set (cons (for/set ([s ss]) (s->c s))
-                (\(\sqcup\)-stores ss)))]))
-\end{alltt}
+We can reuse the reduction relation we have defined, but with some
+scaffolding around it. A state in the store-widened machine is a pair
+of a set of ISWIM states without a store, and a store. A step of this
+machine will pair the store with each of the states in this set,
+reduce, and combine the output stores to create the next. Let $wn :
+\widehat{State} \times Store \to State$ be the metafunction that adds
+a store to a storeless state, $nw$ removes the store, and $c.\msto$
+projects the store out of a state $c$. Formally,
+
+\begin{align*}
+(cs, \msto) &\widehat{\machstep} (cs', \msto') \\
+\mbox{where } cs' &= \{c' \mid wn(c, \msto) \machstep wn(c, \msto^c), c \in cs\} \\
+              \msto' &= \bigcup\{\msto^c \mid wn(c,\msto)\machstep wn(c', \msto^c), c \in cs\}
+\end{align*}
 
 \subsection{Baseline evaluation}
+
+The final approximation we make to get to our baseline analysis is
+store-allocating results of application sub-expressions. Notice that
+the $\kfn{}$ continuation stores a value - this makes the space of
+continuations quadratic rather than linear in 0-CFA. We instead
+allocate an address for the value position when we create the
+continuation. This address and the tail address are both determined by
+the label of the application point, so the space becomes linear and
+the overall complexity drops to cubic. Note that this is a critical
+abstraction in languages with n-ary functions, since otherwise the
+continuation space becomes ${\mathcal O}(n^n)$!
+
+\begin{align*}
+\ev{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &\machstep
+\ev{\mexpi{0},\menv,\msto\sqcup[\mlab \mapsto \{\mkont\}],\kar{\mexpi{1},\mlab}}
+\\
+\co{\kar{\mexp,\menv,\mlab},\mval,\msto} & \machstep
+\ev{\mexp,\menv,\msto\sqcup[\mlab^f \mapsto \{\mval\}],\kfn{\mlab^f,\mlab}}
+\\
+\co{\kfn{\mlab^f,\mlab},\mval,\msto} & \machstep
+\ap[_\mlab]{\mvalx{u},\mlab^a,\mkont,\msto\sqcup[\mlab^a \mapsto \{\mval\}]}
+\\
+\text{ where } &\mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddr^f)
+\\
+\ap[_\mlab]{\clos{\mvar,\mexp,\menv},\mlab^a, \msto,\mkont} & \machstep
+\ev{\mexp,\menv[\mvar\mapsto\mvar],\msto\sqcup[\mvar \mapsto \msto(\mlab^a)],\mkont}
+\\
+\ap[_\mlab]{\mop,\mlab^a,\msto,\mkont} & \machstep
+\co{\mkont,\mval',\msto}
+\\
+\text{ where }& \mval'\in \{\interpdelta(\mop,\mval) \mid \mval \in \msto(\mlab^a)\}
+\end{align*}
+
+This extra store-allocation is effectively naming all intermediate
+results, and thus the precision aligns with an analysis specialized to
+either ANF or CPS.
 
 Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 
 \section{Precision preserving recipe}
 
 We discuss a variety of techniques for increasing performance by
-decreasing the interpretive overhead of abstract interpretation, all
-in the purely functional realm. These techniques are the following:
+decreasing the interpretive overhead of abstract interpretation. They
+come in two flavors: decreasing the size of the represented state
+space [SS], and decreasing intermediate data structures [DS].
+
 \begin{itemize}
- \item{shrink state space by quotients (lazy non-determinism)}
- \item{shrink state space by removing {\tt ev} states (abstract
-   compilation)}
- \item{decrease intermediate data structures by specializing our
-fixpoint operator to work with widened machine configurations
-(fixpoint specialization)}
- \item{decrease intermediate data structures by operating on store
-   changes rather than whole stores (store deltas)}
+ \item{[SS] quotient by sets of values (lazy non-determinism)}
+ \item{[SS] remove {\tt ev} states (abstract compilation)}
+ \item{[DS] operate on store changes rather than whole stores (store deltas)}
+ \item{[DS] represent the store as a global, mutable hash and
+   determine a state's store by the number of changes made to the
+   global store at the time of visiting (timestamp)}
+ \item{[DS] use a global mutable workset}
+ \item{[DS] represent the global store as a global, mutable vector in
+   the 0-CFA case. (preallocation)}
 \end{itemize}
 Each technique requires minimal changes to the reduction
-relation/fixpoint, and each improves performance by integer factors.
+relation/fixpoint, and each improves performance by integer
+factors. The first three remain in the purely functional realm. The
+final three use mutation in small, localized places, so they do not
+increase conceptual complexity drastically.
 
 \subsection{Lazy non-determinism}
 
@@ -495,38 +540,40 @@ The first problem that we realized with the AAM approach was that much
 of the non-determinism is spurious. For example, in a function
 application,
 \begin{alltt}
-(f x y z w)
+(f x y)
 \end{alltt}
+
 where all variables have been joined with multiple values, each
 variable reference transitions to several new states that comprise the
-cartesian product of all the values of {\tt x}, {\tt y}, {\tt z} and
-{\tt w}, only to be joined back together in {\tt f}'s bindings. For
-this reason, we {\it delay} the non-determinism until it is needed in
-{\it strict contexts} (such as the guard for an {\tt if} a called
-procedure, or a numerical primitive application).
+cartesian product of all the values of {\tt f}, {\tt x} and {\tt y},
+only to be joined back together in the application position. We would see transitions of the following shape:
+\begin{center}
+\includegraphics[scale=0.3]{fanout.pdf}
+\end{center}
+For this reason, we {\it delay} the non-determinism
+until it is needed in {\it strict contexts} (such as the guard for an
+{\tt if} a called procedure, or a numerical primitive application). We instead get transitions of this shape:
+\begin{center}
+\includegraphics[scale=0.3]{lazy.pdf}
+\end{center}
+
 
 For this, we introduce a new value for a delayed lookup that acts to
 quotient the state space by the values at the delayed address.
 
 \begin{align*}
-force(\msto,\clos{\mvar,\mexp,\menv}) &= \{\clos{\mvar,\mexp,\menv}\}\\
 force(\msto,\saddr\maddralt) &= \msto(\maddralt)\\
+force(\msto,\mval) &= \{\mval\}\\
 \ev{\svar{\mvar},\menv,\mkont,\msto} &\machstep\;
 \co{\mkont,\saddr{\menv(\mvar)},\msto} \\
-\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},v,\msto}
+\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto}
 &\machstep\;
-\ev[^\mcntr]{\mexp,\menv,\msto,\kfn[^\mcntr_\mlab]{\mval,\maddr}} \\
-\mbox{where } &\mval' \in force(\msto,\mval) \\
+\ev[^\mcntr]{\mexp,\menv,\msto\sqcup[\maddr^f \mapsto force(\msto,\mval)],\kfn[^\mcntr_\mlab]{\maddr^f,\maddr}} \\
 bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
   \maddr], \msto\sqcup[\maddr \mapsto force(\msto, \mval)], \mcntr' \\
 \mbox{where } \mcntr' &= \lfloor\mlab\mcntr\rfloor_k \\
               \maddr &= \mvar\mcntr'
 \end{align*}
-
-The force for the second rule is necessary to keep the same type for
-the \(\kfn{}\) continuation, but we would rather use an address. This
-introduces (acceptably) more imprecision, but has the same precision as an ANF
-analysis\footnote{Exercise for the reader.}.
 
 Lazy:
    cpu time: 32481 real time: 32881 gc time: 547
@@ -638,27 +685,13 @@ Compile + Lazy:
    cpu time: 31173 real time: 31642 gc time: 739
 
 \newpage
-\subsection{Fixed-point specialization}
 
-\begin{alltt}
-;; \(\widehat{State} \to \widehat{State}\)
-(define (wide-step-specialized state)
-  (match state
-    [(cons \(\msto\) cs)
-     (define-values (cs* \(\msto\)*)
-       (for/fold ([cs* \(\varnothing\)] [\(\msto\)* \(\msto\)])
-         ([c cs])
-         (match (step-compiled^ (cons \(\msto\) c))
-           [(cons \(\msto\)** cs**)
-            (values (\(\cup\) cs* cs**) (\(\sqcup\)-store \(\msto\)* \(\msto\)**))])))
-     (cons \(\msto\)* (\(\cup\) cs cs*))]))
-\end{alltt}
-%% Should be commutted to beginning
+\subsection{Store deltas}
 
-Special + Compile + Lazy:
-   cpu time: 14212 real time: 14681 gc time: 823
-
-\subsection{Computing with store changes}
+Each step in the fixpointer for the above techniques requires joining
+several (possibly large) stores together. Even with immutable hashes
+that utilize sharing, this is memory-intensive. Worse, this
+contributes an obscene fraction of the runtime.
 
 \begin{alltt}
 ;; \(\widehat{State} \to \widehat{State}\)
@@ -685,34 +718,27 @@ Special + Compile + Lazy:
 Delta Store + Special + Compile + Lazy:
    cpu time: 668 real time: 686 gc time: 41
 
-\section{Sacrificing precision for performance}
+\subsection{Timestamping stores}
 
-Each step in the fixpointer for the above techniques requires joining
-several (possibly large) stores together. Even with immutable hashes
-that utilize sharing, this is memory-intensive. Worse, this
-contributes an obscene fraction of the runtime. We reuse a technique
-created in Shivers' dissertation~\cite{ianjohnson:Shivers:1991:CFA},
-timestamp approximation, that removes the need for joining whole
-stores by manipulating a global store imperatively. This loses
+The store delta technique removes overhead of joining large stores,
+but for determining if a state has been visited before, we still have
+to compare entire stores - an expensive computation.  We modify a
+technique created in Shivers'
+dissertation~\cite{ianjohnson:Shivers:1991:CFA}, timestamp
+approximation, that removes the need for joining whole stores by
+manipulating a global store imperatively. The original technique loses
 precision because the starting store for each state in a machine
 configuration can change between stepping all states and introduce
-more flows than originally possible. The example in figure
-\ref{fig:timestamp} illustrates this loss in precision. {\bf TODO:}
-EXPLANATION OF LOSS. In many applications, this is acceptable for the
-performance improvement.
+more flows than originally possible. However, by delaying the store
+changes until after all steps have completed, we can maintain our
+precision. In a variety of experiments, we observed that the overhead
+for storing store-deltas was outweighed by the precision keeping flows
+in check. That is to say, the analysis was faster {\it and} more precise.
 
-\begin{figure}
+TODO: technical detail
+
+\subsection{Pre-allocating the store}
 TODO
-\caption{Precision lossy program in timestamp approximation}
-\label{fig:timestamp}
-\end{figure}
-
-
-% For David to fill in.
-\subsection{Imperative global store and worklist}
-...
-\subsection{Pre-allocated global store}
-...
 
 % Ian's sections: generators, implementation and compound data
 \section{Implementation}
@@ -775,25 +801,29 @@ suggest.
      (match k
        ['mt (generator (do (\(\msto\)) ([v <- (force \(\msto\) v)])
         (yield (ans \(\msto\) v))))]
-       [(ar\(\superscript\mlab\) e \(\menv\))
-        (generator (do (\(\msto\)) ()
-          (yield (ev \(\msto\) e \(\menv\) (fn v l)))))
-       [(fn\(\superscript\mlab\) f)
-        (generator (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)])
-         (yield (ap \(\msto\) f v k))))]
-       [(fi\(\superscript\mlab\) c a \(\menv\))
+       [(ar\(\superscript\mcntr\subscript\mlab\) e \(\menv\) a)
         (generator
-         (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)]
+         (do (\(\msto\)) ([\(\msto*\) (join \(\msto\) a\(\superscript{f}\) (force \(\msto\) v))])
+           (yield (ev \(\msto*\) e \(\menv\) (fn\(\superscript\mcntr\subscript\mlab\) a\(\superscript{f}\) a)))))
+       [(fn\(\superscript\mcntr\subscript\mlab\) fa a)
+        (generator
+         (do (\(\msto\)) ([\(\msto*\) (join \(\msto\) a\(\superscript{a}\) (force \(\msto\) v))]
+                  [k <- (get \(\msto\) a)]
+                  [f <- (get \(\msto\) fa)])
+           (yield (ap\(\superscript\mcntr\subscript\mlab\) \(\msto*\) f a\(\superscript{a}\) k))))]
+       [(fi\(\superscript\mcntr\subscript\mlab\) c a \(\menv\))
+        (generator
+         (do (\(\msto\)) ([k <- (get \(\msto\) l)]
                   [v <- (force \(\msto\) v)])
            (yield (ev \(\msto\) (if v c a) \(\menv\) k))))])]
-    [(ap \(\msto\) fun a k)
+    [(ap\(\superscript\mcntr\subscript\mlab\) \(\msto\) fun a k)
      (match fun
-       [(clos l x e \(\menv\))
+       [(clos x e \(\menv\))
         (generator
          (do (\(\msto\)) ([(\(\menv\)* \(\msto\)*) (bind state)])
            (yield (ev \(\msto\)* e \(\menv\)* k))))]
        [(? op? o)
-        (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)]
+        (do (\(\msto\)) ([k <- (get \(\msto\) l)]
                  [v <- (force \(\msto\) v)]
                  [v (\(\interpdelta\) o (list v))])
           (yield (co \(\msto\) k v)))
