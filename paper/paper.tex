@@ -389,7 +389,7 @@ strategy:
 For the duration of this paper, $\sqcup$ is a point-wise lifting of $\cup$:
 \begin{align*}
 \msto\sqcup \varnothing &= \msto \\
-\msto\sqcup \msto'[\maddr \mapsto S] &= \lambda \maddralt. \left\{ 
+\msto\sqcup \msto'[\maddr \mapsto S] &= \lambda \maddralt. \left\{
   \begin{array}{ll}
     \msto(\maddr)\cup S & \mbox{if } \maddralt = \maddr, \maddr\in dom(\msto) \\
     S & \mbox{if } \maddralt = \maddr, \maddr\notin dom(\msto) \\
@@ -776,12 +776,12 @@ cs^* &= \{c' \mid (c,\msto,\msdiff) \machstep (c',\msdiff^c) \} \\
 %% Delta Store + Compile + Lazy:
 %%    cpu time: 668 real time: 686 gc time: 41
 
-\subsection{Timestamping stores}
+\subsection{Timestamping an imperative store}
 
 The store delta technique removes overhead of joining large stores,
-but for determining if a state has been visited before, we still have
-to compare entire stores - an expensive computation.  We modify a
-technique created in Shivers'
+but for determining if a state has been visited before (vis. $f(X)
+\setminus S$ in ${\mathcal G}$), we still have to compare entire stores - an
+expensive computation.  We modify a technique created in Shivers'
 dissertation~\cite{ianjohnson:Shivers:1991:CFA}, timestamp
 approximation, that removes the need for joining whole stores by
 manipulating a global store imperatively. The original technique loses
@@ -791,12 +791,68 @@ more flows than originally possible. However, by delaying the store
 changes until after all steps have completed, we can maintain our
 precision. In a variety of experiments, we observed that the overhead
 for storing store-deltas was outweighed by the precision keeping flows
-in check. That is to say, the analysis was faster {\it and} more precise.
+in check. That is to say, the analysis was faster {\it and} more
+precise.
 
-TODO: technical detail
+We pair this technique with a mutable workset. That is, to avoid the
+intermediate sets introduced by the $State \to \Set(State)$ signature
+of $\machstep$, we change the fixpoint algorithm to use a global
+workset, {\tt todo}, that $\machstep$ imperatively updates with the
+states that it reaches.
+
+In total, we have six globals:
+\begin{itemize}
+ \item{{\tt $\msto$}, the store}
+ \item{{\tt todo}, the workset}
+ \item{{\tt seen}, a map from state to the timestamp at which it was last seen}
+ \item{{\tt $\msdiff$}, the store changes for the current step}
+ \item{{\tt $\msdiff$?}, a boolean tracking whether the stepped state contributed a store change}
+ \item{{\tt T}, the timestamp of the store}
+\end{itemize}
+
+To ensure termination, we guard adding $c$ to {\tt todo} by the following check:
+\begin{align*}\msdiff\mbox{{\tt ?}} \vee {\tt seen}(c) \neq {\tt T}\end{align*}
+If it succeeds, {\tt todo} gets $c$ and we update {\tt seen} to map $c$ to {\tt T}.
+
+After all steps complete, we apply $\msdiff$ to $\msto$ and increase
+{\tt T} as long as there was at least one change in $\msdiff$. This
+logic is only sound if we know that each $\ttuple{\maddr}{\mval{s}}$
+in $\msdiff$ would change the value of $\maddr$ in the current
+store. Thus, we also guard additions to $\msdiff$ so that only updates
+that would change the store are permitted. Each time $\msdiff$ is
+successfully extended, we set {\tt $\msdiff$?} to true. Before each
+individual step, we set it to false.
+
+\begin{figure}
+\begin{alltt}
+eval(\(e\)) :=
+  \(\msto\), todo, seen, T := \(\varnothing\), \(\varnothing\), [], 0
+  \(\compile{e}\)(\(\mtcntr, \varnothing, \varnothing, \kmt\))
+  while(true):
+    if todo = \(\varnothing\): return (keys(seen), \(\msto\))
+    else:
+      let old := todo
+      todo, \(\msdiff\) := \(\varnothing\), \(\mtlst\)
+      foreach c \(\in\) old: \(\msdiff\)? := false; c()
+      unless \(\msdiff\) = \(\mtlst\): T += 1; \(\msdiff(\msto)\)
+\end{alltt}
+\caption{Imperative fixpoint algorithm}
+\label{fig:imperative}
+\end{figure}
 
 \subsection{Pre-allocating the store}
-TODO
+Hashes are not the most efficent for raw speed. If we commit to using
+sequential natural numbers for variables and expression labels, by the
+time we finish parsing the input program, we will know exactly how
+many addresses we will need. Thus the store can be represented by a
+vector the size of the largest label assigned, plus 1. This technique
+only works in 0-CFA, since there are many more addresses that can be
+allocated in 1-CFA and higher. To support general $k$-CFA in a vector
+representation, we need a growable vector and a map from addresses to
+assigned indices. When assignable indices run out, we grow the
+vector. The cost of this map is less than a hash representation for
+the whole store since typically there are more references to an address
+than allocations of it.
 
 % Ian's sections: generators, implementation and compound data
 \section{Implementation}
@@ -1373,7 +1429,7 @@ By cases on $wn(lc,\msto) \machstep wn(lc', \msto')$:
 \item{Case $\co{\kar[^\mcntr_\mlab]{\mexp, \menv, \maddr}, \mval, \msto} \machstep
             \ev[^\mcntr]{\mexp, \menv, \kfn[^\mcntr_\mlab]{\mval',\maddr}, \msto}$: \\
       Where $v' \in force(\msto, \mval)$. \\
-      By definition of $\apprx{}{\msto}{}$, 
+      By definition of $\apprx{}{\msto}{}$,
         $cs = \{\co{\kar[^\mcntr_\mlab]{\mexp, \menv, \maddr}, \mval'} \mid \mval \in force(\msto, \mval)\}$.
       By definition of $\machstep, \lapprx{}{\msto}{}$,
         $cs' = \{\ev[^\mcntr]{\mexp, \menv, \kfn[^\mcntr_\mlab]{\mval',\maddr}}
@@ -1408,7 +1464,7 @@ By cases on $wn(lc,\msto) \machstep wn(lc', \msto')$:
         and $\mval'' \in\interpdelta(\mop,\mval')$. \\
       By definition of $\capprx{}{}$ and $\interpdelta$,
         $cs = \{\ap[^\mcntr_\mlab]{\mop, \mvalx{u}, \mkont} \mid
-                \mvalx{u} \in force(\msto, \mval), 
+                \mvalx{u} \in force(\msto, \mval),
                 \mval'' \in\interpdelta(\mop,\mvalx{u})\}$.
       Thus the strict machine takes the same step.}
 \end{itemize}
