@@ -557,7 +557,7 @@ This extra store-allocation is effectively naming all intermediate
 results, and thus the precision aligns with an analysis specialized to
 either ANF or CPS.
 
-Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
+% Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 
 \section{Precision preserving recipe}
 \label{sec:opt}
@@ -622,8 +622,7 @@ bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
               \maddr &= \mvar\mcntr'
 \end{align*}
 
-Lazy:
-   cpu time: 32481 real time: 32881 gc time: 547
+% Lazy:  cpu time: 32481 real time: 32881 gc time: 547
 
 \subsection{Abstract compilation}
 
@@ -722,12 +721,10 @@ is which addresses are pushed.
 \label{fig:caam}
 \end{figure}
 
-Compile:
-   cpu time: 255397 real time: 261532 gc time: 2947
+% Compile: cpu time: 255397 real time: 261532 gc time: 2947
 
-\noindent
-Compile + Lazy:
-   cpu time: 31173 real time: 31642 gc time: 739
+% \noindent
+% Compile + Lazy: cpu time: 31173 real time: 31642 gc time: 739
 
 \newpage
 
@@ -776,8 +773,8 @@ cs^* &= \{c' \mid (c,\msto,\msdiff) \machstep (c',\msdiff^c) \} \\
 \msdiff^* &= concat\{\msdiff^c \mid (c, \msto,\msdiff) \machstep (c', \msdiff^c)\}
 \end{align*}
 
-Delta Store + Compile + Lazy:
-   cpu time: 668 real time: 686 gc time: 41
+%% Delta Store + Compile + Lazy:
+%%    cpu time: 668 real time: 686 gc time: 41
 
 \subsection{Timestamping an imperative store}
 
