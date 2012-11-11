@@ -187,7 +187,7 @@ different in the following ways:
 \ev[^\mcntr]{\mexp,\menv,\msto,\kfn[^\mcntr_\mlab]{\mval,\maddr}}
 \\
 \co{\kfn[^\mcntr_\mlab]{{\mvalx{u}},\maddr},\mval,\msto} & \machstep
-\ap[^\mcntr_\mlab]{\mval,\mvalx{u},\mkont,\msto}
+\ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont,\msto}
 \text{ where }\mkont \in \msto(\maddr)
 \\
 \co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto} & \machstep
@@ -278,10 +278,7 @@ strategy:
 %% \mathit{bind}(\menv,\msto,\mvar,\mval) &= \menv[\mvar\mapsto\mvar],\msto\sqcup[\mvar\mapsto\{\mval\}]
 %% \end{align*}
 
-
 \paragraph{Primitives}
-
-
 
 %% \begin{align*}
 %% \widehat{\mathit{push}}(\maddr,\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
@@ -410,50 +407,93 @@ This program reaches $N$ states under concrete interpretation.
 \newpage
 \subsection{Generic fixpoint calculator}
 
-\begin{alltt}
-;; Expr \(\to\) Set[State]
-(define (eval e)
-  (fix step (set (inj e))))
-\end{alltt}
-
 We compute the semantics of a program by iterating the state
 transition relation until a fixed point in the reachable states is
-reached.
+reached. We begin with a generic fixpoint combinator, ${\mathcal F}$:
 
-\begin{alltt}
-;; \(\forall\) (X) ((X \(\to\) Set[X]) \(\to\) (Set[X] \(\to\) Set[X]))
-(define ((appl f) s)
-  (for/fold ([i (set)])
-    ([x (in-set s)])
-    (\(\cup\) i (f x))))
+\begin{align*}
+{\mathcal F}(f)(X) &= {\mathcal G}(f, X, \varnothing) \\
+{\mathcal G}(f, \varnothing, S) &= S \\
+{\mathcal G}(f, X, S) &= {\mathcal G}(f, f(X) \setminus S, S \cup f(X)) \\
+\end{align*}
 
-;; Calculate fixpoint of (appl f).
-;; \(\forall\) (X) ((X \(\to\) Set[X]) Set[X] \(\to\) Set[X])
-(define (fix f s)
-  (let loop ((accum (set)) (front s))
-    (if (set-empty? front)
-        accum
-        (let ((new-front ((appl f) front)))
-          (loop (\(\cup\) accum front)
-                (new-front . \(\setminus\) . accum))))))
-\end{alltt}
+The $\machstep$ relation is most naturally written as a function from
+a state to a set of all next states. We want to find a fixpoint of
+$\machstep$ on the state space, however, so we must lift it to work on
+sets of states. The lifting is a natural one:
+
+\begin{align*}
+lift(f)(X) &= \bigcup\{f(x) \mid x \in X\}
+\end{align*}
+
+Then $eval(e) = {\mathcal F}(lift(\machstep))(\{\ev[^\mtcntr]{e, \varnothing, \varnothing, \kmt}\})$.
+
+If we run this on our Church numeral example, we must be
+patient. Indeed, the state space is finite, but it is exponential in
+the size of the program. With $k = 0$, the store can be in one of ${\mathcal
+  O}(2^n)$ many configurations! We take a step toward a polynomial
+complexity baseline by lifting the store out so that there is one
+shared amongst all states.
 
 \subsection{Store widening}
 
-\begin{alltt}
-;; \(\widehat{State}\) = (cons (Set Conf) Store)
+A common technique to faster convergence in flow analyses is to share
+a common store that is monotonically updated as interpretation
+continues. In the ISWIM language with only unary operators, this makes
+our 0-CFA quartic in the size of the program. Not great, but
+polynomial.
 
-;; (State \(\to\) Set[State]) \(\to\) \(\widehat{State}\) \(\to\) \(\widehat{State}\)
-(define ((wide-step step) state)
-  (match state
-    [(cons cs \(\msto\))
-     (define ss ((appl step)
-                 (for/set ([c cs]) (c->s c \(\msto\)))))
-     (set (cons (for/set ([s ss]) (s->c s))
-                (\(\sqcup\)-stores ss)))]))
-\end{alltt}
+We can reuse the reduction relation we have defined, but with some
+scaffolding around it. A state in the store-widened machine is a pair
+of a set of ISWIM states without a store, and a store. A step of this
+machine will pair the store with each of the states in this set,
+reduce, and combine the output stores to create the next. Let $wn :
+\widehat{State} \times Store \to State$ be the metafunction that adds
+a store to a storeless state. Formally,
+
+\begin{align*}
+(cs, \msto) &\widehat{\machstep} (cs', \msto') \\
+\mbox{where } cs' &= \{c' \mid wn(c, \msto) \machstep wn(c', \msto^c), c \in cs\} \\
+             \msto' &= \bigcup\{\msto^c \mid wn(c, \msto) \machstep wn(c', \msto^c), c \in cs\}
+\end{align*}
 
 \subsection{Baseline evaluation}
+
+The final approximation we make to get to our baseline analysis is
+store-allocating results of application sub-expressions. Notice that
+the $\kfn{}$ continuation stores a value - this makes the space of
+continuations quadratic rather than linear in 0-CFA. We instead
+allocate an address for the value position when we create the
+continuation. This address and the tail address are both determined by
+the label of the application point, so the space becomes linear and
+the overall complexity drops to cubic. Note that this is a critical
+abstraction in languages with n-ary functions, since otherwise the
+continuation space becomes ${\mathcal O}(n^n)$!
+
+\begin{align*}
+\ev{\sapp[^\mlab]{\mexpi0}{\mexpi1},\msto,\mkont} &\machstep
+\ev{\mexpi{0},\msto\sqcup[\mlab \mapsto \{\mkont\}],\kar{\mexpi{1},\mlab}}
+\\
+\co{\kar{\mexp,\mlab},\mval,\msto} & \machstep
+\ev{\mexp,\msto\sqcup[\mlab^f \mapsto \{\mval\}],\kfn{\mlab^f,\mlab}}
+\\
+\co{\kfn{\mlab^f,\mlab},\mval,\msto} & \machstep
+\ap[_\mlab]{\mvalx{u},\mlab^a,\mkont,\msto\sqcup[\mlab^a \mapsto \{\mval\}]}
+\\
+\text{ where } &\mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddr^f)
+\\
+\ap[_\mlab]{\clos{\mvar,\mexp},\mlab^a, \msto,\mkont} & \machstep
+\ev{\mexp,\msto\sqcup[\mvar \mapsto \msto(\mlab^a)],\mkont}
+\\
+\ap[_\mlab]{\mop,\mlab^a,\msto,\mkont} & \machstep
+\co{\mkont,\mval',\msto}
+\\
+\text{ where }& \mval'\in \{\interpdelta(\mop,\mval) \mid \mval \in \msto(\mlab^a)\}
+\end{align*}
+
+This extra store-allocation is effectively naming all intermediate
+results, and thus the precision aligns with an analysis specialized to
+either ANF or CPS. 
 
 Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 
