@@ -20,7 +20,7 @@
 
 (define (igensym [start 'g]) (string->symbol (symbol->string (gensym start))))
 
-(define ((rename-tf to) inp) (cons to inp))
+(define ((rename-tf to) inp) (cons to (cdr inp)))
 
 (define (quote-tf inp)
   (define limit (cons-limit))
