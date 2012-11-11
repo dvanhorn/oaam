@@ -77,28 +77,43 @@ garbage collection.  It has since been used to verify actor-
 \cite{local:DOsualdo:12A} and
 thread-based~\cite{dvanhorn:Might2011Family} parallelism and
 behavioral contracts~\cite{dvanhorn:TobinHochstadt2012Higherorder}; it
-has been used to model Dalvik, Erlang~\cite{local:DOsualdo:12B},
-JavaScript~\cite{local:DBLP:journals/corr/abs-1109-4467},
-Racket~\cite{dvanhorn:TobinHochstadt2012Higherorder}, and
-Coq~\cite{local:harvard}.
+has been used to model Coq~\cite{local:harvard},
+Dalvik~\cite{local:dalvik}, Erlang~\cite{local:DOsualdo:12B},
+JavaScript~\cite{local:DBLP:journals/corr/abs-1109-4467}, and
+Racket~\cite{dvanhorn:TobinHochstadt2012Higherorder}.
 
 The primary strength of the approach is that abstract interpreters can
 be easily derived through a small number of steps from existing
-machine models. % such as the CESK machine or the Lazy Krivine machine.
-Moreover, since the relationships between abstract machines and
+machine models.  Since the relationships between abstract machines and
 higher-level semantic models---such as definitional
 interpreters~\cite{dvanhorn:reynolds-hosc98}, structured operational
 semantics~\cite{dvanhorn:Plotkin1981Structural}, and reduction
 semantics~\cite{dvanhorn:Felleisen2009Semantics}---are well
 understood~\cite{dvanhorn:Danvy:DSc}, it is possible to navigate from
-these semantic models to sound program analyzers.
+these high-level semantic models to sound program analyzers in a
+systematic way.  Moreover, since these analyses so closely resemble a
+language's interpreter (a) implementing an analysis requires little
+more than implementing an interpreter, (b) a single implementation can
+serve as both an interpreter and analyzer, and (c) verifying the
+correctness of the implementation is straightforward.
+
+However, there is a considerable weakness with the approach: an
+analyzer designed and implemented by following the AAM recipe is
+prohibitively inefficient without both further approximation and
+further implementation effort.
+
+In this article, we develop a systematic approach to deriving the
+feasible implementation of an abstract machine based analyzer.
+
+
+
 
 %% Using this approach has also lead to new insights in pushdown
 %% abstractions of programs capable of precisely modeling the program
 %% stack, even in the presence of control effects.
 
 
-
+\includegraphics[width=2.5in]{rel-time-church.ps}
 
 \subsection{Notation and prerequisites}
 
@@ -106,9 +121,9 @@ Prereqs: Semantics Engineering \cite{dvanhorn:Felleisen2009Semantics},
 AAM \cite{dvanhorn:VanHorn2011Abstracting}
 \cite{dvanhorn:VanHorn2012Systematic}.
 
-Notation: concrete examples of programs under analysis is given in
-(monochrome) Scheme notation.  Code is given in (syntax colored)
-Racket.
+%% Notation: concrete examples of programs under analysis is given in
+%% (monochrome) Scheme notation.  Code is given in (syntax colored)
+%% Racket.
 
 \newpage
 \section{Starting point}
@@ -311,7 +326,7 @@ HERE: ρ
 
 \begin{figure}
 \begin{alltt}
-  ;; State \(\to\) Set[State]
+  ;; State \(\to\) \(\Set(\)State\()\)
   (define (step \(\mstate\))
     (match \(\mstate\)
       [(ev \(\mexp\) \(\rho\) \(\msto\) \(\mkont\))
@@ -355,39 +370,17 @@ HERE: ρ
 
 \newcommand{\church}[1]{\(\ulcorner{\tt #1}\urcorner\)}
 
-%% \begin{alltt}
-%% (define \church2 (\(\lambda\) (f) (\(\lambda\) (x) (f (f x)))))
-
-%% (define pred
-%%   (\(\lambda\) (n)
-%%     (\(\lambda\) (rf)
-%%       (\(\lambda\) (rx)
-%%         (((n (\(\lambda\) (g) (\(\lambda\) (h) (h (g rf)))))
-%%           (\(\lambda\) (i) rx))
-%%          (\(\lambda\) (id) id))))))
-%% \end{alltt}
-
-
-%% (define \church0 (\(\lambda\) (f0) (\(\lambda\) (x0) x0)))
-%% (define \church1 (\(\lambda\) (f1) (\(\lambda\) (x1) (f1 x1))))
-%% (define \church2 (\(\lambda\) (f2) (\(\lambda\) (x2) (f2 (f2 x2)))))
-%% (define \church3 (\(\lambda\) (f3) (\(\lambda\) (x3) (f3 (f3 (f3 x3))))))
-
 \begin{figure}
 \begin{alltt}
+(define (zero? n) ((n (\(\lambda\) (zx) #f)) #t))
+(define (((mult m1) m2) mf) (m2 (m1 mf)))
 (define ((((plus p1) p2) pf) x)
   ((p1 pf) ((p2 pf) x)))
-
-(define (((mult m1) m2) mf)
-  (m2 (m1 mf)))
 
 (define (((pred n) rf) rx)
   (((n (\(\lambda\) (g) (\(\lambda\) (h) (h (g rf)))))
     (\(\lambda\) (ignored) rx))
    (\(\lambda\) (id) id)))
-
-(define (zero? n)
-  ((n (\(\lambda\) (zx) #f)) #t))
 
 (define ((church=? e1) e2)
   (if (zero? e1) (zero? e2)
@@ -399,19 +392,40 @@ HERE: ρ
  ((plus ((mult \church2) \church1)) ((mult \church2) \church3)))
 \end{alltt}
 \caption{Church-numeral calculation}
+\label{fig:church}
 \end{figure}
 
-Where \syntax{church=?} is an equality function for Church numerals
-written in terms of recursion and an iterative \syntax{pred} function.
-The \syntax{plus} and \syntax{mult} functions are written as usual.
+Figure~\ref{fig:church} gives a small example of computing with Church
+numerals.  The example, while small, is informative: (1) it can be
+written in almost any modern programming language\footnote{It is
+  written here using Scheme notation and makes use of the shorthands:
+%
+\begin{alltt}
+   (define (((f x) y) z) ...) \(\equiv\)
 
-This program reaches $N$ states under concrete interpretation.
+   (define f (\(\lambda\) (x) (\(\lambda\) (y) (\(\lambda\) (z) ...))))
+\end{alltt}
+
+\begin{alltt}
+   \church{n} \(\equiv\) (\(\lambda\) (s) (\(\lambda\) (z) (s\(\subscript1\) (s\(\subscript2\) ... (s\(\subscript{n}\) z)))))
+\end{alltt}
+},
+%
+and (2) it stresses an analyzer's ability to deal with complicated
+environment and control structure arising from the use of higher-order
+functions to model arithmetic.
+
+Our baseline analyzer takes NN:NN minutes to analyze this program
+(without store widening it times out after 30 minutes).  This is on
+par with the performance of Sergey,~et al.'s analyzer, which takes
+NN:NN minutes.
+
 
 \newpage
 \subsection{Generic fixpoint calculator}
 
 \begin{alltt}
-;; Expr \(\to\) Set[State]
+;; Expr \(\to\) \(\Set(\)State\()\)
 (define (eval e)
   (fix step (set (inj e))))
 \end{alltt}
@@ -421,7 +435,7 @@ transition relation until a fixed point in the reachable states is
 reached.
 
 \begin{alltt}
-;; \(\forall\) (X) ((X \(\to\) Set[X]) \(\to\) (Set[X] \(\to\) Set[X]))
+;; \(\forall\) (X) ((X \(\to\) \(\Set(\)X\()\)) \(\to\) (\(\Set(\)X\()\) \(\to\) \(\Set(\)X\()\)))
 (define ((appl f) s)
   (for/fold ([i (set)])
     ([x (in-set s)])
@@ -443,7 +457,7 @@ reached.
 \begin{alltt}
 ;; \(\widehat{State}\) = (cons (Set Conf) Store)
 
-;; (State \(\to\) Set[State]) \(\to\) \(\widehat{State}\) \(\to\) \(\widehat{State}\)
+;; (State \(\to\) \(\Set(\)State\()\)) \(\to\) \(\widehat{State}\) \(\to\) \(\widehat{State}\)
 (define ((wide-step step) state)
   (match state
     [(cons cs \(\msto\))
@@ -836,7 +850,7 @@ compilation case and evaluates to its body otherwise.
 
 The {\tt do} form has the special job of maintaining the current store
 and accumulated states (if indeed those are being passed around). It
-uses Racket's syntax parameters ~\cite{ianjohnson:eli/stxparam} to
+uses Racket's syntax parameters ~\cite{dvanhorn:eli/stxparam} to
 track the most recent bindings of these accumulators so that {\tt
   yield-meaning} can refer to them (say {\tt $\sigma$p} and {\tt
   statep}). In the case of state passing and set-accumulated states, its
@@ -953,17 +967,64 @@ flow analysis.  We have adapted the closure generation technique from
 composition evaluators to abstract machines and applied it to similar
 effect.
 
+\paragraph{Constraint-based program analysis for higher-order languages}
+
+Constraint-based program analyses
+(e.g.~\cite{dvanhorn:nielson-nielson-popl97,dvanhorn:wright-jagannathan-toplas98,dvanhorn:Meunier2006Modular})
+typically compute sets of abstract values for each program point.
+These values approximate the values arising at run-time for each
+program point.  Value sets are computed as the least solution to a set
+of constraints (either inclusion or equality constraints).  The
+constraints must be designed and proved as a sound approximation of
+the semantics.  Efficient implementations of these kinds of analyses
+often take the form of worklist-based graph algorithms for contraint
+solving, and are thus quite different from the interpreter
+implementation.  The approach thus requires effort in constraint
+system design and implementation, and the resulting system require
+verification effort to prove the constraint system is sound and that
+the implementation is correct.
+
+This effort increases substantially as the comlexity of the analyzed
+language increases.  Both the work of maintaining the concrete
+semantics and constraint system (and the relations between them) must
+be scaled simultaneously.  However, constraint systems, which have
+been extensively studied in their own right, enjoy efficient
+implementation techniques and can be expressed in declarative logic
+languages that are heavily
+optimized~\cite{dvanhorn:bravenboer-smaragdakis-oopsla09}.
+Consequently, constraint-based analyses can be computed quickly.  For
+example, Jagannathan and Wright's polymorphic splitting
+implementation~\cite{dvanhorn:wright-jagannathan-toplas98} analyses
+the church numeral example of figure~\ref{fig:church} in 7
+milliseconds, about 25 times faster than the fastest implementation
+considered here.  These analyses compute very different things (as
+detailed in section~\ref{sec:accept}), so the performance comparison
+is not apples-to-apples.  We view the primary contribution of this
+work as a systematic path that eases the design, verification, and
+implementation of analyses using the abstracting abstract machine
+approach to within a factor of performant constraint-based analyses.
+
+
+
 \section{Conclusion}
 
 Abstract machines are not only a good model for rapid analysis
 development, they also can be systematically developed into efficient
 algorithms.
 
+
+%% \acks Sam Tobin-Hochstadt for encouragement and feedback -- he was
+%% the first to prompt me to look into how make effective
+%% implementations of the AAM approach.
+
+%% NSF, DARPA
+
 \bibliographystyle{plain}
 \bibliography{local,bibliography}
 
 \appendix
 \section{Relation to Uniform \(k\)-CFA (A Case Against Acceptability)}
+\label{sec:accept}
 
 \cite{dvanhorn:nielson-nielson-popl97} \cite{dvanhorn:Neilson:1999}
 
