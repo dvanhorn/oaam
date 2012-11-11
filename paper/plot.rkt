@@ -32,8 +32,7 @@
 (define (c x) (- (sub1 x))) ;; neg for B/W, pos for color
 (define (next x) (sub1 x))
 
-(plot-width (* 2 (plot-width)))
-(plot-height (* 3/2 (plot-height)))
+
 
 (define (states-per-second)
   (let ([which numbers-state-rate])
@@ -94,6 +93,41 @@
                [interval-line2-color  "black"])
   (abs-time))
 
+(define church-time (for/first ([(name numbers) (in-hash timings)]
+                                #:when (string=? name "church"))
+                      numbers))
+                      
+
+(define (q)
+  (let ([which run])
+    (plot (let ()
+            (define (scale x) (if (number? x) x (* 30 60 1000)))
+            (define baseline (scale (average (which (hash-ref church-time "bl")))))
+            (define numbers* (for*/list ([(tag algo) (in-dict algo-name)]
+                                         ;;#:unless (string=? tag "bl")
+                                         [n (in-value (hash-ref church-time tag))])
+                               (vector algo (/ (scale (average (which n))) baseline))))
+            (discrete-histogram numbers*
+                                #:label "church"
+                                #:skip 1.5 ;#:x-min 0
+                                #:style 1
+                                #:color -7 #;(c (next i)) #:line-color "black" 
+                                #:line-style 1))
+          
+          #:y-label "Time relative to baseline on log scale (smaller is better)"
+          #:x-label "Optimization technique (cumulative, left to right)"
+          #:legend-anchor 'top-right
+          #:out-file "rel-time-church.ps")))
+
+(parameterize ([plot-y-transform (axis-transform-bound log-transform 0.0001 1)]
+               #;[plot-y-ticks     (log-ticks)]
+               [plot-font-size 20]
+               [line-color  "black"]
+               [interval-color  "black"]
+               [interval-line1-color  "black"]
+               [interval-line2-color  "black"]
+               #;[plot-height (* (plot-height))])
+  (q))
 
 (define (peak-mem)
   (let ([which numbers-peak-mem])

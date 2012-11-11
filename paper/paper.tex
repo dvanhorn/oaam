@@ -44,7 +44,7 @@ analyses.  The approach involves deriving abstract interpreters from
 existing machine semantics and has been applied to a variety of
 languages with features widely considered difficult to analyze.
 Although analyzers are straightforward to build under this approach,
-the resulting analyzer is prohibitively inefficient.
+the result is prohibitively inefficient.
 
 This article contributes a step by step process for going from a naive
 analyzer derived under the abstracting abstract machine approach, to
@@ -61,7 +61,7 @@ an efficient program analyzer.
 
 \section{Introduction}
 
-The \emph{abstracting abstract machines}
+The \emph{abstracting abstract machines} (AAM)
 approach~\cite{dvanhorn:VanHorn2011Abstracting,dvanhorn:VanHorn2012Systematic}
 to deriving program analyses provides a straightforward way of
 transforming a programming language semantics in the form of an
@@ -159,9 +159,9 @@ abstraction by widening the store.  The resulting analyzer sacrifices
 precision for speed and is able to analyze the example in about 1
 minute.  Without this abstraction step the analysis is exponential due
 to per-state store variance.  This step is described by Van Horn and
-Might and is necessary to make even small examples feasible.  We
-therefore take the widened interpreter as the baseline for our
-evaluation.
+Might~\cite[\S 3.5--6]{dvanhorn:VanHorn2012Systematic} and is
+necessary to make even small examples feasible.  We therefore take the
+widened interpreter as the baseline for our evaluation.
 
 In section~\ref{sec:opt} we give a series of simple abstractions and
 implementation techniques that, in total, drop the analysis time to
@@ -1183,6 +1183,14 @@ algorithms.
 %% implementations of the AAM approach.
 
 %% NSF, DARPA
+
+\paragraph{Acknowledgments}
+
+We thank Suresh Jagannathan for providing source code to the
+polymorphic splitting
+analyzer~\cite{dvanhorn:wright-jagannathan-toplas98} and Ilya Sergey
+for the introspective pushdown
+analyzer~\cite{dvanhorn:Earl2012Introspective}.
 
 \bibliographystyle{plain}
 \bibliography{local,bibliography}
