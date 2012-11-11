@@ -45,7 +45,7 @@
       (define state-count (box 0))
       (define step^ ((∆-step step) state-count))
       (define start-time (current-milliseconds))
-      (define-values (ss states)
+      (define ss
         (with-limit-handler (start-time state-count)
           (fix step^ (set (cons (update ∆ (hash)) cs)))))
       (state-rate start-time (unbox state-count))

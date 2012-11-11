@@ -1,7 +1,7 @@
 #lang racket
-(require "parse.rkt" "kcfa-instantiations.rkt"
-         racket/sandbox
-         racket/cmdline)
+(require "parse.rkt" "kcfa-instantiations.rkt" "LK-instantiations.rkt"
+         racket/sandbox)
+(provide test aval prep)
 
 (define (sch->sexp file)
   (with-input-from-file file
@@ -42,7 +42,9 @@
                            (flush-output)
                            (printf "Result: Complete~%"))))))
 
-(define test-file
+(module+ main
+ (require racket/cmdline)
+ (define test-file
   (command-line #:once-any
                 [("--bl") "Benchmark baseline"
                  (aval baseline)] ;; least optimized
@@ -77,6 +79,13 @@
                 [("--cb")
                  "Benchmark baseline continuation marks"
                  (aval baseline/cm)]
+                ;; Lazy language analysis
+                [("--kb")
+                 "Benchmark baseline lazy-Krivine machine"
+                 (aval LK-baseline)]
+                [("--kp")
+                 "Benchmark best lazy-Krivine machine"
+                 (aval LK-lazy-0cfa^/c/∆s/prealloc!)]
                 ;; Not benchmarked for paper
                 #|
                 [("--ls2") "Benchmark specialized2 lazy non-determinism"
@@ -107,4 +116,4 @@
 |#
                 #:args (filename)
                 filename))
-(test (prep test-file))
+(test (prep test-file)))

@@ -37,21 +37,24 @@
 (define deltasid "id")
 (define deltaspa "pa")
 (define deltaspd "pd")
-(define imperative "li")
-(define preallocated "lp")
+(define imperative "it")
+(define preallocated "pt")
 
 (define which-analyses
   (list deltas
+        imperative
+        preallocated
+#|
         deltasia
         deltasid
         deltaspa
         deltaspd
-        imperative
-        preallocated
         baseline 
         specialized
         lazy
-        compiled))
+        compiled
+|#
+))
 
 (define known-timeout (hash baseline    (set maze graphs matrix nbody)
                             specialized (set maze graphs matrix nbody)
