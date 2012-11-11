@@ -1,63 +1,57 @@
 #lang racket
-(provide (all-defined-out))
+(provide extend extend* join join* join-store
+         update update/change restrict-to-reachable restrict-to-reachable/vector)
 (require "data.rkt" "ast.rkt" "notation.rkt")
 
-(define (lookup ρ σ x)
-  (hash-ref σ (hash-ref ρ x)))
-(define (lookup-env ρ x)
-  (hash-ref ρ x))
-(define (lookup-sto σ x)
-  (hash-ref σ x))
-(define (get-cont σ l)
-  (hash-ref σ l))
 (define (extend ρ x v)
   (hash-set ρ x v))
 (define (extend* ρ xs vs)
-  (cond [(empty? xs) ρ]
-        [else (extend* (extend ρ (first xs) (first vs))
-                       (rest xs)
-                       (rest vs))]))
-(define (join σ a s)
-  (hash-set σ a
-            (set-union s (hash-ref σ a (set)))))
-(define (join* σ as ss)
-  (cond [(empty? as) σ]
-        [else (join* (join σ (first as) (first ss))
-                     (rest as)
-                     (rest ss))]))
-(define (join-one σ a x)
-  (hash-set σ a
-            (set-add (hash-ref σ a (set)) x)))
-(define (join-one* σ as xs)
-  (cond [(empty? as) σ]
-        [else (join-one* (join-one σ (first as) (first xs))
-                         (rest as)
-                         (rest xs))]))
+  (for/fold ([ρ ρ]) ([x (in-list xs)] [v (in-list vs)])
+    (hash-set ρ x v)))
+(define (join eσ a s)
+  (hash-set eσ a (⊓ s (hash-ref eσ a ∅))))
+(define (join* eσ as ss)
+  (for/fold ([eσ eσ]) ([a as] [s ss]) (join eσ a s)))
+
+;; Perform join and return if the join was idempotent
+(define (join/change eσ a s)
+  (define prev (hash-ref eσ a ∅))
+  (define s* (⊓ s prev))
+  (values (hash-set eσ a s*) (≡ prev s*)))
 
 ;; Store Store -> Store
-(define (join-store σ1 σ2)
-  (for/fold ([σ σ1])
-    ([k×v (in-hash-pairs σ2)])
-    (hash-set σ (car k×v)
-              (set-union (cdr k×v)
-                         (hash-ref σ (car k×v) (set))))))
+(define (join-store eσ1 eσ2)
+  (for/fold ([eσ eσ1])
+      ([(k v) (in-hash eσ2)])
+    (join eσ k v)))
 
-;; Set State -> Store
-(define (join-stores ss)
-  (for/fold ([σ (hash)])
-    ([s ss])
-    (join-store σ (state-σ s))))
+(define (update ∆s eσ)
+  (for/fold ([eσ eσ]) ([a×vs (in-list ∆s)])
+    (join eσ (car a×vs) (cdr a×vs))))
 
-(define (reach σ root)
+(define (update/change ∆s eσ)
+  (for/fold ([eσ eσ] [same? #t]) ([a×vs (in-list ∆s)])
+    (define-values (σ* a-same?) (join/change eσ (car a×vs) (cdr a×vs)))
+    (values σ* (and same? a-same?))))
+
+(define (((mk-reach ref) touches) eσ root)
   (define seen ∅)
   (let loop ([as root])
     (for/union #:res acc ([a (in-set as)]
                           #:unless (a . ∈ . seen))
                (set! seen (∪1 seen a))
                (for/union #:initial (∪1 acc a)
-                          ([v (in-set (hash-ref σ a))])
+                          ([v (in-set (ref eσ a))])
                           (loop (touches v))))))
 
-(define (restrict-to-reachable σ v)
-  (for/hash ([a (in-set (reach σ (touches v)))])
-    (values a (hash-ref σ a))))
+(define ((mk-restrict-to-reachable ref) touches)
+  (define reach ((mk-reach ref) touches))
+  (λ (eσ v)
+     (for/hash ([a (in-set (reach eσ (touches v)))])
+       (values a (ref eσ a)))))
+
+(define reach (mk-reach hash-ref))
+(define reach/vec (mk-reach vector-ref))
+
+(define restrict-to-reachable (mk-restrict-to-reachable hash-ref))
+(define restrict-to-reachable/vector (mk-restrict-to-reachable vector-ref))

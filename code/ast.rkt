@@ -7,19 +7,38 @@
 ;; (lam Lab Sym Exp)
 ;; (app Lab Exp Exp)
 ;; (if Lab Exp Exp Exp)
+;; (st! Lab Var Exp)
+;; (lcc Lab Var Exp)
 ;; (primr Lab Sym)
 ;; (datum Lab Atom)
-(struct exp (lab)            #:transparent)
-(struct var exp (name)       #:transparent)
-(struct lrc exp (xs es e)    #:transparent)
-(struct lam exp (var exp)    #:transparent)
-(struct app exp (rator rand) #:transparent)
-(struct ife exp (t c a)      #:transparent)
-(struct st! exp (x e)        #:transparent)
+(struct exp (lab)             #:transparent)
+(struct var exp (name)        #:transparent)
+(struct lrc exp (xs es e)     #:transparent)
+(struct lam exp (xs exp)      #:transparent)
+(struct rlm exp (xs rest exp) #:transparent)
+(struct app exp (rator rand)  #:transparent)
+(struct ife exp (t c a)       #:transparent)
+(struct st! exp (x e)         #:transparent)
+(struct lcc exp (x e)         #:transparent)
+;; Stack inspection forms
+(struct grt exp (r e)         #:transparent) ;; Grant
+(struct fal exp ()            #:transparent) ;; Fail
+(struct frm exp (r e)         #:transparent) ;; Frame
+(struct tst exp (r t e)       #:transparent) ;; Test
 
 (struct primr exp (which)    #:transparent)
+;; (dst Lab Sym List[Pair[Sym Boolean]] Exp)
+;; Define struct form that should die after we go to real Racket.
+(struct dst exp (name fields e) #:transparent)
 
+
+;; Unmerged data.
 (struct datum exp (val) #:transparent)
+;; Merged versions of data that must be evaluated specially.
+(struct mk-list^ exp (vals) #:transparent)
+(struct mk-improper^ exp (vals last) #:transparent)
+(struct mk-vector^ exp (vals) #:transparent)
+(struct mk-hash^ exp (keys vals) #:transparent)
 
 (define (free e)
   (let loop* ([e e]
@@ -33,6 +52,7 @@
                   ([e (in-list es)])
          (loop* e bound*))]
       [(lam _ vars body) (loop* body (∪/l bound vars))]
+      [(rlm _ vars rest body) (loop* body (∪1 (∪/l bound vars) rest))]
       [(app _ rator rands) (for/union #:initial (loop rator)
                                       ([rand (in-list rands)])
                              (loop rand))]
@@ -40,6 +60,12 @@
       [(st! _ x e)
        (define efs (loop e))
        (if (x . ∈ . bound) efs (∪1 efs x))]
+      [(lcc _ x e) (loop* e (∪1 bound x))]
       [(primr _ _) ∅]
       [(datum _ _) ∅]
+      ;; Continuation mark forms
+      [(grt _ _ e) (loop e)]
+      [(frm _ _ e) (loop e)]
+      [(fal _) ∅]
+      [(tst _ _ t e) (∪ (loop t) (loop e))]
       [_ (error 'free "Bad expr ~a" e)])))

@@ -1,399 +1,460 @@
 #lang racket
-(provide eval eval^ eval/c eval/c^
-         lazy-eval lazy-eval^ lazy-eval/c lazy-eval/c^
-         0cfa 0cfa^ 0cfa/c 0cfa/c^
-         0cfa-step comp-0cfa-step compile-0cfa
-         lazy-0cfa lazy-0cfa^ lazy-0cfa/c lazy-0cfa/c^
-         1cfa 1cfa^ 1cfa/c 1cfa/c^
-         lazy-1cfa lazy-1cfa^ lazy-1cfa/c lazy-1cfa/c^
-         widen)
-(require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt"
-         "notation.rkt" "primitives.rkt")
 
-;; TODO
-;; - special fixed
-;; - store diffs
-;; - ...
-
-;; A [Rel X ... Y] is a (X -> ... -> (Setof Y))
-
-(define snull (set '()))
-(define (toSetOfLists list-of-sets)
-  (match list-of-sets
-    ['() snull]
-    [(list singleS) (for/set ([hd (in-set singleS)]) (list hd))]
-    [(cons hdS tail)
-     (for*/set ([hd (in-set hdS)]
-                [restlist (in-set (toSetOfLists tail))])
-       (cons hd restlist))]))
+(require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt" "primitives.rkt" "parse.rkt"
+         "notation.rkt" "op-struct.rkt" "do.rkt" "add-lib.rkt"
+         (rename-in racket/generator
+                    [yield real-yield]
+                    [generator real-generator])
+         (for-syntax syntax/parse racket/syntax racket/base
+                     syntax/parse/experimental/template)
+         racket/stxparam racket/splicing
+         racket/trace)
+(provide yield-meaning #;<-reprovide
+         mk-analysis)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Machine maker
 
-;; push  : State -> Sto Addr
-;; setter  : ?
-;; widen : Val -> Val
-;; force : [Rel Sto Val Val]
-;; delay : [Rel Sto Addr Val]
+(define-syntax (mk-analysis stx)
+  (syntax-parse stx
+    [(_ (~or ;; analysis parameters
+         (~optional (~seq #:fixpoint fixpoint:expr)
+                    #:defaults ([fixpoint #'fix]))
+         (~once (~seq #:aval aval:id)) ;; name the evaluator to use/provide
+         (~once (~seq #:ans ans:id)) ;; name the answer struct to use/provide
+         (~optional (~seq #:touches touches:id)) ;; Touch relation specialized for clos
+         ;; Analysis strategies flags (requires the right parameters too)
+         (~optional (~and #:compiled compiled?))
+         (~optional (~and #:σ-∆s σ-∆s?))
+         (~optional (~and #:sparse sparse?))
+         ;; Continuation marks incur a representation overhead.
+         ;; We allow this feature to be disabled for benchmarking analysis of
+         ;; languages that do not have continuation marks.
+         (~optional (~seq (~and #:CM CM?) mark-set (~bind [(cm-op 1) (list #'cm)]))
+                    #:defaults ([mark-set #'∅]
+                                [(cm-op 1) '()]))
+         (~optional (~or (~and #:σ-passing σ-passing?)
+                         (~and #:global-σ global-σ?)))
+         (~optional (~and #:wide wide?))
+         (~optional (~or (~and (~seq #:kcfa k-nat-or-∞)
+                               (~bind [K (syntax-e #'k-nat-or-∞)]))
+                         (~and #:1cfa (~bind [K 1])))
+                    #:defaults ([K 0]))
+         (~optional (~seq #:prepare prep-fn:expr)) ;; any preprocessing?
+         (~optional (~or (~and #:generators generators?)
+                         (~and #:set-monad set-monad?)))) ...)
+     #:do [(define-syntax-rule (given kw) (syntax? (attribute kw)))
+           (define-syntax-rule (implies ante concl) (if ante concl #t))
+           (define σ-threading? (or (given σ-passing?) (given σ-∆s?)))
+           (define c-passing? (given set-monad?))]
+     #:fail-unless (implies (given global-σ?) (given wide?))
+     "Cannot globalize narrow stores."
+     #:fail-unless (implies (given σ-∆s?) (given wide?))
+     "Store deltas and narrow stores are antithetical."
+     #:fail-unless (or (given fixpoint) (given set-monad?))
+     "Cannot use a general fixpoint for step function that doesn't return sets."
+     #:fail-when (and (given σ-passing?) (given global-σ?))
+     "Cannot use store passing with a global store"
+     (with-syntax ([((ρ-op ...) (δ-op ...) (l-op ...))
+                    (if (zero? (attribute K)) #'(() () ()) #'((ρ) (δ) (l)))]
+                   [ev: (format-id #'ev "~a:" #'ev)]
+                   [ev #'ev]
+                   ;; represent rσ explicitly in all states?
+                   [(σ-op ...) (if (given wide?) #'() #'(rσ))]
+                   ;; explicitly pass σ/∆ to compiled forms?
+                   [(σ-gop ...) (if σ-threading? #'(gσ) #'())]
+                   ;; If rσ not part of state and not global, it is passed
+                   ;; in as (cons rσ state), so expand accordingly.
+                   [(expander-flags ...)
+                    (cond [(and (given wide?) (not (given global-σ?)))
+                           #'(#:expander #:with-first-cons)]
+                          [else #'()])]
+                   [inj-σ (if (given σ-∆s?) #''() #'(hash))])
+       (define yield-ev
+         (if (attribute compiled?)
+             #'(λ (syn)
+                   (syntax-parse syn #:literals (ev)
+                     [(_ (ev . args)) (syntax/loc syn (ev . args))]
+                     [(_ e:expr) (syntax/loc syn (yield-meaning e))]))
+             #'(syntax-rules () [(_ e) (yield-meaning e)])))
+       (define eval ;; what does ev mean?
+         (syntax/loc stx
+           (match e
+             [(var l x)
+              (λ% (ev-σ ρ k δ)
+                  (do (ev-σ) ([v #:in-delay ev-σ (lookup-env ρ x)])
+                    (yield (co ev-σ k v))))]
+             [(datum l d) (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k d))))]
+             [(primr l which)
+              (define p (primop (compile-primop which)))
+              (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k p))))]
+             [(lam l x e*)
+              (define c (compile e*))
+              (define fv (free e))
+              (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k (clos x c ρ fv)))))]
+             [(rlm l x r e*)
+              (define c (compile e*))
+              (define fv (free e))
+              (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k (rlos x r c ρ fv)))))]
+             [(lrc l xs es b)
+              (define c (compile (first es)))
+              (define cs (map compile (rest es)))
+              (define cb (compile b))
+              (define x (first xs))
+              (define xs* (rest xs))
+              (define ss (map (λ _ nothing) xs))
+              (λ% (ev-σ ρ k δ)
+                  (define as (map (λ (x) (make-var-contour x δ)) xs))
+                  (define/ρ ρ* (extend* ρ xs as))
+                  (do (ev-σ) ([(σ0 a) #:push ev-σ l δ k]
+                           [σ*-lrc #:join* σ0 as ss])
+                    (yield (ev σ*-lrc c ρ* (lrk (marks-of k) x xs* cs cb ρ* a δ) δ))))]
+             [(app l e es)
+              (define c (compile e))
+              (define cs (map compile es))
+              (λ% (ev-σ ρ k δ)
+                  (do (ev-σ) ([(σ*-app a) #:push ev-σ l δ k])
+                    (yield (ev σ*-app c ρ (ls (marks-of k) l 0 cs '() ρ a δ) δ))))]
+             [(ife l e0 e1 e2)
+              (define c0 (compile e0))
+              (define c1 (compile e1))
+              (define c2 (compile e2))
+              (λ% (ev-σ ρ k δ)
+                  (do (ev-σ) ([(σ*-ife a) #:push ev-σ l δ k])
+                    (yield (ev σ*-ife c0 ρ (ifk (marks-of k) c1 c2 ρ a δ) δ))))]
+             [(st! l x e)
+              (define c (compile e))
+              (λ% (ev-σ ρ k δ)
+                  (do (ev-σ) ([(σ*-st! a) #:push ev-σ l δ k])
+                    (yield (ev σ*-st! c ρ (sk! (marks-of k) (lookup-env ρ x) a) δ))))]
+             ;; let/cc is easier to add than call/cc since we make yield
+             ;; always make co states for primitives.
+             [(lcc l x e)
+              (define c (compile e))
+              (λ% (ev-σ ρ k δ)
+                  (define x-addr (make-var-contour x δ))
+                  (define/ρ ρ* (extend ρ x x-addr))
+                  (do (ev-σ) ([σ*-lcc #:join ev-σ x-addr (singleton k)])
+                    (yield (ev σ*-lcc c ρ* k δ))))]
+             ;; Forms for stack inspection
+             [(grt l R e)
+              (define c (compile e))
+              (λ% (ev-σ ρ k δ)
+                  (do (ev-σ) () (yield (ev ev-σ c ρ (grant k R) δ))))]
+             [(fal l)
+              (λ% (ev-σ ρ k δ)
+                  (do (ev-σ) () (yield (co ev-σ (mt mt-marks) fail))))]
+             [(frm l R e)
+              (define c (compile e))
+              (λ% (ev-σ ρ k δ)
+                  (do (ev-σ) () (yield (ev ev-σ c ρ (frame k R) δ))))]
+             [(tst l R t e)
+              (define c0 (compile t))
+              (define c1 (compile e))
+              (λ% (ev-σ ρ k δ)
+                  (do (ev-σ) ()
+                    (if (OK^ R k ev-σ)
+                        (yield (ev ev-σ c0 ρ k δ))
+                        (yield (ev ev-σ c1 ρ k δ)))))]
+             [_ (error 'eval "Bad expr ~a" e)])))
 
-;; Invariant?  δ is the address of the top frame.
+       (define compile-def
+         (cond [(given compiled?)
+                (define hidden-σ (and (given σ-∆s?) (not (given global-σ?)) (generate-temporary #'hidden)))
+                (with-syntax ([(top ...) (listy hidden-σ)]
+                              [topp (or hidden-σ #'gσ)])
+                  (quasisyntax/loc stx
+                    ((define-syntax-rule (... (λ% (gσ ρ k δ) body ...))
+                       (λ (top ... σ-gop ... ρ-op ... k δ-op ...)
+                          (syntax-parameterize ([yield (... (... #,yield-ev))]
+                                                [top-σ (make-rename-transformer #'topp)]
+                                                [target-σ (make-rename-transformer #'gσ)]
+                                                [top-σ? #t])
+                            body (... ...))))
+                     (define (compile e) #,eval))))]
+               [else
+                ;; brittle, since other identifiers must be the same in ev:
+                (syntax/loc stx
+                  ((... (define-syntax-rule (λ% (ev-σ ρ k δ) body ...)
+                          (generator body ...)))
+                   (define compile values)))]))
 
-(define (mk-mk-step ev%)
-  (λ (push bind getter setter widen force delay)
-    (mk-prim-meaning-table getter setter widen delay prim-meaning-table)
-    ;; [Rel State State]
-    (define (step state)
-      (match state
-        [(co σ k v)
-         (match k
-           [(mt) (for*/set ([v (force σ v)])
-                             (ans σ v))]
+       (quasitemplate/loc stx
+         (begin ;; specialize representation given that 0cfa needs less
+           (mk-op-struct co (rσ k v) (σ-op ... k v) expander-flags ...)
+           (mk-op-struct ans (rσ cm v) (σ-op ... cm-op ... v) expander-flags ...
+                         #:expander-id ans:)
+           (mk-op-struct ap (rσ l fn-addr v-addrs k δ)
+                         (σ-op ... l fn-addr v-addrs k δ-op ...)
+                         expander-flags ...)
+           ;; Continuation frames
+           (mk-op-struct mt (cm) (cm-op ...))
+           (mk-op-struct sk! (cm x k) (cm-op ... x k))
+           (mk-op-struct ifk (cm t e ρ k δ) (cm-op ... t e ρ-op ... k δ-op ...))
+           (mk-op-struct lrk (cm x xs es e ρ k δ) (cm-op ... x xs es e ρ-op ... k δ-op ...))
+           (mk-op-struct ls (cm l n es vs ρ k δ) (cm-op ... l n es vs ρ-op ... k δ-op ...))
+           ;; Values
+           (struct primop (which) #:prefab)
+           (mk-op-struct clos (x e ρ free) (x e ρ-op ... free) #:expander-id clos:)
+           (mk-op-struct rlos (x r e ρ free) (x r e ρ-op ... free) #:expander-id rlos:)
+           (define (kont? v) (or (ls? v) (lrk? v) (ifk? v) (sk!? v) (mt? v)))
+           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+           ;; Handling of continuation marks
+           (define (marks-of k)
+             #,(if (given CM?)
+                   #'(match k
+                       [(or (mt: cm)
+                            (sk!: cm _ _)
+                            (ifk: cm _ _ _ _ _)
+                            (lrk: cm _ _ _ _ _ _ _)
+                            (ls: cm _ _ _ _ _ _ _)) cm])
+                   #'#f))
+           (define (tail-of k)
+             #,(if (given CM?)
+                   #'(match k
+                       [(mt: cm) #f]
+                       [(sk!: cm l k) k]
+                       [(ifk: cm t e ρ k δ) k]
+                       [(lrk: cm x xs es e ρ k δ) k]
+                       [(ls: cm l n es vs ρ k δ) k])
+                   #'#f))
+           (define mt-marks
+             (for/hash ([permission (in-set mark-set)])
+               (values permission 'deny)))
+           (define (set-mark cm R)
+             (for/fold ([cm* cm]) ([permission (in-set R)])
+               (hash-set cm permission 'grant)))
+           (define (frame-mark cm R)
+             (for/hash ([(permission _) (in-hash cm)])
+               (values permission (if (permission . ∈ . R)
+                                      'grant
+                                      'deny))))
+           (define (grant k R)
+             #,(if (given CM?)
+                   #'(match k
+                       [(mt: cm)
+                        (mt (set-mark cm R))]
+                       [(sk!: cm l k)
+                        (sk! (set-mark cm R) l k)]
+                       [(ifk: cm t e ρ k δ)
+                        (ifk (set-mark cm R) t e ρ k δ)]
+                       [(lrk: cm x xs es e ρ k δ)
+                        (lrk (set-mark cm R) x xs es e ρ k δ)]
+                       [(ls: cm l n es vs ρ k δ)
+                        (ls (set-mark cm R) l n es vs ρ k δ)])
+                   #'#f))
+           (define (frame k R)
+             #,(if (given CM?)
+                   #'(match k
+                       [(mt: cm)
+                        (mt (frame-mark cm R))]
+                       [(sk!: cm l k)
+                        (sk! (frame-mark cm R) l k)]
+                       [(ifk: cm t e ρ k δ)
+                        (ifk (frame-mark cm R) t e ρ k δ)]
+                       [(lrk: cm x xs es e ρ k δ)
+                        (lrk (frame-mark cm R) x xs es e ρ k δ)]
+                       [(ls: cm l n es vs ρ k δ)
+                        (ls (frame-mark cm R) l n es vs ρ k δ)])
+                   #'#f))
+           ;; XXX: does not work with actions
+           (define-syntax-rule (OK^ R k σ)
+             (let ([seen (make-hasheq)])
+               (define (overlap? R m)
+                 (not (for/or ([(permission status) (in-hash m)]
+                               #:when (eq? status 'deny))
+                        (permission . ∈ . R))))
+               (let loop ([R R] [k k])
+                 (define m (marks-of k))                    
+                 (hash-set! seen k #t)
+                 (or (∅? R)
+                     (and (overlap? R m)
+                          (match (tail-of k)
+                            [#f #t]
+                            [ka
+                             (define R*
+                               (for/set ([permission (in-set R)]
+                                         #:unless (eq? (hash-ref m permission) 'grant))
+                                 permission))
+                             ;; OR because we're looking for a single path through the store.
+                             (for/or ([k (in-set (getter σ ka))]
+                                      #:unless (hash-has-key? seen k))
+                               (loop R* k))]))))))
+           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+           ;; End of continuation mark handling
 
-           [(ls l '() vs ρ a δ)
-            (define args (reverse (cons v vs)))
-            (for*/union ((k (get-cont σ a))
-                         (f (force σ (first args))))
-              (match f
-                [(clos xs e ρ)
-                 (cond [(= (length xs) (length (rest args)))
-                        (define-values (ρ* σ* δ*) (bind ρ σ l δ xs (rest args)))
-                        (ev% σ* e ρ* k δ*)]
-                       [else
-                        ;(printf "arity mismatch~n")
-                        ∅])]
-                [(primop o)
-                 (define forced (for/list ([a (in-list (rest args))])
-                                  (force σ a)))
-                 (define meaning (hash-ref prim-meaning-table o))
-                 (cond [(changes-store? o)
-                        (define-values (_ cs) ;; thread through store changes
-                          (for/fold ([σ σ] [cs ∅]) ([vs (in-set (toSetOfLists forced))]
-                                                        #:when (check-good o vs))
-                            (define-values (σ* rs) (apply meaning σ l δ vs))
-                            (values σ*
-                                    (for/set #:initial cs ([r (in-list rs)])
-                                      (co σ* k r)))))
-                        cs]
-                       [(reads-store? o)
-                        (for*/set ([vs (in-set (toSetOfLists forced))]
-                                   #:when (check-good o vs)
-                                   [r (in-list (apply meaning σ vs))])
-                          (co σ k r))]
-                       [else
-                        (for*/set ([vs (in-set (toSetOfLists forced))]
-                                   #:when (check-good o vs)
-                                   [r (in-list (apply meaning vs))])
-                          (co σ k r))])]
-                [_ ∅]))]
+           #,@(if (given touches)
+                  #`((mk-touches touches clos: rlos: list #,(zero? (attribute K))))
+                  #'())
+           (splicing-syntax-parameterize ([target-σ? (and #,σ-threading? 'threading)]
+                                          [target-cs? #,c-passing?]
+                                          [target-actions? #,(given sparse?)])
+           (define-syntax do-macro
+             (mk-do #,(given σ-∆s?)
+                    #,c-passing?
+                    #,(given global-σ?)
+                    #,(given generators?)))
+           (mk-flatten-value flatten-value-fn clos: rlos: kont?)
+           (splicing-syntax-parameterize ([do (make-rename-transformer #'do-macro)]
+                                          [flatten-value (make-rename-transformer #'flatten-value-fn)])
 
-           [(ls l (list-rest e es) vs ρ a δ)
-            (ev% σ e ρ (ls l es (cons v vs) ρ a δ) δ)]
-           [(ifk t e ρ a δ)
-            (for*/union [(k (get-cont σ a))
-                         (v (force σ v))]
-              (ev% σ (if v t e) ρ k δ))]
-           [(lrk x '() '() e ρ a δ)
-            (define σ* (join σ (lookup-env ρ x) (force σ v)))
-            (for/union ((k (get-cont σ a)))
-              (ev% σ* e ρ k δ))]
-           [(lrk x (cons y xs) (cons e es) b ρ a δ)
-            (define σ* (join σ (lookup-env ρ x) (force σ v)))
-            (ev% σ* e ρ (lrk y xs es b ρ a δ) δ)]
-           [(sk! l a)
-            (define σ* (setter σ l v))
-            (for/set ((k (get-cont σ a)))
-              (co σ* k (void)))])]
+           ;; ev is special since it can mean "apply the compiled version" or
+           ;; make an actual ev state to later interpret.
+           #,@(if (given compiled?)
+                  (quasisyntax/loc stx
+                    ((define-syntax (ev syn)
+                       (syntax-case syn ()
+                         ;; gσ only optional if it's global
+                         [(_ gσ e ρ k δ)
+                          #'(e #,@(listy (and (given σ-∆s?) (not (given global-σ?)) #'top-σ))
+                               σ-gop ... ρ-op ... k δ-op ...)]))
+                     (define-match-expander ev: ;; inert, but introduces bindings
+                       (syntax-rules () [(_ . args) (list . args)]))))
+                  (quasisyntax/loc stx
+                    ((mk-op-struct ev (rσ e ρ k δ) (σ-op ... e ρ-op ... k δ-op ...)
+                                   expander-flags ...))))
 
-        ;; this code is dead when running compiled code.
-        [(ev σ e ρ k δ)
-         (match e
-           [(var l x) (for/set ((v (delay σ (lookup-env ρ x))))
-                        (co σ k v))]
-           [(datum l d) (set (co σ k d))]
-           [(lam l x e) (set (co σ k (clos x e ρ)))]
-           [(lrc l xs es b)
-            (define-values (σ0 a) (push σ l δ k))
-            (define as (map (λ (x) (cons x δ)) xs))
-            (define ρ* (extend* ρ xs as))
-            (define σ* (join* σ0 as (map (λ _ ∅) xs)))
-            (set (ev σ* (first es) ρ* (lrk (first xs) (rest xs) (rest es) b ρ* a δ) δ))]
-           [(app l e0 es)
-            (define-values (σ* a) (push σ l δ k))
-            (set (ev σ* e0 ρ (ls l es '() ρ a δ) δ))]
-           [(ife l e0 e1 e2)
-            (define-values (σ* a) (push σ l δ k))
-            (set (ev σ* e0 ρ (ifk e1 e2 ρ a δ) δ))]
-           [(st! l x e0)
-            (define-values (σ* a) (push σ l δ k))
-            (set (ev σ* e0 ρ (sk! (lookup-env ρ x) a) δ))]
-           [(primr l which)
-            (set (co σ k (primop which)))])]
+            (define-syntax-rule (define/ρ ρ body)
+             #,(if (zero? (attribute K))
+                   #'(void)
+                   #'(define ρ body)))
 
-        [_ ∅]))
-    step))
+           ;; No environments in 0cfa
+           (define-syntax-rule (lookup-env ρ x)
+             #,(cond [(zero? (attribute K)) #'x]
+                     [else #'(hash-ref ρ x (λ () (error 'lookup "Unbound var ~a" x)))]))
+           (...
+            (define-syntax (generator syn)
+              (syntax-parse syn
+                [(_ body:expr ...)
+                 (syntax/loc syn
+                   (syntax-parameterize ([yield (... #,yield-ev)])
+                     #,(cond [(given generators?)
+                              (quasisyntax/loc stx
+                                (... (real-generator () body ...)))]
+                             [else
+                              (quasisyntax/loc stx
+                                (... (begin body ...)))])))])))
 
-(define ((push K) σ l δ k)
-  (define a (cons l δ))
-  (values (join σ a (set k))
-          a))
+           (define (inj e)
+             (define σ₀ (hash))
+             (generator
+              (do (σ₀) () (yield (ev σ₀ (compile e) (hash) (mt mt-marks) '())))))
 
-(define ((bind K) ρ σ l δ xs vs)
-  (define δ* (truncate (cons l δ) K))
-  (define as (map (λ (x) (cons x δ*)) xs))
-  (define ρ* (extend* ρ xs as))
-  (define σ* (join* σ as (map (λ (v) (force σ v)) vs)))
-  (values ρ* σ* δ*))
+           (define (aval e #:prepare [prepare (?? prep-fn
+                                                  (λ (e)
+                                                     ;; Don't join literals when parsing for
+                                                     ;; concrete evaluation.
+                                                     (parameterize ([cons-limit
+                                                                     #,(if (eq? (attribute K) +inf.0)
+                                                                           #'+inf.0
+                                                                           #'(cons-limit))])
+                                                       (define-values (e* r) (parse-prog e gensym gensym))
+                                                       (add-lib e* r gensym gensym))))])
+             (fixpoint step (inj (prepare e))))
 
-(define (ev-interp  σ e ρ k δ) (set (ev σ e ρ k δ)))
-(define (ev-compile σ c ρ k δ) (c σ ρ k δ))
+           #,@compile-def
 
-(define mk-step  (mk-mk-step ev-interp))
+           (define-syntax mk-prims (mk-mk-prims #,(given global-σ?) #,σ-threading?
+                                                #,(given σ-∆s?) #,(given compiled?)
+                                                #,(attribute K)))
+           (mk-prims prim-meaning compile-primop co clos? rlos?)
+           ;; [Rel State State]
+           (define (step state)
+             (match state
+               [(co: co-σ k v)
+                (match k
+                  [(mt: cm) (generator (do (co-σ) ([v #:in-force co-σ v])
+                                     (yield (ans co-σ cm v))))]
 
-(define (mk-comp-step push bind getter setter widen force delay)
-  (values (mk-step push bind getter setter widen force delay)
-          (mk-comp push delay)
-          ((mk-mk-step ev-compile) push bind getter setter widen force delay)))
+                  ;; We need this intermediate step so that σ-∆s work.
+                  ;; The above join is not merged into the store until
+                  ;; after the step, and the address is needed by the call.
+                  [(ls: cm l n '() v-addrs ρ a δ)
+                   (define v-addr (make-var-contour (cons l n) δ))
+                   (define args (reverse (cons v-addr v-addrs)))
+                   (generator
+                    (do (co-σ) ([σ*-ls #:join-forcing co-σ v-addr v]
+                                [k #:in-get σ*-ls a])
+                      (yield (ap σ*-ls l (first args) (rest args) k δ))))]
 
-(define (mk-comp push delay)
-  ;; Expr -> (Store Env Cont Contour -> State)
-  (define (compile e)
-    (match e
-      [(var l x)
-       (λ (σ ρ k δ)
-         (for/set ((v (delay σ (lookup-env ρ x))))
-                  (co σ k v)))]
-      [(datum l d) (λ (σ ρ k δ) (set (co σ k d)))]
-      [(primr l which)
-       (define p (primop which))
-       (λ (σ ρ k δ) (set (co σ k p)))]
-      [(lam l x e)
-       (define c (compile e))
-       (λ (σ ρ k δ) (set (co σ k (clos x c ρ))))]
-    [(lrc l xs es b)
-     (define c (compile (first es)))
-     (define cs (map compile (rest es)))
-     (define cb (compile b))
-     (define x (first xs))
-     (define xs* (rest xs))
-     (define ss (map (λ _ ∅) xs))
-     (λ (σ ρ k δ)
-       (define-values (σ0 a) (push σ l δ k))
-       (define as (map (λ (x) (cons x δ)) xs))
-       (define ρ* (extend* ρ xs as))
-       (define σ* (join* σ0 as (map (λ _ ∅) xs)))
-       (c σ* ρ* (lrk x xs* cs cb ρ* a δ) δ))]
-    [(app l e es)
-     (define c (compile e))
-     (define cs (map compile es))
-     (λ (σ ρ k δ)
-       (define-values (σ* a) (push σ l δ k))
-       (c σ* ρ (ls l cs '() ρ a δ) δ))]
-    [(ife l e0 e1 e2)
-     (define c0 (compile e0))
-     (define c1 (compile e1))
-     (define c2 (compile e2))
-     (λ (σ ρ k δ)
-       (define-values (σ* a) (push σ l δ k))
-       (c0 σ* ρ (ifk c1 c2 ρ a δ) δ))]
-    [(st! l x e)
-     (define c (compile e))
-     (λ (σ ρ k δ)
-       (define-values (σ* a) (push σ l δ k))
-       (c σ* ρ (sk! (lookup-env ρ x) a) δ))]
-    [(primr l which) (define p (primop which))
-     (λ (σ ρ k δ) (set (co σ k p)))]))
-  compile)
+                  [(ls: cm l n (list-rest e es) v-addrs ρ a δ)
+                   (define v-addr (make-var-contour (cons l n) δ))
+                   (generator
+                    (do (co-σ) ([σ*-lsn #:join-forcing co-σ v-addr v])
+                      (yield (ev σ*-lsn e ρ
+                                 (ls cm l (add1 n) es (cons v-addr v-addrs) ρ a δ) δ))))]
+                  [(ifk: cm t e ρ a δ)
+                   (generator
+                    (do (co-σ) ([k* #:in-get co-σ a]
+                                [v #:in-force co-σ v])
+                      (yield (ev co-σ (if v t e) ρ k* δ))))]
+                  [(lrk: cm x '() '() e ρ a δ)
+                   (generator
+                    (do (co-σ) ([σ*-lrk #:join-forcing co-σ (lookup-env ρ x) v]
+                                [k* #:in-get σ*-lrk a])
+                      (yield (ev σ*-lrk e ρ k* δ))))]
+                  [(lrk: cm x (cons y xs) (cons e es) b ρ a δ)
+                   (generator
+                    (do (co-σ) ([σ*-lrkn #:join-forcing co-σ (lookup-env ρ x) v])
+                      (yield (ev σ*-lrkn e ρ (lrk cm y xs es b ρ a δ) δ))))]
+                  [(sk!: cm l a)
+                   (generator
+                    (do (co-σ) ([σ*-sk! #:join-forcing co-σ l v]
+                                [k* #:in-get σ*-sk! a])
+                      (yield (co σ*-sk! k* (void)))))]
+                  [_ (error 'step "Bad continuation ~a" k)])]
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Concrete semantics
+               ;; v is not a value here. It is an address.
+               [(ap: ap-σ l fn-addr arg-addrs k δ)
+                (generator
+                 (do (ap-σ) ([f #:in-get ap-σ fn-addr])
+                   (match f
+                     [(clos: xs e ρ _)
+                      (cond [(= (length xs) (length arg-addrs))
+                             (do (ap-σ)
+                                 ([(ρ* σ*-clos δ*) #:bind ρ ap-σ l δ xs arg-addrs])
+                               (yield (ev σ*-clos e ρ* k δ*)))]
+                            ;; Yield the same state to signal "stuckness".
+                            [else
+                             (log-info "Arity error on ~a at ~a" f l)
+                             (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
+                     [(rlos: xs r e ρ _)
+                      (cond [(<= (length xs) (length arg-addrs))
+                             (do (ap-σ)
+                                 ([(ρ* σ*-clos δ*) #:bind-rest ρ ap-σ l δ xs r arg-addrs])
+                               (yield (ev σ*-clos e ρ* k δ*)))]
+                            ;; Yield the same state to signal "stuckness".
+                            [else
+                             (log-info "Arity error on ~a at ~a" f l)
+                             (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
+                     [(primop o) (prim-meaning o ap-σ l δ k arg-addrs)]
+                     [(? kont? k)
+                      ;; continuations only get one argument.
+                      (cond [(and (pair? arg-addrs) (null? (cdr arg-addrs)))
+                             (do (ap-σ) ([v #:in-delay ap-σ (car arg-addrs)])
+                               (yield (co ap-σ k v)))]
+                            [else
+                             (log-info "Called continuation with wrong number of arguments (~a): ~a at ~a"
+                                       (length arg-addrs) k l)
+                             (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
+                     [(== ●) (=> fail)
+                      (log-debug "implement ●-call")
+                      (fail)]
+                     [_
+                      (log-info "Called non-function ~a" f)
+                      (yield (ap ap-σ l fn-addr arg-addrs k δ))])))]
 
-(define (eval-widen b)
-  (cond [(atomic? b) b]
-        [else (error "Unknown base value" b)]))
+               ;; this code is dead when running compiled code.
+               [(ev: ev-σ e ρ k δ)
+                #,(if (given compiled?)
+                      #'(generator (do (ev-σ) () (yield (ev ev-σ e ρ k δ))))
+                      eval)]
 
-(define (hash-getter σ addr)
-  (hash-ref σ addr (λ () (error 'getter "Unbound addr ~a" addr))))
-(define (mk-eval-setter force)
-  (λ (σ l v) (extend σ l (force σ v))))
+               [(ans: ans-σ cm v) (generator (do (ans-σ) () (yield (ans ans-σ cm v))))]
+               [_ (error 'step "Bad state ~a" state)]))
 
-(define (mk-kcfa-setter force)
-  (λ (σ l v) (join σ l (force σ v))))
+#;
+           (trace step)
 
-(define (force σ x)
-  (match x
-    [(addr a) (lookup-sto σ a)]
-    [v (set v)]))
-
-(define strict-eval-setter
-  (mk-eval-setter (λ (_ v) (set v))))
-
-(define lazy-eval-setter
-  (mk-eval-setter force))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; 0CFA-style Abstract semantics
-
-(define (truncate δ k)
-  (cond [(zero? k) '()]
-        [(empty? δ) '()]
-        [else
-         (cons (first δ)
-               (truncate (rest δ) (sub1 k)))]))
-
-(define (widen b)
-  (match b
-    [(? number?) 'number]
-    [(? string?) 'string]
-    [(? symbol?) 'symbol]
-    [(? boolean?) b]
-    ['number 'number]
-    [else (error "Unknown base value" b)]))
-
-(define (delay σ x)
-  (set (addr x)))
-
-(define strict-kcfa-setter
-  (mk-kcfa-setter (λ (_ v) (set v))))
-
-(define lazy-kcfa-setter
-  (mk-kcfa-setter force))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Potpourris of transition relations
-
-(define-values (eval-step compile-eval comp-eval-step)
-  (mk-comp-step (push +inf.0)
-                (bind +inf.0)
-                hash-getter
-                strict-eval-setter
-                eval-widen
-                (lambda (σ x) (set x))
-                lookup-sto))
-
-(define-values (lazy-eval-step compile-lazy-eval comp-lazy-eval-step)
-  (mk-comp-step (push +inf.0)
-                (bind +inf.0)
-                hash-getter
-                strict-eval-setter
-                eval-widen
-                force
-                delay))
-
-(define-values (1cfa-step compile-1cfa comp-1cfa-step)
-  (mk-comp-step (push 1)
-                (bind 1)
-                hash-getter
-                strict-kcfa-setter
-                widen
-                (lambda (σ x) (set x))
-                lookup-sto))
-
-(define-values (lazy-1cfa-step compile-lazy-1cfa comp-lazy-1cfa-step)
-  (mk-comp-step (push 1)
-                (bind 1)
-                hash-getter
-                lazy-kcfa-setter
-                widen
-                force
-                delay))
-
-(define-values (0cfa-step compile-0cfa comp-0cfa-step)
-  (mk-comp-step (push 0)
-                (bind 0)
-                hash-getter
-                strict-kcfa-setter
-                widen
-                (lambda (σ x) (set x))
-                lookup-sto))
-
-(define-values (lazy-0cfa-step compile-lazy-0cfa comp-lazy-0cfa-step)
-  (mk-comp-step (push 0)
-                (bind 0)
-                hash-getter
-                lazy-kcfa-setter
-                widen
-                force
-                delay))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Potpourris of evaluators
-
-(define ((mk-aval step inj) e)
-  (for/set ([s (fix step (inj e))]
-            #:when (ans? s))
-    (match-define (ans σ v) s)
-    (ans (restrict-to-reachable σ v) v)))
-
-;; (State -> Setof State) -> Exp -> Set Val
-;; 0CFA without store widening
-
-;; (State^ -> Setof State^) -> Exp -> Set Val
-;; 0CFA with store widening
-(define ((mk-aval^ step inj) e)
-  (for/fold ([vs ∅])
-    ([s (fix (wide-step step) (inj e))])
-    (∪ vs
-       (match s
-         [(cons cs σ)
-          (for/set ([c cs]
-                    #:when (ans^? c))
-            (ans^-v c))]))))
-
-(define k0 (mt))
-(define ε '())
-
-;; Exp -> Set State
-(define (inj e)
-  (set (ev (hash) e (hash) k0 ε)))
-
-;; Exp -> Set State^
-(define (inj-wide e)
-  (set (cons (set (ev^ e (hash) k0 ε)) (hash))))
-
-(define ((inj/c c) e)
-  ((c e) (hash) (hash) k0 ε))
-
-(define ((inj-wide/c c) e)
-  (for/set ((s (in-set ((c e) (hash) (hash) k0 ε))))
-           (cons (set (s->c s)) (state-σ s))))
-
-(define (mk-evals step comp-step compile)
-  (values (mk-aval  step inj)
-          (mk-aval^ step inj-wide)
-          (mk-aval  comp-step (inj/c compile))
-          (mk-aval^ comp-step (inj-wide/c compile))))
-
-(define-values (eval eval^ eval/c eval/c^)
-  (mk-evals eval-step comp-eval-step compile-eval))
-
-(define-values (lazy-eval lazy-eval^ lazy-eval/c lazy-eval/c^)
-  (mk-evals lazy-eval-step comp-lazy-eval-step compile-lazy-eval))
-
-(define-values (0cfa 0cfa^ 0cfa/c 0cfa/c^)
-  (mk-evals 0cfa-step comp-0cfa-step compile-0cfa))
-
-(define-values (lazy-0cfa lazy-0cfa^ lazy-0cfa/c lazy-0cfa/c^)
-  (mk-evals lazy-0cfa-step comp-lazy-0cfa-step compile-lazy-0cfa))
-
-(define-values (1cfa 1cfa^ 1cfa/c 1cfa/c^)
-  (mk-evals 1cfa-step comp-1cfa-step compile-1cfa))
-
-(define-values (lazy-1cfa lazy-1cfa^ lazy-1cfa/c lazy-1cfa/c^)
-  (mk-evals lazy-1cfa-step comp-lazy-1cfa-step compile-lazy-1cfa))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Widening State to State^
-
-;; State^ = (cons (Set Conf) Store)
-
-;; (State -> Setof State) -> State^ -> { State^ }
-(define ((wide-step step) state)
-  (match state
-    [(cons cs σ)
-     (define ss ((appl step)
-                 (for/set ([c cs]) (c->s c σ))))
-     (set (cons (for/set ([s ss]) (s->c s))
-                (join-stores ss)))]))
+           )))))]))

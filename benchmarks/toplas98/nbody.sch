@@ -442,552 +442,6 @@
 (define (direct-poten pt strength)
   (/ strength (pt-r pt)))
 
-;;; =================================================================
-;;;                 TREES NODES PARTICLES and POINTS
-;;; =================================================================
-
-(begin (begin (begin (define make-raw-tree
-                       (lambda (tree-1 tree-2 tree-3)
-                         (vector '<tree> tree-1 tree-2 tree-3)))
-                     (define tree?
-                       (lambda (obj)
-                         (if (vector? obj)
-                             (if (= (vector-length obj) 4)
-                                 (eq? (vector-ref obj 0) '<tree>)
-                                 #f)
-                             #f)))
-                     (define tree-1
-                       (lambda (obj)
-                         (if (tree? obj)
-                             (void)
-                             (error
-                               'tree-1
-                               "~s is not a ~s"
-                               obj
-                               '<tree>))
-                         (vector-ref obj 1)))
-                     (define tree-2
-                       (lambda (obj)
-                         (if (tree? obj)
-                             (void)
-                             (error
-                               'tree-2
-                               "~s is not a ~s"
-                               obj
-                               '<tree>))
-                         (vector-ref obj 2)))
-                     (define tree-3
-                       (lambda (obj)
-                         (if (tree? obj)
-                             (void)
-                             (error
-                               'tree-3
-                               "~s is not a ~s"
-                               obj
-                               '<tree>))
-                         (vector-ref obj 3)))
-                     (define set-tree-1!
-                       (lambda (obj newval)
-                         (if (tree? obj)
-                             (void)
-                             (error
-                               'set-tree-1!
-                               "~s is not a ~s"
-                               obj
-                               '<tree>))
-                         (vector-set! obj 1 newval)))
-                     (define set-tree-2!
-                       (lambda (obj newval)
-                         (if (tree? obj)
-                             (void)
-                             (error
-                               'set-tree-2!
-                               "~s is not a ~s"
-                               obj
-                               '<tree>))
-                         (vector-set! obj 2 newval)))
-                     (define set-tree-3!
-                       (lambda (obj newval)
-                         (if (tree? obj)
-                             (void)
-                             (error
-                               'set-tree-3!
-                               "~s is not a ~s"
-                               obj
-                               '<tree>))
-                         (vector-set! obj 3 newval))))
-              (define make-tree
-                (lambda (body low-left-front-vertex up-right-back-vertex)
-                  ((lambda ()
-                     (make-raw-tree
-                       body
-                       low-left-front-vertex
-                       up-right-back-vertex)))))
-              (define tree-body tree-1)
-              (define tree-low-left-front-vertex tree-2)
-              (define tree-up-right-back-vertex tree-3)
-              (define set-tree-body! set-tree-1!)
-              (define set-tree-low-left-front-vertex! set-tree-2!)
-              (define set-tree-up-right-back-vertex! set-tree-3!))
-       (begin (begin (define make-raw-node
-                       (lambda (node-1
-                                node-2
-                                node-3
-                                node-4
-                                node-5
-                                node-6
-                                node-7
-                                node-8)
-                         (vector
-                           '<node>
-                           node-1
-                           node-2
-                           node-3
-                           node-4
-                           node-5
-                           node-6
-                           node-7
-                           node-8)))
-                     (define node?
-                       (lambda (obj)
-                         (if (vector? obj)
-                             (if (= (vector-length obj) 9)
-                                 (eq? (vector-ref obj 0) '<node>)
-                                 #f)
-                             #f)))
-                     (define node-1
-                       (lambda (obj)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'node-1
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-ref obj 1)))
-                     (define node-2
-                       (lambda (obj)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'node-2
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-ref obj 2)))
-                     (define node-3
-                       (lambda (obj)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'node-3
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-ref obj 3)))
-                     (define node-4
-                       (lambda (obj)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'node-4
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-ref obj 4)))
-                     (define node-5
-                       (lambda (obj)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'node-5
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-ref obj 5)))
-                     (define node-6
-                       (lambda (obj)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'node-6
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-ref obj 6)))
-                     (define node-7
-                       (lambda (obj)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'node-7
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-ref obj 7)))
-                     (define node-8
-                       (lambda (obj)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'node-8
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-ref obj 8)))
-                     (define set-node-1!
-                       (lambda (obj newval)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'set-node-1!
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-set! obj 1 newval)))
-                     (define set-node-2!
-                       (lambda (obj newval)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'set-node-2!
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-set! obj 2 newval)))
-                     (define set-node-3!
-                       (lambda (obj newval)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'set-node-3!
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-set! obj 3 newval)))
-                     (define set-node-4!
-                       (lambda (obj newval)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'set-node-4!
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-set! obj 4 newval)))
-                     (define set-node-5!
-                       (lambda (obj newval)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'set-node-5!
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-set! obj 5 newval)))
-                     (define set-node-6!
-                       (lambda (obj newval)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'set-node-6!
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-set! obj 6 newval)))
-                     (define set-node-7!
-                       (lambda (obj newval)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'set-node-7!
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-set! obj 7 newval)))
-                     (define set-node-8!
-                       (lambda (obj newval)
-                         (if (node? obj)
-                             (void)
-                             (error
-                               'set-node-8!
-                               "~s is not a ~s"
-                               obj
-                               '<node>))
-                         (vector-set! obj 8 newval))))
-              (define make-node
-                (lambda (center
-                         low-left-front-vertex
-                         up-right-back-vertex
-                         children
-                         particles
-                         multipole-expansion
-                         near-field
-                         interactive-field)
-                  ((lambda ()
-                     (make-raw-node
-                       center
-                       low-left-front-vertex
-                       up-right-back-vertex
-                       children
-                       particles
-                       multipole-expansion
-                       near-field
-                       interactive-field)))))
-              (define node-center node-1)
-              (define node-low-left-front-vertex node-2)
-              (define node-up-right-back-vertex node-3)
-              (define node-children node-4)
-              (define node-particles node-5)
-              (define node-multipole-expansion node-6)
-              (define node-near-field node-7)
-              (define node-interactive-field node-8)
-              (define set-node-center! set-node-1!)
-              (define set-node-low-left-front-vertex! set-node-2!)
-              (define set-node-up-right-back-vertex! set-node-3!)
-              (define set-node-children! set-node-4!)
-              (define set-node-particles! set-node-5!)
-              (define set-node-multipole-expansion! set-node-6!)
-              (define set-node-near-field! set-node-7!)
-              (define set-node-interactive-field! set-node-8!))
-       (define leaf-node?
-         (lambda (node) (null? (node-children node))))
-       (begin (begin (define make-raw-particle
-                       (lambda (particle-1
-                                particle-2
-                                particle-3
-                                particle-4
-                                particle-5
-                                particle-6)
-                         (vector
-                           '<particle>
-                           particle-1
-                           particle-2
-                           particle-3
-                           particle-4
-                           particle-5
-                           particle-6)))
-                     (define particle?
-                       (lambda (obj)
-                         (if (vector? obj)
-                             (if (= (vector-length obj) 7)
-                                 (eq? (vector-ref obj 0) '<particle>)
-                                 #f)
-                             #f)))
-                     (define particle-1
-                       (lambda (obj)
-                         (if (particle? obj)
-                             (void)
-                             (error
-                               'particle-1
-                               "~s is not a ~s"
-                               obj
-                               '<particle>))
-                         (vector-ref obj 1)))
-                     (define particle-2
-                       (lambda (obj)
-                         (if (particle? obj)
-                             (void)
-                             (error
-                               'particle-2
-                               "~s is not a ~s"
-                               obj
-                               '<particle>))
-                         (vector-ref obj 2)))
-                     (define particle-3
-                       (lambda (obj)
-                         (if (particle? obj)
-                             (void)
-                             (error
-                               'particle-3
-                               "~s is not a ~s"
-                               obj
-                               '<particle>))
-                         (vector-ref obj 3)))
-                     (define particle-4
-                       (lambda (obj)
-                         (if (particle? obj)
-                             (void)
-                             (error
-                               'particle-4
-                               "~s is not a ~s"
-                               obj
-                               '<particle>))
-                         (vector-ref obj 4)))
-                     (define particle-5
-                       (lambda (obj)
-                         (if (particle? obj)
-                             (void)
-                             (error
-                               'particle-5
-                               "~s is not a ~s"
-                               obj
-                               '<particle>))
-                         (vector-ref obj 5)))
-                     (define particle-6
-                       (lambda (obj)
-                         (if (particle? obj)
-                             (void)
-                             (error
-                               'particle-6
-                               "~s is not a ~s"
-                               obj
-                               '<particle>))
-                         (vector-ref obj 6)))
-                     (define set-particle-1!
-                       (lambda (obj newval)
-                         (if (particle? obj)
-                             (void)
-                             (error
-                               'set-particle-1!
-                               "~s is not a ~s"
-                               obj
-                               '<particle>))
-                         (vector-set! obj 1 newval)))
-                     (define set-particle-2!
-                       (lambda (obj newval)
-                         (if (particle? obj)
-                             (void)
-                             (error
-                               'set-particle-2!
-                               "~s is not a ~s"
-                               obj
-                               '<particle>))
-                         (vector-set! obj 2 newval)))
-                     (define set-particle-3!
-                       (lambda (obj newval)
-                         (if (particle? obj)
-                             (void)
-                             (error
-                               'set-particle-3!
-                               "~s is not a ~s"
-                               obj
-                               '<particle>))
-                         (vector-set! obj 3 newval)))
-                     (define set-particle-4!
-                       (lambda (obj newval)
-                         (if (particle? obj)
-                             (void)
-                             (error
-                               'set-particle-4!
-                               "~s is not a ~s"
-                               obj
-                               '<particle>))
-                         (vector-set! obj 4 newval)))
-                     (define set-particle-5!
-                       (lambda (obj newval)
-                         (if (particle? obj)
-                             (void)
-                             (error
-                               'set-particle-5!
-                               "~s is not a ~s"
-                               obj
-                               '<particle>))
-                         (vector-set! obj 5 newval)))
-                     (define set-particle-6!
-                       (lambda (obj newval)
-                         (if (particle? obj)
-                             (void)
-                             (error
-                               'set-particle-6!
-                               "~s is not a ~s"
-                               obj
-                               '<particle>))
-                         (vector-set! obj 6 newval))))
-              (define make-particle
-                (lambda (position
-                         acceleration
-                         d-acceleration
-                         potential
-                         d-potential
-                         strength)
-                  ((lambda ()
-                     (make-raw-particle
-                       position
-                       acceleration
-                       d-acceleration
-                       potential
-                       d-potential
-                       strength)))))
-              (define particle-position particle-1)
-              (define particle-acceleration particle-2)
-              (define particle-d-acceleration particle-3)
-              (define particle-potential particle-4)
-              (define particle-d-potential particle-5)
-              (define particle-strength particle-6)
-              (define set-particle-position! set-particle-1!)
-              (define set-particle-acceleration! set-particle-2!)
-              (define set-particle-d-acceleration! set-particle-3!)
-              (define set-particle-potential! set-particle-4!)
-              (define set-particle-d-potential! set-particle-5!)
-              (define set-particle-strength! set-particle-6!))
-       (begin (begin (define make-raw-pt
-                       (lambda (pt-1 pt-2 pt-3)
-                         (vector '<pt> pt-1 pt-2 pt-3)))
-                     (define pt?
-                       (lambda (obj)
-                         (if (vector? obj)
-                             (if (= (vector-length obj) 4)
-                                 (eq? (vector-ref obj 0) '<pt>)
-                                 #f)
-                             #f)))
-                     (define pt-1
-                       (lambda (obj)
-                         (if (pt? obj)
-                             (void)
-                             (error 'pt-1 "~s is not a ~s" obj '<pt>))
-                         (vector-ref obj 1)))
-                     (define pt-2
-                       (lambda (obj)
-                         (if (pt? obj)
-                             (void)
-                             (error 'pt-2 "~s is not a ~s" obj '<pt>))
-                         (vector-ref obj 2)))
-                     (define pt-3
-                       (lambda (obj)
-                         (if (pt? obj)
-                             (void)
-                             (error 'pt-3 "~s is not a ~s" obj '<pt>))
-                         (vector-ref obj 3)))
-                     (define set-pt-1!
-                       (lambda (obj newval)
-                         (if (pt? obj)
-                             (void)
-                             (error
-                               'set-pt-1!
-                               "~s is not a ~s"
-                               obj
-                               '<pt>))
-                         (vector-set! obj 1 newval)))
-                     (define set-pt-2!
-                       (lambda (obj newval)
-                         (if (pt? obj)
-                             (void)
-                             (error
-                               'set-pt-2!
-                               "~s is not a ~s"
-                               obj
-                               '<pt>))
-                         (vector-set! obj 2 newval)))
-                     (define set-pt-3!
-                       (lambda (obj newval)
-                         (if (pt? obj)
-                             (void)
-                             (error
-                               'set-pt-3!
-                               "~s is not a ~s"
-                               obj
-                               '<pt>))
-                         (vector-set! obj 3 newval))))
-              (define make-pt
-                (lambda (x y z) ((lambda () (make-raw-pt x y z)))))
-              (define pt-x pt-1)
-              (define pt-y pt-2)
-              (define pt-z pt-3)
-              (define set-pt-x! set-pt-1!)
-              (define set-pt-y! set-pt-2!)
-              (define set-pt-z! set-pt-3!)))
-
 ;(define-structure (tree
 ;		   body
 ;		   low-left-front-vertex
@@ -1424,5 +878,558 @@
 ;;; (go 2 5 128)    27.44 seconds
 
 (define (nbody-benchmark)
-  (run-benchmark "N-Body" 
-    (lambda () (go 2 5 128))))
+  (go 2 5 128))
+
+;;; =================================================================
+;;;                 TREES NODES PARTICLES and POINTS
+;;; =================================================================
+
+(define make-raw-tree
+  (lambda (tree-1 tree-2 tree-3)
+    (vector '<tree> tree-1 tree-2 tree-3)))
+(define tree?
+  (lambda (obj)
+    (if (vector? obj)
+        (if (= (vector-length obj) 4)
+            (eq? (vector-ref obj 0) '<tree>)
+            #f)
+        #f)))
+(define tree-1
+  (lambda (obj)
+    (if (tree? obj)
+        (void)
+        (error
+         'tree-1
+         "~s is not a ~s"
+         obj
+         '<tree>))
+    (vector-ref obj 1)))
+(define tree-2
+  (lambda (obj)
+    (if (tree? obj)
+        (void)
+        (error
+         'tree-2
+         "~s is not a ~s"
+         obj
+         '<tree>))
+    (vector-ref obj 2)))
+(define tree-3
+  (lambda (obj)
+    (if (tree? obj)
+        (void)
+        (error
+         'tree-3
+         "~s is not a ~s"
+         obj
+         '<tree>))
+    (vector-ref obj 3)))
+(define set-tree-1!
+                       (lambda (obj newval)
+                         (if (tree? obj)
+                             (void)
+                             (error
+                               'set-tree-1!
+                               "~s is not a ~s"
+                               obj
+                               '<tree>))
+                         (vector-set! obj 1 newval)))
+(define set-tree-2!
+  (lambda (obj newval)
+    (if (tree? obj)
+        (void)
+        (error
+         'set-tree-2!
+         "~s is not a ~s"
+         obj
+         '<tree>))
+    (vector-set! obj 2 newval)))
+(define set-tree-3!
+  (lambda (obj newval)
+    (if (tree? obj)
+        (void)
+        (error
+         'set-tree-3!
+         "~s is not a ~s"
+         obj
+         '<tree>))
+    (vector-set! obj 3 newval)))
+(define make-tree
+  (lambda (body low-left-front-vertex up-right-back-vertex)
+    ((lambda ()
+       (make-raw-tree
+        body
+        low-left-front-vertex
+        up-right-back-vertex)))))
+(define tree-body tree-1)
+(define tree-low-left-front-vertex tree-2)
+(define tree-up-right-back-vertex tree-3)
+(define set-tree-body! set-tree-1!)
+(define set-tree-low-left-front-vertex! set-tree-2!)
+(define set-tree-up-right-back-vertex! set-tree-3!)
+(define make-raw-node
+  (lambda (node-1
+           node-2
+           node-3
+           node-4
+           node-5
+           node-6
+           node-7
+           node-8)
+    (vector
+     '<node>
+     node-1
+     node-2
+     node-3
+     node-4
+     node-5
+     node-6
+     node-7
+     node-8)))
+(define node?
+  (lambda (obj)
+    (if (vector? obj)
+        (if (= (vector-length obj) 9)
+            (eq? (vector-ref obj 0) '<node>)
+            #f)
+        #f)))
+(define node-1
+  (lambda (obj)
+    (if (node? obj)
+        (void)
+        (error
+         'node-1
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-ref obj 1)))
+(define node-2
+  (lambda (obj)
+    (if (node? obj)
+        (void)
+        (error
+         'node-2
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-ref obj 2)))
+(define node-3
+  (lambda (obj)
+    (if (node? obj)
+        (void)
+        (error
+         'node-3
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-ref obj 3)))
+(define node-4
+  (lambda (obj)
+    (if (node? obj)
+        (void)
+        (error
+         'node-4
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-ref obj 4)))
+(define node-5
+  (lambda (obj)
+    (if (node? obj)
+        (void)
+        (error
+         'node-5
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-ref obj 5)))
+(define node-6
+  (lambda (obj)
+    (if (node? obj)
+        (void)
+        (error
+         'node-6
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-ref obj 6)))
+(define node-7
+  (lambda (obj)
+    (if (node? obj)
+        (void)
+        (error
+         'node-7
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-ref obj 7)))
+(define node-8
+  (lambda (obj)
+    (if (node? obj)
+        (void)
+        (error
+         'node-8
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-ref obj 8)))
+(define set-node-1!
+  (lambda (obj newval)
+    (if (node? obj)
+        (void)
+        (error
+         'set-node-1!
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-set! obj 1 newval)))
+(define set-node-2!
+  (lambda (obj newval)
+    (if (node? obj)
+        (void)
+        (error
+         'set-node-2!
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-set! obj 2 newval)))
+(define set-node-3!
+  (lambda (obj newval)
+    (if (node? obj)
+        (void)
+        (error
+         'set-node-3!
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-set! obj 3 newval)))
+(define set-node-4!
+  (lambda (obj newval)
+    (if (node? obj)
+        (void)
+        (error
+         'set-node-4!
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-set! obj 4 newval)))
+(define set-node-5!
+  (lambda (obj newval)
+    (if (node? obj)
+        (void)
+        (error
+         'set-node-5!
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-set! obj 5 newval)))
+(define set-node-6!
+  (lambda (obj newval)
+    (if (node? obj)
+        (void)
+        (error
+         'set-node-6!
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-set! obj 6 newval)))
+(define set-node-7!
+  (lambda (obj newval)
+    (if (node? obj)
+        (void)
+        (error
+         'set-node-7!
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-set! obj 7 newval)))
+(define set-node-8!
+  (lambda (obj newval)
+    (if (node? obj)
+        (void)
+        (error
+         'set-node-8!
+         "~s is not a ~s"
+         obj
+         '<node>))
+    (vector-set! obj 8 newval)))
+(define make-node
+  (lambda (center
+           low-left-front-vertex
+           up-right-back-vertex
+           children
+           particles
+           multipole-expansion
+           near-field
+           interactive-field)
+    ((lambda ()
+       (make-raw-node
+        center
+        low-left-front-vertex
+        up-right-back-vertex
+        children
+        particles
+        multipole-expansion
+        near-field
+        interactive-field)))))
+(define node-center node-1)
+(define node-low-left-front-vertex node-2)
+(define node-up-right-back-vertex node-3)
+(define node-children node-4)
+(define node-particles node-5)
+(define node-multipole-expansion node-6)
+(define node-near-field node-7)
+(define node-interactive-field node-8)
+(define set-node-center! set-node-1!)
+(define set-node-low-left-front-vertex! set-node-2!)
+(define set-node-up-right-back-vertex! set-node-3!)
+(define set-node-children! set-node-4!)
+(define set-node-particles! set-node-5!)
+(define set-node-multipole-expansion! set-node-6!)
+(define set-node-near-field! set-node-7!)
+(define set-node-interactive-field! set-node-8!)
+
+(define leaf-node?
+  (lambda (node) (null? (node-children node))))
+
+(define make-raw-particle
+  (lambda (particle-1
+           particle-2
+           particle-3
+           particle-4
+           particle-5
+           particle-6)
+    (vector
+     '<particle>
+     particle-1
+     particle-2
+     particle-3
+     particle-4
+     particle-5
+     particle-6)))
+(define particle?
+  (lambda (obj)
+    (if (vector? obj)
+        (if (= (vector-length obj) 7)
+            (eq? (vector-ref obj 0) '<particle>)
+            #f)
+        #f)))
+(define particle-1
+  (lambda (obj)
+    (if (particle? obj)
+        (void)
+        (error
+         'particle-1
+         "~s is not a ~s"
+         obj
+         '<particle>))
+    (vector-ref obj 1)))
+(define particle-2
+  (lambda (obj)
+    (if (particle? obj)
+        (void)
+        (error
+         'particle-2
+         "~s is not a ~s"
+         obj
+         '<particle>))
+    (vector-ref obj 2)))
+(define particle-3
+  (lambda (obj)
+    (if (particle? obj)
+        (void)
+        (error
+         'particle-3
+         "~s is not a ~s"
+         obj
+         '<particle>))
+    (vector-ref obj 3)))
+(define particle-4
+  (lambda (obj)
+    (if (particle? obj)
+        (void)
+        (error
+         'particle-4
+         "~s is not a ~s"
+         obj
+         '<particle>))
+    (vector-ref obj 4)))
+(define particle-5
+  (lambda (obj)
+    (if (particle? obj)
+        (void)
+        (error
+         'particle-5
+         "~s is not a ~s"
+         obj
+         '<particle>))
+    (vector-ref obj 5)))
+(define particle-6
+  (lambda (obj)
+    (if (particle? obj)
+        (void)
+        (error
+         'particle-6
+         "~s is not a ~s"
+         obj
+         '<particle>))
+    (vector-ref obj 6)))
+(define set-particle-1!
+  (lambda (obj newval)
+    (if (particle? obj)
+        (void)
+        (error
+         'set-particle-1!
+         "~s is not a ~s"
+         obj
+         '<particle>))
+    (vector-set! obj 1 newval)))
+(define set-particle-2!
+  (lambda (obj newval)
+    (if (particle? obj)
+        (void)
+        (error
+         'set-particle-2!
+         "~s is not a ~s"
+         obj
+         '<particle>))
+    (vector-set! obj 2 newval)))
+(define set-particle-3!
+  (lambda (obj newval)
+    (if (particle? obj)
+        (void)
+        (error
+         'set-particle-3!
+         "~s is not a ~s"
+         obj
+         '<particle>))
+    (vector-set! obj 3 newval)))
+(define set-particle-4!
+  (lambda (obj newval)
+    (if (particle? obj)
+        (void)
+        (error
+         'set-particle-4!
+         "~s is not a ~s"
+         obj
+         '<particle>))
+    (vector-set! obj 4 newval)))
+(define set-particle-5!
+  (lambda (obj newval)
+    (if (particle? obj)
+        (void)
+        (error
+         'set-particle-5!
+         "~s is not a ~s"
+         obj
+         '<particle>))
+    (vector-set! obj 5 newval)))
+(define set-particle-6!
+  (lambda (obj newval)
+    (if (particle? obj)
+        (void)
+        (error
+         'set-particle-6!
+         "~s is not a ~s"
+         obj
+         '<particle>))
+    (vector-set! obj 6 newval)))
+
+(define make-particle
+  (lambda (position
+           acceleration
+           d-acceleration
+           potential
+           d-potential
+           strength)
+    ((lambda ()
+       (make-raw-particle
+        position
+        acceleration
+        d-acceleration
+        potential
+        d-potential
+        strength)))))
+(define particle-position particle-1)
+(define particle-acceleration particle-2)
+(define particle-d-acceleration particle-3)
+(define particle-potential particle-4)
+(define particle-d-potential particle-5)
+(define particle-strength particle-6)
+(define set-particle-position! set-particle-1!)
+(define set-particle-acceleration! set-particle-2!)
+(define set-particle-d-acceleration! set-particle-3!)
+(define set-particle-potential! set-particle-4!)
+(define set-particle-d-potential! set-particle-5!)
+(define set-particle-strength! set-particle-6!)
+
+
+(define make-raw-pt
+  (lambda (pt-1 pt-2 pt-3)
+    (vector '<pt> pt-1 pt-2 pt-3)))
+(define pt?
+  (lambda (obj)
+    (if (vector? obj)
+        (if (= (vector-length obj) 4)
+            (eq? (vector-ref obj 0) '<pt>)
+            #f)
+        #f)))
+(define pt-1
+  (lambda (obj)
+    (if (pt? obj)
+        (void)
+        (error 'pt-1 "~s is not a ~s" obj '<pt>))
+    (vector-ref obj 1)))
+(define pt-2
+  (lambda (obj)
+    (if (pt? obj)
+        (void)
+        (error 'pt-2 "~s is not a ~s" obj '<pt>))
+    (vector-ref obj 2)))
+(define pt-3
+  (lambda (obj)
+    (if (pt? obj)
+        (void)
+        (error 'pt-3 "~s is not a ~s" obj '<pt>))
+    (vector-ref obj 3)))
+(define set-pt-1!
+  (lambda (obj newval)
+    (if (pt? obj)
+        (void)
+        (error
+         'set-pt-1!
+         "~s is not a ~s"
+         obj
+         '<pt>))
+    (vector-set! obj 1 newval)))
+(define set-pt-2!
+  (lambda (obj newval)
+    (if (pt? obj)
+        (void)
+        (error
+         'set-pt-2!
+         "~s is not a ~s"
+         obj
+         '<pt>))
+    (vector-set! obj 2 newval)))
+(define set-pt-3!
+  (lambda (obj newval)
+    (if (pt? obj)
+        (void)
+        (error
+         'set-pt-3!
+         "~s is not a ~s"
+         obj
+         '<pt>))
+    (vector-set! obj 3 newval)))
+
+(define make-pt
+  (lambda (x y z) ((lambda () (make-raw-pt x y z)))))
+(define pt-x pt-1)
+(define pt-y pt-2)
+(define pt-z pt-3)
+(define set-pt-x! set-pt-1!)
+(define set-pt-y! set-pt-2!)
+(define set-pt-z! set-pt-3!)
+
+(nbody-benchmark)

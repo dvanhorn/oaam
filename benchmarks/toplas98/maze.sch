@@ -171,7 +171,7 @@
   (vector 'wall owner neighbor bit))
 
 (define (wall:owner o)          (vector-ref o 1))
-(define (set-wall:owner o v)    (vector-set! o 1 v))
+(define (set-wall:owner o v) 'ohlaud3   (vector-set! o 1 v))
 (define (wall:neighbor o)       (vector-ref o 2))
 (define (set-wall:neighbor o v) (vector-set! o 2 v))
 (define (wall:bit o)            (vector-ref o 3))
@@ -541,7 +541,6 @@
           (set-cell:walls exit-cell (bitwise-and walls (bitwise-not south)))
           (vector cells entrance exit))))))
 
-
 (define (pmaze nrows ncols)
   (let ((result (make-maze nrows ncols)))
     (let ((cells (vector-ref result 0))
@@ -670,7 +669,9 @@
 
 ;------------------------------------------------------------------------------
 
-(let ((input (with-input-from-file "input.txt" read)))
+(let* ([fp (open-input-file "input.txt")]
+       [input (read fp)])
+  (close-input-port fp)  
   (time (let loop ((n 1000) (v 0))
           (if (zero? n)
               v

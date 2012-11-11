@@ -636,7 +636,9 @@
 ;      cons
 ;      '())))
 
-(let ((input (with-input-from-file "input.txt" read)))
+(let* ([fp (open-input-file "input.txt")]
+       (input (read fp)))
+  (close-input-port fp)
   (time
    (let loop ((n 45) (v 0))
      (if (zero? n)
