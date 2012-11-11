@@ -698,6 +698,11 @@ Special + Compile + Lazy:
 
 \subsection{Store deltas}
 
+Each step in the fixpointer for the above techniques requires joining
+several (possibly large) stores together. Even with immutable hashes
+that utilize sharing, this is memory-intensive. Worse, this
+contributes an obscene fraction of the runtime.
+
 \begin{alltt}
 ;; \(\widehat{State} \to \widehat{State}\)
 (define (wide-step-specialized state)
@@ -723,34 +728,27 @@ Special + Compile + Lazy:
 Delta Store + Special + Compile + Lazy:
    cpu time: 668 real time: 686 gc time: 41
 
-\section{Sacrificing precision for performance}
+\subsection{Timestamping stores}
 
-Each step in the fixpointer for the above techniques requires joining
-several (possibly large) stores together. Even with immutable hashes
-that utilize sharing, this is memory-intensive. Worse, this
-contributes an obscene fraction of the runtime. We reuse a technique
-created in Shivers' dissertation~\cite{ianjohnson:Shivers:1991:CFA},
-timestamp approximation, that removes the need for joining whole
-stores by manipulating a global store imperatively. This loses
+The store delta technique removes overhead of joining large stores,
+but for determining if a state has been visited before, we still have
+to compare entire stores - an expensive computation.  We modify a
+technique created in Shivers'
+dissertation~\cite{ianjohnson:Shivers:1991:CFA}, timestamp
+approximation, that removes the need for joining whole stores by
+manipulating a global store imperatively. The original technique loses
 precision because the starting store for each state in a machine
 configuration can change between stepping all states and introduce
-more flows than originally possible. The example in figure
-\ref{fig:timestamp} illustrates this loss in precision. {\bf TODO:}
-EXPLANATION OF LOSS. In many applications, this is acceptable for the
-performance improvement.
+more flows than originally possible. However, by delaying the store
+changes until after all steps have completed, we can maintain our
+precision. In a variety of experiments, we observed that the overhead
+for storing store-deltas was outweighed by the precision keeping flows
+in check. That is to say, the analysis was faster {\it and} more precise.
 
-\begin{figure}
+TODO: technical detail
+
+\subsection{Pre-allocating the store}
 TODO
-\caption{Precision lossy program in timestamp approximation}
-\label{fig:timestamp}
-\end{figure}
-
-
-% For David to fill in.
-\subsection{Timestamp}
-...
-\subsection{Pre-allocated global store}
-...
 
 % Ian's sections: generators, implementation and compound data
 \section{Implementation}
@@ -813,25 +811,29 @@ suggest.
      (match k
        ['mt (generator (do (\(\msto\)) ([v <- (force \(\msto\) v)])
         (yield (ans \(\msto\) v))))]
-       [(ar\(\superscript\mlab\) e \(\menv\))
-        (generator (do (\(\msto\)) ()
-          (yield (ev \(\msto\) e \(\menv\) (fn v l)))))
-       [(fn\(\superscript\mlab\) f)
-        (generator (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)])
-         (yield (ap \(\msto\) f v k))))]
-       [(fi\(\superscript\mlab\) c a \(\menv\))
+       [(ar\(\superscript\mcntr\subscript\mlab\) e \(\menv\) a)
         (generator
-         (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)]
+         (do (\(\msto\)) ([\(\msto*\) (join \(\msto\) a\(\superscript{f}\) (force \(\msto\) v))])
+           (yield (ev \(\msto*\) e \(\menv\) (fn\(\superscript\mcntr\subscript\mlab\) a\(\superscript{f}\) a)))))
+       [(fn\(\superscript\mcntr\subscript\mlab\) fa a)
+        (generator
+         (do (\(\msto\)) ([\(\msto*\) (join \(\msto\) a\(\superscript{a}\) (force \(\msto\) v))]
+                  [k <- (get \(\msto\) a)]
+                  [f <- (get \(\msto\) fa)])
+           (yield (ap\(\superscript\mcntr\subscript\mlab\) \(\msto*\) f a\(\superscript{a}\) k))))]
+       [(fi\(\superscript\mcntr\subscript\mlab\) c a \(\menv\))
+        (generator
+         (do (\(\msto\)) ([k <- (get \(\msto\) l)]
                   [v <- (force \(\msto\) v)])
            (yield (ev \(\msto\) (if v c a) \(\menv\) k))))])]
-    [(ap \(\msto\) fun a k)
+    [(ap\(\superscript\mcntr\subscript\mlab\) \(\msto\) fun a k)
      (match fun
-       [(clos l x e \(\menv\))
+       [(clos x e \(\menv\))
         (generator
          (do (\(\msto\)) ([(\(\menv\)* \(\msto\)*) (bind state)])
            (yield (ev \(\msto\)* e \(\menv\)* k))))]
        [(? op? o)
-        (do (\(\msto\)) ([k <- (get-cont \(\msto\) l)]
+        (do (\(\msto\)) ([k <- (get \(\msto\) l)]
                  [v <- (force \(\msto\) v)]
                  [v (\(\interpdelta\) o (list v))])
           (yield (co \(\msto\) k v)))
