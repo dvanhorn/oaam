@@ -545,7 +545,6 @@ until it is needed in {\it strict contexts} (such as the guard for an
 \includegraphics[scale=0.3]{lazy.pdf}
 \end{center}
 
-
 For this, we introduce a new value for a delayed lookup that acts to
 quotient the state space by the values at the delayed address.
 
@@ -573,7 +572,7 @@ of a program by specializing the machine transition relation to the
 program being analyzed. This eliminates interpretative overhead by
 first compiling the program into ``byte code'' instructions.
 
-The essence of the compilation effect can be seen by consider an example
+The essence of the compilation effect can be seen by considering an example
 such as
 \[
 \sapp{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2}}{\mexp_3}
@@ -598,7 +597,6 @@ which makes the following transitions:
 where $\msto_4 = \msto_0 \sqcup \{ [\maddr_1 \mapsto \{ \mkont \}],
 [\maddr_2 \mapsto \kar{\mexp_3,\menv,\maddr_1}]
 [\maddr_3 \mapsto \kar{\mexp_2,\menv,\maddr_2}]$.
-
 
 Notice that the only difference between concrete and abstract interpretation
 is which addresses are pushed.
@@ -653,7 +651,7 @@ is which addresses are pushed.
 %% APPLY
 \ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\msto,\mkont} & \machstep
 \mcomp^{\mcntr'}(\menv',\msto',\mkont) \\
-\text{ where }\menv',\msto',\mcntr' &= \mathit{bind\,}^{ \mcntr}_\mlab(\msto,\mvar,\mval)
+\text{ where }\menv',\msto',\mcntr' &= \mathit{bind\,}^{ \mcntr}_\mlab(\menv,\msto,\mvar,\mval)
 \\
 \ap{\mop,\mval,\msto,\mkont} & \machstep
 \co{\mkont,\mval',\msto} \\
@@ -663,7 +661,6 @@ is which addresses are pushed.
 \caption{Abstract$^2$ machine for compiled ISWIM}
 \label{fig:caam}
 \end{figure}
-
 
 Compile:
    cpu time: 255397 real time: 261532 gc time: 2947
@@ -677,31 +674,47 @@ Compile + Lazy:
 \subsection{Store deltas}
 
 Each step in the fixpointer for the above techniques requires joining
-several (possibly large) stores together. Even with immutable hashes
+several, commonly large, stores together. Even with immutable hashes
 that utilize sharing, this is memory-intensive. Worse, this
-contributes an obscene fraction of the runtime.
+contributes an obscene fraction of the runtime. If we instead track
+the changes to the store made over all steps and afterwards update the
+store, we end up with much less allocation and computational overhead.
 
-\begin{alltt}
-;; \(\widehat{State} \to \widehat{State}\)
-(define (wide-step-specialized state)
-  (match state
-    [(cons \(\msto\) cs)
-     (define-values (cs* \(\msdiff\))
-       (for/fold ([cs* (set)] [\(\msdiff\)* '()])
-         ([c cs])
-         (match (step-compiled^ (cons \(\msto\) c))
-           [(cons \(\msdiff\)** cs**)
-            (values (\(\cup\) cs* cs**) (++ \(\msdiff\)** \(\msdiff\)*))])))
-     (cons (update \(\msdiff\) \(\msto\)) (\(\cup\) cs cs*))]))
-\end{alltt}
+We represent changes as a list of pairs of address to set of storable
+values. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$ now becomes
+$\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$ begins as empty for
+each step. Applying the changes is straightforward:
 
-\[
-\{ \widehat{v_3}, \widehat{v_5}, \widehat{v_6} \} = 0001011
-\]
+\begin{align*}
+\mtlst(\msto) &= \msto \\
+\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}(\msto) &= \msdiff(\msto)\sqcup[\maddr \mapsto \mval{s}]
+\end{align*}
 
-\[
-\sigma = \mbox{\tt \#(0$_0$,\dots,0$_{|P|}$)}
-\]
+The reduction relation does have to change to accomodate this
+technique, but only in this regard. The whole store is still given so
+that lookups are possible. Example rule:
+
+\begin{align*}
+bind^{\mcntr}_\mlab(\menv, \msto, \msdiff, \mvar, \mval) &= \menv[\mvar \mapsto \maddr], \cons{\ttuple{\maddr}{force(\msto,\mval)}}{\msdiff}, \mcntr' \\
+\text{ where } \mcntr' &= \lfloor \mlab \mcntr\rfloor_k \\
+               \maddr &= \mvar\mcntr' \\
+(\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont},\msto,\msdiff) & \machstep
+(\ev[^{\mcntr'}]{\mexp,\menv',\mkont},\msdiff') \\
+\text{ where }\menv',\msdiff',\mcntr' &= \mathit{bind\,}^{ \mcntr}_\mlab(\menv,\msto,\msdiff,\mvar,\mval)
+\end{align*}
+
+We also lift $\machstep$ differently to accomodate for this asymmetry
+in the input and output. For each state that is stepped, we feed the
+output changes to the next so that all changes get accumulated.
+
+\begin{align*}
+(cs, \msto) &\widehat{\machstep} (cs\cup cs', \msdiff(\msto)) \\
+\mbox{ where } (cs', \msdiff) &= step^*(\varnothing, cs, \mtlst) \\
+step^*(S, \varnothing, \msdiff) &= (S, \msdiff) \\
+step^*(S, \{c\}\cup cs, \msdiff &= step^*(S\cup cs^*, cs, \msdiff^*) \\
+cs^* &= \{c' \mid (c,\msto,\msdiff) \machstep (c',\msdiff^c) \} \\
+\msdiff^* &= concat\{\msdiff^c \mid (c, \msto,\msdiff) \machstep (c', \msdiff^c)\}
+\end{align*}
 
 Delta Store + Special + Compile + Lazy:
    cpu time: 668 real time: 686 gc time: 41
