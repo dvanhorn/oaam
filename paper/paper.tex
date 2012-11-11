@@ -463,7 +463,7 @@ reached. We begin with a generic fixpoint combinator, ${\mathcal F}$:
 \begin{align*}
 {\mathcal F}(f)(X) &= {\mathcal G}(f, X, \varnothing) \\
 {\mathcal G}(f, \varnothing, S) &= S \\
-{\mathcal G}(f, X, S) &= {\mathcal G}(f, f(X) \setminus S, S \cup f(X)) \\
+{\mathcal G}(f, X, S) &= {\mathcal G}(f, f(X) \setminus S, S \cup X) \\
 \end{align*}
 
 The $\machstep$ relation is most naturally written as a function from
