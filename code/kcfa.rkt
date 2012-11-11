@@ -284,7 +284,7 @@
            ;; End of continuation mark handling
 
            #,@(if (given touches)
-                  #`((mk-touches touches clos: rlos: #,(zero? (attribute K))))
+                  #`((mk-touches touches clos: rlos: list #,(zero? (attribute K))))
                   #'())
            (splicing-syntax-parameterize ([target-σ? (and #,σ-threading? 'threading)]
                                           [target-cs? #,c-passing?]

@@ -164,22 +164,19 @@
       (null? x)
       (eof-object? x)))
 
-(define-simple-macro* (mk-touches touches:id clos:id rlos:id 0cfa?:boolean)
+(define-simple-macro* (mk-touches touches:id clos:id rlos:id promise:id 0cfa?:boolean)
   (define (touches v)
     (match v
       [(clos xs e ρ fvs)
        #,(if (syntax-e #'0cfa?)
              #'fvs
-             #'(for/hash ([x (in-set fvs)]
-                          #:unless (memv x xs))
+             #'(for/hash ([x (in-set fvs)])
                  (hash-ref ρ x
                            (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ)))))]
       [(rlos xs rest e ρ fvs)
        #,(if (syntax-e #'0cfa?)
              #'fvs
-             #'(for/hash ([x (in-set fvs)]
-                          #:unless (or (eq? x rest)
-                                       (memv x xs)))
+             #'(for/hash ([x (in-set fvs)])
                  (hash-ref ρ x
                            (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ)))))]
       [(consv a d) (set a d)]
@@ -188,5 +185,11 @@
       [(or (vectorv^ _ a)
            (vectorv-immutable^ _ a)) (set a)]
       [(? set? s) (for/union ([v (in-set s)]) (touches v))]
+      [(promise e ρ)
+       #,(if (syntax-e #'0cfa?)
+             #'(free e)
+             #'(for/hash ([x (in-set (free e))])
+                 (hash-ref ρ x
+                           (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ)))))]
       [_ (set)])))
 
