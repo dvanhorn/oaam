@@ -589,9 +589,7 @@ increase conceptual complexity drastically.
 The first problem that we realized with the AAM approach was that much
 of the non-determinism is spurious. For example, in a function
 application,
-\begin{alltt}
-(f x y)
-\end{alltt}
+\begin{center}{\tt (f x y)}\end{center}
 
 where all variables have been joined with multiple values, each
 variable reference transitions to several new states that comprise the
@@ -778,7 +776,7 @@ cs^* &= \{c' \mid (c,\msto,\msdiff) \machstep (c',\msdiff^c) \} \\
 \msdiff^* &= concat\{\msdiff^c \mid (c, \msto,\msdiff) \machstep (c', \msdiff^c)\}
 \end{align*}
 
-Delta Store + Special + Compile + Lazy:
+Delta Store + Compile + Lazy:
    cpu time: 668 real time: 686 gc time: 41
 
 \subsection{Timestamping stores}
@@ -1100,7 +1098,7 @@ system design and implementation, and the resulting system require
 verification effort to prove the constraint system is sound and that
 the implementation is correct.
 
-This effort increases substantially as the comlexity of the analyzed
+This effort increases substantially as the complexity of the analyzed
 language increases.  Both the work of maintaining the concrete
 semantics and constraint system (and the relations between them) must
 be scaled simultaneously.  However, constraint systems, which have
@@ -1120,15 +1118,12 @@ work as a systematic path that eases the design, verification, and
 implementation of analyses using the abstracting abstract machine
 approach to within a factor of performant constraint-based analyses.
 
-
-
 \section{Conclusion}
 \label{sec:conclusion}
 
 Abstract machines are not only a good model for rapid analysis
 development, they also can be systematically developed into efficient
 algorithms.
-
 
 %% \acks Sam Tobin-Hochstadt for encouragement and feedback -- he was
 %% the first to prompt me to look into how make effective
