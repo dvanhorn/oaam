@@ -13,13 +13,13 @@
   (and var (sqrt var)))
 
 (define algo-name
-  '(("bl" . "baseline")
-    ("sp" . "specialized")
+  '(;;("bl" . "baseline")
+    ("sp" . "baseline")
     ("ls" . "lazy")
     ("lc" . "compiled")
-    ;("ld" . "deltas")
-    ("li" . "imperative")
-    ("lp" . "preallocated")))
+    ("ld" . "deltas")
+    ("id" . "imperative")
+    ("pd" . "preallocated")))
 
 (define (c x) (- (sub1 x))) ;; neg for B/W, pos for color
 (define (next x) (sub1 x))
@@ -32,9 +32,9 @@
     (plot (for/list ([(name numbers) (in-hash timings)]
                      [i (in-naturals)])
             (define (scale x) (if (number? x) x (* 30 60 1000)))
-            (define baseline (scale (average (which (hash-ref numbers "bl")))))
+            (define baseline (scale (average (which (hash-ref numbers "sp")))))
             (define numbers* (for*/list ([(tag algo) (in-dict algo-name)]
-                                         #:unless (string=? tag "bl")
+                                         #:unless (string=? tag "sp")
                                          [n (in-value (hash-ref numbers tag))])
                                (vector algo (/ (scale (average (which n))) baseline))))
             (discrete-histogram numbers*
