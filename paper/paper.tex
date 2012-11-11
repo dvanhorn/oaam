@@ -174,7 +174,7 @@ analysis time for this example.
 \includegraphics[width=2.5in]{rel-time-church.ps}
 \end{center}
 \caption{Relative run-time of
-optimized analyers to baseline for Church numeral example.}
+optimized analyzers to baseline for Church numeral example.}
 \label{fig:churchtime}
 \end{figure}
 
@@ -187,7 +187,7 @@ cause the baseline analyzer to take longer than 30 minutes or to
 consume more 1 gigabit of memory, at which point the analysis is
 stopped.  This is the case for the largest benchmark program, which is
 3,500 lines of code and takes under a minute in the most optimized
-analyer.  For those benchmarks that did complete on the baseline, the
+analyzer.  For those benchmarks that did complete on the baseline, the
 optimized analyzer outperformed the baseline by a factor of
 % 475
 two to
@@ -269,7 +269,7 @@ different in the following ways:
 \item continuations are heap-allocated,
 \item there are ``contour values'' (written $\mcntr$) and syntax
   labels ($\mlab$) threaded through the computation, and
-\item the machine is implicity parameterized by the functions
+\item the machine is implicitly parameterized by the functions
   $\mathit{push}$, $\mathit{bind}$, $\interpdelta$ and $\sqcup$.
 \end{itemize}
 
@@ -347,17 +347,17 @@ a deterministic machine.  (The relation is really a function.)
 
 \paragraph{Abstract interpretation} can be characterized by setting the implicit
 parameters just as above, but dropping the $\maddr \not\in \msto$
-condition.  This family of interpereters is also non-deterministic in
+condition.  This family of interpreters is also non-deterministic in
 choices of addresses, but it is free to choose addresses that are
 already in use.  Consequently, the machines may be non-deterministic
-when mutiple values reside in a store location.
+when multiple values reside in a store location.
 
 It is important to recognize from this definition that \emph{any}
 allocation strategy is an abstract interpretation.  In particular,
-concrete intepretation is a kind of abstract interpretation.  So is an
+concrete interpretation is a kind of abstract interpretation.  So is an
 interpretation that allocates a single cell into which all bindings
 and continuations are stored.  On the one hand is an abstract
-intepretation that is non-computable and gives only the ground truth
+interpretation that is non-computable and gives only the ground truth
 of a programs behavior; on the other is an abstract interpretation
 that is easy to compute but gives little information.  Useful program
 analyses lay somewhere in between and can be characterized by their
@@ -386,7 +386,7 @@ strategy:
               \lfloor \mcntr \rfloor_0 &= \mtcntr \\
               \lfloor \mlab\mcntr \rfloor_{k+1} &= \mlab\lfloor \mcntr\rfloor_k
 \end{align*}
-For the duration of this paper, $\sqcup$ is a pointwise lifting of $\cup$:
+For the duration of this paper, $\sqcup$ is a point-wise lifting of $\cup$:
 \begin{align*}
 \msto\sqcup \varnothing &= \msto \\
 \msto\sqcup \msto'[\maddr \mapsto S] &= \lambda \maddralt. \left\{ 
@@ -737,10 +737,10 @@ Each step in the fixpointer for the above techniques requires joining
 several, commonly large, stores together. Even with immutable hashes
 that utilize sharing, this is memory-intensive. Worse, this
 contributes an obscene fraction of the runtime. If we instead track
-the changes to the store made over all steps and afterwards update the
+the changes to the store made over all steps and afterward update the
 store, we end up with much less allocation and computational overhead.
 
-We represent changes as a list of pairs of address to set of storable
+We represent changes as a list of pairs of address to set of storeable
 values. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$ now becomes
 $\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$ begins as empty for
 each step. Applying the changes is straightforward:
@@ -750,7 +750,7 @@ each step. Applying the changes is straightforward:
 \cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}(\msto) &= \msdiff(\msto)\sqcup[\maddr \mapsto \mval{s}]
 \end{align*}
 
-The reduction relation does have to change to accomodate this
+The reduction relation does have to change to accommodate this
 technique, but only in this regard. The whole store is still given so
 that lookups are possible. Example rule:
 
@@ -763,7 +763,7 @@ bind^{\mcntr}_\mlab(\menv, \msto, \msdiff, \mvar, \mval) &= \menv[\mvar \mapsto 
 \text{ where }\menv',\msdiff',\mcntr' &= \mathit{bind\,}^{ \mcntr}_\mlab(\menv,\msto,\msdiff,\mvar,\mval)
 \end{align*}
 
-We also lift $\machstep$ differently to accomodate for this asymmetry
+We also lift $\machstep$ differently to accommodate for this asymmetry
 in the input and output. For each state that is stepped, we feed the
 output changes to the next so that all changes get accumulated.
 
@@ -807,7 +807,7 @@ TODO
 
 All the above techniques can be combined into a single implementation
 of the small step reduction relation and simple variations of a
-general fixpoint combinator. We implementated all of these ideas in an
+general fixpoint combinator. We implemented all of these ideas in an
 analysis of core Scheme (call-by-value lambda calculus extended with
 variable-arity functions, call/cc, vectors, conses, recursive binding,
 various primitives) in just 3000 lines of Racket. Most lines are spent
@@ -1091,7 +1091,7 @@ program point.  Value sets are computed as the least solution to a set
 of constraints (either inclusion or equality constraints).  The
 constraints must be designed and proved as a sound approximation of
 the semantics.  Efficient implementations of these kinds of analyses
-often take the form of worklist-based graph algorithms for contraint
+often take the form of worklist-based graph algorithms for constraint
 solving, and are thus quite different from the interpreter
 implementation.  The approach thus requires effort in constraint
 system design and implementation, and the resulting system require
