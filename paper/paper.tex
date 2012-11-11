@@ -449,12 +449,14 @@ of a set of ISWIM states without a store, and a store. A step of this
 machine will pair the store with each of the states in this set,
 reduce, and combine the output stores to create the next. Let $wn :
 \widehat{State} \times Store \to State$ be the metafunction that adds
-a store to a storeless state. Formally,
+a store to a storeless state, $nw$ removes the store, and $c.\msto$
+projects the store out of a state $c$. Formally,
 
 \begin{align*}
 (cs, \msto) &\widehat{\machstep} (cs', \msto') \\
-\mbox{where } cs' &= \{c' \mid wn(c, \msto) \machstep wn(c', \msto^c), c \in cs\} \\
-             \msto' &= \bigcup\{\msto^c \mid wn(c, \msto) \machstep wn(c', \msto^c), c \in cs\}
+\mbox{where } CS' &= lift(\machstep)(\{ wn(c, \msto) \mid c \in cs\}) \\
+              cs' &= \{nw(C') \mid C' \in CS'\} \\
+              \msto' &= \bigcup\{C'.\msto \mid C' \in CS'\}
 \end{align*}
 
 \subsection{Baseline evaluation}
@@ -471,19 +473,19 @@ abstraction in languages with n-ary functions, since otherwise the
 continuation space becomes ${\mathcal O}(n^n)$!
 
 \begin{align*}
-\ev{\sapp[^\mlab]{\mexpi0}{\mexpi1},\msto,\mkont} &\machstep
-\ev{\mexpi{0},\msto\sqcup[\mlab \mapsto \{\mkont\}],\kar{\mexpi{1},\mlab}}
+\ev{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &\machstep
+\ev{\mexpi{0},\menv,\msto\sqcup[\mlab \mapsto \{\mkont\}],\kar{\mexpi{1},\mlab}}
 \\
-\co{\kar{\mexp,\mlab},\mval,\msto} & \machstep
-\ev{\mexp,\msto\sqcup[\mlab^f \mapsto \{\mval\}],\kfn{\mlab^f,\mlab}}
+\co{\kar{\mexp,\menv,\mlab},\mval,\msto} & \machstep
+\ev{\mexp,\menv,\msto\sqcup[\mlab^f \mapsto \{\mval\}],\kfn{\mlab^f,\mlab}}
 \\
 \co{\kfn{\mlab^f,\mlab},\mval,\msto} & \machstep
 \ap[_\mlab]{\mvalx{u},\mlab^a,\mkont,\msto\sqcup[\mlab^a \mapsto \{\mval\}]}
 \\
 \text{ where } &\mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddr^f)
 \\
-\ap[_\mlab]{\clos{\mvar,\mexp},\mlab^a, \msto,\mkont} & \machstep
-\ev{\mexp,\msto\sqcup[\mvar \mapsto \msto(\mlab^a)],\mkont}
+\ap[_\mlab]{\clos{\mvar,\mexp,\menv},\mlab^a, \msto,\mkont} & \machstep
+\ev{\mexp,\menv[\mvar\mapsto\mvar],\msto\sqcup[\mvar \mapsto \msto(\mlab^a)],\mkont}
 \\
 \ap[_\mlab]{\mop,\mlab^a,\msto,\mkont} & \machstep
 \co{\mkont,\mval',\msto}
@@ -493,7 +495,7 @@ continuation space becomes ${\mathcal O}(n^n)$!
 
 This extra store-allocation is effectively naming all intermediate
 results, and thus the precision aligns with an analysis specialized to
-either ANF or CPS. 
+either ANF or CPS.
 
 Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 
@@ -529,38 +531,40 @@ The first problem that we realized with the AAM approach was that much
 of the non-determinism is spurious. For example, in a function
 application,
 \begin{alltt}
-(f x y z w)
+(f x y)
 \end{alltt}
+
 where all variables have been joined with multiple values, each
 variable reference transitions to several new states that comprise the
-cartesian product of all the values of {\tt x}, {\tt y}, {\tt z} and
-{\tt w}, only to be joined back together in {\tt f}'s bindings. For
-this reason, we {\it delay} the non-determinism until it is needed in
-{\it strict contexts} (such as the guard for an {\tt if} a called
-procedure, or a numerical primitive application).
+cartesian product of all the values of {\tt f}, {\tt x} and {\tt y},
+only to be joined back together in the application position. We would see transitions of the following shape:
+\begin{center}
+\includegraphics[scale=0.3]{fanout.pdf}
+\end{center}
+For this reason, we {\it delay} the non-determinism
+until it is needed in {\it strict contexts} (such as the guard for an
+{\tt if} a called procedure, or a numerical primitive application). We instead get transitions of this shape:
+\begin{center}
+\includegraphics[scale=0.3]{lazy.pdf}
+\end{center}
+
 
 For this, we introduce a new value for a delayed lookup that acts to
 quotient the state space by the values at the delayed address.
 
 \begin{align*}
-force(\msto,\clos{\mvar,\mexp,\menv}) &= \{\clos{\mvar,\mexp,\menv}\}\\
 force(\msto,\saddr\maddralt) &= \msto(\maddralt)\\
+force(\msto,\mval) &= \{\mval\}\\
 \ev{\svar{\mvar},\menv,\mkont,\msto} &\machstep\;
 \co{\mkont,\saddr{\menv(\mvar)},\msto} \\
-\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},v,\msto}
+\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto}
 &\machstep\;
-\ev[^\mcntr]{\mexp,\menv,\msto,\kfn[^\mcntr_\mlab]{\mval,\maddr}} \\
-\mbox{where } &\mval' \in force(\msto,\mval) \\
+\ev[^\mcntr]{\mexp,\menv,\msto\sqcup[\maddr^f \mapsto force(\msto,\mval)],\kfn[^\mcntr_\mlab]{\maddr^f,\maddr}} \\
 bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
   \maddr], \msto\sqcup[\maddr \mapsto force(\msto, \mval)], \mcntr' \\
 \mbox{where } \mcntr' &= \lfloor\mlab\mcntr\rfloor_k \\
               \maddr &= \mvar\mcntr'
 \end{align*}
-
-The force for the second rule is necessary to keep the same type for
-the \(\kfn{}\) continuation, but we would rather use an address. This
-introduces (acceptably) more imprecision, but has the same precision as an ANF
-analysis\footnote{Exercise for the reader.}.
 
 Lazy:
    cpu time: 32481 real time: 32881 gc time: 547
