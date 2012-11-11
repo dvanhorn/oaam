@@ -1,6 +1,6 @@
 #lang racket
 
-(define base-num 10)
+(define base-num 15)
 (define run-num (make-parameter 5))
 (define num-threads 5)
 
