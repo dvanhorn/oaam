@@ -80,7 +80,6 @@
                   (do (ev-σ) ([v #:in-get ev-σ xaddr])
                     (match v
                       [(promise: e ρ*)
-                       (log-debug "Demanded ~a as ~a" x v)
                        (do (ev-σ) ([(σ* a) #:push ev-σ l δ k])
                          (yield (ev σ* e ρ* (dmd xaddr a) δ)))]
                       [v (yield (co ev-σ k v))])))]
@@ -203,13 +202,12 @@
                          expander-flags ...)
            (struct mt () #:prefab)
            (mk-op-struct ifk (t e ρ k δ) (t e ρ-op ... k δ-op ...))
-           (mk-op-struct lrk (x xs es e ρ k δ) (x xs es e ρ-op ... k δ-op ...))
            (mk-op-struct dly (l v-addrs k δ) (l v-addrs k δ-op ...)) ;; delay arguments
            (mk-op-struct dmd (a k) (a k)) ;; demanded binding
            (mk-op-struct dmp (l o at ad k δ) (l o at ad k δ-op ...)) ;; demand args for primop
            (mk-op-struct clos (xs e ρ free) (xs e ρ-op ... free) #:expander-id clos:)
            (mk-op-struct rlos (xs r e ρ free) (xs r e ρ-op ... free) #:expander-id rlos:)
-           (define (kont? v) (or (dly? v) (dmd? v) (dmp? v) (lrk? v) (ifk? v) (mt? v)))
+           (define (kont? v) (or (dly? v) (dmd? v) (dmp? v) (ifk? v) (mt? v)))
            ;; values
            (mk-op-struct promise (e ρ) (e ρ-op ...))
 
@@ -315,7 +313,6 @@
                                      (yield (ans co-σ v))))]
 
                   [(dmd: va ka)
-                   (log-debug "Updating demand ~a to ~a" va v)
                    (generator (do (co-σ) ([σ*dmd #:join co-σ va (singleton v)]
                                           [k #:in-get σ*dmd ka])
                                 (yield (co σ*dmd k v))))]
@@ -326,7 +323,6 @@
                       (match fn
                         [(clos: xs e ρ _)
                          (cond [(= (length xs) (length v-addrs))
-                                (log-debug "Applying ~a to ~a" fn v-addrs)
                                 (do (co-σ)
                                     ([(ρ* σ*-clos δ*) #:bind ρ co-σ l δ xs v-addrs]
                                      [k #:in-get σ*-clos ka])
@@ -341,57 +337,45 @@
                         ;; that needs forcing, and continue until all arguments are known
                         ;; to have forced values.
                         [(primop o)
-                         (let loop ([at v-addrs] [ad '()])
-                           (match at
-                             ['() (define ad* (reverse ad))
-                              (do (co-σ) ([k #:in-get co-σ ka])
-                                (prim-meaning o co-σ l δ k ad*))]
-                             [(cons va at)
-                              (define vs (getter co-σ va))
-                              (cond [(for/or ([v (in-set vs)]) (promise? v))
-                                     (define ad* (cons va ad))
-                                     (do (co-σ) ([v (in-set vs)])
-                                       (match v
-                                         [(promise: e ρ)
-                                          (yield (ev co-σ e ρ (dmp l o at ad* ka δ) δ))]
-                                         [_ (continue)]))]
-                                    [else (loop at (cons va ad))])]))]
+                         (match v-addrs
+                           ['() (do (co-σ) ([k #:in-get co-σ ka])
+                                  (prim-meaning o co-σ l δ k '()))]
+                           [(cons va at)
+                            (define vs (getter co-σ va))
+                            (define ad* (list va))
+                            (do (co-σ) ([v (in-set vs)])
+                              (match v
+                                [(promise: e ρ)
+                                 (yield (ev co-σ e ρ (dmp l o at ad* ka δ) δ))]
+                                [_ (yield (co co-σ (dmp l o at ad* ka δ) v))]))])]
                         [_ (log-info "Applied non-function: ~a at ~a" fn l)
                            (yield (co co-σ k v))])))]
 
                   [(dmp: l o at (and (cons af _) ad) ka δ)
                    (generator
-                   (do (co-σ) ([σ*dmp #:join co-σ af (singleton v)])
-                     (let loop ([at at] [ad ad])
-                       (match at
-                         ['() (define ad* (reverse ad))
-                          (do (co-σ) ([k #:in-get co-σ ka])
-                            (prim-meaning o co-σ l δ k ad*))]
-                         [(cons va at)
-                          (define vs (getter co-σ va))
-                          (cond [(for/or ([v (in-set vs)]) (promise? v))
-                                 (define ad* (cons va ad))
-                                 (do (co-σ) ([v (in-set vs)])
-                                   (match v
-                                     [(promise: e ρ)
-                                      (yield (ev co-σ e ρ (dmp l o at ad* ka δ) δ))]
-                                     [_ (continue)]))]
-                                [else (loop at (cons va ad))])]))))]
+                   (do (co-σ) ([σ*dmp #:join-forcing co-σ af v])
+                     (match at
+                       ['() (define ad* (reverse ad))
+                        (do (co-σ) ([k #:in-get co-σ ka])
+                          (prim-meaning o co-σ l δ k ad*))]
+                       [(cons va at)
+                        (define vs (getter co-σ va))
+                        (define k (dmp l o at (cons va ad) ka δ))
+                        (do (co-σ) ([has-nonpromise? (in-set (∪1 (set #f) (not (for/and ([v (in-set vs)]) (promise? v)))))])
+                          (if has-nonpromise?
+                              (do (co-σ) ([v (delay co-σ va)])
+                                (yield (co co-σ k v)))
+                              (do (co-σ) ([v (in-set vs)])
+                                (match v
+                                  ;; at least one promise. Go force it.
+                                  [(promise: e ρ) (yield (ev co-σ e ρ k δ))]
+                                  [_ (continue)]))))])))]
 
                   [(ifk: t e ρ a δ)
                    (generator
                     (do (co-σ) ([k* #:in-get co-σ a]
                                 [v #:in-force co-σ v])
                       (yield (ev co-σ (if v t e) ρ k* δ))))]
-                  [(lrk: x '() '() e ρ a δ)
-                   (generator
-                    (do (co-σ) ([σ*-lrk #:join-forcing co-σ (lookup-env ρ x) v]
-                                [k* #:in-get σ*-lrk a])
-                      (yield (ev σ*-lrk e ρ k* δ))))]
-                  [(lrk: x (cons y xs) (cons e es) b ρ a δ)
-                   (generator
-                    (do (co-σ) ([σ*-lrkn #:join-forcing co-σ (lookup-env ρ x) v])
-                      (yield (ev σ*-lrkn e ρ (lrk y xs es b ρ a δ) δ))))]
                   [_ (error 'step "Bad continuation ~a" k)])]
 
                ;; this code is dead when running compiled code.
@@ -403,7 +387,7 @@
                [(ans: ans-σ v) (generator (do (ans-σ) () (yield (ans ans-σ v))))]
                [_ (error 'step "Bad state ~a" state)]))
 
-
+#;
            (trace step)
 
            )))))]))
