@@ -397,69 +397,25 @@ For the duration of this paper, $\sqcup$ is a point-wise lifting of $\cup$:
   \end{array}\right.
 \end{align*}
 
-\paragraph{Primitives}
+%% \paragraph{Primitives}
 
-\begin{align*}
-\mnum+1 &\in \interpdelta(\saddone,\mnum) &
-\mnum-1 &\in \interpdelta(\ssubone,\mnum)\\
-\strue &\in \interpdelta(\szerohuh,\szero) &
-\sfalse &\in \interpdelta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
-\end{align*}
+%% \begin{align*}
+%% \mnum+1 &\in \interpdelta(\saddone,\mnum) &
+%% \mnum-1 &\in \interpdelta(\ssubone,\mnum)\\
+%% \strue &\in \interpdelta(\szerohuh,\szero) &
+%% \sfalse &\in \interpdelta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
+%% \end{align*}
 
-\begin{align*}
-\sNum &\in \hat\interpdelta(\saddone,\mnum) &
-\sNum &\in \hat\interpdelta(\ssubone,\mnum)\\
-\strue &\in \hat\interpdelta(\szerohuh,\sNum) &
-\sfalse &\in \hat\interpdelta(\szerohuh,\sNum)\\
-\strue &\in \hat\interpdelta(\szerohuh,\szero) &
-\sfalse &\in \hat\interpdelta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
-\end{align*}
+%% \begin{align*}
+%% \sNum &\in \hat\interpdelta(\saddone,\mnum) &
+%% \sNum &\in \hat\interpdelta(\ssubone,\mnum)\\
+%% \strue &\in \hat\interpdelta(\szerohuh,\sNum) &
+%% \sfalse &\in \hat\interpdelta(\szerohuh,\sNum)\\
+%% \strue &\in \hat\interpdelta(\szerohuh,\szero) &
+%% \sfalse &\in \hat\interpdelta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
+%% \end{align*}
 
-\begin{figure}
-\begin{alltt}
-  ;; State \(\to\) \(\Set(\)State\()\)
-  (define (step \(\mstate\))
-    (match \(\mstate\)
-      [(ev \(\mexp\) \(\rho\) \(\msto\) \(\mkont\))
-       (match \(\mexp\)
-         [(var\(\superscript\mlab\) \(\mvar\))
-          (for/set ((\(\mval\) (lookup \(\rho\) \(\msto\) \(\mvar\))))
-            (co \(\msto\) \(\mkont\) \(\mval\)))]
-         [(lit\(\superscript\mlab\) \(\mlit\)) (set (co \(\msto\) \(\mkont\) \(\mlit\)))]
-         [(lam\(\superscript\mlab\) \(\mvar\) \(\mexp\)) (set (co \(\msto\) \(\mkont\) (clos \(\mvar\) \(\mexp\) \(\rho\))))]
-         [(app\(\superscript\mlab\) \(\mexp\subscript0\) \(\mexp\subscript1\))
-          (define-values (\(\msto'\) \(\maddr\)) (push \(\mstate\)))
-          (set (ev \(\mexp\subscript0\) \(\rho\) \(\msto'\) (ar \(\mexp\subscript1\) \(\rho\) \(\maddr\))))]
-         [(ife\(\superscript\mlab\) \(\mexp\subscript0\) \(\mexp\subscript1\) \(\mexp\subscript2\))
-          (define-values (\(\msto'\) \(\maddr\)) (push \(\mstate\)))
-          (set (ev \(\mexp\subscript0\) \(\rho\) \(\msto'\) (ifk \(\mexp\subscript1\) \(\mexp\subscript2\) \(\rho\) \(\maddr\))))])]
-      [(co \(\msto\) \(\mkont\) \(\mval\))
-       (match \(\mkont\)
-         ['mt (set (ans \(\msto\) \(\mval\)))]
-         [(ar\(\superscript\mlab\) \(\mexp\) \(\rho\)) (set (ev \(\mexp\) \(\rho\) \(\msto\) (fn \(\mval\) l)))]
-         [(fn\(\superscript\mlab\) \(\mval'\))
-          (for/set ((\(\mkont\) (get-cont \(\msto\) l)))
-            (ap \(\msto\) \(\mval'\) \(\mval\) \(\mkont\)))]
-         [(fi\(\superscript\mlab\) c a \(\rho\))
-          (for/set ((k (get-cont \(\msto\) l)))
-            (ev (if v c \(\maddr\)) \(\rho\) \(\msto\) \(\mkont\)))])]
-      [(ap \(\msto\) fun \(\maddr\) \(\mkont\))
-       (match fun
-         [(clos l \(\mvar\) \(\mexp\) \(\rho\))
-          (define-values (\(\rho'\) \(\msto'\)) (bind \(\mstate\)))
-          (set (ev \(\msto'\) \(\mexp\) \(\rho'\) \(\mkont\)))]
-         [(op \(\mop\))
-          (for*/set ((\(\mkont\) (get-cont \(\msto\) l))
-                     (\(\mval\) (\(\interpdelta\) \(\mop\) \(\mval\))))
-            (co \(\msto\) \(\mkont\) \(\mval\)))]
-         [_ (set)]))]))
-\end{alltt}
-\caption{Implementation of machine transition relation.}
-\end{figure}
-
-
-
-\newpage
+%\newpage
 \section{Baseline analyzer}
 \label{sec:baseline}
 
@@ -507,16 +463,21 @@ We can reuse the reduction relation we have defined, but with some
 scaffolding around it. A state in the store-widened machine is a pair
 of a set of ISWIM states without a store, and a store. A step of this
 machine will pair the store with each of the states in this set,
-reduce, and combine the output stores to create the next. Let $wn :
-\widehat{State} \times Store \to State$ be the metafunction that adds
-a store to a storeless state, $nw$ removes the store, and $c.\msto$
-projects the store out of a state $c$. Formally,
+reduce, and combine the output stores to create the next. The
+scaffolded reduction relation, $\widehat{\machstep}$, is as follows:
+
+Let $wn : \widehat{State} \times Store \to State$ be the metafunction
+that adds a store to a storeless state and $c.\msto$ projects the
+store out of a state $c$.
 
 \begin{align*}
 (cs, \msto) &\widehat{\machstep} (cs', \msto') \\
 \mbox{where } cs' &= \{c' \mid wn(c, \msto) \machstep wn(c, \msto^c), c \in cs\} \\
               \msto' &= \bigsqcup\{\msto^c \mid wn(c,\msto)\machstep wn(c', \msto^c), c \in cs\}
 \end{align*}
+That is, the next set of states is what we get by stepping each
+given state, without its store. The next store is the combination of all produced
+stores. For simplicity, assume that stuck states step to themselves.
 
 \subsection{Baseline evaluation}
 \label{sec:baselineeval}
@@ -531,6 +492,8 @@ the label of the application point, so the space becomes linear and
 the overall complexity drops to cubic. Note that this is a critical
 abstraction in languages with n-ary functions, since otherwise the
 continuation space becomes ${\mathcal O}(n^n)$!
+
+The important rules that change are the following, specialized to 0-CFA:
 
 \begin{align*}
 \ev{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &\machstep
@@ -555,11 +518,13 @@ continuation space becomes ${\mathcal O}(n^n)$!
 
 This extra store-allocation is effectively naming all intermediate
 results, and thus the precision aligns with an analysis specialized to
-either ANF or CPS.
+either ANF or CPS. We can also play a representation trick and remove
+$\menv$ since we know it is the identity function in 0-CFA. We will
+refer to this change in the semantics as value indirection.
 
 % Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 
-\section{Precision preserving recipe}
+\section{Mostly precision preserving recipe}
 \label{sec:opt}
 
 We discuss a variety of techniques for increasing performance by
@@ -578,6 +543,7 @@ space [SS], and decreasing intermediate data structures [DS].
  \item{[DS] represent the global store as a global, mutable vector in
    the 0-CFA case. (preallocation)}
 \end{itemize}
+
 Each technique requires minimal changes to the reduction
 relation/fixpoint, and each improves performance by integer
 factors. The first three remain in the purely functional realm. The
@@ -586,15 +552,13 @@ increase conceptual complexity drastically.
 
 \subsection{Lazy non-determinism}
 
-The first problem that we realized with the AAM approach was that much
-of the non-determinism is spurious. For example, in a function
-application,
-\begin{center}{\tt (f x y)}\end{center}
-
+A shortcoming of the AAM approach is that much of the non-determinism
+is spurious. For example, in a function application, {\tt (f x y)},
 where all variables have been joined with multiple values, each
 variable reference transitions to several new states that comprise the
 cartesian product of all the values of {\tt f}, {\tt x} and {\tt y},
-only to be joined back together in the application position. We would see transitions of the following shape:
+only to be joined back together in their respective application positions. We would
+see transitions of the following shape:
 \begin{center}
 \includegraphics[scale=0.3]{fanout.pdf}
 \end{center}
@@ -606,7 +570,7 @@ until it is needed in {\it strict contexts} (such as the guard for an
 \end{center}
 
 For this, we introduce a new value for a delayed lookup that acts to
-quotient the state space by the values at the delayed address.
+quotient the state space by the values at the delayed address. Its changes to the semantics are highlighted in the following rules:
 
 \begin{align*}
 force(\msto,\saddr\maddralt) &= \msto(\maddralt)\\
@@ -622,6 +586,32 @@ bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
               \maddr &= \mvar\mcntr'
 \end{align*}
 
+This semantics introduces a subtle precision difference over the
+baseline that is negligible. Consider a configuration where a
+reference to a variable and a binding of a variable will happen in one
+step. With laziness, the reference will mean the original binding(s)
+of the variable or the new one, because the actual store lookup is
+delayed precisely one step (i.e. laziness is administrative). Without
+laziness, the reference will fan out to all the bindings of the
+variable before the new binding happens and thus might have an
+observable precision difference. In our experience, this situation
+happens too rarely to warrant the significant increase in time and
+memory needed for this eager non-determinism. Indeed, were the
+variable reference a step later and another binding is not made in
+that step, the results of the two approaches are the same.
+
+The administrative nature of laziness means that we could remove the
+loss in precision by essentially duplicating the reduction relation to
+specialize variable lookup. This works since in the semantics of ISWIM
+with value indirection consumes the value component of states in
+one step. This is not the case for semantics that replicate the value
+component across reductions, say for popping off exception handler
+frames. Further convolution is needed to remove the administrative
+nature of laziness in these semantics. Due to the increase of
+conceptual complexity for negligable benefit, we decided against this
+approach.
+
+All following techniques preserve precision.
 % Lazy:  cpu time: 32481 real time: 32881 gc time: 547
 
 \subsection{Abstract compilation}
@@ -726,7 +716,7 @@ is which addresses are pushed.
 % \noindent
 % Compile + Lazy: cpu time: 31173 real time: 31642 gc time: 739
 
-\newpage
+%\newpage
 
 \subsection{Store deltas}
 
@@ -845,188 +835,48 @@ Hashes are not the most efficent for raw speed. If we commit to using
 sequential natural numbers for variables and expression labels, by the
 time we finish parsing the input program, we will know exactly how
 many addresses we will need. Thus the store can be represented by a
-vector the size of the largest label assigned, plus 1. This technique
-only works in 0-CFA, since there are many more addresses that can be
-allocated in 1-CFA and higher. To support general $k$-CFA in a vector
-representation, we need a growable vector and a map from addresses to
-assigned indices. When assignable indices run out, we grow the
-vector. The cost of this map is less than a hash representation for
-the whole store since typically there are more references to an address
-than allocations of it.
+vector the size of the largest label (call it $\mlab_{max}$) assigned, plus
+1. The parser should be assigning new, fresh names to variables
+anyway, so this change is a one-liner.
 
-% Ian's sections: generators, implementation and compound data
-\section{Implementation}
-\label{sec:impl}
-
-All the above techniques can be combined into a single implementation
-of the small step reduction relation and simple variations of a
-general fixpoint combinator. We implemented all of these ideas in an
-analysis of core Scheme (call-by-value lambda calculus extended with
-variable-arity functions, call/cc, vectors, conses, recursive binding,
-various primitives) in just 3000 lines of Racket. Most lines are spent
-defining the primitives and expected library functions used in our
-benchmarks. Here we describe the unifying vocabulary for writing such
-a framework, and some design decisions related to scaling to a
-language with compound data.
-
-\subsection{Vocabulary of Parameterized Optimizations}
-
-We combine the interface of generators~\cite{ianjohnson:cluhistory}
-with a special lambda form ({\tt $\lambda$\%}) that wraps the meanings
-of {\tt ev} states. We also have a special {\tt do} form that performs
-behind-the-scenes state passing and iteration much like {\tt do} in
-Haskell. In the presence of the different optimization
-techniques, {\tt generator}, {\tt yield}, {\tt $\lambda$\%} and {\tt do}
-change meaning slightly, but keep the same interface as their names
-suggest.
-
-\begin{figure}
-\begin{alltt}
-\(e-dispatch =\)
-(match e
-  [(var\(\superscript\mlab\) x)
-   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-    (do (\(\msto\)) ((v (delay (lookup-env \(\menv\) x))))
-      (yield (co \(\msto\) k v))))]
-  [(lit\(\superscript\mlab\) l)
-   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-    (do (\(\msto\)) () (yield (co \(\msto\) k n))))]
-  [(lam\(\superscript\mlab\) x e)
-   (define c (compile e))
-   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-    (do (\(\msto\)) () (yield (co \(\msto\) k (clos x c \(\menv\))))))]
-  [(app\(\superscript\mlab\) f e)
-   (define cf (compile f))
-   (define ce (compile e))
-   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-    (define-values (\(\msto\)* a) (push state))
-    (yield (ev \(\msto\)* cf \(\menv\) (ar c \(\menv\) a))))]
-  [(ife\(\superscript\mlab\) e0 e1 e2)
-   (define c0 (compile e0))
-   (define c1 (compile e1))
-   (define c2 (compile e2))
-   (\(\lambda\)\% (\(\msto\) \(\menv\) k)
-     (do (\(\msto\)) [(\(\msto\)* a) (push state)]
-      (yield (ev \(\msto\)* c0 \(\menv\) (ifk c1 c2 \(\menv\) a)))))])
-
-(define (step state)
-  (match state
-    [(ev \(\msto\) e \(\menv\) k) \(e-dispatch\)] ;; dead if compiled.
-    [(co \(\msto\) k v)
-     (match k
-       ['mt (generator (do (\(\msto\)) ([v <- (force \(\msto\) v)])
-        (yield (ans \(\msto\) v))))]
-       [(ar\(\superscript\mcntr\subscript\mlab\) e \(\menv\) a)
-        (generator
-         (do (\(\msto\)) ([\(\msto*\) (join \(\msto\) a\(\superscript{f}\) (force \(\msto\) v))])
-           (yield (ev \(\msto*\) e \(\menv\) (fn\(\superscript\mcntr\subscript\mlab\) a\(\superscript{f}\) a)))))
-       [(fn\(\superscript\mcntr\subscript\mlab\) fa a)
-        (generator
-         (do (\(\msto\)) ([\(\msto*\) (join \(\msto\) a\(\superscript{a}\) (force \(\msto\) v))]
-                  [k <- (get \(\msto\) a)]
-                  [f <- (get \(\msto\) fa)])
-           (yield (ap\(\superscript\mcntr\subscript\mlab\) \(\msto*\) f a\(\superscript{a}\) k))))]
-       [(fi\(\superscript\mcntr\subscript\mlab\) c a \(\menv\))
-        (generator
-         (do (\(\msto\)) ([k <- (get \(\msto\) l)]
-                  [v <- (force \(\msto\) v)])
-           (yield (ev \(\msto\) (if v c a) \(\menv\) k))))])]
-    [(ap\(\superscript\mcntr\subscript\mlab\) \(\msto\) fun a k)
-     (match fun
-       [(clos x e \(\menv\))
-        (generator
-         (do (\(\msto\)) ([(\(\menv\)* \(\msto\)*) (bind state)])
-           (yield (ev \(\msto\)* e \(\menv\)* k))))]
-       [(? op? o)
-        (do (\(\msto\)) ([k <- (get \(\msto\) l)]
-                 [v <- (force \(\msto\) v)]
-                 [v (\(\interpdelta\) o (list v))])
-          (yield (co \(\msto\) k v)))
-       [_ (generator (do (\(\msto\)) () (continue)))]))]))
-\end{alltt}
-\caption{Parameterized Abstract$^2$ machine for ISWIM}
-\label{fig:paam}
-\end{figure}
-
-\begin{figure}
-\begin{alltt}
-(define (compile e) \(e-dispatch\))
-(\(\lambda\)\% (\(\msto\) \(\menv\) k) body \ldots) \(\machstep\) (\(\lambda\) (\(\msto\) \(\menv\) k) body \ldots)
-(yield (ev \(\msto\) c . rest)) \(\longmapsto\) (c \(\msto\) . rest)
-(yield e) \(\longmapsto\) (yield-meaning e)
-\end{alltt}
-\caption{Meaning of forms if compiled}
-\label{fig:cfm}
-\end{figure}
-
-\begin{figure}
-\begin{alltt}
-(define (compile e) e)
-(\(\lambda\)\% (\(\msto\) \(\menv\) k) body \ldots) \(\longmapsto\) (let () body ...)
-(yield e) \(\longmapsto\) (yield-meaning e)
-\end{alltt}
-\caption{Meaning of forms if not compiled}
-\label{fig:ncfm}
-\end{figure}
-
-Why generators? Relations in general cannot be written as computable
-functions, but in our case we have a decidable relation with finitely
-many pairs sharing the same left component. There are several
-implementation strategies for such relations, some more effective than
-others. For instance, a silly implementation strategy would be
-defining a binary function that decides membership in the relation. We
-want the definition to drive the interpreter, so we might naturally
-decide to write a function that takes a state and returns a set of all
-the next states. As we described in the imperative workset section,
-this intermediate allocation is unnecessary and wasteful. What we
-really want is a way of pulling on the reduction relation for more
-next states as the fixpoint is ready for them.
-
-For intermediate sets, {\tt yield} is {\tt return} in the set
-monad. For the imperative worklist, {\tt yield} performs mutation
-behind the scenes. Indeed, we could use real generators! This is the
-only case where {\tt generator} constructs a nullary generator; in the
-other cases it evaluates to its body. Racket's generators are not
-tuned for performance, so we actually lose efficiency in this case,
-but the unifying vocabulary is instructive nonetheless.
-
-The {\tt $\lambda$\%} form constructs a real closure in the
-compilation case and evaluates to its body otherwise.
-
-The {\tt do} form has the special job of maintaining the current store
-and accumulated states (if indeed those are being passed around). It
-uses Racket's syntax parameters ~\cite{dvanhorn:eli/stxparam} to
-track the most recent bindings of these accumulators so that {\tt
-  yield-meaning} can refer to them (say {\tt $\sigma$p} and {\tt
-  statep}). In the case of state passing and set-accumulated states, its
-definition is simply
-
-\begin{center}
-\begin{alltt}
-(yield-meaning e) \(\longmapsto\) (values \(\sigma\)p (set-add statep e))
-\end{alltt}
-\end{center}
-
-The linguistic elements described above were all reusable to implement
-the various languages' abstract interpreters. The language of our
-benchmarks, Scheme, has compound data (e.g. vectors and conses), which
-introduces choices for abstraction.
+This technique by itself only works in 0-CFA, since there are many more
+addresses that can be allocated in 1-CFA and higher. To support
+general $k$-CFA in a vector representation, we use a growable vector
+and a map from addresses to assigned indices. When assignable indices
+run out, we grow the vector. The cost of this map is less than a hash
+representation for the whole store since typically there are more
+references to an address than allocations of it. This is more
+space-efficient than preallocating $(\mlab_{max}+1)^k$ addresses
+up-front and addressing by the contour converted to polynomial, since
+many combinations of labels are not likely to occur. The all up-front
+allocation again breaks down when we add compound data, which
+introduce new kinds of labels (e.g. left and right components of a
+tuple).
 
 \subsection{Abstracting Compound Data}
 
-We discovered that the choice of abstract domain for literal data
-(such as the large quoted axiom database in the Boyer benchmark)
-drastically affected the performance of our analysis on the benchmark
-suite. It is worth discussing the ``obvious'' and na\"ive abstraction
-that is natural to a reader of
-~\citep{dvanhorn:VanHorn2011Abstracting}, and other easy-to-implement
-yet effective approaches.
+Practical issues of performance arise when one chooses the
+``obvious,'' or ``natural'' abstraction for compound data. Our running
+example will be the classic Boyer benchmark. The detail of note for
+the Boyer benchmark is that it has large list literals, the exact
+value of which do not particularly matter for control-flow
+analysis. If we interpret a list literal of 30 elements (that again
+have 10 elements each) as 300 applications of {\tt cons}, and then
+interpret a function that traverses the tree, we will end up
+interpreting that function at least 300 times, when once or twice
+would do.
+
+We will first explain the natural abstraction of tuples, and then we
+will explain a less precise allocation strategy from uniform $k-CFA$
+that we use for large compound data literals that we modified from the
+implementation in \citep{dvanhorn:wright-jagannathan-toplas98}.
 
 \subsubsection{Na\"ively}
 
-The uniform way they approach a simple abstraction strategy is to cut
+The uniform way AAM approaches a simple abstraction strategy is to cut
 recursion out of the data definition by tying the recursive knot
-through the abstract store. For Scheme, the grammar for values looks like the following:
+through the abstract store. For Scheme, the grammar for values looks
+like the following:
 
 \begin{alltt}
 Value ::= #t | #f | (cons Value Value) | '() | ...
@@ -1035,23 +885,34 @@ Value ::= #t | #f | (cons Value Value) | '() | ...
 Upon evaluating a {\tt cons} application, we instead allocate two
 addresses $a$ and $d$, join them to the respective values in the
 store, and return the flattened {\tt (cons $a$ $d$)} value. Since
-these addresses are all distinguished at different syntactic
-callsites, and quoted lists really are sugar for a sequence of calls
-to {\tt cons}, this abstraction explodes the value space. Analyzing a
-function that counts the number of atoms in a literal s-expression
-would actually interpret that function at least that number of times
-(more because of intermediate conses). Indeed, even in our fastest
-parameterization, this abstraction causes the analysis of Boyer to be
-430 times slower than the approach we will now describe.
+these addresses are all distinguished at different syntactic callsites
+in the uniform $k$-CFA allocation strategy, and quoted lists are sugar
+for a sequence of calls to {\tt cons}, this abstraction explodes the
+value space. Analyzing a function that counts the number of atoms in a
+literal s-expression would actually interpret that function at least
+that number of times (more because of intermediate conses). Indeed,
+even in our fastest parameterization, this abstraction causes the
+analysis of Boyer to be 430 times slower than the approach we will now
+describe.
 
 \subsubsection{Less na\"ively and less precisely}
 
 The number of syntactic uses of {\tt cons} versus implicit uses via
 literal lists is dramatically smaller in typical Scheme programs. We
-use the above abstraction for these syntactic uses, but choose a
-different strategy for quoted lists. Quotation is special because it
-cannot introduce function values or mutable values, which is important
-to enhancing our technique's soundness to conceptual complexity ratio.
+use the above abstraction for these syntactic uses, but choose to
+interpret literal lists as not always sugar for cascading {\tt
+  cons}es. In particular, if a list literal is ``too big'' (in our
+case length > 1), we interpret the list as a circular data structure;
+the right address points back to the {\tt cons} itself, and the left
+address points to all of the elements of the list. We take this
+farther and join the list elements together in with a coarse
+type-based abstraction. Quotation is special because it cannot
+introduce function values, which is important to enhancing our
+technique's soundness to conceptual complexity ratio. If we join two
+values of different type together, we don't get ``anything,'' which
+has complex meaning in higher-order languages (Shivers' escape
+semantics) and is overly approximate. We instead get ``any quotable
+value,'' which has much simpler semantics.
 
 There are a few steps to consider:
 \begin{itemize}
@@ -1060,7 +921,10 @@ There are a few steps to consider:
  \item{Define a ``larger'' value lattice element for all quotable data, {\tt QData}}
  \item{Interpret {\tt (quote (a ...))} as {\tt (qlist a ...)}, a new primitive function defined in figure \ref{fig:qlist},
        and similar definitions for immutable vectors.}
- \item{Extend the $\interpdelta$ axioms to include conservative meaning for these new values (e.g. {\tt (car QData)} = {\tt QData}, {\tt (add1 QData)} = {\tt Number} and log ``possible type error'') and allow them to allocate addresses and change the store}
+ \item{Extend the $\interpdelta$ axioms to include conservative
+   meaning for these new values (e.g. {\tt (car QData)} = {\tt QData},
+   {\tt (add1 QData)} = {\tt Number} and log ``possible type error'')
+   and allow them to allocate addresses and change the store}
 \end{itemize}
 
 \begin{figure}
@@ -1082,10 +946,6 @@ merge({\tt QPair}, v) &= {\tt QData} \\
 \caption{Quoted list primitive}
 \label{fig:qlist}
 \end{figure}
-
-The alternative to {\tt QData} is to go higher in the lattice to
-$\top$, which has more complicated meaning (Shivers' escape semantics) and
-is overly approximate.
 
 \section{Evaluation}
 \label{sec:eval}
@@ -1113,9 +973,6 @@ is overly approximate.
 \includegraphics[width=3.2in]{peak-mem.ps}
 \end{center}
 \end{figure}
-
-
-
 
 
 \cite{dvanhorn:Earl2012Introspective}
@@ -1324,272 +1181,5 @@ Although there are several implementations (CFA2,ICFP'12), they
 operate at speeds roughly on par with our starting point: unoptimized
 store widened
 machines. \cite{dvanhorn:Earl2012Introspective,dvanhorn:Vardoulakis2011CFA2}
-
-\appendix
-\section{Proof: laziness is precision-preserving}
-Given widened machine configurations, we can show that lazy
-non-determinism is precision-preserving in the cases that application
-positions are store-allocated and not. We first show the latter since
-it uses less cluttered transition rules. The high level is that the
-``fan-out'' of non-determinism is collapsed back in the store (in the
-store-allocated applications case) or delayed a single step by
-laziness that would have happened in a step of strictness.
-
-Details of lazy machine given as a diff from the strict machine. \\
-State space of $lazy-\widehat{CESK}^*_t$ varies just in
-$\mathit{Value}$ (storable values do not change):
-\begin{align*}
-\mval \in \mathit{Value} &::= z \mid b \mid o \mid \saddr{\maddr} \\
-\end{align*}
-
-We define a relation between strict and lazy machines that illustrates
-the quotient that the lazy states embody.
-
-\newcommand{\vapprx}[3]{#1 \cong_{#2} #3}
-\newcommand{\kapprx}[3]{#1 \cong_{#2} #3}
-\newcommand{\lapprx}[3]{#1 \approx_{#2} #3}
-\newcommand{\apprx}[3]{#1 \sim_{#2} #3}
-\newcommand{\capprx}[2]{#1 \sim #2}
-
-\begin{mathpar}
-\inferrule{\mval' \in force(\msto, \mval)}
-          {\vapprx{\mval}{\msto}{\mval'}} \quad
-\inferrule{\ans{\mval} \in cs}{\lapprx{\ans{\mval}}{\msto}{cs}} \quad
-\inferrule{\ev{\mexp, \menv, \mkont, \mcntr} \in cs}
-          {\lapprx{\ev{\mexp, \menv,\mkont, \mcntr}}{\msto}{cs}} \\
-\inferrule{\co{\mkont, \mval'} \in cs \\
-           \vapprx{\mval}{\msto}{\mval'}}
-          {\lapprx{\co{\mkont, \mval}}{\msto}{cs}} \quad
-\inferrule{\ap{\mval_0, \mval_1, \mkont} \in cs \\
-           \vapprx{\mval_1}{\msto}{\mval_1'}}
-          {\lapprx{\ap{\mval_0, \mval_1', \mkont}}{\msto}{cs}} \\
-\inferrule{\ev{\mexp, \menv, \mkont} \in lcs}
-          {\apprx{\ev{\mexp, \menv,\mkont}}{\msto}{lcs}} \quad
-\inferrule{\ans{\mval} \in lcs \\
-           \vapprx{\mval}{\msto}{\mval'}}
-          {\apprx{\ans{\mval'}}{\msto}{lcs}} \\
-\inferrule{\co{\mkont, \mval} \in lcs \\
-           \vapprx{\mval}{\msto}{\mval'}}
-          {\apprx{\co{\mkont, \mval'}}{\msto}{lcs}} \quad
-\inferrule{\ap{\mval_0, \mval_1, \mkont} \in lcs \\
-           \vapprx{\mval_1}{\msto}{\mval_1'}}
-          {\apprx{\ap{\mval_0, \mval_1', \mkont}}{\msto}{lcs}} \\
-\inferrule{\forall lc \in lcs, \lapprx{lc}{\msto}{cs} \\
-           \forall c \in cs, \apprx{c}{\msto}{lcs}}
-          {\capprx{(lcs, \msto)}{(cs, \msto)}}
-\end{mathpar}
-
-We also need metafunctions for adding and removing a store component
-from states. These are straightforwardly defined, so just name them
-$wn$ and $nw$ respectively.
-%% c2vc(<e^l r k d>,s) = <e^l r s k d>
-%% c2vc(<v k d>,s) = <v s k d>
-%% vc2c(<e^l r s k d>) = <e^l r k d>
-%% vc2c(<v s k d>) = <v k d>
-
-The property we show is that all states stay related through
-reduction. The main difficulty is in showing the resulting stores are
-in fact equal. We do this by showing each lazy reduction corresponds
-to a set of strict reductions, for which the union of their output
-stores equal the lazy store. Also for strict equality, every strict
-reduction corresponds to a lazy reduction (immediate from the relation).
-
-\begin{lemma}[Partition step]
-$\forall lc, lcs', cs, \msto, \msto'.$
- if  $\capprx{(\{lc\},\msto)}{(cs,\msto)}$
- and $\forall lc' \in lcs'. wn(lc,\msto) \machstep wn(lc', \msto')$ then
- $\exists cs'. \forall c \in cs. \exists c' \in cs', \msto^c$
- such that $wn(c,\msto) \machstep wn(c', \msto^c)$
- and       $\msto' = \bigcup\limits_{c \in cs}{\msto^c}$
- and       $\capprx{(lcs',\msto')}{(cs',\msto')}$.
-\end{lemma}
-\begin{proof}
-Let $lc' \in lcs'$ be arbitrary.
-By cases on $wn(lc,\msto) \machstep wn(lc', \msto')$:
-\begin{itemize}
-\item{Case $\ev{\svar{\mvar}, \menv, \mkont, \msto} \machstep \co{\mkont,
-    \saddr{\menv(\mvar)}, \msto}$: \\ By definition of $\machstep$,
-  $wn(lc,\msto)$ steps strictly to each of $cs' = \{\co{\mval, \mkont} \mid \mval \in \msto(\menv(\mvar))\}$.  By definition of
-  $\capprx{}{}$, $cs = \{lc\}$. The stores are the same, and by
-  definition of $\lapprx{}{\msto}{}$, $\lapprx{lc'}{\msto}{cs'}$.}
-\item{Case $\ev{\slit{\mlit}, \menv, \msto, \mkont, \msto} \machstep
-            \co{\mkont, \mlit, \msto}$: \\
-      Immeditate.}
-\item{Case $\ev{\slam{\mvar}{\mexp}, \menv, \mkont, \msto} \machstep
-            \co{\mkont, \clos{\mvar, \mexp, \menv}, \msto}$: \\
-      Immediate}
-\item{Case $\ev[^\mcntr]{\sapp[^\mlab]{\mexp_0}{\mexp_1}, \menv, \mkont, \msto} \machstep
-            \ev[^\mcntr]{\mexp_0, \menv, \msto', \kar[^\mcntr_\mlab]{\mexp_1, \menv, \maddr}, \msto'}$: \\
-      Where $\maddr, \msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)$ \\
-      Immediate.}
-\item{Case $\ev[^\mcntr]{\sif[^\mlab]{\mexp_0}{\mexp_1}{\mexp_2}, \menv, \mkont, \msto} \machstep
-            \ev[^\mcntr]{\mexp_0, \menv, \msto', \kif[^\mcntr]{\mexp_1, \mexp_2, \menv, \maddr}, \msto'}$: \\
-      Where $\maddr, \msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)$ \\
-      Immediate.}
-\item{Case $\co{\kmt, \mval, \msto} \machstep \ans{\msto, \mval'}$: \\
-      Where $\mval' \in force(\msto, \mval)$ \\
-      By definition of $\capprx{}{}$, $cs = \{\co{\kmt, \mval'} \mid \mval \in force(\msto, \mval)\}$.
-      By definition of $\machstep$, $wn(lc,\msto)$ steps strictly to
-      each of $cs' = \{\ans{\mval}\}$. The stores are the same.
-      By definition of $\lapprx{}{\msto}{}$, $\forall lc' \in lcs'. \lapprx{lc'}{\msto}{cs'}$.
-      By definition of $\apprx{}{\msto}{}$, $\forall c' \in cs'. \apprx{c'}{\msto}{lcs'}$.
-      Thus $\capprx{(lcs',\msto)}{(cs',\msto)}$.}
-\item{Case $\co{\kar[^\mcntr_\mlab]{\mexp, \menv, \maddr}, \mval, \msto} \machstep
-            \ev[^\mcntr]{\mexp, \menv, \kfn[^\mcntr_\mlab]{\mval',\maddr}, \msto}$: \\
-      Where $v' \in force(\msto, \mval)$. \\
-      By definition of $\apprx{}{\msto}{}$,
-        $cs = \{\co{\kar[^\mcntr_\mlab]{\mexp, \menv, \maddr}, \mval'} \mid \mval \in force(\msto, \mval)\}$.
-      By definition of $\machstep, \lapprx{}{\msto}{}$,
-        $cs' = \{\ev[^\mcntr]{\mexp, \menv, \kfn[^\mcntr_\mlab]{\mval',\maddr}}
-            \mid \co{\kar[^\mcntr_\mlab]{\mexp, \menv, \maddr}, \mval'} \in cs\}$.
-      The stores are the same, and the previous imply $\capprx{(lcs',\msto)}{(cs',\msto)}$.}
-\item{Case $\co{\kfn[^\mcntr_\mlab]{\mvalx{u}, \maddr}, \mval, \msto} \machstep
-            \ap{\mvalx{u}, \mval, \mkont, \msto}$: \\
-      Where $\mkont \in \msto(\maddr)$. \\
-      Immediate.}
-\item{Case $\co{\kif[^\mcntr]{\mexp_0, \mexp_1, \menv, \maddr}, \mval, \msto} \machstep
-            \ev{\mexp_0, \menv, \mkont, \msto}$: \\
-      Where $\mkont \in \msto(\maddr)$. \\
-      By definition of $\machstep$, $\strue \in force(\msto, \mval)$, thus by definition of
-      $\capprx{}{}$, the strict machine takes the same step.}
-\item{Case $\co{\kif[^\mcntr]{\mexp_0, \mexp_1, \menv, \maddr}, \mval, \msto} \machstep
-            \ev{\mexp_1, \menv, \mkont, \msto}$: \\
-      Where $\mkont \in \msto(\maddr)$. \\
-      By definition of $\machstep$, $\sfalse \in force(\msto, \mval)$, thus by definition of
-      $\capprx{}{}$, the strict machine takes the same step.}
-\item{Case $\ap[^\mcntr_\mlab]{\clos{\mvar, \mexp, \menv}, \mval, \mkont,\msto} \machstep
-            \ev[^{\mcntr'}]{\mexp, \menv', \mkont, \msto'}$: \\
-      Where $\menv', \msto', \mcntr' = \mathit{bind}^\mcntr_\mlab(\menv, \msto, \mvar, \mval)$
-      By definition of $\apprx{}{\msto}{}$,
-        $cs = \{\ap[^\mcntr_\mlab]{\clos{\mvar, \mexp, \menv}, \mval', \mkont} \mid
-                \mval' \in force(\msto, \mval)\}$.
-      Thus $cs' = \{\ev[^{\mcntr'}]{\mexp, \menv', \mkont}\}$ (clearly $\lapprx{lc'}{\msto'}{cs'}$)  and
-      for all $c \in cs$, $wn(c,\msto) \machstep wn(c',\msto\sqcup[\mvar\mcntr' \mapsto \{c.\mval\}])$.
-      Thus the union of these stores is equal to $\msto'$.}
-\item{Case $\ap[^\mcntr_\mlab]{\mop, \mval, \mkont,\msto} \machstep
-            \co{\mval'', \mkont, \msto}$: \\
-      Where $\mval' \in force(\msto, \mval)$
-        and $\mval'' \in\interpdelta(\mop,\mval')$. \\
-      By definition of $\capprx{}{}$ and $\interpdelta$,
-        $cs = \{\ap[^\mcntr_\mlab]{\mop, \mvalx{u}, \mkont} \mid
-                \mvalx{u} \in force(\msto, \mval),
-                \mval'' \in\interpdelta(\mop,\mvalx{u})\}$.
-      Thus the strict machine takes the same step.}
-\end{itemize}
-\end{proof}
-
-
-\begin{theorem}[Laziness preserves precision]
-$\forall lcs,cs,lcs',\msto,\msto'$ if $\capprx{(lcs, \msto)}{(cs,\msto)}$
-  and $(lcs,\msto) \machstep (lcs',\msto')$ then there exists $cs'$
-  such that $(cs,\msto) \machstep (cs',\msto')$
-\end{theorem}
-\begin{proof}
-By definition of $\machstep$,
-$lcs' = \{lc' \mid \exists \msto^{lc}. wn(lc,\msto) \machstep wn(lc', \msto^{lc}), lc \in lcs\}$
-For each $lc \in lcs$ let $\hat{c}^{lc} \subseteq cs$ be the
-smallest set such that $\lapprx{lc}{\msto}{\hat{c}^{lc}}$. \\ By the
-previous lemma, there exists a $\hat{c}^{lc}{}'$ such that $\capprx{(\{lc' \mid wn(lc,\msto) \machstep
-  wn(lc', \msto^{lc})\}, \msto^{lc})}{(\hat{c}',\msto^{lc})}$. Let
-$cs' = \bigcup\limits_{lc \in lcs}{\hat{c}^{lc}{}'}$ and $\msto' = \bigcup\limits_{lc \in lcs}{\msto^{lc}}$.
-Since each step individually is related, the union is related: $\capprx{lcs'}{\msto'}{cs'}$.
-By definition of $\machstep$, $(cs, \msto) \machstep (cs', \msto')$ and $(lcs, \msto) \machstep (lcs', \msto')$.
-\end{proof}
-
-%% --Eval
-%% <x r s k d> --> <v s k d> where v in s(r(x))  [VAR]
-%% <(e0^l0 e1^l1)^{l,lf,la} r s k d> --> <e0^l0 r s\sqcup[ld |-> {k}] ar^{l,lf,la}(e1^l1 r ld) d> [APP]
-%% <(lambda x e) r s k d> --> <clos(x e r) s k d> [CLOS]
-%% --Continue
-%% <v s ar^{l,lf,la}(e^le r a) d> --> <e^le r s\sqcup[lfd |-> {v}] fn^{l,la}(lfd, a)> [CO]
-%% --Apply
-%% <v s fn^{l,la}(fa, ka) d> --> <e^fl r[x |-> xd'] s'[xd' |-> s'(lad)] k d'> [AP]
-%%   where clos(x e^fl r) in s(fa)
-%%         k in s(ka)
-%%         s' = s\sqcup[lad |-> {v}]
-%%         d' = truncate(ld, K)
-
-%% This extra binding corresponds directly to the intermediate
-%% bindings introduced by ANF.
-%% Matt's ANF analyses likely have all the flavours of our "laziness" technique, but this is how we get our chocolate with our peanut butter as Olin would say.
-
-%% Compare this to lazyCESK^*t:
-%% v ::= clos(x e r) | addr(a)
-%% Clos ::= clos(x e r)
-%% s : a -> P(Clos)
-%% others the same
-
-%% force(s, addr(a)) = s(a)
-%% force(s, clos(x e r)) = {clos(x e r)}
-
-%% --Eval
-%% <x r s k d> --> <addr(r(x)) s k d>
-%% others the same
-%% --Continue
-%% <v s ar^{l,lf,la}(e^le r a) d> --> <e^le r s\sqcup[lfd |-> force(s,v)] fn^{l,la}(lfd, a)>
-%% --Apply
-%% <v s fn^{l,la}(fa, ka) d> --> <e^fl r[x |-> xd'] s'[xd' |-> s'(lad)] k d'>
-%%   where clos(x e^fl r) in s(fa)
-%%         k in s(ka)
-%%         s' = s\sqcup[lad |-> force(s, v)]
-%%         d' = truncate(ld, K)
-%% The same globalizing stuff applies.
-
-%% Let us relate the state spaces of the two abstract machines for the lambda calculus in the following way
-
-%% Then we can show that if lazyconf ~ conf and lazyconf ==> lazyconf' then there exists a conf' such that conf ==> conf' and lazyconf' ~ conf'
-%% Let lc in lazyconf.cs be arbitrary (call lazyconf.s, s)
-%% By cases on lc:
-%% <x r k d>:
-%% Premises:
-%% <x r k d> in conf.cs
-%% Thus:
-%% Since
-%% <x r s k d> -->lazy   <addr(r(x)) s k d>
-%% <x r s k d> -->strict <v s k d> where v in s(r(x))
-%% By definition of force, v in force(s, addr(r(x)))
-%% Thus the first rule of ~_s applies and the second rule of l~_s applies.
-
-%% <(lambda x e) r k d>:
-%% Trivial
-
-%% <(e0^l0 e1^l1)^{l,lf,la} r k d>:
-%% Premises:
-%% <(e0^l0 e1^l1)^{l,lf,la} r k d> in conf.cs
-%% Thus:
-%% <(e0^l0 e1^l1)^{l,lf,la} r s k d> -->lazy   <e0^l0 r s\sqcup[ld |-> {k}] ar^{l,lf,la}(e1^l1 r ld) d>
-%% <(e0^l0 e1^l1)^{l,lf,la} r s k d> -->strict <e0^l0 r s\sqcup[ld |-> {k}] ar^{l,lf,la}(e1^l1 r ld) d>
-
-%% Stores are same in this case.
-
-%% <v ar^{l,lf,la}(e^le r a) d>:
-%% Premises:
-%% For all v' in force(s, v),
-%%   <v' ar^{l,lf,la}(e^le r a) d> in conf.cs
-%% Thus:
-%% <v ar^{l,lf,la}(e^le r ka) d> -->lazy   <e^le r s\sqcup[lfd |-> force(s, v)] fn^{l,la}(lfd ka) d>
-%% for all v' in force(s,v),
-%% <v' ar^{l,lf,la}(e^le r ka) d> -->strict <e^le r s\sqcup[lfd |-> {v'}] fn^{l,la}(lfd ka) d>
-%% Thus the union of all the strict stores will equal the lazy store.
-
-%% <v fn^{l,la}(fa ka) d>:
-%% Premises:
-%% For all v' in force(s,v),
-%%   <v' fn^{l,la}(fa ka) d> in conf.cs
-%% Thus
-%% <v fn^{l,la}(fa ka) d> -->lazy <e^fl r[x |-> xd'] s'\sqcup[xd' |-> s'(lad)] k d'>
-%% where k in s(ka)
-%%       clos(x e^fl r) in s(fa)
-%%       d' = truncate(ld, K)
-%%       s' = s\sqcup[lad |-> force(s,v)]
-%% For all v' in force(s,v),
-%% <v' fn^{l,la}(fa ka) d> -->strict <e^fl r[x |-> xd'] s'\sqcup[xd' |-> s'(lad)] k d'>
-%% where k in s(ka)
-%%       clos(x e^fl r) in s(fa)
-%%       d' = truncate(ld, K)
-%%       s' = s\sqcup[lad |-> {v'}]
-
-%% Thus the union of all the strict stores will equal the lazy store.
-
 
 \end{document}
