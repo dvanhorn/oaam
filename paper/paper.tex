@@ -529,7 +529,7 @@ That is, the next set of states is what we get by stepping each
 given state, without its store. The next store is the combination of all produced
 stores. For simplicity, assume that stuck states step to themselves.
 
-\subsection{Baseline evaluation}
+\subsection{Store-allocated results}
 \label{sec:baselineeval}
 
 The final approximation we make to get to our baseline analysis is
@@ -540,8 +540,7 @@ continuations quadratic rather than linear in 0-CFA. A linear space
 drops the complexity to cubic.
 
 To achieve this, we instead allocate an address for the value position
-when we create the continuation.  We will refer to this change in the
-semantics as store-allocated results. This address and the tail address are
+when we create the continuation.  This address and the tail address are
 both determined by the label of the application point, so the space
 becomes linear and the overall complexity drops to cubic. Note that
 this is a critical abstraction in languages with n-ary functions,
