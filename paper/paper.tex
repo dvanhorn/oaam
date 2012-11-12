@@ -73,7 +73,7 @@ machine-oriented view of computation, it becomes possible to design,
 verify, and implement program analyzers for realistic language
 features typically considered difficult to model.  The approach was
 originally applied to features such as higher-order functions,
-stack-inspection, exceptions, laziness, first-class continuations, and
+stack inspection, exceptions, laziness, first-class continuations, and
 garbage collection.  It has since been used to verify actor-
 \cite{local:DOsualdo:12A} and
 thread-based~\cite{dvanhorn:Might2011Family} parallelism and
@@ -998,6 +998,93 @@ merge({\tt QPair}, v) &= {\tt QData} \\
 \section{Evaluation}
 \label{sec:eval}
 
+
+We have implemented, optimized, and evaluated \emph{all} of the
+machines presented in their JFP paper
+\cite{dvanhorn:VanHorn2012Systematic}, with the exception of the
+machine for performing pushdown flow analysis.  This includes machines
+supporting higher-order functions, state, first-class control,
+laziness, and stack inspection.
+
+For each benchmark, we collect analysis times, peak memory usage, and
+the rate of states-per-second explored by the analysis for each of the
+optimizations discussed in section~\ref{sec:opt}, culmulatively
+applied.  The analysis is stopped after consuming 30 minutes of time
+or 1 gigabyte of space.  When presenting \emph{relative} numbers, we
+use the timeout limits as a lower bound on the actual time required,
+thus giving a conservative estimate of improvements.
+
+All benchmarks are calculated as an average of N runs on a [MACHINE
+  SPECS].
+
+\begin{figure}
+\begin{tiny}
+\begin{alltt}
+Program  |  LOC | B. Time | O. Time | B. Space | O. Space | B. Rate | O. Rate
+----------------------------------------------------------------------------
+nucleic  | 3508 |
+matrix   |  747 |
+nbody    | 1434 |
+earley   |  667 |
+maze     |  681 |
+church   |   41 |
+lattice  |  214 |
+boyer    |  642 |
+mbrotz   |   68 |
+\end{alltt}
+\end{tiny}
+\end{figure}
+
+\begin{itemize}
+
+\item {\bf nucleic}: a floating-point intensive application taken from
+  molecular biology that has been used widely in benchmarking
+  functional language
+  implementations~\cite{dvanhorn:Hartel1996Benchmarking} and analyses
+  (e.g.~\cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
+  It is a constraint satisfaction algorithm used to determine the
+  three-dimensional structure of nucleic acids.
+
+\item {\bf matrix} tests whether M is maximal among all matrices of
+  the same dimension obtainable by simple reordering of rows and
+  columns and negation of any subset of rows and columns.  It is
+  written in continuation-passing style (used in
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
+
+
+\item {\bf nbody}: implements the Greengard multipole algorithm for
+  computing gravitational forces on point masses distributed uniformly
+  in a cube (used in
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
+
+\item {\bf earley}:  Earley's parser written by Marc Feeley.
+
+\item {\bf maze}: generates a random maze and finds a path (used in
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98})
+  Makes use of Scheme's {\tt call-with-current-continuation}
+  operation.
+
+\item {\bf church}: tests distributivity of multiplication over
+  addition for a few Church numerals (introduced by
+  \cite{dvanhorn:Vardoulakis2011CFA2}).
+
+\item {\bf lattice}: enumerates the maps between two lattices (used in
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98})
+
+\item {\bf boyer}: a term-rewriting theorem prover (used in
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98})
+
+\item {\bf mbrotZ}: generates Mandelbrot set fractal using complex
+  numbers.
+
+\item {\bf graphs}: counts the number of directed graphs with a
+  distinguished root and \(k\) vertices, each having out-degree at
+  most 2. It makes extensive use of higher-order procedures and is
+  written in a continuation-passing style (used by
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98})
+
+\end{itemize}
+
 \begin{figure*}
 \begin{center}
 \includegraphics[width=6in]{rel-time.ps}
@@ -1022,15 +1109,39 @@ merge({\tt QPair}, v) &= {\tt QData} \\
 \end{center}
 \end{figure}
 
-
-\cite{dvanhorn:Earl2012Introspective}
-
-\cite{dvanhorn:wright-jagannathan-toplas98}
-
-Other benchmarks
-
 \section{Related work}
 \label{sec:related}
+
+\paragraph{Abstracting Abstract Machines}
+
+This work clearly closely follows Van Horn and Might's original papers
+on abstracting abstract
+machines~\cite{dvanhorn:VanHorn2011Abstracting,dvanhorn:VanHorn2012Systematic},
+which in turn is one piece of the large body of research on flow
+analysis for higher-order languages (see
+Midtgaard~\cite{dvanhorn:Midtgaard2011Controlflow} for a thorough
+survey).  The AAM approach sits at the confluence of two major lines
+of research: (1) the study of abstract
+machines~\cite{dvanhorn:landin-64} and their systematic
+construction~\cite{dvanhorn:reynolds-hosc98}, and (2) the theory of
+abstract interpretation
+\cite{dvanhorn:Cousot:1977:AI,dvanhorn:Cousot:1979:Galois}.
+
+
+\paragraph{Frameworks for flow analysis of higher-order programs}
+
+The analysis most similar to that presented in section~\ref{sec:aam}
+is the infinitary control-flow analysis of Nielson and
+Nielson~\cite{dvanhorn:nielson-nielson-popl97} and the unified
+treatment of flow analysis by Jagannathan and
+Weeks~\cite{dvanhorn:jagannathan-weeks-popl95}.  Both are
+parameterized in such a way that in the limit, the analysis is
+equivalent to an interreter for the language, just as is the case
+here.  What is different is that both give a constraint-based
+formulation of the abstract semantics rather than a finite machine
+model.
+
+\paragraph{Abstract compilation}
 
 Boucher and Feeley \cite{dvanhorn:Boucher1996Abstract} introduced the
 idea of \emph{abstract compilation}, which used closure generation
