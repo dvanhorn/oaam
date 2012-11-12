@@ -179,10 +179,7 @@ optimized analyzers to baseline for Church numeral example.}
 \label{fig:churchtime}
 \end{figure}
 
-In section~\ref{sec:impl}, we describe a more complete implementation
-scaled up and capable of analyzing Scheme benchmark programs.
-
-In section~\ref{sec:eval} we evaluate this implementation against a
+In section~\ref{sec:eval} we evaluate our implementation against a
 set of benchmark programs drawn from the literature.  Many benchmarks
 cause the baseline analyzer to take longer than 30 minutes or to
 consume more 1 gigabit of memory, at which point the analysis is
@@ -589,26 +586,21 @@ come in two flavors: decreasing the size of the represented state
 space [SS], and decreasing the amount of intermediate data structures [DS].
 
 \begin{itemize}
- \item{[SS] quotient by sets of values (lazy non-determinism)}
- \item{[SS] remove {\tt ev} states (abstract compilation)}
- \item{[DS] operate on store changes rather than whole stores (store deltas)}
- \item{[DS] represent the store as a global, mutable hash and
+ \item{[SS] lazy non-determinism: quotient by sets of values}
+ \item{[SS] abstract compilation: eliminate {\tt ev} states}
+ \item{[DS] store deltas: operate on store changes rather than whole stores}
+ \item{[DS] timestamp: represent the store as a global, mutable hash and
    determine a state's store by the number of changes made to the
-   global store at the time of visiting (timestamp)}
- \item{[DS] use a global mutable workset}
- \item{[DS] represent the global store as a global, mutable vector (preallocation)}
- \item{[SS] coarsely abstract literal data (abstracting compound data)}
+   global store at the time of visiting}
+ \item{[DS] preallocation: represent the global store as a global, mutable vector}
+ \item{[SS] uniform literal approximation: coarsely abstract literal data}
 \end{itemize}
 
 Some techniques preserve the precision of the underlying analysis, and
 others do not. We will discuss the design decisions behind the
 precision-lossy techniques.  Each technique requires minimal changes
 to the reduction relation/fixpoint, and each improves performance by
-integer factors. The first three and last remain in the purely
-functional realm. The final three use mutation in small, localized
-places, so they do not increase conceptual complexity
-drastically. Also, preallocation and mutable workset are standard
-implementation practices \cite{ianjohnson:Shivers:1991:CFA}.
+integer factors.
 
 \subsection{Lazy non-determinism}
 
@@ -680,8 +672,9 @@ Laziness removes several represented states that would then have to be
 stepped by the fixpoint combinator.  We can further eliminate the {\tt
   ev} states from the run-time interpretation of a program by
 specializing the machine transition relation to the program being
-analyzed. This eliminates interpretative overhead by first compiling
-the program into ``byte code'' instructions.
+analyzed. This precision-preserving transformation eliminates
+interpretative overhead by first compiling the program into ``byte
+code'' instructions.
 
 The essence of the compilation effect can be seen by considering an example
 such as
@@ -718,7 +711,8 @@ the other components of the {\tt ev} state. Its definition in figure
 
 \begin{figure}
 \begin{align*}
-\compile{\svar\mvar} &= \lambda(\menv,\msto,\mkont) .\co{\mkont,\mval,\msto} \text{ where }\mval\in\msto(\menv(\mvar))
+\compile{\_} &: Expr \to Env \times Store \times Kont \to State \\
+\compile{\svar\mvar} &= \lambda(\menv,\msto,\mkont) .\co{\mkont,\saddr{\menv(\mvar)},\msto}
 \\
 \compile{\slit\mlit} &= \lambda(\menv,\msto,\mkont) .
 \co{\mkont,\mlit,\msto}
@@ -788,16 +782,18 @@ the other components of the {\tt ev} state. Its definition in figure
 \subsection{Store deltas}
 
 Each step in the fixpoint for the above techniques requires joining
-several, commonly large, stores together. Even with immutable hashes
-that utilize sharing, this is memory- and time-intensive. Worse, this
-contributes an obscene fraction of the runtime. If we instead track
-the changes to the store made over all steps and afterward update the
-store, we end up with much less allocation and computational overhead.
+several, commonly large, stores together. Each step is unlikely to
+always modify all addresses of the store, so this is needlessly
+memory- and time-intensive. We can instead accumulate store changes
+and apply them after all steps have completed. This uses far fewer
+join operations, leading to much less allocation and computational
+overhead.
 
-We represent changes as a list of pairs of address to set of storeable
-values. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$ now becomes
-$\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$ begins as empty for
-each step. Applying the changes is straightforward:
+We represent changes as $Store\msdiff = List[Addr \times
+  \Set(Storeable)]$. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$ now
+becomes $\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$
+begins as empty for each step. Applying the changes is
+straightforward:
 
 \begin{align*}
 \mtlst(\msto) &= \msto \\
@@ -818,10 +814,13 @@ bind^{\mcntr}_\mlab(\menv, \msto, \msdiff, \mvar, \mval) &= \menv[\mvar \mapsto 
 \text{ where } \mcntr' &= \lfloor \mlab \mcntr\rfloor_k \\
                \maddr &= \mvar\mcntr'
 \end{align*}
+Compilation changes to additionally take a $\msdiff$ component, so the
+above rule's right hand side would instead be $k^{\mcntr'}(\menv',
+\msto, \msdiff', \mkont)$ where $k = \compile{e}$ would be in the closure.
 
 We also lift $\machstep$ to accommodate for this asymmetry
 in the input and output. For each state that is stepped, we feed the
-output changes to the next so that all changes get accumulated.
+output changes to the next so that all changes get accumulated:
 
 \begin{align*}
 (cs, \msto) &\widehat{\machstep} (cs\cup cs', \msdiff(\msto)) \\
@@ -839,31 +838,33 @@ cs^* &= \{c' \mid (c,\msto,\msdiff) \machstep (c',\msdiff^c) \} \\
 
 The store delta technique removes overhead of joining large stores,
 but for determining if a state has been visited before (vis. $f(X)
-\setminus S$ in ${\mathcal G}$), we still have to compare entire stores - an
-expensive computation.  We modify a technique created in Shivers'
-dissertation~\cite{ianjohnson:Shivers:1991:CFA}, timestamp
-approximation, that removes the need for joining whole stores by
-manipulating a global store imperatively. The original technique loses
-precision because the starting store for each state in a machine
-configuration can change between stepping all states and introduce
-more flows than originally possible. However, by delaying the store
-changes until after all steps have completed, we can maintain our
-precision. In a variety of experiments, we observed that the overhead
-for storing store-deltas was outweighed by the precision keeping flows
-in check. That is to say, the analysis was faster {\it and} more
-precise.
+\setminus S$ in ${\mathcal G}$), we still have to compare entire
+stores - an expensive computation.  We modify a technique due to
+Shivers~\cite{ianjohnson:Shivers:1991:CFA}, timestamp approximation,
+that removes the need for joining whole stores by manipulating a
+global store imperatively. The original technique loses precision
+because states are stepped in sequence, modifying the store in place -
+more values or continuations can be added before another state gets to
+step. This interference means more possible flows (i.e. less
+precision) and a nondeterministic analysis - the order the set of states is
+traversed is not necessarily deterministic. However, by delaying the
+store changes until after all steps have completed, we can maintain
+our precision and determinism. In a variety of experiments, we
+observed that the time and space overhead for storing store-deltas was outweighed by
+the precision keeping flows in check. That is to say, the analysis was
+faster {\it and} more precise.
 
-We pair this technique with a mutable workset. That is, to avoid the
-intermediate sets introduced by the $State \to \Set(State)$ signature
-of $\machstep$, we change the fixpoint algorithm to use a global
+We pair this technique with a mutable workset to avoid the
+intermediate sets introduced by the $State \times Store \to \Set(State) \times Store\msdiff$ signature
+of $\machstep$. This necessitates a change to the fixpoint algorithm to use a global
 workset, {\tt todo}, that $\machstep$ imperatively updates with the
-states that it reaches.
+states that it would have otherwise accumulated in a set that would later be added to the workset.
 
 In total, we have six globals:
 \begin{itemize}
  \item{{\tt $\msto$}, the store}
  \item{{\tt todo}, the workset}
- \item{{\tt seen}, a map from state to the timestamp at which it was last seen}
+ \item{{\tt seen}, a map from states to the timestamps at which they were last seen}
  \item{{\tt $\msdiff$}, the store changes for the current step}
  \item{{\tt $\msdiff$?}, a boolean tracking whether the stepped state contributed a store change}
  \item{{\tt T}, the timestamp of the store}
@@ -924,7 +925,7 @@ allocation again breaks down when we add compound data, which
 introduce new kinds of labels (e.g. left and right components of a
 tuple at the contour of creation).
 
-\subsection{Abstracting Compound Data}
+\subsection{Abstracting literal compound data}
 
 Practical issues of performance arise when one chooses the
 ``obvious,'' or ``natural'' abstraction for compound data. Our running
@@ -972,7 +973,7 @@ literal lists is dramatically smaller in typical Scheme programs. We
 use the above abstraction for these syntactic uses, but choose to
 interpret literal lists as not always sugar for cascading {\tt
   cons}es. In particular, if a list literal is ``too big'' (in our
-case length > 1), we interpret the list as a circular data structure;
+case length $>$ 1), we interpret the list as a circular data structure;
 the right address points back to the {\tt cons} itself, and the left
 address points to all of the elements of the list. We take this
 farther and join the list elements together in with a coarse
@@ -1017,8 +1018,22 @@ merge({\tt QPair}, v) &= {\tt QData} \\
 \label{fig:qlist}
 \end{figure}
 
+\paragraph{Mutable literal data} The Scheme we model is nonstandard in that it has immutable literal
+data (the Scheme benchmarks did not mutate their literal data). To
+support mutable literal data, abstract values like {\tt QPair} would
+be like regular conses, only point to a preallocated pair of addresses
+that hold {\tt QData} as well. This is because conses can be mutated
+to hold any value, not just quoted data.
+
 \section{Evaluation}
 \label{sec:eval}
+
+Our implementation of the analysis used in the evaluation is roughly
+3500 lines of Racket code.
+%% 400 lines for the core, 700 lines for
+%% abstraction over optimizations, 1500 lines for primitives and standard
+%% list operations, 700 lines for instantiations to different
+%% optimizations and 300 for parsing and macro transformers.
 
 \begin{figure*}
 \begin{center}
