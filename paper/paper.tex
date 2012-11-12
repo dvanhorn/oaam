@@ -386,7 +386,9 @@ strategy:
               \lfloor \mcntr \rfloor_0 &= \mtcntr \\
               \lfloor \mlab\mcntr \rfloor_{k+1} &= \mlab\lfloor \mcntr\rfloor_k
 \end{align*}
-For the duration of this paper, $\sqcup$ is a point-wise lifting of $\cup$:
+For the duration of this paper, since our example abstract value space
+has no interesting ordering, $\sqcup$ is a point-wise lifting of
+$\cup$:
 \begin{align*}
 \msto\sqcup \varnothing &= \msto \\
 \msto\sqcup \msto'[\maddr \mapsto S] &= \lambda \maddralt. \left\{
@@ -458,8 +460,16 @@ For the duration of this paper, $\sqcup$ is a point-wise lifting of $\cup$:
 %% \end{figure}
 
 \newpage
-\section{Baseline analyzer}
+\section{Reduction semantics to baseline analyzer}
 \label{sec:baseline}
+
+The uniform $k$-CFA allocation strategy would make the fixpoint of the
+reduction relation in figure \ref{fig:aam} a computable analysis, but
+not an effective one. This is not the strategy that AAM, nor we,
+recommend. We explain a succession of approximations to reach the
+baseline analysis that we compare performance against. But first, we
+need a fixpoint combinator to drive the succession of reduction
+relations we define.
 
 \subsection{Generic fixpoint calculator}
 \label{sec:fixpoint}
@@ -525,15 +535,19 @@ stores. For simplicity, assume that stuck states step to themselves.
 \label{sec:baselineeval}
 
 The final approximation we make to get to our baseline analysis is
-store-allocating results of application sub-expressions. Notice that
+store-allocating results of application sub-expressions. The semantics
+of the previous section is where AAM leaves off. However, notice that
 the $\kfn{}$ continuation stores a value - this makes the space of
-continuations quadratic rather than linear in 0-CFA. We instead
-allocate an address for the value position when we create the
-continuation. This address and the tail address are both determined by
-the label of the application point, so the space becomes linear and
-the overall complexity drops to cubic. Note that this is a critical
-abstraction in languages with n-ary functions, since otherwise the
-continuation space becomes ${\mathcal O}(n^n)$!
+continuations quadratic rather than linear in 0-CFA. A linear space
+drops the complexity to cubic.
+
+To achieve this, we instead allocate an address for the value position
+when we create the continuation.  We will refer to this change in the
+semantics as store-allocated results. This address and the tail address are
+both determined by the label of the application point, so the space
+becomes linear and the overall complexity drops to cubic. Note that
+this is a critical abstraction in languages with n-ary functions,
+since otherwise the continuation space becomes ${\mathcal O}(n^n)$!
 
 The important rules that change are the following, specialized to 0-CFA:
 
@@ -560,19 +574,18 @@ The important rules that change are the following, specialized to 0-CFA:
 
 This extra store-allocation is effectively naming all intermediate
 results, and thus the precision aligns with an analysis specialized to
-either ANF or CPS. We can also play a representation trick and remove
-$\menv$ since we know it is the identity function in 0-CFA. We will
-refer to this change in the semantics as value indirection.
+ANF. We can also play a representation trick and remove
+$\menv$ since we know it is the identity function in 0-CFA.
 
 % Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 
 \section{Implementation techniques}
 \label{sec:opt}
 
-We discuss a variety of techniques for increasing performance by
+We discuss a succession of techniques for increasing performance by
 decreasing the interpretive overhead of abstract interpretation. They
 come in two flavors: decreasing the size of the represented state
-space [SS], and decreasing intermediate data structures [DS].
+space [SS], and decreasing the amount of intermediate data structures [DS].
 
 \begin{itemize}
  \item{[SS] quotient by sets of values (lazy non-determinism)}
@@ -582,8 +595,7 @@ space [SS], and decreasing intermediate data structures [DS].
    determine a state's store by the number of changes made to the
    global store at the time of visiting (timestamp)}
  \item{[DS] use a global mutable workset}
- \item{[DS] represent the global store as a global, mutable vector in
-   the 0-CFA case. (preallocation)}
+ \item{[DS] represent the global store as a global, mutable vector (preallocation)}
  \item{[SS] coarsely abstract literal data (abstracting compound data)}
 \end{itemize}
 
@@ -591,9 +603,11 @@ Some techniques preserve the precision of the underlying analysis, and
 others do not. We will discuss the design decisions behind the
 precision-lossy techniques.  Each technique requires minimal changes
 to the reduction relation/fixpoint, and each improves performance by
-integer factors. The first three remain in the purely functional
-realm. The final three use mutation in small, localized places, so
-they do not increase conceptual complexity drastically.
+integer factors. The first three and last remain in the purely
+functional realm. The final three use mutation in small, localized
+places, so they do not increase conceptual complexity
+drastically. Also, preallocation and mutable workset are standard
+implementation practices \cite{ianjohnson:Shivers:1991:CFA}.
 
 \subsection{Lazy non-determinism}
 
@@ -601,7 +615,7 @@ A shortcoming of the AAM approach is that much of the non-determinism
 is spurious. For example, in a function application, {\tt (f x y)},
 where all variables have been joined with multiple values, each
 variable reference transitions to several new states that comprise the
-cartesian product of all the values of {\tt f}, {\tt x} and {\tt y},
+cartesian product of all the values of {\tt f}, {\tt x} and {\tt y} (or in the our baseline analysis, the sum),
 only to be joined back together in their respective application positions. We would
 see transitions of the following shape:
 \begin{center}
@@ -615,7 +629,8 @@ until it is needed in {\it strict contexts} (such as the guard for an
 \end{center}
 
 For this, we introduce a new value for a delayed lookup that acts to
-quotient the state space by the values at the delayed address. Its changes to the semantics are highlighted in the following rules:
+quotient the state space by the values at the delayed address. Its
+changes to the semantics are highlighted in the following rules:
 
 \begin{align*}
 force(\msto,\saddr\maddralt) &= \msto(\maddralt)\\
@@ -631,7 +646,7 @@ bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
               \maddr &= \mvar\mcntr'
 \end{align*}
 
-This semantics introduces a subtle precision difference over the
+\paragraph{Precision loss} This semantics introduces a subtle precision difference over the
 baseline that is negligible. Consider a configuration where a
 reference to a variable and a binding of a variable will happen in one
 step. With laziness, the reference will mean the original binding(s)
@@ -642,13 +657,13 @@ variable before the new binding happens and thus might have an
 observable precision difference. In our experience, this situation
 happens too rarely to warrant the significant increase in time and
 memory needed for this eager non-determinism. Indeed, were the
-variable reference a step later and another binding is not made in
+variable reference a step later and another binding not made in
 that step, the results of the two approaches are the same.
 
-The administrative nature of laziness means that we could remove the
+\paragraph{Avoiding precision loss} The administrative nature of laziness means that we could remove the
 loss in precision by essentially duplicating the reduction relation to
 specialize variable lookup. This works since in the semantics of ISWIM
-with value indirection consumes the value component of states in
+with store-allocated results consumes the value component of states in
 one step. This is not the case for semantics that replicate the value
 component across reductions, say for popping off exception handler
 frames. Further convolution is needed to remove the administrative
@@ -660,10 +675,12 @@ approach.
 
 \subsection{Abstract compilation}
 
-We can eliminate the {\tt ev} states from the run-time interpretation
-of a program by specializing the machine transition relation to the
-program being analyzed. This eliminates interpretative overhead by
-first compiling the program into ``byte code'' instructions.
+Laziness removes several represented states that would then have to be
+stepped by the fixpoint combinator.  We can further eliminate the {\tt
+  ev} states from the run-time interpretation of a program by
+specializing the machine transition relation to the program being
+analyzed. This eliminates interpretative overhead by first compiling
+the program into ``byte code'' instructions.
 
 The essence of the compilation effect can be seen by considering an example
 such as
@@ -694,7 +711,9 @@ where $\msto_4 = \msto_0 \sqcup \{ [\maddr_1 \mapsto \{ \mkont \}],
 The compilation step converts expressions into functions that expect
 the other components of the {\tt ev} state. Its definition in figure
 \ref{fig:compile} shows close similarity to the rules for interpreting
-    {\tt ev} states. The next step is to change creation of {\tt ev} states to simply calling these functions. The modified reduction relation is shown in figure \ref{fig:caam}.
+    {\tt ev} states. The next step is to change creation of {\tt ev}
+    states to simply calling these functions. The modified reduction
+    relation is shown in figure \ref{fig:caam}.
 
 \begin{figure}
 \begin{align*}
@@ -767,9 +786,9 @@ the other components of the {\tt ev} state. Its definition in figure
 
 \subsection{Store deltas}
 
-Each step in the fixpointer for the above techniques requires joining
+Each step in the fixpoint for the above techniques requires joining
 several, commonly large, stores together. Even with immutable hashes
-that utilize sharing, this is memory-intensive. Worse, this
+that utilize sharing, this is memory- and time-intensive. Worse, this
 contributes an obscene fraction of the runtime. If we instead track
 the changes to the store made over all steps and afterward update the
 store, we end up with much less allocation and computational overhead.
@@ -789,15 +808,17 @@ technique, but only in this regard. The whole store is still given so
 that lookups are possible. Example rule:
 
 \begin{align*}
-bind^{\mcntr}_\mlab(\menv, \msto, \msdiff, \mvar, \mval) &= \menv[\mvar \mapsto \maddr], \cons{\ttuple{\maddr}{force(\msto,\mval)}}{\msdiff}, \mcntr' \\
-\text{ where } \mcntr' &= \lfloor \mlab \mcntr\rfloor_k \\
-               \maddr &= \mvar\mcntr' \\
 (\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont},\msto,\msdiff) & \machstep
 (\ev[^{\mcntr'}]{\mexp,\menv',\mkont},\msdiff') \\
 \text{ where }\menv',\msdiff',\mcntr' &= \mathit{bind\,}^{ \mcntr}_\mlab(\menv,\msto,\msdiff,\mvar,\mval)
 \end{align*}
+\begin{align*}
+bind^{\mcntr}_\mlab(\menv, \msto, \msdiff, \mvar, \mval) &= \menv[\mvar \mapsto \maddr], \cons{\ttuple{\maddr}{force(\msto,\mval)}}{\msdiff}, \mcntr' \\
+\text{ where } \mcntr' &= \lfloor \mlab \mcntr\rfloor_k \\
+               \maddr &= \mvar\mcntr'
+\end{align*}
 
-We also lift $\machstep$ differently to accommodate for this asymmetry
+We also lift $\machstep$ to accommodate for this asymmetry
 in the input and output. For each state that is stepped, we feed the
 output changes to the next so that all changes get accumulated.
 
@@ -847,13 +868,15 @@ In total, we have six globals:
  \item{{\tt T}, the timestamp of the store}
 \end{itemize}
 
-To ensure termination, we guard adding $c$ to {\tt todo} by the following check:
+The new fixpoint calculation is defined in
+figure~\ref{fig:imperative}.  To ensure termination, we guard adding
+$c$ to {\tt todo} by the following check:
 \begin{align*}\msdiff\mbox{{\tt ?}} \vee {\tt seen}(c) \neq {\tt T}\end{align*}
 If it succeeds, {\tt todo} gets $c$ and we update {\tt seen} to map $c$ to {\tt T}.
 
-After all steps complete, we apply $\msdiff$ to $\msto$ and increase
+After all steps complete, we apply $\msdiff$ to $\msto$ imperatively and increase
 {\tt T} as long as there was at least one change in $\msdiff$. This
-logic is only sound if we know that each $\ttuple{\maddr}{\mval{s}}$
+logic leads to termination if we know that each $\ttuple{\maddr}{\mval{s}}$
 in $\msdiff$ would change the value of $\maddr$ in the current
 store. Thus, we also guard additions to $\msdiff$ so that only updates
 that would change the store are permitted. Each time $\msdiff$ is
@@ -898,7 +921,7 @@ up-front and addressing by the contour converted to polynomial, since
 many combinations of labels are not likely to occur. The all up-front
 allocation again breaks down when we add compound data, which
 introduce new kinds of labels (e.g. left and right components of a
-tuple).
+tuple at the contour of creation).
 
 \subsection{Abstracting Compound Data}
 
@@ -906,15 +929,14 @@ Practical issues of performance arise when one chooses the
 ``obvious,'' or ``natural'' abstraction for compound data. Our running
 example will be the classic Boyer benchmark. The detail of note for
 the Boyer benchmark is that it has large list literals, the exact
-value of which do not particularly matter for control-flow
-analysis. If we interpret a list literal of 30 elements (that again
-have 10 elements each) as 300 applications of {\tt cons}, and then
-interpret a function that traverses the tree, we will end up
-interpreting that function at least 300 times, when once or twice
-would do.
+values of which do not particularly matter for many analyses. If we
+interpret a list literal of 30 elements (that again have 10 elements
+each) as 300 applications of {\tt cons}, and then interpret a function
+that traverses the tree, we will end up interpreting that function at
+least 300 times, when once or twice would do.
 
 We will first explain the natural abstraction of tuples, and then we
-will explain a less precise allocation strategy from uniform $k-CFA$
+will explain a less precise allocation strategy from uniform $k$-CFA
 that we use for large compound data literals that we modified from the
 implementation in \citep{dvanhorn:wright-jagannathan-toplas98}.
 
@@ -938,7 +960,7 @@ for a sequence of calls to {\tt cons}, this abstraction explodes the
 value space. Analyzing a function that counts the number of atoms in a
 literal s-expression would actually interpret that function at least
 that number of times (more because of intermediate conses). Indeed,
-even in our fastest parameterization, this abstraction causes the
+even in our fastest implementation, this abstraction causes the
 analysis of Boyer to be 430 times slower than the approach we will now
 describe.
 
