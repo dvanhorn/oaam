@@ -83,7 +83,11 @@
              [(var l x)
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([v #:in-delay ev-σ (lookup-env ρ x)])
-                    (yield (co ev-σ k v))))]
+                    (yield (co ev-σ k v)))
+                  ;; Needed for strict/compiled, but for lazy this is an unnecessary state
+                  #;
+                  (do (ev-σ) ()
+                    (yield (dr ev-σ k (lookup-env ρ x)))))]
              [(datum l d) (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k d))))]
              [(primr l which)
               (define p (primop (compile-primop which)))
@@ -107,7 +111,7 @@
                   (define as (map (λ (x) (make-var-contour x δ)) xs))
                   (define/ρ ρ* (extend* ρ xs as))
                   (do (ev-σ) ([(σ0 a) #:push ev-σ l δ k]
-                           [σ*-lrc #:join* σ0 as ss])
+                              [σ*-lrc #:join* σ0 as ss])
                     (yield (ev σ*-lrc c ρ* (lrk (marks-of k) x xs* cs cb ρ* a δ) δ))))]
              [(app l e es)
               (define c (compile e))
@@ -182,6 +186,10 @@
        (quasitemplate/loc stx
          (begin ;; specialize representation given that 0cfa needs less
            (mk-op-struct co (rσ k v) (σ-op ... k v) expander-flags ...)
+           ;; Variable dereference causes problems with strict/compiled
+           ;; instantiations because store changes are delayed a step.
+           ;; We fix this by making variable dereference a new kind of state.
+           (mk-op-struct dr (rσ k a) (σ-op ... k a) expander-flags ...)
            (mk-op-struct ans (rσ cm v) (σ-op ... cm-op ... v) expander-flags ...
                          #:expander-id ans:)
            (mk-op-struct ap (rσ l fn-addr v-addrs k δ)
@@ -362,6 +370,11 @@
            ;; [Rel State State]
            (define (step state)
              (match state
+               ;; Only for compiled/strict
+               #;
+               [(dr: dr-σ k a)
+                (generator
+                 (do (dr-σ) ([v #:in-delay dr-σ a]) (yield (co dr-σ k v))))]
                [(co: co-σ k v)
                 (match k
                   [(mt: cm) (generator (do (co-σ) ([v #:in-force co-σ v])
