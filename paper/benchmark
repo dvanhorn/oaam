@@ -1,3 +1,4 @@
+ 
 ./nbody.id.time.15:cpu time: 43050 real time: 43081 gc time: 3293
 ./nucleic.it.time.15:cpu time: 112447 real time: 112507 gc time: 17040
 ./boyer.it.time.15:cpu time: 20729 real time: 20738 gc time: 920
@@ -335,6 +336,7 @@
 ./mbrotZ.pd.time.15:States/second: 33990.29126213592
 ./church.sp.time.15:States/second: 721.7128852176281
 ./nbody.lc.time.15:Result: Timeout
+./boyer.ld.time.15:Result: Timeout
 ./nucleic.ld.time.15:Result: Timeout
 ./nucleic.bl.time.15:Result: Exhausted memory
 ./nucleic.sp.time.15:Result: Exhausted memory
@@ -347,7 +349,7 @@
 ./lattice.lc.mem.15:Peak memory use after a collection: 148552448
 ./nucleic.pd.mem.15:Peak memory use after a collection: 142497352
 ./mbrotZ.id.mem.15:Peak memory use after a collection: 63087960
-./nucleic.ld.mem.15:Peak memory use after a collection: 2247806200
+./nucleic.ld.mem.15:Peak memory use after a collection: 2248419320
 ./nbody.lc.mem.15:Peak memory use after a collection: 658789688
 ./matrix.it.mem.15:Peak memory use after a collection: 73052968
 ./maze.ld.mem.15:Peak memory use after a collection: 476504672
@@ -395,6 +397,7 @@
 ./matrix.pd.mem.15:Peak memory use after a collection: 66536368
 ./maze.it.mem.15:Peak memory use after a collection: 67899648
 ./earley.ia.mem.15:Peak memory use after a collection: 63087800
+./boyer.ld.mem.15:Peak memory use after a collection: 1555221992
 ./church.bl.mem.15:Peak memory use after a collection: 85829624
 ./nbody.id.mem.15:Peak memory use after a collection: 130633344
 ./graphs.pa.mem.15:Peak memory use after a collection: 67187024
@@ -433,7 +436,7 @@
 ./lattice.lc.mem.15:Current memory use: 167252800
 ./nucleic.pd.mem.15:Current memory use: 121575760
 ./mbrotZ.id.mem.15:Current memory use: 67469232
-./nucleic.ld.mem.15:Current memory use: 2055274952
+./nucleic.ld.mem.15:Current memory use: 2070622304
 ./nbody.lc.mem.15:Current memory use: 340051592
 ./matrix.it.mem.15:Current memory use: 106511232
 ./maze.ld.mem.15:Current memory use: 454635624
@@ -481,6 +484,7 @@
 ./matrix.pd.mem.15:Current memory use: 89537600
 ./maze.it.mem.15:Current memory use: 95511624
 ./earley.ia.mem.15:Current memory use: 62452168
+./boyer.ld.mem.15:Current memory use: 1581329768
 ./church.bl.mem.15:Current memory use: 112865112
 ./nbody.id.mem.15:Current memory use: 130190112
 ./graphs.pa.mem.15:Current memory use: 80977376
@@ -852,6 +856,8 @@
 ./lattice.ld.time.16:States/second: 38249.760765550236
 ./mbrotZ.id.time.16:States/second: 32719.6261682243
 ./mbrotZ.sp.time.16:States/second: 523.2715004031448
+./boyer.ld.time.16:Result: Timeout
+./nucleic.ld.time.16:Result: Timeout
 ./nbody.lc.time.16:Result: Timeout
 ./nucleic.ls.time.16:Result: Exhausted memory
 ./boyer.sp.time.16:Result: Exhausted memory
@@ -895,6 +901,7 @@
 ./matrix.pt.mem.16:Peak memory use after a collection: 71986856
 ./matrix.it.mem.16:Peak memory use after a collection: 73052680
 ./church.id.mem.16:Peak memory use after a collection: 63087800
+./boyer.ld.mem.16:Peak memory use after a collection: 1489642360
 ./boyer.pa.mem.16:Peak memory use after a collection: 97360696
 ./maze.pd.mem.16:Peak memory use after a collection: 63087800
 ./earley.sp.mem.16:Peak memory use after a collection: 430943096
@@ -924,6 +931,7 @@
 ./mbrotZ.it.mem.16:Peak memory use after a collection: 62915928
 ./lattice.bl.mem.16:Peak memory use after a collection: 231979304
 ./lattice.sp.mem.16:Peak memory use after a collection: 239946504
+./nucleic.ld.mem.16:Peak memory use after a collection: 2248037448
 ./graphs.pa.mem.16:Peak memory use after a collection: 67187592
 ./lattice.pd.mem.16:Peak memory use after a collection: 63087960
 ./church.ls.mem.16:Peak memory use after a collection: 78521880
@@ -980,6 +988,7 @@
 ./matrix.pt.mem.16:Current memory use: 97817240
 ./matrix.it.mem.16:Current memory use: 106511168
 ./church.id.mem.16:Current memory use: 60119416
+./boyer.ld.mem.16:Current memory use: 1497330856
 ./boyer.pa.mem.16:Current memory use: 107283680
 ./maze.pd.mem.16:Current memory use: 88754416
 ./earley.sp.mem.16:Current memory use: 309669248
@@ -1009,6 +1018,7 @@
 ./mbrotZ.it.mem.16:Current memory use: 71744032
 ./lattice.bl.mem.16:Current memory use: 192210592
 ./lattice.sp.mem.16:Current memory use: 160554768
+./nucleic.ld.mem.16:Current memory use: 2036845216
 ./graphs.pa.mem.16:Current memory use: 80974912
 ./lattice.pd.mem.16:Current memory use: 75378480
 ./church.ls.mem.16:Current memory use: 111772368
@@ -1367,7 +1377,9 @@
 ./nucleic.it.time.17:States/second: 7355.437550516683
 ./lattice.bl.time.17:States/second: 305.16569088671366
 ./boyer.id.time.17:States/second: 29084.827388899485
+./nucleic.ld.time.17:Result: Timeout
 ./nbody.lc.time.17:Result: Timeout
+./boyer.ld.time.17:Result: Timeout
 ./boyer.lc.time.17:Result: Exhausted memory
 ./nucleic.lc.time.17:Result: Exhausted memory
 ./boyer.sp.time.17:Result: Exhausted memory
@@ -1383,6 +1395,7 @@
 ./mbrotZ.lc.mem.17:Peak memory use after a collection: 140034952
 ./earley.id.mem.17:Peak memory use after a collection: 63087800
 ./church.id.mem.17:Peak memory use after a collection: 63087960
+./boyer.ld.mem.17:Peak memory use after a collection: 1518373088
 ./earley.it.mem.17:Peak memory use after a collection: 62916568
 ./mbrotZ.bl.mem.17:Peak memory use after a collection: 275528488
 ./earley.pt.mem.17:Peak memory use after a collection: 62916088
@@ -1398,6 +1411,7 @@
 ./matrix.ia.mem.17:Peak memory use after a collection: 68605648
 ./earley.pa.mem.17:Peak memory use after a collection: 63087640
 ./lattice.pt.mem.17:Peak memory use after a collection: 62915928
+./nucleic.ld.mem.17:Peak memory use after a collection: 2248083544
 ./maze.pt.mem.17:Peak memory use after a collection: 66344024
 ./church.sp.mem.17:Peak memory use after a collection: 90525152
 ./graphs.id.mem.17:Peak memory use after a collection: 68567600
@@ -1468,6 +1482,7 @@
 ./mbrotZ.lc.mem.17:Current memory use: 173175760
 ./earley.id.mem.17:Current memory use: 62441064
 ./church.id.mem.17:Current memory use: 60118888
+./boyer.ld.mem.17:Current memory use: 1526617248
 ./earley.it.mem.17:Current memory use: 72994024
 ./mbrotZ.bl.mem.17:Current memory use: 265461928
 ./earley.pt.mem.17:Current memory use: 71533832
@@ -1483,6 +1498,7 @@
 ./matrix.ia.mem.17:Current memory use: 92880608
 ./earley.pa.mem.17:Current memory use: 61560264
 ./lattice.pt.mem.17:Current memory use: 68294464
+./nucleic.ld.mem.17:Current memory use: 1991930616
 ./maze.pt.mem.17:Current memory use: 70714184
 ./church.sp.mem.17:Current memory use: 115760504
 ./graphs.id.mem.17:Current memory use: 82135312
@@ -1882,7 +1898,9 @@
 ./matrix.ia.time.18:States/second: 61567.04420898794
 ./boyer.id.time.18:States/second: 28728.664280331574
 ./mbrotZ.ls.time.18:States/second: 536.8534966280865
+./boyer.ld.time.18:Result: Timeout
 ./nbody.lc.time.18:Result: Timeout
+./nucleic.ld.time.18:Result: Timeout
 ./boyer.ls.time.18:Result: Exhausted memory
 ./boyer.sp.time.18:Result: Exhausted memory
 ./nucleic.bl.time.18:Result: Exhausted memory
@@ -1903,6 +1921,7 @@
 ./matrix.pa.mem.18:Peak memory use after a collection: 66296800
 ./matrix.id.mem.18:Peak memory use after a collection: 67725544
 ./lattice.pa.mem.18:Peak memory use after a collection: 63087800
+./boyer.ld.mem.18:Peak memory use after a collection: 1471280000
 ./mbrotZ.ia.mem.18:Peak memory use after a collection: 63087640
 ./matrix.ld.mem.18:Peak memory use after a collection: 411712328
 ./mbrotZ.sp.mem.18:Peak memory use after a collection: 308974488
@@ -1937,6 +1956,7 @@
 ./nucleic.it.mem.18:Peak memory use after a collection: 160391880
 ./lattice.ld.mem.18:Peak memory use after a collection: 78833776
 ./maze.ld.mem.18:Peak memory use after a collection: 476487240
+./nucleic.ld.mem.18:Peak memory use after a collection: 2248104224
 ./boyer.it.mem.18:Peak memory use after a collection: 106035720
 ./lattice.ia.mem.18:Peak memory use after a collection: 63088280
 ./boyer.pd.mem.18:Peak memory use after a collection: 97263016
@@ -1988,6 +2008,7 @@
 ./matrix.pa.mem.18:Current memory use: 91539784
 ./matrix.id.mem.18:Current memory use: 96063640
 ./lattice.pa.mem.18:Current memory use: 75382328
+./boyer.ld.mem.18:Current memory use: 1488204992
 ./mbrotZ.ia.mem.18:Current memory use: 67487184
 ./matrix.ld.mem.18:Current memory use: 436959776
 ./mbrotZ.sp.mem.18:Current memory use: 229886384
@@ -2022,6 +2043,7 @@
 ./nucleic.it.mem.18:Current memory use: 123317832
 ./lattice.ld.mem.18:Current memory use: 91154560
 ./maze.ld.mem.18:Current memory use: 454637288
+./nucleic.ld.mem.18:Current memory use: 2095361152
 ./boyer.it.mem.18:Current memory use: 124011192
 ./lattice.ia.mem.18:Current memory use: 76346552
 ./boyer.pd.mem.18:Current memory use: 106959832
@@ -2398,6 +2420,8 @@
 ./church.ls.time.19:States/second: 748.7630760531524
 ./boyer.ia.time.19:States/second: 29343.676336171644
 ./nbody.lc.time.19:Result: Timeout
+./nucleic.ld.time.19:Result: Timeout
+./boyer.ld.time.19:Result: Timeout
 ./nucleic.sp.time.19:Result: Exhausted memory
 ./nucleic.bl.time.19:Result: Exhausted memory
 ./boyer.sp.time.19:Result: Exhausted memory
@@ -2459,6 +2483,7 @@
 ./mbrotZ.lc.mem.19:Peak memory use after a collection: 140034584
 ./church.sp.mem.19:Peak memory use after a collection: 90524784
 ./matrix.pa.mem.19:Peak memory use after a collection: 66299928
+./nucleic.ld.mem.19:Peak memory use after a collection: 2248145064
 ./church.lc.mem.19:Peak memory use after a collection: 64374504
 ./church.pa.mem.19:Peak memory use after a collection: 63088440
 ./church.pt.mem.19:Peak memory use after a collection: 62915928
@@ -2479,6 +2504,7 @@
 ./boyer.pt.mem.19:Peak memory use after a collection: 101223408
 ./lattice.ls.mem.19:Peak memory use after a collection: 240172496
 ./earley.it.mem.19:Peak memory use after a collection: 62915928
+./boyer.ld.mem.19:Peak memory use after a collection: 1532064656
 ./maze.pa.mem.19:Peak memory use after a collection: 63087480
 ./boyer.it.mem.19:Peak memory use after a collection: 106033240
 ./nbody.id.mem.19:Peak memory use after a collection: 132031152
@@ -2544,6 +2570,7 @@
 ./mbrotZ.lc.mem.19:Current memory use: 173175392
 ./church.sp.mem.19:Current memory use: 115760136
 ./matrix.pa.mem.19:Current memory use: 91542912
+./nucleic.ld.mem.19:Current memory use: 2081815696
 ./church.lc.mem.19:Current memory use: 83101376
 ./church.pa.mem.19:Current memory use: 59855424
 ./church.pt.mem.19:Current memory use: 82768944
@@ -2564,6 +2591,7 @@
 ./boyer.pt.mem.19:Current memory use: 108923840
 ./lattice.ls.mem.19:Current memory use: 191814968
 ./earley.it.mem.19:Current memory use: 72996288
+./boyer.ld.mem.19:Current memory use: 1537443344
 ./maze.pa.mem.19:Current memory use: 88749056
 ./boyer.it.mem.19:Current memory use: 124008712
 ./nbody.id.mem.19:Current memory use: 128907272
