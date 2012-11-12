@@ -1,0 +1,396 @@
+\appendix
+\section{Relation to Uniform \(k\)-CFA (A Case Against Acceptability)}
+\label{sec:accept}
+
+\cite{dvanhorn:nielson-nielson-popl97} \cite{dvanhorn:Neilson:1999}
+
+This machine's allocation strategy mimics the Uniform k-CFA analysis
+in Principles of Program Analysis, which is defined in terms of
+``$\delta$ contours.''  However, because the machine represetation makes
+context explicit via continuations, we can calculate these contours
+rather than thread them throught the evaluator.  In other words, we
+can use the CESK* machine without modification to obtain Uniform k-CFA
+by way of a simple allocation strategy.  (In this way, it's a
+simplification of the presentation in JFP.)
+
+NNH uses a coinductive acceptability relation to specify Uniform
+k-CFA:
+
+\[
+   C,R \models^{ce}_\delta E
+\]
+
+The cache and global environment form a finite store-like structure
+holding bindings and return values.  The contour environment ce maps
+variables to locations in R which contains their bindings, just as the
+environment of the CESK* machine does.  The current contour delta is a
+string of application labels describing the enclosing context under
+which this term is being analyzed (or evaluated).  If you view the
+acceptability relation as a big-step evalator, the
+$(\widehat C,\widehat\rho)$ component should be seen as a global
+store ce is the environment mapping variables to their locations.
+
+Starting form the initial configuration for a program and iterating
+the machine transition relation until reaching a fixpoint of reachable
+states will \emph{underestimate} the acceptability relation of Uniform
+k-CFA.  You can recover acceptability by feeding this store back into
+the initial configuration and iterating again.  Repeating this process
+until a complete run of the program reaches no new states will be the
+least solution that is acceptable.
+
+HOWEVER.  Why should we care about acceptability?  What this
+machine computes is safe.  In other words, it computes a more
+precise characterization of the run-time behavior of a program.  In
+doing is so, it actually saves work (as can be seen above).
+
+An Example:
+
+\begin{alltt}
+ (let ((id (\(\lambda\) (x) x)))
+   (begin (id 1) (id 2)))
+\end{alltt}
+
+Under Uniform 0-CFA, we would have:
+\[
+   [{\tt x} \mapsto \{{\tt 1}, {\tt 2}\}] \in \widehat\rho
+\]
+
+in the least solution to $\models$.  This says that, when run, 'x' is
+bound to 1 or 2.
+
+Under the machine semantics using a 0CFA allocation policy, the trace
+semantics of the machine show that x is bound to 1, and that at some
+later point, x becomes bound to 1 or 2.  Moreover, the machine would
+show that (id 1) evaluates to 1 and only 1, while Uniform 0CFA must
+give that (id 1) is either 1 or 2 to be acceptable.  We don't see any
+value in these kinds of false flows that are due to the global and
+timeless aspects of C,R which acceptability requires the heap to be
+both finite and unchanging over the course of abstract
+interpretation. (Another view of the difference: the machine abstracts
+a program's execution as a \emph{finite state machine} that mimics the
+machine interpretation of the program; the aceptability relation of
+Uniform \(k\)-CFA abstracts a program's execution as a \emph{finite
+  map} that mimics the big-step evaluator: from terms to (sets of)
+values.)
+
+
+\subsection{Another problem with acceptability: Temporal ignorance}
+
+The small-step approach to static analysis brings subtle yet important temporal
+richness not found in classical analyses for higher-order programs.
+%
+Classical analyses (ultimately) compute judgments on program terms and
+contexts, e.g., at expression $e$, value $x$ may have value $v$.
+%
+The judgments do not relate the order in which expressions and context may be
+evaluated in a program, e.g., a classical analysis has nothing to say with
+regard to question like, ``Do we always evaluate $e_1$ before $e_2$?'' or ``Is
+it always the case that a file handle is opened, read and then closed in that
+order?''
+
+Small-step analyses, by their nature, encode the temporal relationships between
+abstract states.
+%
+It is sensible to make temporal queries of a small-step analysis.
+%
+Of course, this does not come for free: respecting temporal order imposes an
+order in which states and terms may be evaluated \emph{during} the analysis.
+%
+Classical analyses can (and do) evaluate expressions in any order, or in some
+cases, even in parallel~\cite{might:Prabhu:2010:EigenCFA}.
+%
+Relaxing that restriction on order affords additional optimizations that we
+have \emph{not} performed.
+
+We avoid sacrificing order not simply because we are interested in the
+questions it allows us to ask, but because considering temporal order actually
+improves the precision of the analysis itself.
+
+
+
+\section{Pushdown Analysis}
+
+It is straightforward to instantiate a \emph{pushdown} abstraction by
+bounding only the variable binding portion of the heap, but using a
+unique allocation strategy for continuations.  Such a strategy
+abstracts a program's execution as a \emph{pushdown automata}
+that mimics the machine interpretation.  This strategy therefore
+models the abstract stack in a true stack like fashion and always
+properly matches function calls with their return.
+
+Although such analyses can be formulated straightforwardly in the
+abstract machine approach, it is not clear all of the techniques of
+this paper can be applied to similar effect in the pushdown context.
+The main problem is calculation of an analysis can no longer be
+computed as the fixed point of the machine transition relation.
+Although there are several implementations (CFA2,ICFP'12), they
+operate at speeds roughly on par with our starting point: unoptimized
+store widened
+machines. \cite{dvanhorn:Earl2012Introspective,dvanhorn:Vardoulakis2011CFA2}
+
+\section{Proof: laziness is precision-preserving}
+Given widened machine configurations, we can show that lazy
+non-determinism is precision-preserving in the cases that application
+positions are store-allocated and not. We first show the latter since
+it uses less cluttered transition rules. The high level is that the
+``fan-out'' of non-determinism is collapsed back in the store (in the
+store-allocated applications case) or delayed a single step by
+laziness that would have happened in a step of strictness.
+
+Details of lazy machine given as a diff from the strict machine. \\
+State space of $lazy-\widehat{CESK}^*_t$ varies just in
+$\mathit{Value}$ (storable values do not change):
+\begin{align*}
+\mval \in \mathit{Value} &::= z \mid b \mid o \mid \saddr{\maddr} \\
+\end{align*}
+
+We define a relation between strict and lazy machines that illustrates
+the quotient that the lazy states embody.
+
+\newcommand{\vapprx}[3]{#1 \cong_{#2} #3}
+\newcommand{\kapprx}[3]{#1 \cong_{#2} #3}
+\newcommand{\lapprx}[3]{#1 \approx_{#2} #3}
+\newcommand{\apprx}[3]{#1 \sim_{#2} #3}
+\newcommand{\capprx}[2]{#1 \sim #2}
+
+\begin{mathpar}
+\inferrule{\mval' \in force(\msto, \mval)}
+          {\vapprx{\mval}{\msto}{\mval'}} \quad
+\inferrule{\ans{\mval} \in cs}{\lapprx{\ans{\mval}}{\msto}{cs}} \quad
+\inferrule{\ev{\mexp, \menv, \mkont, \mcntr} \in cs}
+          {\lapprx{\ev{\mexp, \menv,\mkont, \mcntr}}{\msto}{cs}} \\
+\inferrule{\co{\mkont, \mval'} \in cs \\
+           \vapprx{\mval}{\msto}{\mval'}}
+          {\lapprx{\co{\mkont, \mval}}{\msto}{cs}} \quad
+\inferrule{\ap{\mval_0, \mval_1, \mkont} \in cs \\
+           \vapprx{\mval_1}{\msto}{\mval_1'}}
+          {\lapprx{\ap{\mval_0, \mval_1', \mkont}}{\msto}{cs}} \\
+\inferrule{\ev{\mexp, \menv, \mkont} \in lcs}
+          {\apprx{\ev{\mexp, \menv,\mkont}}{\msto}{lcs}} \quad
+\inferrule{\ans{\mval} \in lcs \\
+           \vapprx{\mval}{\msto}{\mval'}}
+          {\apprx{\ans{\mval'}}{\msto}{lcs}} \\
+\inferrule{\co{\mkont, \mval} \in lcs \\
+           \vapprx{\mval}{\msto}{\mval'}}
+          {\apprx{\co{\mkont, \mval'}}{\msto}{lcs}} \quad
+\inferrule{\ap{\mval_0, \mval_1, \mkont} \in lcs \\
+           \vapprx{\mval_1}{\msto}{\mval_1'}}
+          {\apprx{\ap{\mval_0, \mval_1', \mkont}}{\msto}{lcs}} \\
+\inferrule{\forall lc \in lcs, \lapprx{lc}{\msto}{cs} \\
+           \forall c \in cs, \apprx{c}{\msto}{lcs}}
+          {\capprx{(lcs, \msto)}{(cs, \msto)}}
+\end{mathpar}
+
+We also need metafunctions for adding and removing a store component
+from states. These are straightforwardly defined, so just name them
+$wn$ and $nw$ respectively.
+%% c2vc(<e^l r k d>,s) = <e^l r s k d>
+%% c2vc(<v k d>,s) = <v s k d>
+%% vc2c(<e^l r s k d>) = <e^l r k d>
+%% vc2c(<v s k d>) = <v k d>
+
+The property we show is that all states stay related through
+reduction. The main difficulty is in showing the resulting stores are
+in fact equal. We do this by showing each lazy reduction corresponds
+to a set of strict reductions, for which the union of their output
+stores equal the lazy store. Also for strict equality, every strict
+reduction corresponds to a lazy reduction (immediate from the relation).
+
+\begin{lemma}[Partition step]
+$\forall lc, lcs', cs, \msto, \msto'.$
+ if  $\capprx{(\{lc\},\msto)}{(cs,\msto)}$
+ and $\forall lc' \in lcs'. wn(lc,\msto) \machstep wn(lc', \msto')$ then
+ $\exists cs'. \forall c \in cs. \exists c' \in cs', \msto^c$
+ such that $wn(c,\msto) \machstep wn(c', \msto^c)$
+ and       $\msto' = \bigcup\limits_{c \in cs}{\msto^c}$
+ and       $\capprx{(lcs',\msto')}{(cs',\msto')}$.
+\end{lemma}
+\begin{proof}
+Let $lc' \in lcs'$ be arbitrary.
+By cases on $wn(lc,\msto) \machstep wn(lc', \msto')$:
+\begin{itemize}
+\item{Case $\ev{\svar{\mvar}, \menv, \mkont, \msto} \machstep \co{\mkont,
+    \saddr{\menv(\mvar)}, \msto}$: \\ By definition of $\machstep$,
+  $wn(lc,\msto)$ steps strictly to each of $cs' = \{\co{\mval, \mkont} \mid \mval \in \msto(\menv(\mvar))\}$.  By definition of
+  $\capprx{}{}$, $cs = \{lc\}$. The stores are the same, and by
+  definition of $\lapprx{}{\msto}{}$, $\lapprx{lc'}{\msto}{cs'}$.}
+\item{Case $\ev{\slit{\mlit}, \menv, \msto, \mkont, \msto} \machstep
+            \co{\mkont, \mlit, \msto}$: \\
+      Immeditate.}
+\item{Case $\ev{\slam{\mvar}{\mexp}, \menv, \mkont, \msto} \machstep
+            \co{\mkont, \clos{\mvar, \mexp, \menv}, \msto}$: \\
+      Immediate}
+\item{Case $\ev[^\mcntr]{\sapp[^\mlab]{\mexp_0}{\mexp_1}, \menv, \mkont, \msto} \machstep
+            \ev[^\mcntr]{\mexp_0, \menv, \msto', \kar[^\mcntr_\mlab]{\mexp_1, \menv, \maddr}, \msto'}$: \\
+      Where $\maddr, \msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)$ \\
+      Immediate.}
+\item{Case $\ev[^\mcntr]{\sif[^\mlab]{\mexp_0}{\mexp_1}{\mexp_2}, \menv, \mkont, \msto} \machstep
+            \ev[^\mcntr]{\mexp_0, \menv, \msto', \kif[^\mcntr]{\mexp_1, \mexp_2, \menv, \maddr}, \msto'}$: \\
+      Where $\maddr, \msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)$ \\
+      Immediate.}
+\item{Case $\co{\kmt, \mval, \msto} \machstep \ans{\msto, \mval'}$: \\
+      Where $\mval' \in force(\msto, \mval)$ \\
+      By definition of $\capprx{}{}$, $cs = \{\co{\kmt, \mval'} \mid \mval \in force(\msto, \mval)\}$.
+      By definition of $\machstep$, $wn(lc,\msto)$ steps strictly to
+      each of $cs' = \{\ans{\mval}\}$. The stores are the same.
+      By definition of $\lapprx{}{\msto}{}$, $\forall lc' \in lcs'. \lapprx{lc'}{\msto}{cs'}$.
+      By definition of $\apprx{}{\msto}{}$, $\forall c' \in cs'. \apprx{c'}{\msto}{lcs'}$.
+      Thus $\capprx{(lcs',\msto)}{(cs',\msto)}$.}
+\item{Case $\co{\kar[^\mcntr_\mlab]{\mexp, \menv, \maddr}, \mval, \msto} \machstep
+            \ev[^\mcntr]{\mexp, \menv, \kfn[^\mcntr_\mlab]{\mval',\maddr}, \msto}$: \\
+      Where $v' \in force(\msto, \mval)$. \\
+      By definition of $\apprx{}{\msto}{}$,
+        $cs = \{\co{\kar[^\mcntr_\mlab]{\mexp, \menv, \maddr}, \mval'} \mid \mval \in force(\msto, \mval)\}$.
+      By definition of $\machstep, \lapprx{}{\msto}{}$,
+        $cs' = \{\ev[^\mcntr]{\mexp, \menv, \kfn[^\mcntr_\mlab]{\mval',\maddr}}
+            \mid \co{\kar[^\mcntr_\mlab]{\mexp, \menv, \maddr}, \mval'} \in cs\}$.
+      The stores are the same, and the previous imply $\capprx{(lcs',\msto)}{(cs',\msto)}$.}
+\item{Case $\co{\kfn[^\mcntr_\mlab]{\mvalx{u}, \maddr}, \mval, \msto} \machstep
+            \ap{\mvalx{u}, \mval, \mkont, \msto}$: \\
+      Where $\mkont \in \msto(\maddr)$. \\
+      Immediate.}
+\item{Case $\co{\kif[^\mcntr]{\mexp_0, \mexp_1, \menv, \maddr}, \mval, \msto} \machstep
+            \ev{\mexp_0, \menv, \mkont, \msto}$: \\
+      Where $\mkont \in \msto(\maddr)$. \\
+      By definition of $\machstep$, $\strue \in force(\msto, \mval)$, thus by definition of
+      $\capprx{}{}$, the strict machine takes the same step.}
+\item{Case $\co{\kif[^\mcntr]{\mexp_0, \mexp_1, \menv, \maddr}, \mval, \msto} \machstep
+            \ev{\mexp_1, \menv, \mkont, \msto}$: \\
+      Where $\mkont \in \msto(\maddr)$. \\
+      By definition of $\machstep$, $\sfalse \in force(\msto, \mval)$, thus by definition of
+      $\capprx{}{}$, the strict machine takes the same step.}
+\item{Case $\ap[^\mcntr_\mlab]{\clos{\mvar, \mexp, \menv}, \mval, \mkont,\msto} \machstep
+            \ev[^{\mcntr'}]{\mexp, \menv', \mkont, \msto'}$: \\
+      Where $\menv', \msto', \mcntr' = \mathit{bind}^\mcntr_\mlab(\menv, \msto, \mvar, \mval)$
+      By definition of $\apprx{}{\msto}{}$,
+        $cs = \{\ap[^\mcntr_\mlab]{\clos{\mvar, \mexp, \menv}, \mval', \mkont} \mid
+                \mval' \in force(\msto, \mval)\}$.
+      Thus $cs' = \{\ev[^{\mcntr'}]{\mexp, \menv', \mkont}\}$ (clearly $\lapprx{lc'}{\msto'}{cs'}$)  and
+      for all $c \in cs$, $wn(c,\msto) \machstep wn(c',\msto\sqcup[\mvar\mcntr' \mapsto \{c.\mval\}])$.
+      Thus the union of these stores is equal to $\msto'$.}
+\item{Case $\ap[^\mcntr_\mlab]{\mop, \mval, \mkont,\msto} \machstep
+            \co{\mval'', \mkont, \msto}$: \\
+      Where $\mval' \in force(\msto, \mval)$
+        and $\mval'' \in\interpdelta(\mop,\mval')$. \\
+      By definition of $\capprx{}{}$ and $\interpdelta$,
+        $cs = \{\ap[^\mcntr_\mlab]{\mop, \mvalx{u}, \mkont} \mid
+                \mvalx{u} \in force(\msto, \mval),
+                \mval'' \in\interpdelta(\mop,\mvalx{u})\}$.
+      Thus the strict machine takes the same step.}
+\end{itemize}
+\end{proof}
+
+
+\begin{theorem}[Laziness preserves precision]
+$\forall lcs,cs,lcs',\msto,\msto'$ if $\capprx{(lcs, \msto)}{(cs,\msto)}$
+  and $(lcs,\msto) \machstep (lcs',\msto')$ then there exists $cs'$
+  such that $(cs,\msto) \machstep (cs',\msto')$
+\end{theorem}
+\begin{proof}
+By definition of $\machstep$,
+$lcs' = \{lc' \mid \exists \msto^{lc}. wn(lc,\msto) \machstep wn(lc', \msto^{lc}), lc \in lcs\}$
+For each $lc \in lcs$ let $\hat{c}^{lc} \subseteq cs$ be the
+smallest set such that $\lapprx{lc}{\msto}{\hat{c}^{lc}}$. \\ By the
+previous lemma, there exists a $\hat{c}^{lc}{}'$ such that $\capprx{(\{lc' \mid wn(lc,\msto) \machstep
+  wn(lc', \msto^{lc})\}, \msto^{lc})}{(\hat{c}',\msto^{lc})}$. Let
+$cs' = \bigcup\limits_{lc \in lcs}{\hat{c}^{lc}{}'}$ and $\msto' = \bigcup\limits_{lc \in lcs}{\msto^{lc}}$.
+Since each step individually is related, the union is related: $\capprx{lcs'}{\msto'}{cs'}$.
+By definition of $\machstep$, $(cs, \msto) \machstep (cs', \msto')$ and $(lcs, \msto) \machstep (lcs', \msto')$.
+\end{proof}
+
+%% --Eval
+%% <x r s k d> --> <v s k d> where v in s(r(x))  [VAR]
+%% <(e0^l0 e1^l1)^{l,lf,la} r s k d> --> <e0^l0 r s\sqcup[ld |-> {k}] ar^{l,lf,la}(e1^l1 r ld) d> [APP]
+%% <(lambda x e) r s k d> --> <clos(x e r) s k d> [CLOS]
+%% --Continue
+%% <v s ar^{l,lf,la}(e^le r a) d> --> <e^le r s\sqcup[lfd |-> {v}] fn^{l,la}(lfd, a)> [CO]
+%% --Apply
+%% <v s fn^{l,la}(fa, ka) d> --> <e^fl r[x |-> xd'] s'[xd' |-> s'(lad)] k d'> [AP]
+%%   where clos(x e^fl r) in s(fa)
+%%         k in s(ka)
+%%         s' = s\sqcup[lad |-> {v}]
+%%         d' = truncate(ld, K)
+
+%% This extra binding corresponds directly to the intermediate
+%% bindings introduced by ANF.
+%% Matt's ANF analyses likely have all the flavours of our "laziness" technique, but this is how we get our chocolate with our peanut butter as Olin would say.
+
+%% Compare this to lazyCESK^*t:
+%% v ::= clos(x e r) | addr(a)
+%% Clos ::= clos(x e r)
+%% s : a -> P(Clos)
+%% others the same
+
+%% force(s, addr(a)) = s(a)
+%% force(s, clos(x e r)) = {clos(x e r)}
+
+%% --Eval
+%% <x r s k d> --> <addr(r(x)) s k d>
+%% others the same
+%% --Continue
+%% <v s ar^{l,lf,la}(e^le r a) d> --> <e^le r s\sqcup[lfd |-> force(s,v)] fn^{l,la}(lfd, a)>
+%% --Apply
+%% <v s fn^{l,la}(fa, ka) d> --> <e^fl r[x |-> xd'] s'[xd' |-> s'(lad)] k d'>
+%%   where clos(x e^fl r) in s(fa)
+%%         k in s(ka)
+%%         s' = s\sqcup[lad |-> force(s, v)]
+%%         d' = truncate(ld, K)
+%% The same globalizing stuff applies.
+
+%% Let us relate the state spaces of the two abstract machines for the lambda calculus in the following way
+
+%% Then we can show that if lazyconf ~ conf and lazyconf ==> lazyconf' then there exists a conf' such that conf ==> conf' and lazyconf' ~ conf'
+%% Let lc in lazyconf.cs be arbitrary (call lazyconf.s, s)
+%% By cases on lc:
+%% <x r k d>:
+%% Premises:
+%% <x r k d> in conf.cs
+%% Thus:
+%% Since
+%% <x r s k d> -->lazy   <addr(r(x)) s k d>
+%% <x r s k d> -->strict <v s k d> where v in s(r(x))
+%% By definition of force, v in force(s, addr(r(x)))
+%% Thus the first rule of ~_s applies and the second rule of l~_s applies.
+
+%% <(lambda x e) r k d>:
+%% Trivial
+
+%% <(e0^l0 e1^l1)^{l,lf,la} r k d>:
+%% Premises:
+%% <(e0^l0 e1^l1)^{l,lf,la} r k d> in conf.cs
+%% Thus:
+%% <(e0^l0 e1^l1)^{l,lf,la} r s k d> -->lazy   <e0^l0 r s\sqcup[ld |-> {k}] ar^{l,lf,la}(e1^l1 r ld) d>
+%% <(e0^l0 e1^l1)^{l,lf,la} r s k d> -->strict <e0^l0 r s\sqcup[ld |-> {k}] ar^{l,lf,la}(e1^l1 r ld) d>
+
+%% Stores are same in this case.
+
+%% <v ar^{l,lf,la}(e^le r a) d>:
+%% Premises:
+%% For all v' in force(s, v),
+%%   <v' ar^{l,lf,la}(e^le r a) d> in conf.cs
+%% Thus:
+%% <v ar^{l,lf,la}(e^le r ka) d> -->lazy   <e^le r s\sqcup[lfd |-> force(s, v)] fn^{l,la}(lfd ka) d>
+%% for all v' in force(s,v),
+%% <v' ar^{l,lf,la}(e^le r ka) d> -->strict <e^le r s\sqcup[lfd |-> {v'}] fn^{l,la}(lfd ka) d>
+%% Thus the union of all the strict stores will equal the lazy store.
+
+%% <v fn^{l,la}(fa ka) d>:
+%% Premises:
+%% For all v' in force(s,v),
+%%   <v' fn^{l,la}(fa ka) d> in conf.cs
+%% Thus
+%% <v fn^{l,la}(fa ka) d> -->lazy <e^fl r[x |-> xd'] s'\sqcup[xd' |-> s'(lad)] k d'>
+%% where k in s(ka)
+%%       clos(x e^fl r) in s(fa)
+%%       d' = truncate(ld, K)
+%%       s' = s\sqcup[lad |-> force(s,v)]
+%% For all v' in force(s,v),
+%% <v' fn^{l,la}(fa ka) d> -->strict <e^fl r[x |-> xd'] s'\sqcup[xd' |-> s'(lad)] k d'>
+%% where k in s(ka)
+%%       clos(x e^fl r) in s(fa)
+%%       d' = truncate(ld, K)
+%%       s' = s\sqcup[lad |-> {v'}]
+
+%% Thus the union of all the strict stores will equal the lazy store.
+
+
