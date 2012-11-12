@@ -22,7 +22,7 @@
 % \titlebanner{banner above paper title}        % These are ignored unless
 % \preprintfooter{short description of paper}   % 'preprint' option specified.
 
-\title{Optimizing Abstract$^{\text 2}$ Machines}
+\title{Optimizing Abstract Abstract Machines}
 
 %% \authorinfo{J. Ian Johnson}
 %%            {Northeastern University}
@@ -415,47 +415,47 @@ For the duration of this paper, $\sqcup$ is a point-wise lifting of $\cup$:
 \sfalse &\in \hat\interpdelta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
 \end{align*}
 
-\begin{figure}
-\begin{alltt}
-  ;; State \(\to\) \(\Set(\)State\()\)
-  (define (step \(\mstate\))
-    (match \(\mstate\)
-      [(ev \(\mexp\) \(\rho\) \(\msto\) \(\mkont\))
-       (match \(\mexp\)
-         [(var\(\superscript\mlab\) \(\mvar\))
-          (for/set ((\(\mval\) (lookup \(\rho\) \(\msto\) \(\mvar\))))
-            (co \(\msto\) \(\mkont\) \(\mval\)))]
-         [(lit\(\superscript\mlab\) \(\mlit\)) (set (co \(\msto\) \(\mkont\) \(\mlit\)))]
-         [(lam\(\superscript\mlab\) \(\mvar\) \(\mexp\)) (set (co \(\msto\) \(\mkont\) (clos \(\mvar\) \(\mexp\) \(\rho\))))]
-         [(app\(\superscript\mlab\) \(\mexp\subscript0\) \(\mexp\subscript1\))
-          (define-values (\(\msto'\) \(\maddr\)) (push \(\mstate\)))
-          (set (ev \(\mexp\subscript0\) \(\rho\) \(\msto'\) (ar \(\mexp\subscript1\) \(\rho\) \(\maddr\))))]
-         [(ife\(\superscript\mlab\) \(\mexp\subscript0\) \(\mexp\subscript1\) \(\mexp\subscript2\))
-          (define-values (\(\msto'\) \(\maddr\)) (push \(\mstate\)))
-          (set (ev \(\mexp\subscript0\) \(\rho\) \(\msto'\) (ifk \(\mexp\subscript1\) \(\mexp\subscript2\) \(\rho\) \(\maddr\))))])]
-      [(co \(\msto\) \(\mkont\) \(\mval\))
-       (match \(\mkont\)
-         ['mt (set (ans \(\msto\) \(\mval\)))]
-         [(ar\(\superscript\mlab\) \(\mexp\) \(\rho\)) (set (ev \(\mexp\) \(\rho\) \(\msto\) (fn \(\mval\) l)))]
-         [(fn\(\superscript\mlab\) \(\mval'\))
-          (for/set ((\(\mkont\) (get-cont \(\msto\) l)))
-            (ap \(\msto\) \(\mval'\) \(\mval\) \(\mkont\)))]
-         [(fi\(\superscript\mlab\) c a \(\rho\))
-          (for/set ((k (get-cont \(\msto\) l)))
-            (ev (if v c \(\maddr\)) \(\rho\) \(\msto\) \(\mkont\)))])]
-      [(ap \(\msto\) fun \(\maddr\) \(\mkont\))
-       (match fun
-         [(clos l \(\mvar\) \(\mexp\) \(\rho\))
-          (define-values (\(\rho'\) \(\msto'\)) (bind \(\mstate\)))
-          (set (ev \(\msto'\) \(\mexp\) \(\rho'\) \(\mkont\)))]
-         [(op \(\mop\))
-          (for*/set ((\(\mkont\) (get-cont \(\msto\) l))
-                     (\(\mval\) (\(\interpdelta\) \(\mop\) \(\mval\))))
-            (co \(\msto\) \(\mkont\) \(\mval\)))]
-         [_ (set)]))]))
-\end{alltt}
-\caption{Implementation of machine transition relation.}
-\end{figure}
+%% \begin{figure}
+%% \begin{alltt}
+%%   ;; State \(\to\) \(\Set(\)State\()\)
+%%   (define (step \(\mstate\))
+%%     (match \(\mstate\)
+%%       [(ev \(\mexp\) \(\rho\) \(\msto\) \(\mkont\))
+%%        (match \(\mexp\)
+%%          [(var\(\superscript\mlab\) \(\mvar\))
+%%           (for/set ((\(\mval\) (lookup \(\rho\) \(\msto\) \(\mvar\))))
+%%             (co \(\msto\) \(\mkont\) \(\mval\)))]
+%%          [(lit\(\superscript\mlab\) \(\mlit\)) (set (co \(\msto\) \(\mkont\) \(\mlit\)))]
+%%          [(lam\(\superscript\mlab\) \(\mvar\) \(\mexp\)) (set (co \(\msto\) \(\mkont\) (clos \(\mvar\) \(\mexp\) \(\rho\))))]
+%%          [(app\(\superscript\mlab\) \(\mexp\subscript0\) \(\mexp\subscript1\))
+%%           (define-values (\(\msto'\) \(\maddr\)) (push \(\mstate\)))
+%%           (set (ev \(\mexp\subscript0\) \(\rho\) \(\msto'\) (ar \(\mexp\subscript1\) \(\rho\) \(\maddr\))))]
+%%          [(ife\(\superscript\mlab\) \(\mexp\subscript0\) \(\mexp\subscript1\) \(\mexp\subscript2\))
+%%           (define-values (\(\msto'\) \(\maddr\)) (push \(\mstate\)))
+%%           (set (ev \(\mexp\subscript0\) \(\rho\) \(\msto'\) (ifk \(\mexp\subscript1\) \(\mexp\subscript2\) \(\rho\) \(\maddr\))))])]
+%%       [(co \(\msto\) \(\mkont\) \(\mval\))
+%%        (match \(\mkont\)
+%%          ['mt (set (ans \(\msto\) \(\mval\)))]
+%%          [(ar\(\superscript\mlab\) \(\mexp\) \(\rho\)) (set (ev \(\mexp\) \(\rho\) \(\msto\) (fn \(\mval\) l)))]
+%%          [(fn\(\superscript\mlab\) \(\mval'\))
+%%           (for/set ((\(\mkont\) (get-cont \(\msto\) l)))
+%%             (ap \(\msto\) \(\mval'\) \(\mval\) \(\mkont\)))]
+%%          [(fi\(\superscript\mlab\) c a \(\rho\))
+%%           (for/set ((k (get-cont \(\msto\) l)))
+%%             (ev (if v c \(\maddr\)) \(\rho\) \(\msto\) \(\mkont\)))])]
+%%       [(ap \(\msto\) fun \(\maddr\) \(\mkont\))
+%%        (match fun
+%%          [(clos l \(\mvar\) \(\mexp\) \(\rho\))
+%%           (define-values (\(\rho'\) \(\msto'\)) (bind \(\mstate\)))
+%%           (set (ev \(\msto'\) \(\mexp\) \(\rho'\) \(\mkont\)))]
+%%          [(op \(\mop\))
+%%           (for*/set ((\(\mkont\) (get-cont \(\msto\) l))
+%%                      (\(\mval\) (\(\interpdelta\) \(\mop\) \(\mval\))))
+%%             (co \(\msto\) \(\mkont\) \(\mval\)))]
+%%          [_ (set)]))]))
+%% \end{alltt}
+%% \caption{Implementation of machine transition relation.}
+%% \end{figure}
 
 
 
