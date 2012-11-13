@@ -384,19 +384,9 @@ strategy:
               \lfloor \mcntr \rfloor_0 &= \mtcntr \\
               \lfloor \mlab\mcntr \rfloor_{k+1} &= \mlab\lfloor \mcntr\rfloor_k
 \end{align*}
+$\sqcup$ on stores is a point-wise lifting of $\sqcup$: $\msto \sqcup \msto' = \lambda \maddr. \msto(\maddr) \sqcup \msto'(\maddr)$.
 For the duration of this paper, since our example abstract value space
-has no interesting ordering, $\sqcup$ is a point-wise lifting of
-$\cup$:
-\begin{align*}
-\msto\sqcup \varnothing &= \msto \\
-\msto\sqcup \msto'[\maddr \mapsto S] &= \lambda \maddralt. \left\{
-  \begin{array}{ll}
-    \msto(\maddr)\cup S & \mbox{if } \maddralt = \maddr, \maddr\in dom(\msto) \\
-    S & \mbox{if } \maddralt = \maddr, \maddr\notin dom(\msto) \\
-    (\msto\sqcup\msto')(\maddralt) & \mbox{otherwise}
-  \end{array}\right.
-\end{align*}
-
+has no interesting ordering, $\sqcup$ can be read as $\cup$.
 \paragraph{Primitives}
 
 \begin{align*}
@@ -461,9 +451,9 @@ $\cup$:
 \section{Reduction semantics to baseline analyzer}
 \label{sec:baseline}
 
-The uniform $k$-CFA allocation strategy would make the fixpoint of the
-reduction relation in figure \ref{fig:aam} a computable analysis, but
-not an effective one. This is not the strategy that AAM, nor we,
+The uniform $k$-CFA allocation strategy would make $eval$ in figure
+\ref{fig:aam} a computable abstraction of reachable states, but not an
+effective one. This is not the strategy that AAM, nor we,
 recommend. We explain a succession of approximations to reach the
 baseline analysis that we compare performance against. But first, we
 need a fixpoint combinator to drive the succession of reduction
@@ -474,7 +464,8 @@ relations we define.
 
 We compute the semantics of a program by iterating the state
 transition relation until a fixed point in the reachable states is
-reached. We begin with a generic fixpoint combinator, ${\mathcal F}$:
+reached. We begin with Kleene's fixpoint combinator, ${\mathcal F}$,
+presented in the frontier/accumulator style:
 
 \begin{align*}
 {\mathcal F}(f)(X) &= {\mathcal G}(f, X, \varnothing) \\
@@ -503,11 +494,12 @@ shared amongst all states.
 \subsection{Store widening}
 \label{sec:storewiden}
 
-A common technique to faster convergence in flow analyses is to share
+A common technique to accelerate convergence in flow analyses is to share
 a common store that is monotonically updated as interpretation
 continues. In the ISWIM language with only unary operators, this makes
-our 0-CFA quartic in the size of the program. Not great, but
-polynomial.
+our 0-CFA quartic in the size of the program, which in one step drops the
+complexity from intractable exponentiality to merely daunting
+polynomiality.
 
 We can reuse the reduction relation we have defined, but with some
 scaffolding around it. A state in the store-widened machine is a pair
@@ -516,14 +508,13 @@ machine will pair the store with each of the states in this set,
 reduce, and combine the output stores to create the next. The
 scaffolded reduction relation, $\widehat{\machstep}$, is as follows:
 
-Let $wn : \widehat{State} \times Store \to State$ be the metafunction
-that adds a store to a storeless state and $c.\msto$ projects the
-store out of a state $c$.
-
 \begin{align*}
-(cs, \msto) &\widehat{\machstep} (cs', \msto') \\
+(cs, \msto) &\mathrel{\widehat{\machstep}} (cs', \msto') \\
 \mbox{where } cs' &= \{c' \mid wn(c, \msto) \machstep wn(c, \msto^c), c \in cs\} \\
-              \msto' &= \bigsqcup\{\msto^c \mid wn(c,\msto)\machstep wn(c', \msto^c), c \in cs\}
+              \msto' &= \bigsqcup\{\msto^c \mid wn(c,\msto)\machstep wn(c', \msto^c), c \in cs\} \\
+wn(\ev{\mexp, \menv, \mkont}, \msto) &= \ev{\mexp, \menv, \msto, \mkont} \\
+wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \msto, \mkont} \\
+wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont}
 \end{align*}
 That is, the next set of states is what we get by stepping each
 given state, without its store. The next store is the combination of all produced
@@ -540,11 +531,13 @@ continuations quadratic rather than linear in 0-CFA. A linear space
 drops the complexity to cubic.
 
 To achieve this, we instead allocate an address for the value position
-when we create the continuation.  This address and the tail address are
-both determined by the label of the application point, so the space
-becomes linear and the overall complexity drops to cubic. Note that
-this is a critical abstraction in languages with n-ary functions,
+when we create the continuation.  This address and the tail address
+are both determined by the label of the application point, so the
+space becomes linear and the overall complexity drops to cubic. Note
+that this is a critical abstraction in languages with n-ary functions,
 since otherwise the continuation space becomes ${\mathcal O}(n^n)$!
+This amount of distinction between continuations is unnecessary
+in practice.
 
 The important rules that change are the following, specialized to 0-CFA:
 
@@ -571,8 +564,10 @@ The important rules that change are the following, specialized to 0-CFA:
 
 This extra store-allocation is effectively naming all intermediate
 results, and thus the precision aligns with an analysis specialized to
-ANF. We can also play a representation trick and remove
-$\menv$ since we know it is the identity function in 0-CFA.
+ANF. We can also play a representation trick in 0-CFA and remove
+$\menv$. In monovariant analyses, variables map to themselves, meaning
+$\menv$ is effectively the identity function. That degeneration, in
+turn, allows us to simply discard it from the analysis.
 
 % Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 
@@ -822,7 +817,7 @@ in the input and output. For each state that is stepped, we feed the
 output changes to the next so that all changes get accumulated:
 
 \begin{align*}
-(cs, \msto) &\widehat{\machstep} (cs\cup cs', \msdiff(\msto)) \\
+(cs, \msto) &\mathrel{\widehat{\machstep}} (cs\cup cs', \msdiff(\msto)) \\
 \mbox{ where } (cs', \msdiff) &= step^*(\varnothing, cs, \mtlst) \\
 step^*(S, \varnothing, \msdiff) &= (S, \msdiff) \\
 step^*(S, \{c\}\cup cs, \msdiff &= step^*(S\cup cs^*, cs, \msdiff^*) \\
