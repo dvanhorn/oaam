@@ -8,7 +8,7 @@
   (provide (all-defined-out))
   (define start-run 15)
   (define end-run 19)
-  (define algos '("bl" "sp" "ls" "lc" "ld" "ia" "id" "pa" "pd" "it" "pt"))
+  (define algos '("bl" "sp" "ls" "lc" "ld" "fd" "ia" "id" "pa" "pd" "it" "pt"))
   (define names '("church" "mbrotZ" "earley" "boyer" "graphs"
                   "lattice" "matrix" "maze" "nbody" "nucleic")))
 (require 'data (for-syntax 'data))
@@ -51,7 +51,7 @@
 (with-input-from-file "benchmark"
   (λ ()
      (for ([line (in-port read-line)]
-           #:unless (string=? "" (trim line)))
+           #:unless (string=? "" (string-trim line)))
        (define sp (open-input-string line))
        (define-values (file algo run#)
          (apply values (for/list ([i (in-range 3)]) (L sp))))
