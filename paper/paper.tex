@@ -49,7 +49,10 @@ the result is prohibitively inefficient.
 
 This article contributes a step by step process for going from a naive
 analyzer derived under the abstracting abstract machine approach, to
-an efficient program analyzer.
+an efficient program analyzer.  The end result of the process is a two
+to three order-of-magnitude improvement over the systematically
+derived analyzer, making it competitive with hand-optimized
+implementations that compute fundamentally less precise results.
 \end{abstract}
 
 %% \category{CR-number}{subcategory}{third-level}
@@ -104,7 +107,7 @@ prohibitively inefficient without both further approximation and
 further implementation effort.
 
 In this article, we develop a systematic approach to deriving the
-feasible implementation of an abstract machine based analyzer.
+feasible implementation of an abstract-machine-based analyzer.
 
 
 
@@ -126,11 +129,30 @@ feasible implementation of an abstract machine based analyzer.
 
 \section{At a glance}
 
-In the following sections, we develop an analyzer for a core
-functional language and follow a series of steps of abstraction and
-optimization.  At each step we evaluate the implementation on an
-example that computes with Church numerals, shown in
-figure~\ref{fig:church}.
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=2.5in]{rel-time-church.ps}
+\end{center}
+\caption{Relative run-time of
+optimized analyzers to baseline for Church numeral example.}
+\label{fig:churchtime}
+\end{figure}
+
+
+This paper is organized in two halfs: in the first, we start with a
+quick review of the AAM approach to develop an analysis framework and
+then apply our step-by-step optimization techniques in the simplified
+setting of a core functional language.  This allows us to explicate
+the optimizations with a minimal amount of inessential technical
+overhead.  In the second half, we scale this approach up to an
+analyzer for a realistic untyped, higher-order imperative language
+with a number of interesting features.
+
+At each step during the initial development, we evaluate the
+implementation on an example, shown in figure~\ref{fig:church}, taken
+from the flow analysis literature~\cite{dvanhorn:Vardoulakis2011CFA2}
+that tests distributivity of multiplication over addition on Church
+numerals.
 %% \footnote{It is
 %%   written here using Scheme notation and makes use of the shorthands:
 %% %
@@ -145,11 +167,16 @@ figure~\ref{fig:church}.
 %% \end{alltt}}
 The example, while small, is informative:
 \begin{enumerate}
-\item it can be written in most modern programming languages, and
+\item it can be written in most modern programming languages,
 %
-\item it stresses an analyzer's ability to deal with complicated
-environment and control structure arising from the use of higher-order
-functions to encode arithmetic.
+\item it was designed to stress an analyzer's ability to deal with
+  complicated environment and control structure arising from the use
+  of higher-order functions to encode arithmetic, and
+%
+\item it proves to be the \emph{least} improved benchmark of the
+  complete suite considered in section~\ref{sec:eval}, and thus it
+  serves as a good sanity check and lower-bound for each of the
+  optimization techniques considered.
 \end{enumerate}
 
 We start, in section~\ref{sec:aam}, by developing an abstract
@@ -170,14 +197,6 @@ nearly a factor of 500, dropping the analys time to a fraction of a
 second.  Figure~\ref{fig:churchtime} shows the step-wise improvement
 of the analysis time for this example.
 
-\begin{figure}
-\begin{center}
-\includegraphics[width=2.5in]{rel-time-church.ps}
-\end{center}
-\caption{Relative run-time of
-optimized analyzers to baseline for Church numeral example.}
-\label{fig:churchtime}
-\end{figure}
 
 Section~\ref{sec:eval} describes the evaluation of each optimiztion
 technique applied to an implementation supporting a more realistic set
@@ -261,7 +280,14 @@ Figure~\ref{fig:aam} defines the semantics of ISWIM as a machine
 model.  Evaluation is defined as the set of states reachable by the
 reflexive, transitive closure of the machine transition relation.  The
 machine is a very slight variation on a standard abstract machine for
-ISWIM in ``eval, continue, apply'' form.
+ISWIM in ``eval, continue, apply''
+form~\cite{dvanhorn:Danvy:DSc}.\marginpar{There's probably a better
+  (more specific) cite for eval/apply/continue.}  It can be
+systematically derived from a definitional interpreter through a
+continuation-passing style transformation and defunctionalization, or
+from a structural operational semantics using the refocusing
+construction of Danvy and
+Nielsen~\cite{dvanhorn:Danvy-Nielsen:RS-04-26}.
 
 Compared with the standard machine semantics, this definition is
 different in the following ways:
@@ -274,60 +300,70 @@ different in the following ways:
   $\mathit{push}$, $\mathit{bind}$, $\interpdelta$ and $\sqcup$.
 \end{itemize}
 
-\begin{figure*}
+\begin{figure}
+\begin{gather*}
 \begin{align*}
 \mathit{eval}(\mexp) &= \{ \mstate\ |\ \ev[^{\mtcntr}]{\mexp,\varnothing,\varnothing,\kmt} \multimachstep \mstate \} \text{ where }
+\end{align*}
 \\[2mm]
+\begin{array}{@{}r@{\ }c@{\ }l@{}}
 %% EVAL
-\ev{\svar\mvar,\menv,\msto,\mkont} &\machstep
+\ev{\svar\mvar,\menv,\msto,\mkont} &\machstep&
 \co{\mkont,\mval,\msto}
 \text{ where }\mval \in \msto(\menv(\mvar))
 \\
-\ev{\slit\mlit,\menv,\msto,\mkont} &\machstep
+\ev{\slit\mlit,\menv,\msto,\mkont} &\machstep&
 \co{\mkont,\mlit,\msto}
 \\
-\ev{\slam\mvar\mexp,\menv,\msto,\mkont} &\machstep
+\ev{\slam\mvar\mexp,\menv,\msto,\mkont} &\machstep&
 \co{\mkont,\clos{\mvar,\mexp,\menv},\msto}
 \\
-\ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &\machstep
+\ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &\machstep&
 \ev[^\mcntr]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}
+\\
+&&
 \text{ where }\maddr,\msto' = \mathit{push}^\mcntr_\mlab(\msto,\mkont)
 \\
-\ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} &\machstep
+\ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} &\machstep&
 \ev[^\mcntr]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}
+\\
+&&
 \text{ where }\maddr,\msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)
 \\[2mm]
 %% CONTINUE
-\co{\kmt,\mval,\msto} &\machstep
+\co{\kmt,\mval,\msto} &\machstep&
 \ans{\msto,\mval}
 \\
-\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto} & \machstep
+\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto} & \machstep&
 \ev[^\mcntr]{\mexp,\menv,\msto,\kfn[^\mcntr_\mlab]{\mval,\maddr}}
 \\
-\co{\kfn[^\mcntr_\mlab]{{\mvalx{u}},\maddr},\mval,\msto} & \machstep
+\co{\kfn[^\mcntr_\mlab]{{\mvalx{u}},\maddr},\mval,\msto} & \machstep&
 \ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont,\msto}
 \text{ where }\mkont \in \msto(\maddr)
 \\
-\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto} & \machstep
+\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto} & \machstep&
 \ev[^\mcntr]{\mexpi0,\menv,\msto,\mkont}
 \text{ where }\mkont\in\msto(\maddr)
 \\
-\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\sfalse,\msto} & \machstep
+\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\sfalse,\msto} & \machstep&
 \ev[^\mcntr]{\mexpi1,\menv,\msto,\mkont}
 \text{ where }\mkont\in\msto(\maddr)
 \\[2mm]
 %% APPLY
-\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont} & \machstep
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont} & \machstep&
 \ev[^{\mcntr'}\!]{\mexp,\menv',\msto',\mkont}
-\text{ where }\menv',\msto',\mcntr' = \mathit{bind\,}^{ \mcntr}_\mlab(\menv,\msto,\mvar,\mval)
 \\
-\ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont} & \machstep
+\multicolumn{3}{r@{}}{
+\text{ where }\menv',\msto',\mcntr' = \mathit{bind\,}^{ \mcntr}_\mlab(\menv,\msto,\mvar,\mval)}
+\\
+\ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont} & \machstep&
 \co{\mkont,\mval',\msto}
 \text{ where } \mval'\in\interpdelta(\mop,\mval)
-\end{align*}
-\caption{Abstract$^2$ machine for ISWIM}
+\end{array}
+\end{gather*}
+\caption{Abstract abstract machine for ISWIM}
 \label{fig:aam}
-\end{figure*}
+\end{figure}
 
 
 \paragraph{Concrete interpretation} can be characterized by setting the implicit
@@ -354,8 +390,9 @@ already in use.  Consequently, the machines may be non-deterministic
 when multiple values reside in a store location.
 
 It is important to recognize from this definition that \emph{any}
-allocation strategy is an abstract interpretation.  In particular,
-concrete interpretation is a kind of abstract interpretation.  So is an
+allocation strategy is an abstract
+interpretation~\cite{MIGHTANDMANOLIOS}.  In particular, concrete
+interpretation is a kind of abstract interpretation.  So is an
 interpretation that allocates a single cell into which all bindings
 and continuations are stored.  On the one hand is an abstract
 interpretation that is non-computable and gives only the ground truth
@@ -458,7 +495,7 @@ For the duration of this paper, $\sqcup$ is a point-wise lifting of $\cup$:
 %% \caption{Implementation of machine transition relation.}
 %% \end{figure}
 
-\newpage
+%\newpage
 \section{Baseline analyzer}
 \label{sec:baseline}
 
