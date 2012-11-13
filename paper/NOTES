@@ -35,3 +35,6 @@ presented?  Should there be?
 
 Should we list the state SIZE as an evaluation metric and show
 results?
+
+Make sure to use \mathit for metafunction names.
+
