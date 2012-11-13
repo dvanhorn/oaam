@@ -198,26 +198,7 @@ nearly a factor of 500, dropping the analys time to a fraction of a
 second.  Figure~\ref{fig:churchtime} shows the step-wise improvement
 of the analysis time for this example.
 
-
-Section~\ref{sec:eval} describes the evaluation of each optimiztion
-technique applied to an implementation supporting a more realistic set
-of features, including mutation, first-class control, compound data, a
-full numeric tower and many more forms of primitive data and
-operations.
-%
-We evaluate this implementation against a set of benchmark programs
-drawn from the literature.
-%
-For all benchmarks, the optimized analyzer outperforms the baseline
-by at least a factor of
-% 475
-two to
-% 4,382
-three orders of magnitude.
-
-
 \newcommand{\church}[1]{\(\ulcorner{\tt #1}\urcorner\)}
-
 \begin{figure}
 \hrule
 \vspace{2mm}
@@ -245,10 +226,7 @@ three orders of magnitude.
 \label{fig:church}
 \end{figure}
 
-Section~\ref{sec:related} relates this work to the literature and
-section~\ref{sec:conclusion} concludes.
-
-\begin{figure}
+\begin{figure}[t]
 \hrule
 \vspace{2mm}
 \begin{alltt}
@@ -287,9 +265,62 @@ section~\ref{sec:conclusion} concludes.
   removes intepretive overhead in the form of intermediate states,
   thus minimizing the corridor transitions.  The end result is a more
   compact abstraction of the program that can be generated faster.}
+\label{fig:state-graphs}
 \end{figure}
 
+The AAM approach, in essence, does the following: it takes a
+machine-based view of computation and turns it into a \emph{finitary
+  approximation} by bounding the size of the store.  With a limited
+address space, the store must map addresses to \emph{sets} of values.
+Store updates are interpreted as joins, and store dereferences are
+interpreted by non-deterministic choice of an element from a set.  The
+result of analyzing a program is a finite directed graph where nodes
+in the graph are (abstract) machine states and edges denote machine
+transitions between states.
 
+The techniques we propose for optimizing analysis fall into the
+following categories:
+\begin{enumerate}
+\item generate fewer states by avoiding the eager exploration of
+  non-deterministic choices that will later collapse into a single
+  join point.  We accompish this by applying lazy evaluation
+  techniques so that non-determinism is evaluated \emph{by need}.
+
+\item generate fewer states by avoiding unnecessary, intermediate
+  states of a computation.  We accomplish this by applying compilation
+  techniques from functional languages to avoid interpretive overhead
+  in the machine transition system.
+
+\item generate states faster.  We accomplish this by better algorithm
+  design in the fixpoint computation we use to generate state graphs.
+\end{enumerate}
+Figure~\ref{fig:state-graphs} shows the effect of (1) and (2) for a
+small example due to Earl, et
+al.~\cite{dvanhorn:Earl2012Introspective}.
+By generating significantly fewer states at a significantly faster
+rate, we are able to achieve large performance improvements in terms
+of both time and space.
+
+Section~\ref{sec:eval} describes the evaluation of each optimiztion
+technique applied to an implementation supporting a more realistic set
+of features, including mutation, first-class control, compound data, a
+full numeric tower and many more forms of primitive data and
+operations.
+%
+We evaluate this implementation against a set of benchmark programs
+drawn from the literature.
+%
+For all benchmarks, the optimized analyzer outperforms the baseline
+by at least a factor of
+% 475
+two to
+% 4,382
+three orders of magnitude.
+
+Section~\ref{sec:related} relates this work to the literature and
+section~\ref{sec:conclusion} concludes.
+
+\newpage
 \section{An abstract$^{\text 2}$ machine for ISWIM}
 \label{sec:aam}
 
