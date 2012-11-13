@@ -1,5 +1,3 @@
-What are the specs for the benchmark machine?
-
 Which benchmarks were also evaluated in Soft Typing paper?
 
 Look at the Jagannathan and Weeks paper and relate it in related work
@@ -12,25 +10,6 @@ The psuedoknot citation has bad characters in it.
 Did Ian implement GC?
 
 Need Cousot '79 citation.
-
-FUCK ME:
-$ racket max-mins.rkt
--: contract violation
-  expected: number?
-  given: 'eof
-  argument position: 1st
-  other arguments...:
-   15
-  context...:
-
-(Consequently, the evaluation table is incomplete.)
-
-In fact: NONE OF THE NUMBERS WORK.
-
-Picture worth 1K words: lets generate state graphs (in the style of
-the ICFP'12 paper) for the Church example (a) under baseline (b) with
-lazy non-determinism (c) with compilation.  (Or a simpler example if
-these are unweildy.)
 
 Is there a rhyme or reason to the order in which the benchmarks are
 presented?  Should there be?
