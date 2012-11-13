@@ -50,7 +50,8 @@
 ;; ./out.sh
 (with-input-from-file "benchmark"
   (λ ()
-     (for ([line (in-port read-line)])
+     (for ([line (in-port read-line)]
+           #:unless (string=? "" (trim line)))
        (define sp (open-input-string line))
        (define-values (file algo run#)
          (apply values (for/list ([i (in-range 3)]) (L sp))))
