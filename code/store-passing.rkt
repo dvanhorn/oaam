@@ -1,6 +1,7 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
-         "fix.rkt" "handle-limits.rkt")
+         "fix.rkt" "handle-limits.rkt"
+         "graph.rkt")
 (provide bind-join-whole bind-join*-whole
          (for-syntax bind-rest) ;; common helper
          wide-step hash-getter
@@ -15,14 +16,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Widen set-monad fixpoint
 (define-syntax-rule (wide-step-specialized step)
-  (λ (state-count) ;; Remove this for performant-version
+  (λ (state-count graph) ;; Remove this for performant version
      (λ (state)
         (match state
           [(cons wsσ cs)
            (define-values (σ* cs*)
              (for/fold ([σ* wsσ] [cs ∅]) ([c (in-set cs)])
                (define-values (σ** cs*) (step (cons wsσ c)))
-               (values (join-store σ* σ**) (∪ cs* cs))))
+               ;; Add new states to accumulator and construct graph
+               (define cs** (for/set #:initial cs ([c* (in-set cs*)])
+                                     (add-edge! graph c c*)
+                                     c*))
+               (values (join-store σ* σ**) cs**)))
            ;; Stuck states are the same as input. Remove stuck states from the count
            ;; XXX: Remove for performant version. This is just for statistics.
            (set-box! state-count (+ (unbox state-count)
@@ -49,8 +54,9 @@
  (define-syntax-rule (name step fst)
    (let ()
      (define-values (f^σ cs) fst)
+     (define graph (make-hash))
      (define state-count (box 0))
-     (define step^ ((wide-step-specialized step) state-count))
+     (define step^ ((wide-step-specialized step) state-count graph))
      (define start-time (current-milliseconds))
      (define ss (with-limit-handler (start-time state-count)
                   (fix step^ (set (cons f^σ cs)))))
@@ -58,7 +64,9 @@
      (define-values (σ final-cs)
        (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
          (match s
-           [(cons fsσ cs) (values (join-store last-σ fsσ) (∪ final-cs cs))]
+           [(cons fsσ cs)
+            (dump-dot graph)
+            (values (join-store last-σ fsσ) (∪ final-cs cs))]
            [_ (error 'name "bad output ~a~%" s)])))
      ;; filter the final results
      (values (format "State count: ~a" (unbox state-count))
