@@ -46,6 +46,13 @@
  (require racket/cmdline)
  (define test-file
   (command-line #:once-any
+#|                [("--sid")
+                 "Benchmark compiled imperative store-diff"
+                 (aval 0cfa^/c/∆s!)]
+                [("--spd")
+                 "Benchmark compiled preallocated store-diff"
+                 (aval 0cfa^/c/∆s/prealloc!)]
+|#
                 [("--bl") "Benchmark baseline"
                  (aval baseline)] ;; least optimized
                 [("--sp") "Benchmark specialized fixpoint"
@@ -57,6 +64,9 @@
                 [("--ld")
                   "Benchmark compiled store-diff lazy non-determinism"
                  (aval lazy-0cfa^/c/∆s)]
+                [("--fd")
+                  "Benchmark compiled store-diff lazy non-determinism functional timestamp nonapprox"
+                 (aval lazy-0cfa^/c/∆s/t)]
                 [("--ia")
                  "Benchmark compiled imperative accumulated store-diff lazy non-determinism"
                  (aval lazy-0cfa^/c/∆s/acc!)]
@@ -87,7 +97,7 @@
                  "Benchmark best lazy-Krivine machine"
                  (aval LK-lazy-0cfa^/c/∆s/prealloc!)]
                 ;; Not benchmarked for paper
-                #|
+#|
                 [("--ls2") "Benchmark specialized2 lazy non-determinism"
                  (aval lazy-0cfa^2)]
                 [("--ls3") "Benchmark specialized3 lazy non-determinism"
