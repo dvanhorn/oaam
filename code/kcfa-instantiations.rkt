@@ -33,6 +33,41 @@
    ([widen (make-rename-transformer #'flatten-value)])
    body))
 
+#|
+;; "sid"
+(mk-imperative/∆s^-fixpoint
+                s-imperative/∆s-fixpoint/c s-imperative/∆s-ans/c?
+                s-imperative/∆s-ans/c-v s-imperative/∆s-touches-0/c)
+(with-nonsparse
+ (with-strict
+  (with-0-ctx
+   (with-σ-∆s!
+    (with-abstract
+      (mk-analysis #:aval 0cfa^/c/∆s!
+                   #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
+                   #:ans s-imperative/∆s-ans/c
+                   #:touches s-imperative/∆s-touches-0/c
+                   #:fixpoint s-imperative/∆s-fixpoint/c
+                   #:global-σ #:compiled #:wide))))))
+(provide 0cfa^/c/∆s!)
+
+;; "spd"
+(mk-prealloc/∆s^-fixpoint s-prealloc/∆s-fixpoint/c s-prealloc/∆s-ans/c?
+              s-prealloc/∆s-ans/c-v s-prealloc/∆s-touches-0/c)
+(with-nonsparse
+ (with-strict
+  (with-0-ctx/prealloc
+   (with-σ-∆s/prealloc!
+    (with-abstract
+      (mk-analysis #:aval 0cfa^/c/∆s/prealloc!
+                   #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
+                   #:ans s-prealloc/∆s-ans/c
+                   #:touches s-prealloc/∆s-touches-0/c
+                   #:fixpoint s-prealloc/∆s-fixpoint/c
+                   #:global-σ #:compiled #:wide))))))
+(provide 0cfa^/c/∆s/prealloc!)
+|#
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Potpourris of evaluators
 ;; "bl"
@@ -97,6 +132,21 @@
                            #:wide #:σ-∆s #:set-monad
                            #:compiled)))))))
 (provide lazy-0cfa^/c/∆s)
+
+;; "fd"
+(mk-timestamp-∆-fix^ lazy-0cfa∆^-fixpoint/t lazy-0cfa∆/t-ans^?)
+(with-nonsparse
+ (with-lazy
+  (with-0-ctx
+   (with-σ-∆s
+            (with-σ-passing-set-monad
+             (with-abstract
+              (mk-analysis #:aval lazy-0cfa^/c/∆s/t #:ans lazy-0cfa∆/t-ans^
+                           #:fixpoint lazy-0cfa∆^-fixpoint/t
+                           #:wide #:σ-∆s #:set-monad
+                           #:compiled)))))))
+(provide lazy-0cfa^/c/∆s/t)
+
 ;; "ia"
 (mk-imperative/∆s/acc^-fixpoint
                 imperative/∆s/acc-fixpoint/c imperative/∆s/acc-ans/c?
@@ -161,6 +211,7 @@
                    #:fixpoint prealloc/∆s-fixpoint/c
                    #:global-σ #:compiled #:wide))))))
 (provide lazy-0cfa^/c/∆s/prealloc!)
+
 ;; "it"
 (mk-imperative/timestamp^-fixpoint imperative-fixpoint/c imperative-ans/c?
                                    imperative-ans/c-v imperative-touches-0/c)

@@ -33,6 +33,7 @@
 (define lazy "ls")
 (define compiled "lc")
 (define deltas "ld")
+(define deltasfd "fd")
 (define deltasia "ia")
 (define deltasid "id")
 (define deltaspa "pa")
@@ -41,10 +42,11 @@
 (define preallocated "pt")
 
 (define which-analyses
-  (list deltas
+  (list deltasfd
+#|
+        deltas
         imperative
         preallocated
-#|
         deltasia
         deltasid
         deltaspa

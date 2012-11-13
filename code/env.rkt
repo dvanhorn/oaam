@@ -1,6 +1,6 @@
 #lang racket
 (provide extend extend* join join* join-store
-         update update/change restrict-to-reachable restrict-to-reachable/vector)
+         update update/change would-update? restrict-to-reachable restrict-to-reachable/vector)
 (require "data.rkt" "ast.rkt" "notation.rkt")
 
 (define (extend ρ x v)
@@ -19,6 +19,11 @@
   (define s* (⊓ s prev))
   (values (hash-set eσ a s*) (≡ prev s*)))
 
+(define (no-change? eσ a s)
+  (define prev (hash-ref eσ a ∅))
+  (define s* (⊓ s prev))
+  (≡ prev s*))
+
 ;; Store Store -> Store
 (define (join-store eσ1 eσ2)
   (for/fold ([eσ eσ1])
@@ -33,6 +38,9 @@
   (for/fold ([eσ eσ] [same? #t]) ([a×vs (in-list ∆s)])
     (define-values (σ* a-same?) (join/change eσ (car a×vs) (cdr a×vs)))
     (values σ* (and same? a-same?))))
+
+(define (would-update? ∆s eσ)
+  (not (for/and ([a×vs (in-list ∆s)]) (no-change? eσ (car a×vs) (cdr a×vs)))))
 
 (define (((mk-reach ref) touches) eσ root)
   (define seen ∅)

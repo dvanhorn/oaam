@@ -72,27 +72,33 @@
      (define-values (last-σ final-cs)
        (with-limit-handler (start-time num-states)
          (let loop ([accum (hash)] [front cs] [σ (update ∆ (hash))] [σ-count 0])
-           (match (for/first ([c (in-set front)]) c)
-             [#f 
-              (state-rate start-time num-states)
-              (values σ (for/set ([(c _) (in-hash accum)]) c))]
-             [c
-              ;; If a state is revisited with a different store, that counts as
-              ;; a different state.
-              (set! num-states (add1 num-states))
-              (define-values (∆ cs*) (step (cons σ c)))
-              (define-values (σ* same?) (update/change ∆ σ))
-              (define count* (if same? σ-count (add1 σ-count)))
-              (define-values (accum* front*)
-                (for/fold ([accum accum] [front (front . ∖1 . c)])
-                    ([c* (in-set cs*)]
-                     #:unless (= count* (hash-ref accum c* -1)))
-                  (values (hash-set accum c* count*) (∪1 front c*))))
-              (loop accum* front* σ* count*)]))))
+           (cond [(∅? front)
+                  (state-rate start-time num-states)
+                  (values σ (for/set ([(c _) (in-hash accum)]) c))]
+                 [else
+                  ;; If a state is revisited with a different store, that counts as
+                  ;; a different state.
+                  (set! num-states (+ num-states (set-count front)))
+                  (let step/join ([accum accum] [todo front] [front ∅] [∆ '()])
+                      (match (for/first ([c (in-set todo)]) c)
+                        [#f (define σ* (update ∆ σ))
+                            (define count* (if (null? ∆) σ-count (add1 σ-count)))
+                            (loop accum front σ* count*)]
+                        [c (define-values (∆* cs*) (step (cons σ c)))
+                           (define change? (would-update? ∆* σ))
+                           (define ∆** (if change? (append ∆* ∆) ∆))
+                           (define todo* (todo . ∖1 . c))
+                           (define-values (accum* front*)
+                             (for/fold ([accum* accum] [front* front])
+                                 ([c* (in-set cs*)]
+                                  #:when (or change?
+                                             (not (= σ-count (hash-ref accum c* -1)))))
+                               (values (hash-set accum* c* σ-count) (∪1 front* c*))))
+                           (step/join accum* todo* front* ∆**)]))]))))
      ;; filter the final results
      (values (format "State count: ~a" num-states)
              (format "Point count: ~a" (set-count final-cs))
-             σ
+             last-σ
              (for/set ([c (in-set final-cs)]
                        #:when (ans^? c))
                c)))))
