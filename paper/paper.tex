@@ -6,6 +6,7 @@
 \usepackage{url}
 \usepackage{graphicx}
 \usepackage{balance}
+\usepackage{calc}
 
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}{Lemma}
@@ -218,6 +219,8 @@ three orders of magnitude.
 \newcommand{\church}[1]{\(\ulcorner{\tt #1}\urcorner\)}
 
 \begin{figure}
+\hrule
+\vspace{2mm}
 \begin{alltt}
 (define (zero? n) ((n (\(\lambda\) (zx) #f)) #t))
 (define (((mult m1) m2) mf) (m2 (m1 mf)))
@@ -245,8 +248,54 @@ three orders of magnitude.
 Section~\ref{sec:related} relates this work to the literature and
 section~\ref{sec:conclusion} concludes.
 
+\begin{figure}
+\hrule
+\vspace{2mm}
+\begin{alltt}
+(define (id x) x)
+(define (f n)
+  (cond [(<= n 1)  1]
+        [else      (* n (f (- n 1)))]))
+(define (g n)
+  (cond [(<= n 1)  1]
+        [else      (+ (* n n) (g (- n 1)))]))
+(print (+ ((id f) 3) ((id g) 4)))
+\end{alltt}
+\hrule
+\begin{center}
+\begin{tabular}{ccc}
+\raisebox{1ex-\height}{
+\includegraphics[height=4in]{introspective-base.pdf}}
+&
+\raisebox{1ex-\height}{
+\includegraphics[height=3.7in]{introspective-lazy.pdf}}
+&
+\raisebox{1ex-\height}{
+\includegraphics[height=2.2in]{introspective-lazyc.pdf}}
+\\
+(a) Baseline
+&
+(b) Lazy
+&
+(c) Compiled
+\end{tabular}
+\end{center}
+\caption{Example state graphs for the program above.  Part (a) shows
+  the result of the baseline analyzer.  It has long ``corridor''
+  transitions and ``diamond'' subgraphs that fan-out from
+  nondeterminism and fan-in from joins.  Part (b) shows the result of
+  performing nondeterminism lazily and thus avoids many of the diamond
+  subgraphs.  Part (c) shows the result of abstract compilation that
+  removes intepretive overhead in the form of intermediate states,
+  thus minimizing the corridor transitions.  The end result is a more
+  compact abstraction of the program that can be generated faster.}
+\end{figure}
 
 
+
+\newpage
+\
+\newpage
 \section{An abstract$^{\text 2}$ machine for ISWIM}
 \label{sec:aam}
 
