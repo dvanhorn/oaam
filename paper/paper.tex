@@ -495,16 +495,16 @@ The uniform $k$-CFA allocation strategy would make $eval$ in figure
 effective one. This is not the strategy that AAM, nor we,
 recommend. We explain a succession of approximations to reach the
 baseline analysis that we compare performance against. But first, we
-need a fixpoint combinator to drive the succession of reduction
+need a fixed-point combinator to drive the succession of reduction
 relations we define.
 
-\subsection{Generic fixpoint calculator}
+\subsection{Generic fixed-point calculator}
 \label{sec:fixpoint}
 
 We compute the semantics of a program by iterating the state
-transition relation until a fixed point in the reachable states is
-reached. We begin with Kleene's fixpoint combinator, ${\mathcal F}$,
-presented in the frontier/accumulator style:
+transition relation until a fixed-point in the reachable states is
+reached. We begin with Kleene's fixed-point combinator, ${\mathcal F}$,
+operationalized in the frontier/accumulator style:
 
 \begin{align*}
 {\mathcal F}(f)(X) &= {\mathcal G}(f, X, \varnothing) \\
@@ -513,7 +513,7 @@ presented in the frontier/accumulator style:
 \end{align*}
 
 The $\machstep$ relation is most naturally written as a function from
-a state to a set of all next states. To calculate $eval$, we find a fixed point of
+a state to a set of all next states. To calculate $eval$, we find a fixed-point of
 $\machstep$ lifted to step a set of states. The lifting is a natural one:
 
 \begin{align*}
@@ -548,11 +548,12 @@ scaffolded reduction relation, $\widehat{\machstep}$, is as follows:
 
 \begin{align*}
 (cs, \msto) &\mathrel{\widehat{\machstep}} (cs', \msto') \\
-\mbox{where } cs' &= \{c' \mid wn(c, \msto) \machstep wn(c, \msto^c), c \in cs\} \\
-              \msto' &= \bigsqcup\{\msto^c \mid wn(c,\msto)\machstep wn(c', \msto^c), c \in cs\} \\
+\mbox{where } cs' &= \{c' \mid wn(c, \msto) \mathrel{\machstep} wn(c, \msto^c), c \in cs\} \\
+              \msto' &= \bigsqcup\{\msto^c \mid wn(c,\msto)\mathrel{\machstep} wn(c', \msto^c), c \in cs\} \\
 wn(\ev{\mexp, \menv, \mkont}, \msto) &= \ev{\mexp, \menv, \msto, \mkont} \\
 wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \msto, \mkont} \\
-wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont}
+wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont} \\
+wn(\ans{\mval}, \msto) &= \ans{\msto, \mval}
 \end{align*}
 That is, the next set of states is what we get by stepping each
 given state, without its store. The next store is the combination of all produced
@@ -605,7 +606,7 @@ results, and thus the precision aligns with an analysis specialized to
 ANF. We can also play a representation trick in 0-CFA and remove
 $\menv$. In monovariant analyses, variables map to themselves, meaning
 $\menv$ is effectively the identity function. That degeneration, in
-turn, allows us to simply discard it from the analysis.
+turn, allows us to discard it from the analysis.
 
 % Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 
@@ -614,24 +615,24 @@ turn, allows us to simply discard it from the analysis.
 
 We discuss a succession of techniques for increasing performance by
 decreasing the interpretive overhead of abstract interpretation. They
-come in two flavors: decreasing the size of the represented state
-space [SS], and decreasing the amount of intermediate data structures [DS].
+come in two flavors: decreasing the size of the state space with domain-specific knowledge [DSK], and
+decreasing the amount of intermediate data structures [Eng](ineering).
 
-\begin{itemize}
- \item{[SS] lazy non-determinism: quotient by sets of values}
- \item{[SS] abstract compilation: eliminate {\tt ev} states}
- \item{[DS] store deltas: operate on store changes rather than whole stores}
- \item{[DS] timestamp: represent the store as a global, mutable hash and
-   determine a state's store by the number of changes made to the
-   global store at the time of visiting}
- \item{[DS] preallocation: represent the global store as a global, mutable vector}
- \item{[SS] uniform literal approximation: coarsely abstract literal data}
-\end{itemize}
+\begin{enumerate}
+ \item{[DSK] lazy non-determinism: quotient by sets of values}
+ \item{[DSK] abstract compilation: eliminate {\tt ev} states}
+ \item{[Eng] store deltas: operate on store changes rather than whole stores}
+ \item{[DSK/Eng] timestamp: represent the store as a global, mutable
+   hash and determine a state's store by the number of changes made to
+   the global store at the time of visiting}
+ \item{[Eng] preallocation: represent the global store as a global, mutable vector}
+ \item{[DSK] uniform literal approximation: coarsely abstract literal data}
+\end{enumerate}
 
 Some techniques preserve the precision of the underlying analysis, and
 others do not. We will discuss the design decisions behind the
 precision-lossy techniques.  Each technique requires minimal changes
-to the reduction relation/fixpoint, and each improves performance by
+to the reduction relation, and each improves performance by
 integer factors.
 
 \subsection{Lazy non-determinism}
@@ -639,10 +640,10 @@ integer factors.
 A shortcoming of the AAM approach is that much of the non-determinism
 is spurious. For example, in a function application, {\tt (f x y)},
 where all variables have been joined with multiple values, each
-variable reference transitions to several new states that comprise the
-cartesian product of all the values of {\tt f}, {\tt x} and {\tt y} (or in the our baseline analysis, the sum),
-only to be joined back together in their respective application positions. We would
-see transitions of the following shape:
+variable reference transitions to as many new states as there are
+values, only to be joined back together in their respective
+application positions. We would see transitions of the following
+shape:
 \begin{center}
 \includegraphics[scale=0.3]{fanout.pdf}
 \end{center}
@@ -653,7 +654,18 @@ until it is needed in {\it strict contexts} (such as the guard for an
 \includegraphics[scale=0.3]{lazy.pdf}
 \end{center}
 
-For this, we introduce a new kind of value, $\saddr{\maddr}$, for delaying looking up $\maddr$. This acts to quotient the state space by the values at the delayed address. The following rules highlight the changes to the semantics:
+This does not change the concrete semantics of the language. It is an
+abstraction of the otherwise several states the original
+non-deterministic semantics steps to. We say the abstraction is
+\emph{lazy} because it delays dereferencing an address until its
+contents are \emph{needed} as values in the semantics. It does not
+change the execution order that leads to the values that are stored in
+the address.
+
+We introduce a new kind of value, $\saddr{\maddr}$, that represents a
+delayed lookup of $\maddr$. This acts to quotient the state space by
+the values at the delayed address. The following rules highlight the
+changes to the semantics:
 
 \begin{align*}
 force &: Store \times Addr \to \Set(Value) \\
@@ -675,7 +687,7 @@ This semantics introduces a subtle precision difference over the
 baseline. Consider a configuration where a reference to a variable and
 a binding of a variable will happen in one step. With laziness, the
 reference will mean the original binding(s) of the variable or the new
-one, because the actual store lookup is delayed precisely one step
+one, because the actual store lookup is delayed one step
 (i.e. laziness is administrative). Without laziness, the reference
 will fan out to all the bindings of the variable before the new
 binding happens and thus might have an observable precision
@@ -683,10 +695,10 @@ difference.
 
 \paragraph{Regain precision; complicate implementation}
 The administrative nature of laziness means that we could remove the
-loss in precision by essentially duplicating the reduction relation to
-specialize variable lookup. This works since in the semantics of ISWIM
-with store-allocated results consumes the value component of states in
-one step. This is not the case for semantics that replicate the value
+loss in precision by duplicating the reduction relation to specialize
+variable lookup. This works since in the semantics of ISWIM with
+store-allocated results consumes the value component of states in one
+step. This is not the case for semantics that replicate the value
 component across reductions, say for popping off exception handler
 frames. Further convolution is needed to remove the administrative
 nature of laziness in these semantics. Due to the increase of
@@ -704,7 +716,15 @@ two approaches are the same.
 
 \subsection{Abstract compilation}
 
-The laziness optimization saved time by doing the same amount of reasoning as before but in fewer transitions. We can exploit the same idea - same reasoning, fewer transitions - with abstract compilation. Abstract compilation transforms complex expression whose \emph{abstract} evaluation is deterministic into ``abstract bytecodes.''  The abstract interpreter then does in one transition what previously took many. Abstract compilation eliminates unnecessary allocation, deallocation and branching.
+The laziness optimization saved time by doing the same amount of
+reasoning as before but in fewer transitions. We can exploit the same
+idea - same reasoning, fewer transitions - with abstract
+compilation. Abstract compilation is \emph{precision-preserving} and
+transforms complex expressions whose \emph{abstract} evaluation is
+deterministic into ``abstract bytecodes.''  The abstract interpreter
+then does in one transition what previously took many. Abstract
+compilation eliminates unnecessary allocation, deallocation and
+branching.
 
 The essence of the compilation effect can be seen by considering an
 example such as
@@ -735,9 +755,9 @@ where $\msto_4 = \msto_0 \sqcup \{ [\maddr_1 \mapsto \{ \mkont \}],
 The compilation step converts expressions into functions that expect
 the other components of the {\tt ev} state. Its definition in figure
 \ref{fig:compile} shows close similarity to the rules for interpreting
-    {\tt ev} states. The next step is to change creation of {\tt ev}
-    states to simply calling these functions. Figure \ref{fig:caam}
-    shows the modified reduction relation.
+    {\tt ev} states. The next step is to change reduction rules that
+    create {\tt ev} states to instead call these functions. Figure
+    \ref{fig:caam} shows the modified reduction relation.
 
 \begin{figure}
 \begin{align*}
@@ -812,23 +832,23 @@ the other components of the {\tt ev} state. Its definition in figure
 \subsection{Locally log-based store deltas}
 
 Every step the analysis makes for the above techniques requires
-joining several, commonly large, stores together. Each step is
-unlikely to always modify all addresses of the store, so this is
-needlessly memory- and time-intensive. We can instead log store
-changes and replay the change log on the full store after all steps
-have completed. This uses far fewer join operations, leading to less
-overhead.
+joining large stores together. Not every step will modify all
+addresses of the store, so joining entire stores is wasteful in terms
+of memory and time. We can instead log store changes and replay the
+change log on the full store after all steps have completed. This uses
+far fewer join operations, leading to less overhead, and is \emph{precision preserving}.
 
 We represent changes as $\msdiff \in Store\msdiff = List[Addr \times
-  \Set(Storeable)]$. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$ now
-becomes $\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$
-begins empty ($\mtlst$) for each step. Applying the changes to the
-full store is straightforward - we interpret $\msdiff$ as a $Store \to
-Store$ function:
+  \Set(Storeable)]$. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$
+instead becomes a log addition
+$\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$ begins
+empty ($\mtlst$) for each step. Applying the changes to the full store
+is straightforward:
 
 \begin{align*}
-\mtlst(\msto) &= \msto \\
-\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}(\msto) &= \msdiff(\msto)\sqcup[\maddr \mapsto \mval{s}]
+replay &: Store\msdiff \times Store \to Store \\
+replay(\mtlst, \msto) &= \msto \\
+replay(\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}, \msto) &= replay(\msdiff, \msto\sqcup[\maddr \mapsto \mval{s}])
 \end{align*}
 
 The reduction relation does have to change to accommodate this
@@ -854,7 +874,7 @@ in the input and output. For each state that is stepped, we feed the
 output changes to the next so that all changes get accumulated:
 
 \begin{align*}
-(cs, \msto) &\mathrel{\widehat{\machstep}} (cs\cup cs', \msdiff(\msto)) \\
+(cs, \msto) &\mathrel{\widehat{\machstep}} (cs\cup cs', replay(\msdiff,\msto)) \\
 \mbox{ where } (cs', \msdiff) &= step^*(\varnothing, cs, \mtlst) \\
 step^*(S, \varnothing, \msdiff) &= (S, \msdiff) \\
 step^*(S, \{c\}\cup cs, \msdiff &= step^*(S\cup cs^*, cs, \msdiff^*) \\
@@ -873,7 +893,6 @@ concat(\{\msdiff\}\cup D) &= append(\msdiff, concat(D))
 %%    cpu time: 668 real time: 686 gc time: 41
 
 \subsection{Timestamping an imperative store}
-
 
 Thus far, we have made our optimizations in a purely functional
 manner. For the next series of optimizations, we need to dip into the
@@ -904,7 +923,6 @@ address $\maddr$ and another branch reads from address
 $\maddr$. Fortunately, given our conversion to log-based stores this
 change is straightforward.
 
-
 The current state of the state-space search now has six components:
 
 \begin{itemize}
@@ -916,20 +934,21 @@ The current state of the state-space search now has six components:
  \item{{\tt T}, the timestamp of the store}
 \end{itemize}
 
-The new fixpoint calculation is defined in
+The new $eval$ calculation is defined in
 figure~\ref{fig:imperative}.  To ensure termination, we guard adding
 $c$ to {\tt todo} by the following check:
 \begin{align*}\msdiff\mbox{{\tt ?}} \vee {\tt seen}(c) \neq {\tt T}\end{align*}
 If it succeeds, {\tt todo} gets $c$ and we update {\tt seen} to map $c$ to {\tt T}.
 
-After all steps complete, we apply $\msdiff$ to $\msto$ imperatively and increase
-{\tt T} as long as there was at least one change in $\msdiff$. This
-logic leads to termination if we know that each $\ttuple{\maddr}{\mval{s}}$
-in $\msdiff$ would change the value of $\maddr$ in the current
-store. Thus, we also guard additions to $\msdiff$ so that only updates
-that would change the store are permitted. Each time $\msdiff$ is
-successfully extended, we set {\tt $\msdiff$?} to true. Before each
-individual step, we set it to false.
+After all steps complete, we apply $\msdiff$ to $\msto$ imperatively
+(with {\tt replay!}) and increase {\tt T} as long as there was at
+least one change in $\msdiff$. This logic leads to termination if we
+know that each $\ttuple{\maddr}{\mval{s}}$ in $\msdiff$ would change
+the value of $\maddr$ in the current store. Thus, we also guard
+additions to $\msdiff$ so that only updates that would change the
+store are permitted. Each time $\msdiff$ is successfully extended, we
+set {\tt $\msdiff$?} to true. Before each individual step, we set it
+to false.
 
 \begin{figure}
 \begin{alltt}
@@ -942,9 +961,9 @@ eval(\(e\)) :=
       let old := todo
       todo, \(\msdiff\) := \(\varnothing\), \(\mtlst\)
       foreach c \(\in\) old: \(\msdiff\)? := false; c()
-      unless \(\msdiff\) = \(\mtlst\): T += 1; \(\msdiff(\msto)\)
+      unless \(\msdiff\) = \(\mtlst\): T += 1; replay!(\(\msdiff, \msto\))
 \end{alltt}
-\caption{Imperative fixpoint algorithm}
+\caption{Imperative algorithm}
 \label{fig:imperative}
 \end{figure}
 
@@ -957,8 +976,8 @@ vector the size of the largest label (call it $\mlab_{max}$) assigned, plus
 1. The parser should be assigning new, fresh names to variables
 anyway, so this change is a one-liner.
 
-This technique by itself only works in 0-CFA, since there are many more
-addresses that can be allocated in 1-CFA and higher. To support
+This technique by itself only works in 0-CFA, since there are many
+more addresses that can be allocated in 1-CFA and higher. To support
 general $k$-CFA in a vector representation, we use a growable vector
 and a map from addresses to assigned indices. When assignable indices
 run out, we grow the vector. The cost of this map is less than a hash
@@ -966,10 +985,11 @@ representation for the whole store since typically there are more
 references to an address than allocations of it. This is more
 space-efficient than preallocating $(\mlab_{max}+1)^k$ addresses
 up-front and addressing by the contour converted to polynomial, since
-many combinations of labels are not likely to occur. The all up-front
-allocation again breaks down when we add compound data, which
-introduce new kinds of labels (e.g. left and right components of a
-tuple at the contour of creation).
+a majority of combinations of labels will not occur, except in
+pathological programs. The all up-front allocation again breaks down
+when we add compound data, which introduce new kinds of labels
+(e.g. left and right components of a tuple at the contour of
+creation).
 
 \subsection{Abstracting literal compound data}
 
@@ -977,7 +997,7 @@ Practical issues of performance arise when one chooses the
 ``obvious,'' or ``natural'' abstraction for compound data. Our running
 example will be the classic Boyer benchmark. The detail of note for
 the Boyer benchmark is that it has large list literals, the exact
-values of which do not particularly matter for many analyses. If we
+values of which do not matter for many analyses. If we
 interpret a list literal of 30 elements (that again have 10 elements
 each) as 300 applications of {\tt cons}, and then interpret a function
 that traverses the tree, we will end up interpreting that function at
@@ -1015,20 +1035,19 @@ describe.
 \subsubsection{Less na\"ively and less precisely}
 
 The number of syntactic uses of {\tt cons} versus implicit uses via
-literal lists is dramatically smaller in typical Scheme programs. We
-use the above abstraction for these syntactic uses, but choose to
-interpret literal lists as not always sugar for cascading {\tt
-  cons}es. In particular, if a list literal is ``too big'' (in our
-case length $>$ 1), we interpret the list as a circular data
-structure; the right address points back to the {\tt cons} itself, and
-the left address points to all of the elements of the list. We take
-this farther and join the list elements together in with a coarse
-type-based abstraction. In effect, large lists or vectors of literal
-numbers become unbounded lists/vectors of ``number.'' Heterogeneous
-data is combined to just ``data,'' rather than a union of ``number'',
-``string'', etc. since primitives are interpreted on every combination
-of values that flow to them, and unions lead to more primitive
-interpretations.
+literal lists is smaller in typical Scheme programs. We use the above
+abstraction for these syntactic uses, but choose to interpret literal
+lists as not always sugar for cascading {\tt cons}es. In particular,
+if a list literal is ``too big'' (in our case length $>$ 1), we
+interpret the list as a circular data structure; the right address
+points back to the {\tt cons} itself, and the left address points to
+all of the elements of the list. We take this farther and join the
+list elements together in with a coarse type-based abstraction. In
+effect, large lists or vectors of literal numbers become unbounded
+lists/vectors of ``number.'' Heterogeneous data is combined to just
+``data,'' rather than a union of ``number'', ``string'', etc. since
+primitives are interpreted on every combination of values that flow to
+them, and unions lead to more primitive interpretations.
 
 Quotation is special because it cannot introduce function values,
 which is important to enhancing our technique's soundness to
@@ -1071,7 +1090,8 @@ merge({\tt QPair}, v) &= {\tt QData} \\
 \label{fig:qlist}
 \end{figure}
 
-\paragraph{Mutable literal data} The Scheme we model is nonstandard in that it has immutable literal
+\paragraph{Mutable literal data}
+The Scheme we model is nonstandard in that it has immutable literal
 data (the Scheme benchmarks did not mutate their literal data). To
 support mutable literal data, abstract values like {\tt QPair} would
 be like regular conses, only point to a preallocated pair of addresses
@@ -1106,7 +1126,7 @@ Scheme's numeric tower including exact rationals, complex, and
 floating point numbers.
 
 Many benchmarks cause the baseline analyzer to take longer than 30
-minutes or to consume more 1 gigabit of memory, at which point the
+minutes or to consume more 1 gigabyte of memory, at which point the
 analysis is stopped.  This is the case for the largest benchmark
 program, which is 3,500 lines of code and takes under a minute in the
 most optimized analyzer.  For those benchmarks that did complete on
