@@ -31,9 +31,6 @@ introspective-lazy.pdf: introspective-lazy.dot
 introspective-lazyc.pdf: introspective-lazyc.dot
 	dot -Tpdf introspective-lazyc.dot -o introspective-lazyc.pdf
 
-paper.pdf: paper.tex appendix.tex introspective-base.pdf
-	xelatex paper
-
 #%.pdf: %.dvi
 #	dvipdfm -o $(basename $@).pdf $(basename $@).dvi
 
