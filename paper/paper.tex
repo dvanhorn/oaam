@@ -124,7 +124,7 @@ feasible implementation of an abstract machine based analyzer.
 %% (monochrome) Scheme notation.  Code is given in (syntax colored)
 %% Racket.
 
-\section{At a Glance}
+\section{At a glance}
 
 In the following sections, we develop an analyzer for a core
 functional language and follow a series of steps of abstraction and
@@ -149,26 +149,26 @@ The example, while small, is informative:
 %
 \item it stresses an analyzer's ability to deal with complicated
 environment and control structure arising from the use of higher-order
-functions to model arithmetic.
+functions to encode arithmetic.
 \end{enumerate}
 
 We start, in section~\ref{sec:aam}, by developing an abstract
-interpreter according to the abstracting abstract machines approach
-and observe the resulting implementation cannot analyze the example in
-under 30 minutes.  In section~\ref{sec:baseline}, we perform a further
-abstraction by widening the store.  The resulting analyzer sacrifices
-precision for speed and is able to analyze the example in about 1
-minute.  Without this abstraction step the analysis is exponential due
-to per-state store variance.  This step is described by Van Horn and
-Might~\cite[\S 3.5--6]{dvanhorn:VanHorn2012Systematic} and is
-necessary to make even small examples feasible.  We therefore take the
-widened interpreter as the baseline for our evaluation.
+interpreter according to the AAM approach.  Without further
+abstraction, the analysis is exponential due to per-state store
+variance and thus cannot analyze the example in a reasonable amount of
+time.  In section~\ref{sec:baseline}, we perform a further abstraction
+by widening the store.  The resulting analyzer sacrifices precision
+for speed and is able to analyze the example in about 1 minute.  This
+step is described by Van Horn and Might~\cite[\S
+  3.5--6]{dvanhorn:VanHorn2012Systematic} and is necessary to make
+even small examples feasible.  We therefore take the widened
+interpreter as the baseline for our evaluation.
 
-In section~\ref{sec:opt} we give a series of simple abstractions and
-implementation techniques that, in total, drop the analysis time to
-only 138 milliseconds, a speedup of 475 times.
-Figure~\ref{fig:churchtime} shows the step-wise improvement of the
-analysis time for this example.
+Section~\ref{sec:opt} gives a series of simple abstractions and
+implementation techniques that, in total, speed up the analysis by
+nearly a factor of 500, dropping the analys time to a fraction of a
+second.  Figure~\ref{fig:churchtime} shows the step-wise improvement
+of the analysis time for this example.
 
 \begin{figure}
 \begin{center}
@@ -179,17 +179,17 @@ optimized analyzers to baseline for Church numeral example.}
 \label{fig:churchtime}
 \end{figure}
 
-In section~\ref{sec:impl}, we describe a more complete implementation
-scaled up and capable of analyzing Scheme benchmark programs.
-
-In section~\ref{sec:eval} we evaluate this implementation against a
-set of benchmark programs drawn from the literature.  Many benchmarks
-cause the baseline analyzer to take longer than 30 minutes or to
-consume more 1 gigabit of memory, at which point the analysis is
-stopped.  This is the case for the largest benchmark program, which is
-3,500 lines of code and takes under a minute in the most optimized
-analyzer.  For those benchmarks that did complete on the baseline, the
-optimized analyzer outperformed the baseline by a factor of
+Section~\ref{sec:eval} describes the evaluation of each optimiztion
+technique applied to an implementation supporting a more realistic set
+of features, including mutation, first-class control, compound data, a
+full numeric tower and many more forms of primitive data and
+operations.
+%
+We evaluate this implementation against a set of benchmark programs
+drawn from the literature.
+%
+For all benchmarks, the optimized analyzer outperforms the baseline
+by at least a factor of
 % 475
 two to
 % 4,382
@@ -998,7 +998,6 @@ merge({\tt QPair}, v) &= {\tt QData} \\
 \section{Evaluation}
 \label{sec:eval}
 
-
 We have implemented, optimized, and evaluated \emph{all} of the
 machines presented in their JFP paper
 \cite{dvanhorn:VanHorn2012Systematic}, with the exception of the
@@ -1017,25 +1016,44 @@ thus giving a conservative estimate of improvements.
 All benchmarks are calculated as an average of N runs on a [MACHINE
   SPECS].
 
+The benchmarks make use of mutation, first-class control (in the form
+of Scheme's {\tt call/cc} operator), compound data such as lists and
+vectors, many more primitive forms of data and operations such as
+Scheme's numeric tower including exact rationals, complex, and
+floating point numbers.
+
+Many benchmarks cause the baseline analyzer to take longer than 30
+minutes or to consume more 1 gigabit of memory, at which point the
+analysis is stopped.  This is the case for the largest benchmark
+program, which is 3,500 lines of code and takes under a minute in the
+most optimized analyzer.  For those benchmarks that did complete on
+the baseline, the optimized analyzer outperformed the baseline by a
+factor of 475 to 4,382.
+
 \begin{figure}
-\begin{tiny}
-\begin{alltt}
-Program  |  LOC | B. Time | O. Time | B. Space | O. Space | B. Rate | O. Rate
-----------------------------------------------------------------------------
-nucleic  | 3508 |
-matrix   |  747 |
-nbody    | 1434 |
-earley   |  667 |
-maze     |  681 |
-church   |   41 |
-lattice  |  214 |
-boyer    |  642 |
-mbrotz   |   68 |
-\end{alltt}
-\end{tiny}
+\begin{tabular}{@{}l|r|r|r|r|r|r|r@{}}
+Program & LOC
+& \multicolumn{2}{c|}{Time (ms)}
+& \multicolumn{2}{c|}{Space (mb)}
+& \multicolumn{2}{c@{}}{Speed (state/sec)}
+\\
+\hline\hline
+nucleic &  3508 & 0 & 0 & 0 & 0 & 0 & 0\\
+matrix  &  747  & ? & ? & ? & ? & ? & ?\\
+nbody   & 1434  & ? & ? & ? & ? & ? & ?\\
+earley  &  667  & ? & ? & ? & ? & ? & ?\\
+maze    &  681  & ? & ? & ? & ? & ? & ?\\
+church  &   41  & ? & ? & ? & ? & ? & ?\\
+lattice &  214  & ? & ? & ? & ? & ? & ?\\
+boyer   &  642  & ? & ? & ? & ? & ? & ?\\
+mbrotz  &   68  & ? & ? & ? & ? & ? & ?
+\end{tabular}
+\caption{Overview performance comparison between baseline and
+  optimized analyzer.}
+\label{fig:bench-overview}
 \end{figure}
 
-\begin{itemize}
+\begin{enumerate}  %% Maybe use ``dictionary'' style enumeration.
 
 \item {\bf nucleic}: a floating-point intensive application taken from
   molecular biology that has been used widely in benchmarking
@@ -1083,7 +1101,7 @@ mbrotz   |   68 |
   written in a continuation-passing style (used by
   \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98})
 
-\end{itemize}
+\end{enumerate}
 
 \begin{figure*}
 \begin{center}
@@ -1109,6 +1127,51 @@ mbrotz   |   68 |
 \end{center}
 \end{figure}
 
+\paragraph{Comparison with other flow analysis implementations}
+
+[Computes results more like Earl, et al.'s 0CFA, which times out on
+  the Church numeral benchmark and so even though it offers a fair
+  point of comparison, a more thorough evaluation is likely to
+  uninformative as the other benchmarks are highly likely to timeout
+  as well (and it would require significant effort to extend their
+  implementation with the features needed to analyze our benchmark
+  suite).  That implementation is evaluated against much smaller
+  benchmarks: the largest program consists of 63 \emph{subexpressions}
+  and times out after 30 minutes.]
+
+Vardoulakis and Shivers evaluate their CFA2
+analyzer~\cite{dvanhorn:Vardoulakis2011CFA2} against a variant of 0CFA
+defined in their framework.  [NEED TIMING FOR 0CFA ON CHURCH.]  The
+Church example is the largest benchmark Vardoulakis and Shivers
+consider.  More work would be required to scale the analyzer to the
+set of features required by our benchmarks.
+
+[Should probably talk about mCFA too.]
+
+The only analyzers we were able to find that proved capable of
+analyzing the full suite of benchmarks considered here were the Soft
+Typing system of Wright [CITE] and, in many ways its successor, the
+Polymorphic splitting system of Wright and
+Jagannathan~\cite{dvanhorn:wright-jagannathan-toplas98}.\footnote{This
+  is not a coincidence; these papers set a high standard for
+  evaluation, which we consciously aimed to approach.  Many of our
+  benchmarks are drawn from these papers.}  Unfortunately, these
+analyses compute an inherently different and uncomparable form of
+analysis.  Consequently, we have omitted a complete comparison with
+these implementations,.  The AAM approach provides more precision in
+terms of temporal-ordering of program states, which comes at a cost
+that can be avoided in constraint-based approaches.  Consequently
+implementation techniques cannot be ``ported'' between these two
+approaches.  However, our optimized implementation is within an order
+of magnitude of the performance of Wright and Jaganathan's analyzer.
+Although we would like to improve this to be more competitive, the
+optimized AAM approach still has many strengths to recommend it in
+terms of precision, ease of implementation and verification, and rapid
+design.
+
+
+
+
 \section{Related work}
 \label{sec:related}
 
@@ -1130,10 +1193,10 @@ abstract interpretation
 
 \paragraph{Frameworks for flow analysis of higher-order programs}
 
-The analysis most similar to that presented in section~\ref{sec:aam}
-is the infinitary control-flow analysis of Nielson and
-Nielson~\cite{dvanhorn:nielson-nielson-popl97} and the unified
-treatment of flow analysis by Jagannathan and
+Besides the original AAM work, the analysis most similar to that
+presented in section~\ref{sec:aam} is the infinitary control-flow
+analysis of Nielson and Nielson~\cite{dvanhorn:nielson-nielson-popl97}
+and the unified treatment of flow analysis by Jagannathan and
 Weeks~\cite{dvanhorn:jagannathan-weeks-popl95}.  Both are
 parameterized in such a way that in the limit, the analysis is
 equivalent to an interreter for the language, just as is the case
@@ -1195,8 +1258,11 @@ development, they also can be systematically developed into efficient
 algorithms.
 
 %% \acks Sam Tobin-Hochstadt for encouragement and feedback -- he was
-%% the first to prompt me to look into how make effective
+%% the first to prompt us to look into how make effective
 %% implementations of the AAM approach.
+
+%% Vincent St Amour for feedback on early drafts.
+%% Greg Morrisset and Matthias Felleisen for discussions.
 
 %% NSF, DARPA
 
