@@ -23,4 +23,13 @@ $ racket max-mins.rkt
 
 (Consequently, the evaluation table is incomplete.)
 
-Convert alltt table to real table.
+Picture worth 1K words: lets generate state graphs (in the style of
+the ICFP'12 paper) for the Church example (a) under baseline (b) with
+lazy non-determinism (c) with compilation.  (Or a simpler example if
+these are unweildy.)
+
+Is there a rhyme or reason to the order in which the benchmarks are
+presented?  Should there be?
+
+Should we list the state SIZE as an evaluation metric and show
+results?
