@@ -560,7 +560,7 @@ that adds a store to a storeless state and $c.\msto$ projects the
 store out of a state $c$.
 
 \begin{align*}
-(cs, \msto) &\widehat{\machstep} (cs', \msto') \\
+(cs, \msto) &\mathrel{\widehat{\machstep}} (cs', \msto') \\
 \mbox{where } cs' &= \{c' \mid wn(c, \msto) \machstep wn(c, \msto^c), c \in cs\} \\
               \msto' &= \bigsqcup\{\msto^c \mid wn(c,\msto)\machstep wn(c', \msto^c), c \in cs\}
 \end{align*}
@@ -659,11 +659,10 @@ until it is needed in {\it strict contexts} (such as the guard for an
 \includegraphics[scale=0.3]{lazy.pdf}
 \end{center}
 
-For this, we introduce a new value for a delayed lookup that acts to
-quotient the state space by the values at the delayed address. Its
-changes to the semantics are highlighted in the following rules:
+For this, we introduce a new kind of value, $\saddr{\maddr}$, for delaying looking up $\maddr$. This acts to quotient the state space by the values at the delayed address. The following rules highlight the changes to the semantics:
 
 \begin{align*}
+force &: Store \times Addr \to \Set(Value) \\
 force(\msto,\saddr\maddralt) &= \msto(\maddralt)\\
 force(\msto,\mval) &= \{\mval\}\\
 \ev{\svar{\mvar},\menv,\mkont,\msto} &\machstep\;
@@ -677,21 +676,19 @@ bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
               \maddr &= \mvar\mcntr'
 \end{align*}
 
-\paragraph{Precision loss} This semantics introduces a subtle precision difference over the
-baseline that is negligible. Consider a configuration where a
-reference to a variable and a binding of a variable will happen in one
-step. With laziness, the reference will mean the original binding(s)
-of the variable or the new one, because the actual store lookup is
-delayed precisely one step (i.e. laziness is administrative). Without
-laziness, the reference will fan out to all the bindings of the
-variable before the new binding happens and thus might have an
-observable precision difference. In our experience, this situation
-happens too rarely to warrant the significant increase in time and
-memory needed for this eager non-determinism. Indeed, were the
-variable reference a step later and another binding not made in
-that step, the results of the two approaches are the same.
+\paragraph{Lose precision; simplify implementation}
+This semantics introduces a subtle precision difference over the
+baseline. Consider a configuration where a reference to a variable and
+a binding of a variable will happen in one step. With laziness, the
+reference will mean the original binding(s) of the variable or the new
+one, because the actual store lookup is delayed precisely one step
+(i.e. laziness is administrative). Without laziness, the reference
+will fan out to all the bindings of the variable before the new
+binding happens and thus might have an observable precision
+difference.
 
-\paragraph{Avoiding precision loss} The administrative nature of laziness means that we could remove the
+\paragraph{Regain precision; complicate implementation}
+The administrative nature of laziness means that we could remove the
 loss in precision by essentially duplicating the reduction relation to
 specialize variable lookup. This works since in the semantics of ISWIM
 with store-allocated results consumes the value component of states in
@@ -702,20 +699,21 @@ nature of laziness in these semantics. Due to the increase of
 conceptual complexity for negligable benefit, we decided against this
 approach.
 
+\paragraph{Our choice: option 1}
+The configurations that lead to precision loss happen too rarely to
+warrant the significant increase in time and memory needed for this
+eager non-determinism. Indeed, were the variable reference a step
+later and another binding not made in that step, the results of the
+two approaches are the same.
+
 % Lazy:  cpu time: 32481 real time: 32881 gc time: 547
 
 \subsection{Abstract compilation}
 
-Laziness removes several represented states that would then have to be
-stepped by the fixpoint combinator.  We can further eliminate the {\tt
-  ev} states from the run-time interpretation of a program by
-specializing the machine transition relation to the program being
-analyzed. This precision-preserving transformation eliminates
-interpretative overhead by first compiling the program into ``byte
-code'' instructions.
+The laziness optimization saved time by doing the same amount of reasoning as before but in fewer transitions. We can exploit the same idea - same reasoning, fewer transitions - with abstract compilation. Abstract compilation transforms complex expression whose \emph{abstract} evaluation is deterministic into ``abstract bytecodes.''  The abstract interpreter then does in one transition what previously took many. Abstract compilation eliminates unnecessary allocation, deallocation and branching.
 
-The essence of the compilation effect can be seen by considering an example
-such as
+The essence of the compilation effect can be seen by considering an
+example such as
 \[
 \sapp{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2}}{\mexp_3}
 \]
@@ -744,8 +742,8 @@ The compilation step converts expressions into functions that expect
 the other components of the {\tt ev} state. Its definition in figure
 \ref{fig:compile} shows close similarity to the rules for interpreting
     {\tt ev} states. The next step is to change creation of {\tt ev}
-    states to simply calling these functions. The modified reduction
-    relation is shown in figure \ref{fig:caam}.
+    states to simply calling these functions. Figure \ref{fig:caam}
+    shows the modified reduction relation.
 
 \begin{figure}
 \begin{align*}
@@ -769,7 +767,7 @@ the other components of the {\tt ev} state. Its definition in figure
 \\
 &\text{ where }\maddr,\msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)
 \end{align*}
-\caption{Compilation}
+\caption{Abstract compilation}
 \label{fig:compile}
 \end{figure}
 
@@ -817,21 +815,22 @@ the other components of the {\tt ev} state. Its definition in figure
 
 %\newpage
 
-\subsection{Store deltas}
+\subsection{Locally log-based store deltas}
 
-Each step in the fixpoint for the above techniques requires joining
-several, commonly large, stores together. Each step is unlikely to
-always modify all addresses of the store, so this is needlessly
-memory- and time-intensive. We can instead accumulate store changes
-and apply them after all steps have completed. This uses far fewer
-join operations, leading to much less allocation and computational
+Every step the analysis makes for the above techniques requires
+joining several, commonly large, stores together. Each step is
+unlikely to always modify all addresses of the store, so this is
+needlessly memory- and time-intensive. We can instead log store
+changes and replay the change log on the full store after all steps
+have completed. This uses far fewer join operations, leading to less
 overhead.
 
-We represent changes as $Store\msdiff = List[Addr \times
+We represent changes as $\msdiff \in Store\msdiff = List[Addr \times
   \Set(Storeable)]$. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$ now
 becomes $\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$
-begins as empty for each step. Applying the changes is
-straightforward:
+begins empty ($\mtlst$) for each step. Applying the changes to the
+full store is straightforward - we interpret $\msdiff$ as a $Store \to
+Store$ function:
 
 \begin{align*}
 \mtlst(\msto) &= \msto \\
@@ -861,7 +860,7 @@ in the input and output. For each state that is stepped, we feed the
 output changes to the next so that all changes get accumulated:
 
 \begin{align*}
-(cs, \msto) &\widehat{\machstep} (cs\cup cs', \msdiff(\msto)) \\
+(cs, \msto) &\mathrel{\widehat{\machstep}} (cs\cup cs', \msdiff(\msto)) \\
 \mbox{ where } (cs', \msdiff) &= step^*(\varnothing, cs, \mtlst) \\
 step^*(S, \varnothing, \msdiff) &= (S, \msdiff) \\
 step^*(S, \{c\}\cup cs, \msdiff &= step^*(S\cup cs^*, cs, \msdiff^*) \\
@@ -869,36 +868,51 @@ cs^* &= \{c' \mid (c,\msto,\msdiff) \machstep (c',\msdiff^c) \} \\
 \msdiff^* &= concat\{\msdiff^c \mid (c, \msto,\msdiff) \machstep (c', \msdiff^c)\}
 \end{align*}
 
-%% Delta Store + Compile + Lazy:
+Here $concat : \Set(Store\msdiff) \to Store\msdiff$ flattens the lists
+of changes to one; order it appends does not matter:
+\begin{align*}
+concat(\varnothing) &= \mtlst \\
+concat(\{\msdiff\}\cup D) &= append(\msdiff, concat(D))
+\end{align*}
+
+%% Delta Store +k Compile + Lazy:
 %%    cpu time: 668 real time: 686 gc time: 41
 
 \subsection{Timestamping an imperative store}
 
-The store delta technique removes overhead of joining large stores,
-but for determining if a state has been visited before (vis. $f(X)
-\setminus S$ in ${\mathcal G}$), we still have to compare entire
-stores - an expensive computation.  We modify a technique due to
-Shivers~\cite{ianjohnson:Shivers:1991:CFA}, timestamp approximation,
-that removes the need for joining whole stores by manipulating a
-global store imperatively. The original technique loses precision
-because states are stepped in sequence, modifying the store in place -
-more values or continuations can be added before another state gets to
-step. This interference means more possible flows (i.e. less
-precision) and a nondeterministic analysis - the order the set of states is
-traversed is not necessarily deterministic. However, by delaying the
-store changes until after all steps have completed, we can maintain
-our precision and determinism. In a variety of experiments, we
-observed that the time and space overhead for storing store-deltas was outweighed by
-the precision keeping flows in check. That is to say, the analysis was
-faster {\it and} more precise.
 
-We pair this technique with a mutable workset to avoid the
-intermediate sets introduced by the $State \times Store \to \Set(State) \times Store\msdiff$ signature
-of $\machstep$. This necessitates a change to the fixpoint algorithm to use a global
-workset, {\tt todo}, that $\machstep$ imperatively updates with the
-states that it would have otherwise accumulated in a set that would later be added to the workset.
+Thus far, we have made our optimizations in a purely functional
+manner. For the next series of optimizations, we need to dip into the
+imperative. We can motivate this entire sequence of optimizations by
+focusing on the largest bottleneck in the current state-space
+exploration algorithm: checking to see if a state has already been
+seen. Given two states, checking equality is expensive because the
+stores within each are large, and every entry must be checked against
+every other. Hashes can sometimes rule out inequality relatively
+quickly, but the incidence of collisions and actual equality is
+costly.
 
-In total, we have six globals:
+And, there is a better way. Shivers' original work on k-CFA was
+susceptible to the same problem, and he suggested three complementary
+optimizations: (1) make the store global; (2) update the store
+imperatively; and (3) associate every change in the store with a
+version number -- its timestamp. Then, put timestamps in states
+where previously there were stores. Given two states, the analysis can
+now compare their stores just by comparing their timestamps -- a
+constant-time operation.
+
+There is a subtle loss of precision and Shivers' original time-stamp
+technique that we can fix. For a given abstract state, all writes to
+the global store need to be delayed until the analysis considers all
+branches from that abstract state. This avoids cross-branch pollution
+which would not otherwise happen, e.g., when one branch writes to
+address $\maddr$ and another branch reads from address
+$\maddr$. Fortunately, given our conversion to log-based stores this
+change is straightforward.
+
+
+The current state of the state-space search now has six components:
+
 \begin{itemize}
  \item{{\tt $\msto$}, the store}
  \item{{\tt todo}, the workset}
