@@ -254,11 +254,9 @@ section~\ref{sec:conclusion} concludes.
 \begin{alltt}
 (define (id x) x)
 (define (f n)
-  (cond [(<= n 1)  1]
-        [else      (* n (f (- n 1)))]))
+  (if (<= n 1) 1 (* n (f (- n 1)))))
 (define (g n)
-  (cond [(<= n 1)  1]
-        [else      (+ (* n n) (g (- n 1)))]))
+  (if (<= n 1) 1 (+ (* n n) (g (- n 1)))))
 (print (+ ((id f) 3) ((id g) 4)))
 \end{alltt}
 \hrule
@@ -277,7 +275,7 @@ section~\ref{sec:conclusion} concludes.
 &
 (b) Lazy
 &
-(c) Compiled
+(c) Compiled (\& lazy)
 \end{tabular}
 \end{center}
 \caption{Example state graphs for the program above.  Part (a) shows
@@ -292,10 +290,6 @@ section~\ref{sec:conclusion} concludes.
 \end{figure}
 
 
-
-\newpage
-\
-\newpage
 \section{An abstract$^{\text 2}$ machine for ISWIM}
 \label{sec:aam}
 
@@ -330,8 +324,7 @@ model.  Evaluation is defined as the set of states reachable by the
 reflexive, transitive closure of the machine transition relation.  The
 machine is a very slight variation on a standard abstract machine for
 ISWIM in ``eval, continue, apply''
-form~\cite{dvanhorn:Danvy:DSc}.\marginpar{There's probably a better
-  (more specific) cite for eval/apply/continue.}  It can be
+form~\cite{dvanhorn:Danvy:DSc}.  It can be
 systematically derived from a definitional interpreter through a
 continuation-passing style transformation and defunctionalization, or
 from a structural operational semantics using the refocusing
