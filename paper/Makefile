@@ -19,11 +19,20 @@ getbib:
 bibtex:
 	bibtex $(CURRENT)
 
-%.dvi: %.tex 
+%.dvi: %.tex
 	latex $(basename $@)
 
-%.pdf: %.tex
-	xelatex $(basename $@)
+introspective-base.pdf: introspective-base.dot
+	dot -Tpdf introspective-base.dot -o introspective-base.pdf
+
+introspective-lazy.pdf: introspective-lazy.dot
+	dot -Tpdf introspective-lazy.dot -o introspective-lazy.pdf
+
+introspective-lazyc.pdf: introspective-lazyc.dot
+	dot -Tpdf introspective-lazyc.dot -o introspective-lazyc.pdf
+
+paper.pdf: paper.tex appendix.tex introspective-base.pdf
+	xelatex paper
 
 #%.pdf: %.dvi
 #	dvipdfm -o $(basename $@).pdf $(basename $@).dvi
