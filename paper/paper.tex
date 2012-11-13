@@ -49,7 +49,10 @@ the result is prohibitively inefficient.
 
 This article contributes a step by step process for going from a naive
 analyzer derived under the abstracting abstract machine approach, to
-an efficient program analyzer.
+an efficient program analyzer.  The end result of the process is a two
+to three order-of-magnitude improvement over the systematically
+derived analyzer, making it competitive with hand-optimized
+implementations that compute fundamentally less precise results.
 \end{abstract}
 
 %% \category{CR-number}{subcategory}{third-level}
@@ -73,7 +76,7 @@ machine-oriented view of computation, it becomes possible to design,
 verify, and implement program analyzers for realistic language
 features typically considered difficult to model.  The approach was
 originally applied to features such as higher-order functions,
-stack-inspection, exceptions, laziness, first-class continuations, and
+stack inspection, exceptions, laziness, first-class continuations, and
 garbage collection.  It has since been used to verify actor-
 \cite{local:DOsualdo:12A} and
 thread-based~\cite{dvanhorn:Might2011Family} parallelism and
@@ -104,7 +107,7 @@ prohibitively inefficient without both further approximation and
 further implementation effort.
 
 In this article, we develop a systematic approach to deriving the
-feasible implementation of an abstract machine based analyzer.
+feasible implementation of an abstract-machine-based analyzer.
 
 
 
@@ -124,13 +127,32 @@ feasible implementation of an abstract machine based analyzer.
 %% (monochrome) Scheme notation.  Code is given in (syntax colored)
 %% Racket.
 
-\section{At a Glance}
+\section{At a glance}
 
-In the following sections, we develop an analyzer for a core
-functional language and follow a series of steps of abstraction and
-optimization.  At each step we evaluate the implementation on an
-example that computes with Church numerals, shown in
-figure~\ref{fig:church}.
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=2.5in]{rel-time-church.ps}
+\end{center}
+\caption{Relative run-time of
+optimized analyzers to baseline for Church numeral example.}
+\label{fig:churchtime}
+\end{figure}
+
+
+This paper is organized in two halfs: in the first, we start with a
+quick review of the AAM approach to develop an analysis framework and
+then apply our step-by-step optimization techniques in the simplified
+setting of a core functional language.  This allows us to explicate
+the optimizations with a minimal amount of inessential technical
+overhead.  In the second half, we scale this approach up to an
+analyzer for a realistic untyped, higher-order imperative language
+with a number of interesting features.
+
+At each step during the initial development, we evaluate the
+implementation on an example, shown in figure~\ref{fig:church}, taken
+from the flow analysis literature~\cite{dvanhorn:Vardoulakis2011CFA2}
+that tests distributivity of multiplication over addition on Church
+numerals.
 %% \footnote{It is
 %%   written here using Scheme notation and makes use of the shorthands:
 %% %
@@ -145,48 +167,48 @@ figure~\ref{fig:church}.
 %% \end{alltt}}
 The example, while small, is informative:
 \begin{enumerate}
-\item it can be written in most modern programming languages, and
+\item it can be written in most modern programming languages,
 %
-\item it stresses an analyzer's ability to deal with complicated
-environment and control structure arising from the use of higher-order
-functions to model arithmetic.
+\item it was designed to stress an analyzer's ability to deal with
+  complicated environment and control structure arising from the use
+  of higher-order functions to encode arithmetic, and
+%
+\item it proves to be the \emph{least} improved benchmark of the
+  complete suite considered in section~\ref{sec:eval}, and thus it
+  serves as a good sanity check and lower-bound for each of the
+  optimization techniques considered.
 \end{enumerate}
 
 We start, in section~\ref{sec:aam}, by developing an abstract
-interpreter according to the abstracting abstract machines approach
-and observe the resulting implementation cannot analyze the example in
-under 30 minutes.  In section~\ref{sec:baseline}, we perform a further
-abstraction by widening the store.  The resulting analyzer sacrifices
-precision for speed and is able to analyze the example in about 1
-minute.  Without this abstraction step the analysis is exponential due
-to per-state store variance.  This step is described by Van Horn and
-Might~\cite[\S 3.5--6]{dvanhorn:VanHorn2012Systematic} and is
-necessary to make even small examples feasible.  We therefore take the
-widened interpreter as the baseline for our evaluation.
+interpreter according to the AAM approach.  Without further
+abstraction, the analysis is exponential due to per-state store
+variance and thus cannot analyze the example in a reasonable amount of
+time.  In section~\ref{sec:baseline}, we perform a further abstraction
+by widening the store.  The resulting analyzer sacrifices precision
+for speed and is able to analyze the example in about 1 minute.  This
+step is described by Van Horn and Might~\cite[\S
+  3.5--6]{dvanhorn:VanHorn2012Systematic} and is necessary to make
+even small examples feasible.  We therefore take the widened
+interpreter as the baseline for our evaluation.
 
-In section~\ref{sec:opt} we give a series of simple abstractions and
-implementation techniques that, in total, drop the analysis time to
-only 138 milliseconds, a speedup of 475 times.
-Figure~\ref{fig:churchtime} shows the step-wise improvement of the
-analysis time for this example.
+Section~\ref{sec:opt} gives a series of simple abstractions and
+implementation techniques that, in total, speed up the analysis by
+nearly a factor of 500, dropping the analys time to a fraction of a
+second.  Figure~\ref{fig:churchtime} shows the step-wise improvement
+of the analysis time for this example.
 
-\begin{figure}
-\begin{center}
-\includegraphics[width=2.5in]{rel-time-church.ps}
-\end{center}
-\caption{Relative run-time of
-optimized analyzers to baseline for Church numeral example.}
-\label{fig:churchtime}
-\end{figure}
 
-In section~\ref{sec:eval} we evaluate our implementation against a
-set of benchmark programs drawn from the literature.  Many benchmarks
-cause the baseline analyzer to take longer than 30 minutes or to
-consume more 1 gigabit of memory, at which point the analysis is
-stopped.  This is the case for the largest benchmark program, which is
-3,500 lines of code and takes under a minute in the most optimized
-analyzer.  For those benchmarks that did complete on the baseline, the
-optimized analyzer outperformed the baseline by a factor of
+Section~\ref{sec:eval} describes the evaluation of each optimiztion
+technique applied to an implementation supporting a more realistic set
+of features, including mutation, first-class control, compound data, a
+full numeric tower and many more forms of primitive data and
+operations.
+%
+We evaluate this implementation against a set of benchmark programs
+drawn from the literature.
+%
+For all benchmarks, the optimized analyzer outperforms the baseline
+by at least a factor of
 % 475
 two to
 % 4,382
@@ -258,7 +280,14 @@ Figure~\ref{fig:aam} defines the semantics of ISWIM as a machine
 model.  Evaluation is defined as the set of states reachable by the
 reflexive, transitive closure of the machine transition relation.  The
 machine is a very slight variation on a standard abstract machine for
-ISWIM in ``eval, continue, apply'' form.
+ISWIM in ``eval, continue, apply''
+form~\cite{dvanhorn:Danvy:DSc}.\marginpar{There's probably a better
+  (more specific) cite for eval/apply/continue.}  It can be
+systematically derived from a definitional interpreter through a
+continuation-passing style transformation and defunctionalization, or
+from a structural operational semantics using the refocusing
+construction of Danvy and
+Nielsen~\cite{dvanhorn:Danvy-Nielsen:RS-04-26}.
 
 Compared with the standard machine semantics, this definition is
 different in the following ways:
@@ -271,60 +300,70 @@ different in the following ways:
   $\mathit{push}$, $\mathit{bind}$, $\interpdelta$ and $\sqcup$.
 \end{itemize}
 
-\begin{figure*}
+\begin{figure}
+\begin{gather*}
 \begin{align*}
 \mathit{eval}(\mexp) &= \{ \mstate\ |\ \ev[^{\mtcntr}]{\mexp,\varnothing,\varnothing,\kmt} \multimachstep \mstate \} \text{ where }
+\end{align*}
 \\[2mm]
+\begin{array}{@{}r@{\ }c@{\ }l@{}}
 %% EVAL
-\ev{\svar\mvar,\menv,\msto,\mkont} &\machstep
+\ev{\svar\mvar,\menv,\msto,\mkont} &\machstep&
 \co{\mkont,\mval,\msto}
 \text{ where }\mval \in \msto(\menv(\mvar))
 \\
-\ev{\slit\mlit,\menv,\msto,\mkont} &\machstep
+\ev{\slit\mlit,\menv,\msto,\mkont} &\machstep&
 \co{\mkont,\mlit,\msto}
 \\
-\ev{\slam\mvar\mexp,\menv,\msto,\mkont} &\machstep
+\ev{\slam\mvar\mexp,\menv,\msto,\mkont} &\machstep&
 \co{\mkont,\clos{\mvar,\mexp,\menv},\msto}
 \\
-\ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &\machstep
+\ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &\machstep&
 \ev[^\mcntr]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}
+\\
+&&
 \text{ where }\maddr,\msto' = \mathit{push}^\mcntr_\mlab(\msto,\mkont)
 \\
-\ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} &\machstep
+\ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} &\machstep&
 \ev[^\mcntr]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}
+\\
+&&
 \text{ where }\maddr,\msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)
 \\[2mm]
 %% CONTINUE
-\co{\kmt,\mval,\msto} &\machstep
+\co{\kmt,\mval,\msto} &\machstep&
 \ans{\msto,\mval}
 \\
-\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto} & \machstep
+\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto} & \machstep&
 \ev[^\mcntr]{\mexp,\menv,\msto,\kfn[^\mcntr_\mlab]{\mval,\maddr}}
 \\
-\co{\kfn[^\mcntr_\mlab]{{\mvalx{u}},\maddr},\mval,\msto} & \machstep
+\co{\kfn[^\mcntr_\mlab]{{\mvalx{u}},\maddr},\mval,\msto} & \machstep&
 \ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont,\msto}
 \text{ where }\mkont \in \msto(\maddr)
 \\
-\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto} & \machstep
+\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto} & \machstep&
 \ev[^\mcntr]{\mexpi0,\menv,\msto,\mkont}
 \text{ where }\mkont\in\msto(\maddr)
 \\
-\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\sfalse,\msto} & \machstep
+\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\sfalse,\msto} & \machstep&
 \ev[^\mcntr]{\mexpi1,\menv,\msto,\mkont}
 \text{ where }\mkont\in\msto(\maddr)
 \\[2mm]
 %% APPLY
-\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont} & \machstep
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont} & \machstep&
 \ev[^{\mcntr'}\!]{\mexp,\menv',\msto',\mkont}
-\text{ where }\menv',\msto',\mcntr' = \mathit{bind\,}^{ \mcntr}_\mlab(\menv,\msto,\mvar,\mval)
 \\
-\ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont} & \machstep
+\multicolumn{3}{r@{}}{
+\text{ where }\menv',\msto',\mcntr' = \mathit{bind\,}^{ \mcntr}_\mlab(\menv,\msto,\mvar,\mval)}
+\\
+\ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont} & \machstep&
 \co{\mkont,\mval',\msto}
 \text{ where } \mval'\in\interpdelta(\mop,\mval)
-\end{align*}
-\caption{Abstract$^2$ machine for ISWIM}
+\end{array}
+\end{gather*}
+\caption{Abstract abstract machine for ISWIM}
 \label{fig:aam}
-\end{figure*}
+\end{figure}
 
 
 \paragraph{Concrete interpretation} can be characterized by setting the implicit
@@ -351,8 +390,9 @@ already in use.  Consequently, the machines may be non-deterministic
 when multiple values reside in a store location.
 
 It is important to recognize from this definition that \emph{any}
-allocation strategy is an abstract interpretation.  In particular,
-concrete interpretation is a kind of abstract interpretation.  So is an
+allocation strategy is an abstract
+interpretation~\cite{MIGHTANDMANOLIOS}.  In particular, concrete
+interpretation is a kind of abstract interpretation.  So is an
 interpretation that allocates a single cell into which all bindings
 and continuations are stored.  On the one hand is an abstract
 interpretation that is non-computable and gives only the ground truth
@@ -447,7 +487,6 @@ has no interesting ordering, $\sqcup$ can be read as $\cup$.
 %% \caption{Implementation of machine transition relation.}
 %% \end{figure}
 
-\newpage
 \section{Reduction semantics to baseline analyzer}
 \label{sec:baseline}
 
@@ -615,11 +654,10 @@ until it is needed in {\it strict contexts} (such as the guard for an
 \includegraphics[scale=0.3]{lazy.pdf}
 \end{center}
 
-For this, we introduce a new value for a delayed lookup that acts to
-quotient the state space by the values at the delayed address. Its
-changes to the semantics are highlighted in the following rules:
+For this, we introduce a new kind of value, $\saddr{\maddr}$, for delaying looking up $\maddr$. This acts to quotient the state space by the values at the delayed address. The following rules highlight the changes to the semantics:
 
 \begin{align*}
+force &: Store \times Addr \to \Set(Value) \\
 force(\msto,\saddr\maddralt) &= \msto(\maddralt)\\
 force(\msto,\mval) &= \{\mval\}\\
 \ev{\svar{\mvar},\menv,\mkont,\msto} &\machstep\;
@@ -633,21 +671,19 @@ bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
               \maddr &= \mvar\mcntr'
 \end{align*}
 
-\paragraph{Precision loss} This semantics introduces a subtle precision difference over the
-baseline that is negligible. Consider a configuration where a
-reference to a variable and a binding of a variable will happen in one
-step. With laziness, the reference will mean the original binding(s)
-of the variable or the new one, because the actual store lookup is
-delayed precisely one step (i.e. laziness is administrative). Without
-laziness, the reference will fan out to all the bindings of the
-variable before the new binding happens and thus might have an
-observable precision difference. In our experience, this situation
-happens too rarely to warrant the significant increase in time and
-memory needed for this eager non-determinism. Indeed, were the
-variable reference a step later and another binding not made in
-that step, the results of the two approaches are the same.
+\paragraph{Lose precision; simplify implementation}
+This semantics introduces a subtle precision difference over the
+baseline. Consider a configuration where a reference to a variable and
+a binding of a variable will happen in one step. With laziness, the
+reference will mean the original binding(s) of the variable or the new
+one, because the actual store lookup is delayed precisely one step
+(i.e. laziness is administrative). Without laziness, the reference
+will fan out to all the bindings of the variable before the new
+binding happens and thus might have an observable precision
+difference.
 
-\paragraph{Avoiding precision loss} The administrative nature of laziness means that we could remove the
+\paragraph{Regain precision; complicate implementation}
+The administrative nature of laziness means that we could remove the
 loss in precision by essentially duplicating the reduction relation to
 specialize variable lookup. This works since in the semantics of ISWIM
 with store-allocated results consumes the value component of states in
@@ -658,20 +694,21 @@ nature of laziness in these semantics. Due to the increase of
 conceptual complexity for negligable benefit, we decided against this
 approach.
 
+\paragraph{Our choice: option 1}
+The configurations that lead to precision loss happen too rarely to
+warrant the significant increase in time and memory needed for this
+eager non-determinism. Indeed, were the variable reference a step
+later and another binding not made in that step, the results of the
+two approaches are the same.
+
 % Lazy:  cpu time: 32481 real time: 32881 gc time: 547
 
 \subsection{Abstract compilation}
 
-Laziness removes several represented states that would then have to be
-stepped by the fixpoint combinator.  We can further eliminate the {\tt
-  ev} states from the run-time interpretation of a program by
-specializing the machine transition relation to the program being
-analyzed. This precision-preserving transformation eliminates
-interpretative overhead by first compiling the program into ``byte
-code'' instructions.
+The laziness optimization saved time by doing the same amount of reasoning as before but in fewer transitions. We can exploit the same idea - same reasoning, fewer transitions - with abstract compilation. Abstract compilation transforms complex expression whose \emph{abstract} evaluation is deterministic into ``abstract bytecodes.''  The abstract interpreter then does in one transition what previously took many. Abstract compilation eliminates unnecessary allocation, deallocation and branching.
 
-The essence of the compilation effect can be seen by considering an example
-such as
+The essence of the compilation effect can be seen by considering an
+example such as
 \[
 \sapp{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2}}{\mexp_3}
 \]
@@ -700,8 +737,8 @@ The compilation step converts expressions into functions that expect
 the other components of the {\tt ev} state. Its definition in figure
 \ref{fig:compile} shows close similarity to the rules for interpreting
     {\tt ev} states. The next step is to change creation of {\tt ev}
-    states to simply calling these functions. The modified reduction
-    relation is shown in figure \ref{fig:caam}.
+    states to simply calling these functions. Figure \ref{fig:caam}
+    shows the modified reduction relation.
 
 \begin{figure}
 \begin{align*}
@@ -725,7 +762,7 @@ the other components of the {\tt ev} state. Its definition in figure
 \\
 &\text{ where }\maddr,\msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)
 \end{align*}
-\caption{Compilation}
+\caption{Abstract compilation}
 \label{fig:compile}
 \end{figure}
 
@@ -773,21 +810,22 @@ the other components of the {\tt ev} state. Its definition in figure
 
 %\newpage
 
-\subsection{Store deltas}
+\subsection{Locally log-based store deltas}
 
-Each step in the fixpoint for the above techniques requires joining
-several, commonly large, stores together. Each step is unlikely to
-always modify all addresses of the store, so this is needlessly
-memory- and time-intensive. We can instead accumulate store changes
-and apply them after all steps have completed. This uses far fewer
-join operations, leading to much less allocation and computational
+Every step the analysis makes for the above techniques requires
+joining several, commonly large, stores together. Each step is
+unlikely to always modify all addresses of the store, so this is
+needlessly memory- and time-intensive. We can instead log store
+changes and replay the change log on the full store after all steps
+have completed. This uses far fewer join operations, leading to less
 overhead.
 
-We represent changes as $Store\msdiff = List[Addr \times
+We represent changes as $\msdiff \in Store\msdiff = List[Addr \times
   \Set(Storeable)]$. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$ now
 becomes $\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$
-begins as empty for each step. Applying the changes is
-straightforward:
+begins empty ($\mtlst$) for each step. Applying the changes to the
+full store is straightforward - we interpret $\msdiff$ as a $Store \to
+Store$ function:
 
 \begin{align*}
 \mtlst(\msto) &= \msto \\
@@ -825,36 +863,51 @@ cs^* &= \{c' \mid (c,\msto,\msdiff) \machstep (c',\msdiff^c) \} \\
 \msdiff^* &= concat\{\msdiff^c \mid (c, \msto,\msdiff) \machstep (c', \msdiff^c)\}
 \end{align*}
 
-%% Delta Store + Compile + Lazy:
+Here $concat : \Set(Store\msdiff) \to Store\msdiff$ flattens the lists
+of changes to one; order it appends does not matter:
+\begin{align*}
+concat(\varnothing) &= \mtlst \\
+concat(\{\msdiff\}\cup D) &= append(\msdiff, concat(D))
+\end{align*}
+
+%% Delta Store +k Compile + Lazy:
 %%    cpu time: 668 real time: 686 gc time: 41
 
 \subsection{Timestamping an imperative store}
 
-The store delta technique removes overhead of joining large stores,
-but for determining if a state has been visited before (vis. $f(X)
-\setminus S$ in ${\mathcal G}$), we still have to compare entire
-stores - an expensive computation.  We modify a technique due to
-Shivers~\cite{ianjohnson:Shivers:1991:CFA}, timestamp approximation,
-that removes the need for joining whole stores by manipulating a
-global store imperatively. The original technique loses precision
-because states are stepped in sequence, modifying the store in place -
-more values or continuations can be added before another state gets to
-step. This interference means more possible flows (i.e. less
-precision) and a nondeterministic analysis - the order the set of states is
-traversed is not necessarily deterministic. However, by delaying the
-store changes until after all steps have completed, we can maintain
-our precision and determinism. In a variety of experiments, we
-observed that the time and space overhead for storing store-deltas was outweighed by
-the precision keeping flows in check. That is to say, the analysis was
-faster {\it and} more precise.
 
-We pair this technique with a mutable workset to avoid the
-intermediate sets introduced by the $State \times Store \to \Set(State) \times Store\msdiff$ signature
-of $\machstep$. This necessitates a change to the fixpoint algorithm to use a global
-workset, {\tt todo}, that $\machstep$ imperatively updates with the
-states that it would have otherwise accumulated in a set that would later be added to the workset.
+Thus far, we have made our optimizations in a purely functional
+manner. For the next series of optimizations, we need to dip into the
+imperative. We can motivate this entire sequence of optimizations by
+focusing on the largest bottleneck in the current state-space
+exploration algorithm: checking to see if a state has already been
+seen. Given two states, checking equality is expensive because the
+stores within each are large, and every entry must be checked against
+every other. Hashes can sometimes rule out inequality relatively
+quickly, but the incidence of collisions and actual equality is
+costly.
 
-In total, we have six globals:
+And, there is a better way. Shivers' original work on k-CFA was
+susceptible to the same problem, and he suggested three complementary
+optimizations: (1) make the store global; (2) update the store
+imperatively; and (3) associate every change in the store with a
+version number -- its timestamp. Then, put timestamps in states
+where previously there were stores. Given two states, the analysis can
+now compare their stores just by comparing their timestamps -- a
+constant-time operation.
+
+There is a subtle loss of precision and Shivers' original time-stamp
+technique that we can fix. For a given abstract state, all writes to
+the global store need to be delayed until the analysis considers all
+branches from that abstract state. This avoids cross-branch pollution
+which would not otherwise happen, e.g., when one branch writes to
+address $\maddr$ and another branch reads from address
+$\maddr$. Fortunately, given our conversion to log-based stores this
+change is straightforward.
+
+
+The current state of the state-space search now has six components:
+
 \begin{itemize}
  \item{{\tt $\msto$}, the store}
  \item{{\tt todo}, the workset}
@@ -1022,6 +1075,111 @@ to hold any value, not just quoted data.
 \section{Evaluation}
 \label{sec:eval}
 
+We have implemented, optimized, and evaluated \emph{all} of the
+machines presented in their JFP paper
+\cite{dvanhorn:VanHorn2012Systematic}, with the exception of the
+machine for performing pushdown flow analysis.  This includes machines
+supporting higher-order functions, state, first-class control,
+laziness, and stack inspection.
+
+For each benchmark, we collect analysis times, peak memory usage, and
+the rate of states-per-second explored by the analysis for each of the
+optimizations discussed in section~\ref{sec:opt}, culmulatively
+applied.  The analysis is stopped after consuming 30 minutes of time
+or 1 gigabyte of space.  When presenting \emph{relative} numbers, we
+use the timeout limits as a lower bound on the actual time required,
+thus giving a conservative estimate of improvements.
+
+All benchmarks are calculated as an average of N runs on a [MACHINE
+  SPECS].
+
+The benchmarks make use of mutation, first-class control (in the form
+of Scheme's {\tt call/cc} operator), compound data such as lists and
+vectors, many more primitive forms of data and operations such as
+Scheme's numeric tower including exact rationals, complex, and
+floating point numbers.
+
+Many benchmarks cause the baseline analyzer to take longer than 30
+minutes or to consume more 1 gigabit of memory, at which point the
+analysis is stopped.  This is the case for the largest benchmark
+program, which is 3,500 lines of code and takes under a minute in the
+most optimized analyzer.  For those benchmarks that did complete on
+the baseline, the optimized analyzer outperformed the baseline by a
+factor of 475 to 4,382.
+
+\begin{figure}
+\begin{tabular}{@{}l|r|r|r|r|r|r|r@{}}
+Program & LOC
+& \multicolumn{2}{c|}{Time (ms)}
+& \multicolumn{2}{c|}{Space (mb)}
+& \multicolumn{2}{c@{}}{Speed (state/sec)}
+\\
+\hline\hline
+nucleic &  3508 & 0 & 0 & 0 & 0 & 0 & 0\\
+matrix  &  747  & ? & ? & ? & ? & ? & ?\\
+nbody   & 1434  & ? & ? & ? & ? & ? & ?\\
+earley  &  667  & ? & ? & ? & ? & ? & ?\\
+maze    &  681  & ? & ? & ? & ? & ? & ?\\
+church  &   41  & ? & ? & ? & ? & ? & ?\\
+lattice &  214  & ? & ? & ? & ? & ? & ?\\
+boyer   &  642  & ? & ? & ? & ? & ? & ?\\
+mbrotz  &   68  & ? & ? & ? & ? & ? & ?
+\end{tabular}
+\caption{Overview performance comparison between baseline and
+  optimized analyzer.}
+\label{fig:bench-overview}
+\end{figure}
+
+\begin{enumerate}  %% Maybe use ``dictionary'' style enumeration.
+
+\item {\bf nucleic}: a floating-point intensive application taken from
+  molecular biology that has been used widely in benchmarking
+  functional language
+  implementations~\cite{dvanhorn:Hartel1996Benchmarking} and analyses
+  (e.g.~\cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
+  It is a constraint satisfaction algorithm used to determine the
+  three-dimensional structure of nucleic acids.
+
+\item {\bf matrix} tests whether M is maximal among all matrices of
+  the same dimension obtainable by simple reordering of rows and
+  columns and negation of any subset of rows and columns.  It is
+  written in continuation-passing style (used in
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
+
+
+\item {\bf nbody}: implements the Greengard multipole algorithm for
+  computing gravitational forces on point masses distributed uniformly
+  in a cube (used in
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
+
+\item {\bf earley}:  Earley's parser written by Marc Feeley.
+
+\item {\bf maze}: generates a random maze and finds a path (used in
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98})
+  Makes use of Scheme's {\tt call-with-current-continuation}
+  operation.
+
+\item {\bf church}: tests distributivity of multiplication over
+  addition for a few Church numerals (introduced by
+  \cite{dvanhorn:Vardoulakis2011CFA2}).
+
+\item {\bf lattice}: enumerates the maps between two lattices (used in
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98})
+
+\item {\bf boyer}: a term-rewriting theorem prover (used in
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98})
+
+\item {\bf mbrotZ}: generates Mandelbrot set fractal using complex
+  numbers.
+
+\item {\bf graphs}: counts the number of directed graphs with a
+  distinguished root and \(k\) vertices, each having out-degree at
+  most 2. It makes extensive use of higher-order procedures and is
+  written in a continuation-passing style (used by
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98})
+
+\end{enumerate}
+
 Our implementation of the analysis used in the evaluation is roughly
 3500 lines of Racket code.
 %% 400 lines for the core, 700 lines for
@@ -1053,15 +1211,84 @@ Our implementation of the analysis used in the evaluation is roughly
 \end{center}
 \end{figure}
 
+\paragraph{Comparison with other flow analysis implementations}
 
-\cite{dvanhorn:Earl2012Introspective}
+[Computes results more like Earl, et al.'s 0CFA, which times out on
+  the Church numeral benchmark and so even though it offers a fair
+  point of comparison, a more thorough evaluation is likely to
+  uninformative as the other benchmarks are highly likely to timeout
+  as well (and it would require significant effort to extend their
+  implementation with the features needed to analyze our benchmark
+  suite).  That implementation is evaluated against much smaller
+  benchmarks: the largest program consists of 63 \emph{subexpressions}
+  and times out after 30 minutes.]
 
-\cite{dvanhorn:wright-jagannathan-toplas98}
+Vardoulakis and Shivers evaluate their CFA2
+analyzer~\cite{dvanhorn:Vardoulakis2011CFA2} against a variant of 0CFA
+defined in their framework.  [NEED TIMING FOR 0CFA ON CHURCH.]  The
+Church example is the largest benchmark Vardoulakis and Shivers
+consider.  More work would be required to scale the analyzer to the
+set of features required by our benchmarks.
 
-Other benchmarks
+[Should probably talk about mCFA too.]
+
+The only analyzers we were able to find that proved capable of
+analyzing the full suite of benchmarks considered here were the Soft
+Typing system of Wright [CITE] and, in many ways its successor, the
+Polymorphic splitting system of Wright and
+Jagannathan~\cite{dvanhorn:wright-jagannathan-toplas98}.\footnote{This
+  is not a coincidence; these papers set a high standard for
+  evaluation, which we consciously aimed to approach.  Many of our
+  benchmarks are drawn from these papers.}  Unfortunately, these
+analyses compute an inherently different and uncomparable form of
+analysis.  Consequently, we have omitted a complete comparison with
+these implementations,.  The AAM approach provides more precision in
+terms of temporal-ordering of program states, which comes at a cost
+that can be avoided in constraint-based approaches.  Consequently
+implementation techniques cannot be ``ported'' between these two
+approaches.  However, our optimized implementation is within an order
+of magnitude of the performance of Wright and Jaganathan's analyzer.
+Although we would like to improve this to be more competitive, the
+optimized AAM approach still has many strengths to recommend it in
+terms of precision, ease of implementation and verification, and rapid
+design.
+
+
+
 
 \section{Related work}
 \label{sec:related}
+
+\paragraph{Abstracting Abstract Machines}
+
+This work clearly closely follows Van Horn and Might's original papers
+on abstracting abstract
+machines~\cite{dvanhorn:VanHorn2011Abstracting,dvanhorn:VanHorn2012Systematic},
+which in turn is one piece of the large body of research on flow
+analysis for higher-order languages (see
+Midtgaard~\cite{dvanhorn:Midtgaard2011Controlflow} for a thorough
+survey).  The AAM approach sits at the confluence of two major lines
+of research: (1) the study of abstract
+machines~\cite{dvanhorn:landin-64} and their systematic
+construction~\cite{dvanhorn:reynolds-hosc98}, and (2) the theory of
+abstract interpretation
+\cite{dvanhorn:Cousot:1977:AI,dvanhorn:Cousot:1979:Galois}.
+
+
+\paragraph{Frameworks for flow analysis of higher-order programs}
+
+Besides the original AAM work, the analysis most similar to that
+presented in section~\ref{sec:aam} is the infinitary control-flow
+analysis of Nielson and Nielson~\cite{dvanhorn:nielson-nielson-popl97}
+and the unified treatment of flow analysis by Jagannathan and
+Weeks~\cite{dvanhorn:jagannathan-weeks-popl95}.  Both are
+parameterized in such a way that in the limit, the analysis is
+equivalent to an interreter for the language, just as is the case
+here.  What is different is that both give a constraint-based
+formulation of the abstract semantics rather than a finite machine
+model.
+
+\paragraph{Abstract compilation}
 
 Boucher and Feeley \cite{dvanhorn:Boucher1996Abstract} introduced the
 idea of \emph{abstract compilation}, which used closure generation
@@ -1115,8 +1342,11 @@ development, they also can be systematically developed into efficient
 algorithms.
 
 %% \acks Sam Tobin-Hochstadt for encouragement and feedback -- he was
-%% the first to prompt me to look into how make effective
+%% the first to prompt us to look into how make effective
 %% implementations of the AAM approach.
+
+%% Vincent St Amour for feedback on early drafts.
+%% Greg Morrisset and Matthias Felleisen for discussions.
 
 %% NSF, DARPA
 

@@ -17,17 +17,17 @@
   (and var (sqrt var)))
 
 (define algo-name
-  '(("bl" . "baseline")
-    ("sp" . "specialized")
+  '(#;("bl" . "baseline")
+    ("sp" . "baseline") ;; Specialized is the new baseline
     ("ls" . "lazy")
     ("lc" . "compiled")
     ("ld" . "functional deltas")
-    ("ia" . "imperative accumulated deltas")
+    #;("ia" . "imperative accumulated deltas")
     ("id" . "imperative deltas")
-    ("pa" . "preallocated accumulated deltas")
+    #;("pa" . "preallocated accumulated deltas")
     ("pd" . "preallocated deltas")
-    #;("li" . "imperative timestamp") ;; Breaks if uncommented.
-    #;("lp" . "preallocated timestamp")))
+    #;("it" . "imperative timestamp")
+    #;("pt" . "preallocated timestamp")))
 
 (define (c x) (- (sub1 x))) ;; neg for B/W, pos for color
 (define (next x) (sub1 x))
@@ -54,13 +54,15 @@
           #:legend-anchor 'top-left
           #:out-file "state-per-sec.ps")))
 
+
 (parameterize (#;[plot-y-transform (axis-transform-bound log-transform 90000 1)]
                #;[plot-y-ticks     (log-ticks)]
-               [plot-font-size 30]
+               [plot-font-size 20]
                [line-color  "black"]
                [interval-color  "black"]
                [interval-line1-color  "black"]
-               [interval-line2-color  "black"])
+               [interval-line2-color  "black"]
+               [plot-width (* 2 (plot-width))])
   (states-per-second))
 
 
@@ -68,7 +70,7 @@
   (let ([which numbers-run])
     (plot (for/list ([(name numbers) (in-hash timings)]
                      [i (in-naturals)])
-            (define (scale x) (if (number? x) x (* 30 60 1000)))
+            (define (scale x) (if (number? x) x (* 1.2 (expt 10 6))))
             (define numbers* (for*/list ([(tag algo) (in-dict algo-name)]
                                          [n (in-value (hash-ref numbers tag))])
                                (vector algo (scale (average (which n))))))
@@ -86,18 +88,19 @@
 
 (parameterize (#;[plot-y-transform (axis-transform-bound log-transform .0001 1)]
                #;[plot-y-ticks     (log-ticks)]
-               [plot-font-size 30]
+               [plot-font-size 20]
                [line-color  "black"]
                [interval-color  "black"]
                [interval-line1-color  "black"]
-               [interval-line2-color  "black"])
+               [interval-line2-color  "black"]
+               [plot-width (* 2 (plot-width))])
   (abs-time))
 
 (define church-time (for/first ([(name numbers) (in-hash timings)]
                                 #:when (string=? name "church"))
                       numbers))
                       
-
+#;
 (define (q)
   (let ([which run])
     (plot (let ()
@@ -119,6 +122,7 @@
           #:legend-anchor 'top-right
           #:out-file "rel-time-church.ps")))
 
+#;
 (parameterize ([plot-y-transform (axis-transform-bound log-transform 0.0001 1)]
                #;[plot-y-ticks     (log-ticks)]
                [plot-font-size 20]
@@ -133,7 +137,7 @@
   (let ([which numbers-peak-mem])
     (plot (for/list ([(name numbers) (in-hash timings)]
                      [i (in-naturals)])
-            (define (scale x) (if (number? x) x 0))
+            (define (scale x) (if (number? x) x (* 2.5 (expt 10 9))))
             (define numbers* (for*/list ([(tag algo) (in-dict algo-name)]
                                          [n (in-value (hash-ref numbers tag))])
                                (vector algo (scale (average (which n))))))
@@ -142,7 +146,7 @@
                                 #:skip 10.5 #:x-min i
                                 #:style i
                                 #:color -7 #;(c (next i)) #:line-color "black" 
-                                #:line-style i))
+                                 #:line-style i))
           
           #:y-label "Peak memory (smaller is better)"
           #:x-label "Optimization technique (cumulative, left to right)"
@@ -151,11 +155,12 @@
 
 (parameterize (#;[plot-y-transform (axis-transform-bound log-transform .0001 1)]
                #;[plot-y-ticks     (log-ticks)]
-               [plot-font-size 30]
+               [plot-font-size 20]
                [line-color  "black"]
                [interval-color  "black"]
                [interval-line1-color  "black"]
-               [interval-line2-color  "black"])
+               [interval-line2-color  "black"]
+               [plot-width (* 2 (plot-width))])
   (peak-mem))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
