@@ -28,7 +28,9 @@
          (struct-out addr)
          atomic?
          nothing singleton
-         ≡ big⊓ ⊓ ⊓1)
+         ≡ ⊑? big⊓ ⊓ ⊓1)
+;; for destination for *.dot files
+(define graph-file (make-parameter #f))
 
 (define-syntax (define-nonce stx)
   (syntax-case stx () [(_ name) (identifier? #'name)
@@ -107,6 +109,7 @@
 (define ⊓ set-union)
 (define ⊓1 set-add)
 
+(define ⊑? subset?)
 (define (≡ vs0 vs1) (= (set-count vs0) (set-count vs1)))
 
 (define-syntax-rule (big⊓ vs0 V)

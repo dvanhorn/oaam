@@ -20,9 +20,7 @@
   (values (hash-set eσ a s*) (≡ prev s*)))
 
 (define (no-change? eσ a s)
-  (define prev (hash-ref eσ a ∅))
-  (define s* (⊓ s prev))
-  (≡ prev s*))
+  (⊑? s (hash-ref eσ a nothing)))
 
 ;; Store Store -> Store
 (define (join-store eσ1 eσ2)
