@@ -1,4 +1,3 @@
- 
 ./nbody.id.time.15:cpu time: 43050 real time: 43081 gc time: 3293
 ./nucleic.it.time.15:cpu time: 112447 real time: 112507 gc time: 17040
 ./boyer.it.time.15:cpu time: 20729 real time: 20738 gc time: 920
