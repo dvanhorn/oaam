@@ -513,9 +513,8 @@ presented in the frontier/accumulator style:
 \end{align*}
 
 The $\machstep$ relation is most naturally written as a function from
-a state to a set of all next states. We want to find a fixpoint of
-$\machstep$ on the state space, however, so we must lift it to work on
-sets of states. The lifting is a natural one:
+a state to a set of all next states. To calculate $eval$, we find a fixed point of
+$\machstep$ lifted to step a set of states. The lifting is a natural one:
 
 \begin{align*}
 \lift(f)(X) &= \bigcup\{f(x) \mid x \in X\}
@@ -1020,17 +1019,24 @@ literal lists is dramatically smaller in typical Scheme programs. We
 use the above abstraction for these syntactic uses, but choose to
 interpret literal lists as not always sugar for cascading {\tt
   cons}es. In particular, if a list literal is ``too big'' (in our
-case length $>$ 1), we interpret the list as a circular data structure;
-the right address points back to the {\tt cons} itself, and the left
-address points to all of the elements of the list. We take this
-farther and join the list elements together in with a coarse
-type-based abstraction. Quotation is special because it cannot
-introduce function values, which is important to enhancing our
-technique's soundness to conceptual complexity ratio. If we join two
-values of different type together, we don't get ``anything,'' which
-has complex meaning in higher-order languages (Shivers' escape
-semantics) and is overly approximate. We instead get ``any quotable
-value,'' which has much simpler semantics.
+case length $>$ 1), we interpret the list as a circular data
+structure; the right address points back to the {\tt cons} itself, and
+the left address points to all of the elements of the list. We take
+this farther and join the list elements together in with a coarse
+type-based abstraction. In effect, large lists or vectors of literal
+numbers become unbounded lists/vectors of ``number.'' Heterogeneous
+data is combined to just ``data,'' rather than a union of ``number'',
+``string'', etc. since primitives are interpreted on every combination
+of values that flow to them, and unions lead to more primitive
+interpretations.
+
+Quotation is special because it cannot introduce function values,
+which is important to enhancing our technique's soundness to
+conceptual complexity ratio. If we join two values of different type
+together, we don't get ``anything,'' which has complex meaning in
+higher-order languages (Shivers' escape semantics) and is overly
+approximate. We instead get ``any quotable value,'' which has much
+simpler semantics.
 
 There are a few steps to consider:
 \begin{itemize}
@@ -1283,7 +1289,7 @@ analysis of Nielson and Nielson~\cite{dvanhorn:nielson-nielson-popl97}
 and the unified treatment of flow analysis by Jagannathan and
 Weeks~\cite{dvanhorn:jagannathan-weeks-popl95}.  Both are
 parameterized in such a way that in the limit, the analysis is
-equivalent to an interreter for the language, just as is the case
+equivalent to an interpreter for the language, just as is the case
 here.  What is different is that both give a constraint-based
 formulation of the abstract semantics rather than a finite machine
 model.
