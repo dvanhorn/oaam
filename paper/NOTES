@@ -25,6 +25,8 @@ $ racket max-mins.rkt
 
 (Consequently, the evaluation table is incomplete.)
 
+In fact: NONE OF THE NUMBERS WORK.
+
 Picture worth 1K words: lets generate state graphs (in the style of
 the ICFP'12 paper) for the Church example (a) under baseline (b) with
 lazy non-determinism (c) with compilation.  (Or a simpler example if
@@ -38,3 +40,4 @@ results?
 
 Make sure to use \mathit for metafunction names.
 
+Need a tighter citation for eval/app/cont.
