@@ -29,19 +29,17 @@
 % \titlebanner{banner above paper title}        % These are ignored unless
 % \preprintfooter{short description of paper}   % 'preprint' option specified.
 
-\title{Optimizing Abstract Abstract Machines
-\vskip -1.5cm}
+\title{Optimizing Abstract Abstract Machines}
 
-%% \authorinfo{J. Ian Johnson}
-%%            {Northeastern University}
-%%            {ianj@ccs.neu.edu}
-%% \authorinfo{Matthew Might}
-%%            {University of Utah}
-%%            {might@cs.utah.edu}
-%% \authorinfo{David Van Horn}
-%%            {Northeastern University}
-%%            {dvanhorn@ccs.neu.edu}
-\authorinfo{}{}{}
+\authorinfo{J. Ian Johnson}
+           {Northeastern University}
+           {ianj@ccs.neu.edu}
+\authorinfo{Matthew Might}
+           {University of Utah}
+           {might@cs.utah.edu}
+\authorinfo{David Van Horn}
+           {Northeastern University}
+           {dvanhorn@ccs.neu.edu}
 
 \maketitle
 
@@ -1318,15 +1316,15 @@ optimization step.
 \paragraph{Comparison with other flow analysis implementations}
 
 The analysis considered here computes results similar Earl, et al.'s
-0-CFA implementation, which times out on the \Church{} benchmark
-because it does not widen the store as described for our baseline
-evaluator.  So even though it offers a fair point of comparison, a
-more thorough evaluation is probably uninformative as the other
-benchmarks are likely to timeout as well (and it would require
-significant effort to extend their implementation with the features
-needed to analyze our benchmark suite).  That implementation is
-evaluated against much smaller benchmarks: the largest program is 30
-lines.
+0-CFA implementation~\cite{dvanhorn:Earl2012Introspective}, which
+times out on the \Church{} benchmark because it does not widen the
+store as described for our baseline evaluator.  So even though it
+offers a fair point of comparison, a more thorough evaluation is
+probably uninformative as the other benchmarks are likely to timeout
+as well (and it would require significant effort to extend their
+implementation with the features needed to analyze our benchmark
+suite).  That implementation is evaluated against much smaller
+benchmarks: the largest program is 30 lines.
 
 Vardoulakis and Shivers evaluate their CFA2
 analyzer~\cite{dvanhorn:Vardoulakis2011CFA2} against a variant of
