@@ -116,24 +116,6 @@ further implementation effort.
 In this article, we develop a systematic approach to deriving the
 feasible implementation of an abstract-machine-based analyzer.
 
-
-
-
-%% Using this approach has also lead to new insights in pushdown
-%% abstractions of programs capable of precisely modeling the program
-%% stack, even in the presence of control effects.
-
-
-%% \subsection{Notation and prerequisites}
-
-%% Prereqs: Semantics Engineering \cite{dvanhorn:Felleisen2009Semantics},
-%% AAM \cite{dvanhorn:VanHorn2011Abstracting}
-%% \cite{dvanhorn:VanHorn2012Systematic}.
-
-%% Notation: concrete examples of programs under analysis is given in
-%% (monochrome) Scheme notation.  Code is given in (syntax colored)
-%% Racket.
-
 \section{At a glance}
 
 \begin{figure}[t]
@@ -164,18 +146,6 @@ At each step during the initial development, we evaluate the
 implementation on a benchmark from Vardoulakis and
 Shivers~\cite{dvanhorn:Vardoulakis2011CFA2} that tests distributivity
 of multiplication over addition on Church numerals.
-%% \footnote{It is
-%%   written here using Scheme notation and makes use of the shorthands:
-%% %
-%% \begin{alltt}
-%%    (define (((f x) y) z) ...) \(\equiv\)
-%%
-%%    (define f (\(\lambda\) (x) (\(\lambda\) (y) (\(\lambda\) (z) ...))))
-%% \end{alltt}
-%%
-%% \begin{alltt}
-%%    \church{n} \(\equiv\) (\(\lambda\) (s) (\(\lambda\) (z) (s\(\subscript1\) (s\(\subscript2\) ... (s\(\subscript{n}\) z)))))
-%% \end{alltt}}
 The example, while small, is informative:
 \begin{enumerate}
 \item it can be written in most modern programming languages,
@@ -208,46 +178,7 @@ nearly a factor of 500, dropping the analysis time to a fraction of a
 second.  Figure~\ref{fig:churchtime} shows the step-wise improvement
 of the analysis time for this example.
 
-%% \newcommand{\church}[1]{\(\ulcorner{\tt #1}\urcorner\)}
-%% \begin{figure}
-%% \hrule
-%% \vspace{2mm}
-%% \begin{alltt}
-%% (define (zero? n) ((n (\(\lambda\) (zx) #f)) #t))
-%% (define (((mult m1) m2) mf) (m2 (m1 mf)))
-%% (define ((((plus p1) p2) pf) x)
-%%   ((p1 pf) ((p2 pf) x)))
-
-%% (define (((pred n) rf) rx)
-%%   (((n (\(\lambda\) (g) (\(\lambda\) (h) (h (g rf)))))
-%%     (\(\lambda\) (ignored) rx))
-%%    (\(\lambda\) (id) id)))
-
-%% (define ((church=? e1) e2)
-%%   (if (zero? e1) (zero? e2)
-%%       (if (zero? e2) #f
-%%           ((church=? (pred e1)) (pred e2)))))
-
-%% ;; multiplication distributes over addition
-%% ((church=? ((mult \church2) ((plus \church1) \church3)))
-%%  ((plus ((mult \church2) \church1)) ((mult \church2) \church3)))
-%% \end{alltt}
-%% \caption{Church-numeral calculation}
-%% \label{fig:church}
-%% \end{figure}
-
 \begin{figure}[t]
-%% \hrule
-%% \vspace{2mm}
-%% \begin{alltt}
-%% (define (id x) x)
-%% (define (f n)
-%%   (if (<= n 1) 1 (* n (f (- n 1)))))
-%% (define (g n)
-%%   (if (<= n 1) 1 (+ (* n n) (g (- n 1)))))
-%% (print (+ ((id f) 3) ((id g) 4)))
-%% \end{alltt}
-%% \hrule
 \begin{center}
 \begin{tabular}{ccc}
 \raisebox{1ex-\height}{
@@ -331,19 +262,35 @@ Section~\ref{sec:related} relates this work to the literature and
 section~\ref{sec:conclusion} concludes.
 
 %\newpage
-\section{An abstract$^{\text 2}$ machine for ISWIM}
+\section{An analyzer for ISWIM}
 \label{sec:aam}
 
+In this section, we give a brief review of the AAM approach by
+defining a sound analytic framework for a core higher-order functional
+language: Landin's ISWIM~\cite{dvanhorn:Landin1966Next}.  In the
+subsequent sections, we will explore optimizations for the analyzer in
+this simplified setting, but scaling these techniques to realistic
+languages is straightforward and has been done for the analyzer
+evaluated in section~\ref{sec:eval}.
 
 ISWIM is a family of programming languages parameterized by a set of
 base values and operations.  To make things concrete, we consider a
 member of the ISWIM family with integers, booleans, and a few
 operations.
+%
+Figure~\ref{fig:syntax} defines the (abstract) syntax of ISWIM.  It
+includes variables, literals (either integers, booleans, or
+operations), $\lambda$-expressions for defining procedures, procedure
+applications, and conditionals.  Expressions carry a label, $\mlab$,
+which is drawn from an unspecified set and denotes the source location
+of the expression; labels are used to disambiguate distinct, but
+syntactically identical pieces of syntax.  We omit the label
+annotation in contexts where it is irrelevant.
 
 \begin{figure}
 \[
 \begin{array}{l@{\qquad}rcl}
-\text{Expressions} & \mathit{e} &=& \svar[^\mlab]\mvar\\
+\text{Expressions} & \mexp &=& \svar[^\mlab]\mvar\\
 &&|& \slit[^\mlab]\mlit\\
 &&|& \slam[^\mlab]\mvar\mexp\\
 &&|& \sapp[^\mlab]\mexp\mexp \\
@@ -359,7 +306,23 @@ operations.
 \label{fig:syntax}
 \end{figure}
 
-Figure~\ref{fig:syntax} defines the (abstract) syntax of ISWIM.
+\begin{figure}
+\[
+\begin{array}{l@{\qquad}rcl}
+\text{Values} & \mval   &=& \clos{\mvar,\mexp,\menv}\ |\ \mlit\\
+\text{States} & \mstate &=& \ev{\mexp,\menv,\msto,\mkont}\\
+                       &&|& \co{\mkont,\mval,\msto}\\
+                       &&|& \ap{\mval,\mval,\msto,\mkont}\\
+\text{Continuations} & \mkont &=& \kmt\\
+&&|& \kfn{\mval,\maddr}\\
+&&|& \kar{\mexp,\menv,\maddr}\\
+&&|& \kif{\mexp,\mexp,\menv,\maddr}
+\end{array}
+\]
+\caption{Abstract machine components}
+\end{figure}
+
+
 Figure~\ref{fig:aam} defines the semantics of ISWIM as a machine
 model.  Evaluation is defined as the set of states reachable by the
 reflexive, transitive closure of the machine transition relation.  The
