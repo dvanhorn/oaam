@@ -673,21 +673,22 @@ In effect, the new store is computed as the least upper bound of all subsequent 
 \subsection{Store-allocated results}
 \label{sec:baselineeval}
 
-The final approximation we make to get to our baseline analysis is
-store-allocating results of application sub-expressions. The semantics
-of the previous section is where AAM leaves off. However, notice that
-the $\kfn{}$ continuation stores a value - this makes the space of
-continuations quadratic rather than linear in 0-CFA. A linear space
-drops the complexity to cubic.
+The final approximation we make to get to our point of departure is
+store-allocating results of application sub-expressions. 
+The AAM approach stops at the previous optimization. 
+However, the $\kfn{}$ continuation stores a value, and this makes the space of
+continuations quadratic rather than linear in the size of the program---even for a monovariant analysis like 0CFA.
+Having the space of continuations grow linearly with the size of the program 
+will drop the overall complexity to cubic (as expected).
 
-To achieve this, we instead allocate an address for the value position
+To achieve this linearity for continuation, we allocate an address for the value position
 when we create the continuation.  This address and the tail address
 are both determined by the label of the application point, so the
-space becomes linear and the overall complexity drops to cubic. Note
-that this is a critical abstraction in languages with n-ary functions,
-since otherwise the continuation space becomes ${\mathcal O}(n^n)$!
-This amount of distinction between continuations is unnecessary
-in practice.
+space becomes linear and the overall complexity drops to cubic. 
+This is a critical abstraction in languages with $n$-ary functions,
+since otherwise the continuation space grows super-exponentially.
+% In theory, this aggressive distinction between continuations might buy
+% additional precision, but in practice, it does not.
 
 The important rules that change are the following, specialized to 0-CFA:
 
