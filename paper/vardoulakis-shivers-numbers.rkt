@@ -94,7 +94,7 @@
                [plot-height (quotient (plot-height) 2)])
   (list 
    (plot (list
-          (lines rel-time-data #:color 2 #:width 2 
+          (lines rel-time-data #:color 2 #:width 4 
                  #:label "Total analysis time")
           (points rel-time-data #:color 1 #:line-width 2))
          #:y-min -25 
@@ -106,7 +106,7 @@
          #:out-file "church-relative-time.ps")
    
    (plot (list
-          (lines rel-states-per-sec-data #:color 6 #:width 2
+          (lines rel-states-per-sec-data #:color 6 #:width 4
                  #:label "Rate of state transitions")
           (points rel-states-per-sec-data #:color 5 #:line-width 2))
          #:y-min -9
@@ -118,7 +118,7 @@
          #:out-file "church-relative-speed.ps")
    
    (plot (list
-          (lines rel-mem-data #:color 4 #:width 2
+          (lines rel-mem-data #:color 4 #:width 4
                  #:label "Peak memory")
           (points rel-mem-data #:color 3 #:line-width 2))
          #:y-min 1
