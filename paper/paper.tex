@@ -1217,6 +1217,7 @@ factor of two to three orders of magnitude.
 % safer to not give exact factors
 % 475 to 4,382.
 
+We use the following set of benchmarks:
 \begin{figure}
 \centering
 \include{bench-overview}
@@ -1279,36 +1280,38 @@ factor of two to three orders of magnitude.
   \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 \end{enumerate}
 
-Our implementation of the analysis used in the evaluation is roughly
-3500 lines of Racket code.
 %% 400 lines for the core, 700 lines for
 %% abstraction over optimizations, 1500 lines for primitives and standard
 %% list operations, 700 lines for instantiations to different
 %% optimizations and 300 for parsing and macro transformers.
 
+Figure~\ref{fig:bench-overview} gives an overview of the benchmark
+results in terms of absolute time, space, and speed between the
+baseline and most optimized analyzer.  Figure~\ref{fig:bench-all}
+plots the factors of improvement over the baseline for each
+optimization step.
+
 \begin{figure*}
 \begin{center}
-\includegraphics[width=6in]{rel-time.ps}
+  \includegraphics[width=6.5in]{all-relative-memory.ps}
+
+  (a) Peak memory usage
+
+  \vspace{1em}
+  \includegraphics[width=6.5in]{all-relative-speed.ps}
+
+  (b) Rate of state transitions
+
+  \vspace{1em}
+  \includegraphics[width=6.5in]{all-relative-time.ps}
+
+  (c) Total analysis time
 \end{center}
+\caption{Factors of improvement over baseline for each step of
+  optimization.}
+\label{fig:bench-all}
 \end{figure*}
 
-\begin{figure}
-\begin{center}
-\includegraphics[width=3.2in]{abs-time.ps}
-\end{center}
-\end{figure}
-
-\begin{figure}
-\begin{center}
-\includegraphics[width=3.2in]{state-per-sec.ps}
-\end{center}
-\end{figure}
-
-\begin{figure}
-\begin{center}
-\includegraphics[width=3.2in]{peak-mem.ps}
-\end{center}
-\end{figure}
 
 \paragraph{Comparison with other flow analysis implementations}
 
