@@ -632,7 +632,7 @@ To retain soundness, this store grows monotonically.
 Formally, we can cast this optimization as a second abstraction or as the
 application of a widening operator during the fixed-point iteration.
 %
-In the ISWIM language, such a widening makes 0CFA quartic in the size of the
+In the ISWIM language, such a widening makes 0-CFA quartic in the size of the
 program.
 %
 Thus, in one step, complexity drops from intractable exponentiality to merely
@@ -1336,7 +1336,7 @@ Our implementation of the analysis used in the evaluation is roughly
 
 \paragraph{Comparison with other flow analysis implementations}
 
-[Computes results more like Earl, et al.'s 0CFA, which times out on
+[Computes results more like Earl, et al.'s 0-CFA, which times out on
   the Church numeral benchmark and so even though it offers a fair
   point of comparison, a more thorough evaluation is likely to
   uninformative as the other benchmarks are highly likely to timeout
@@ -1347,8 +1347,8 @@ Our implementation of the analysis used in the evaluation is roughly
   and times out after 30 minutes.]
 
 Vardoulakis and Shivers evaluate their CFA2
-analyzer~\cite{dvanhorn:Vardoulakis2011CFA2} against a variant of 0CFA
-defined in their framework.  [NEED TIMING FOR 0CFA ON CHURCH.]  The
+analyzer~\cite{dvanhorn:Vardoulakis2011CFA2} against a variant of 0-CFA
+defined in their framework.  [NEED TIMING FOR 0-CFA ON CHURCH.]  The
 Church example is the largest benchmark Vardoulakis and Shivers
 consider.  More work would be required to scale the analyzer to the
 set of features required by our benchmarks.
