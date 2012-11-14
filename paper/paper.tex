@@ -1191,13 +1191,13 @@ There are a few steps to consider:
 \qquad \mbox{where } \msto' &= \msto\sqcup[a \mapsto \bigsqcup(v ...)] \\
                             &\qquad \sqcup[d \mapsto \{ \mbox{{\tt '()}}, ({\tt cons}\ a\ d)\}] \\
 \bigsqcup(v) &= v \\
-\bigsqcup(v, vs ...) &= \merge(v, \bigsqcup(vs ...)) \\
-\merge(v, v) &= v \\
-\merge(n, m) &= {\tt Number} \\
-\merge(n, v) &= {\tt QData} \\
-\merge(({\tt cons}\ a\ d), ({\tt cons}\ a'\ d')) &= {\tt QPair} \\
-\merge({\tt QPair}, ({\tt cons}\ a\ d)) &= {\tt QPair} \\
-\merge({\tt QPair}, v) &= {\tt QData} \\
+\bigsqcup(v, vs ...) &= \fmerge(v, \bigsqcup(vs ...)) \\
+\fmerge(v, v) &= v \\
+\fmerge(n, m) &= {\tt Number} \\
+\fmerge(n, v) &= {\tt QData} \\
+\fmerge(({\tt cons}\ a\ d), ({\tt cons}\ a'\ d')) &= {\tt QPair} \\
+\fmerge({\tt QPair}, ({\tt cons}\ a\ d)) &= {\tt QPair} \\
+\fmerge({\tt QPair}, v) &= {\tt QData} \\
 \vdots
 \end{align*}
 \caption{Quoted list primitive}
