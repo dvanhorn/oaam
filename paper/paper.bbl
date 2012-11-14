@@ -1,0 +1,194 @@
+\begin{thebibliography}{10}
+
+\bibitem{dvanhorn:Boucher1996Abstract}
+Dominique Boucher and Marc Feeley.
+\newblock Abstract compilation: {A} new implementation paradigm for static
+  analysis.
+\newblock In {\em Compiler Construction: 6th
+  International Conference}, pages 192--207, 1996.
+
+\bibitem{dvanhorn:bravenboer-smaragdakis-oopsla09}
+Martin Bravenboer and Yannis Smaragdakis.
+\newblock Strictly declarative specification of sophisticated points-to
+  analyses.
+\newblock In {\em OOPSLA '09: Proceedings of the 24th annual ACM SIGPLAN
+  Conference on Object-Oriented Programming, Systems, Languages, and
+  Applications}, 2009.
+
+\bibitem{dvanhorn:Cousot:1977:AI}
+Patrick Cousot and Radhia Cousot.
+\newblock Abstract interpretation: a unified lattice model for static analysis
+  of programs by construction or approximation of fixpoints.
+\newblock In {\em Proceedings of the 4th ACM SIGACT-SIGPLAN Symposium
+  on Principles of Programming Languages}, pages 238--252, 1977.
+
+\bibitem{dvanhorn:Cousot1979Systematic}
+Patrick Cousot and Radhia Cousot.
+\newblock Systematic design of program analysis frameworks.
+\newblock In {\em Proceedings of the 6th ACM SIGACT-SIGPLAN Symposium on
+  Principles of Programming Languages}, POPL '79, pages 269--282. ACM, 1979.
+
+\bibitem{dvanhorn:Danvy:DSc}
+Olivier Danvy.
+\newblock {\em An Analytical Approach to Program as Data Objects}.
+\newblock {DSc} thesis, Aarhus University,
+  2006.
+
+\bibitem{dvanhorn:Danvy-Nielsen:RS-04-26}
+Olivier Danvy and Lasse~R. Nielsen.
+\newblock Refocusing in reduction semantics.
+\newblock Research Report BRICS RS-04-26, Department of Computer Science,
+  Aarhus University, 2004.
+
+\bibitem{local:DOsualdo:12A}
+E.~D'Osualdo, J.~Kochems, and C.-H.~L. Ong.
+\newblock Automatic verification of {Erlang}-style concurrency.
+\newblock Technical report, University of Oxford, 2012.
+\newblock \url{http://mjolnir.cs.ox.ac.uk/soter/papers/erlang-verif.pdf}.
+
+\bibitem{local:DOsualdo:12B}
+E.~D'Osualdo, J.~Kochems, and C.-H.~L. Ong.
+\newblock Soter: An automatic safety verifier for {E}rlang.
+\newblock Technical report, University of Oxford, 2012.
+\newblock \url{http://mjolnir.cs.ox.ac.uk/soter/papers/soter-demo.pdf}.
+
+\bibitem{dvanhorn:Earl2012Introspective}
+Christopher Earl, Ilya Sergey, Matthew Might, and David~Van Horn.
+\newblock Introspective pushdown analysis of higher-order programs.
+\newblock In {\em Proceedings of the 17th ACM SIGPLAN International Conference
+  on Functional Programming}, ICFP '12, pages 177--188. ACM, 2012.
+
+\bibitem{dvanhorn:Feeley1987Using}
+Marc Feeley and Guy Lapalme.
+\newblock Using closures for code generation.
+\newblock {\em Comput. Lang.}, 12(1):47--66, 1987.
+
+\bibitem{dvanhorn:Felleisen2009Semantics}
+Matthias Felleisen, Robert~B. Findler, and Matthew Flatt.
+\newblock {\em Semantics Engineering with {PLT} Redex}.
+\newblock MIT Press, 2009.
+
+\bibitem{dvanhorn:Hartel1996Benchmarking}
+Pieter~H. Hartel, Marc Feeley, et al.
+\newblock Benchmarking implementations of functional languages with
+  ``pseudoknot'', a float-intensive benchmark.
+\newblock {\em J. Func. Prog.}, 6(04):621--655, 1996.
+
+\bibitem{dvanhorn:jagannathan-etal-popl98}
+Suresh Jagannathan, Peter Thiemann, Stephen Weeks, and Andrew Wright.
+\newblock Single and loving it: must-alias analysis for higher-order languages.
+\newblock In {\em Proceedings of the 25th ACM SIGPLAN-SIGACT
+  Symposium on Principles of Programming Languages}, pages 329--341, 1998.
+
+\bibitem{dvanhorn:jagannathan-weeks-popl95}
+Suresh Jagannathan and Stephen Weeks.
+\newblock A unified treatment of flow analysis in higher-order languages.
+\newblock In {\em POPL '95: Proceedings of the 22nd ACM SIGPLAN-SIGACT
+  Symposium on Principles of Programming Languages}, pages 393--407. ACM Press,
+  1995.
+
+\bibitem{dvanhorn:Landin1966Next}
+P.~J. Landin.
+\newblock The next 700 programming languages.
+\newblock {\em Commun. ACM}, 9(3):157--166, 1966.
+
+\bibitem{dvanhorn:landin-64}
+Peter~J. Landin.
+\newblock The mechanical evaluation of expressions.
+\newblock {\em The Computer Journal}, 6(4):308--320, 1964.
+
+\bibitem{dvanhorn:Meunier2006Modular}
+Philippe Meunier, Robert~B. Findler, and Matthias Felleisen.
+\newblock Modular set-based analysis from contracts.
+\newblock In {\em POPL '06: Conference record of the 33rd ACM SIGPLAN-SIGACT
+  Symposium on Principles of Programming Languages}, pages 218--231. ACM, 2006.
+
+\bibitem{dvanhorn:Midtgaard2011Controlflow}
+Jan Midtgaard.
+\newblock Control-flow analysis of functional programs.
+\newblock {\em ACM Computing Surveys}, 2011.
+
+\bibitem{dvanhorn:Might2011Family}
+Matthew Might and David~Van Horn.
+\newblock A family of abstract interpretations for static analysis of
+  concurrent {Higher-Order} programs.
+\newblock In {\em Static Analysis}, vol. 6887 of {\em
+  LNCS}, pages 180--197, 2011.
+
+\bibitem{dvanhorn:Might2009Posteriori}
+Matthew Might and Panagiotis Manolios.
+\newblock A posteriori soundness for non-deterministic abstract
+  interpretations.
+\newblock In {\em Proceedings of the 10th International Conference on
+  Verification, Model Checking, and Abstract Interpretation}, pages
+  260--274. Springer-Verlag, 2009.
+
+\bibitem{local:dalvik}
+Matthew Might and David Van{ }Horn.
+\newblock Scalable and precise abstractions of programs for trustworthy
+  software.
+\newblock Technical report, 2012.
+
+\bibitem{local:harvard}
+Greg Morrisett.
+\newblock Harvard university course cs252r: Advanced functional language
+  compilation.
+\newblock \url{http://www.eecs.harvard.edu/~greg/cs252rfa12/}.
+
+\bibitem{dvanhorn:nielson-nielson-popl97}
+Flemming Nielson and Hanne~R. Nielson.
+\newblock Infinitary control flow analysis: a collecting semantics for closure
+  analysis.
+\newblock In {\em POPL '97: Proceedings of the 24th ACM SIGPLAN-SIGACT
+  Symposium on Principles of Programming Languages}, pages 332--345. ACM Press,
+  1997.
+
+\bibitem{dvanhorn:Plotkin1981Structural}
+G.~D. Plotkin.
+\newblock A structural approach to operational semantics.
+\newblock Technical Report DAIMI FN-19, 1981.
+
+\bibitem{dvanhorn:reynolds-hosc98}
+John~C. Reynolds.
+\newblock Definitional interpreters for {Higher-Order} programming languages.
+\newblock {\em Higher-Order and Symbolic Computation}, 11(4):363--397, 1998.
+
+\bibitem{dvanhorn:TobinHochstadt2012Higherorder}
+Sam Tobin-Hochstadt and David Van{ }Horn.
+\newblock Higher-order symbolic execution via contracts.
+\newblock In {\em Proceedings of the ACM International Conference on Object
+  Oriented Programming Systems Languages and Applications}, OOPSLA '12, pages
+  537--554. ACM, 2012.
+
+\bibitem{dvanhorn:VanHorn2011Abstracting}
+David Van{ }Horn and Matthew Might.
+\newblock Abstracting abstract machines: a systematic approach to higher-order
+  program analysis.
+\newblock {\em Communications of the ACM}, 54:101--109, 2011.
+
+\bibitem{local:DBLP:journals/corr/abs-1109-4467}
+David Van{ }Horn and Matthew Might.
+\newblock An analytic framework for {JavaScript}.
+\newblock {\em CoRR}, abs/1109.4467, 2011.
+
+\bibitem{dvanhorn:VanHorn2012Systematic}
+David Van{ }Horn and Matthew Might.
+\newblock Systematic abstraction of abstract machines.
+\newblock {\em J. Func Prog}, 22(4-5):705--746, 2012.
+
+\bibitem{dvanhorn:Vardoulakis2011CFA2}
+Dimitrios Vardoulakis and Olin Shivers.
+\newblock {CFA2}: a {Context-Free} approach to {Control-Flow} analysis.
+\newblock {\em LMCS}, 7(2), 2011.
+
+\bibitem{dvanhorn:Wright1997Practical}
+Andrew~K. Wright and Robert Cartwright.
+\newblock A practical soft type system for {Scheme}.
+\newblock {\em ACM Trans. Program. Lang. Syst.}, 19(1):87--152, 1997.
+
+\bibitem{dvanhorn:wright-jagannathan-toplas98}
+Andrew~K. Wright and Suresh Jagannathan.
+\newblock Polymorphic splitting: an effective polyvariant flow analysis.
+\newblock {\em ACM Trans. Program. Lang. Syst.}, 20(1):166--207, 1998.
+
+\end{thebibliography}
