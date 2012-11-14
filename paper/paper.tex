@@ -143,7 +143,7 @@ feasible implementation of an abstract-machine-based analyzer.
 \includegraphics[width=3.2in]{church-relative-time.ps}
 \vspace{-1.5em}
 \end{center}
-\caption{Relative improvements over the baseline analyzer for the
+\caption{Factor improvements over the baseline analyzer for the
   \Church{} benchmark in terms of peak memory usage, the rate of state
   transitions, and total analysis time. (Bigger is better.) Each point
   is marked with the section that introduces the optimization.}
@@ -1238,13 +1238,13 @@ to hold any value, not just quoted data.
 \section{Evaluation}
 \label{sec:eval}
 
-We have implemented, optimized, and evaluated \emph{all} of the
-machines presented in their JFP paper
-\cite{dvanhorn:VanHorn2012Systematic}, with the exception of the
-machine for performing pushdown flow analysis.  This includes machines
+We have implemented, optimized, and evaluated an analysis framework
 supporting higher-order functions, state, first-class control,
-laziness, and stack inspection.
-
+compound data, and a large number of primitive kinds of data and
+operations such as floating point, complex, and exact rational
+arithmetic.  The analysis is evaluated against a suite of benchmarks
+drawn from the literature.
+%
 For each benchmark, we collect analysis times, peak memory usage, and
 the rate of states-per-second explored by the analysis for each of the
 optimizations discussed in section~\ref{sec:opt}, culmulatively
@@ -1253,14 +1253,9 @@ or 1 gigabyte of space.  When presenting \emph{relative} numbers, we
 use the timeout limits as a lower bound on the actual time required,
 thus giving a conservative estimate of improvements.
 
-All benchmarks are calculated as an average of N runs on a [MACHINE
-  SPECS].
-
-The benchmarks make use of mutation, first-class control (in the form
-of Scheme's {\tt call/cc} operator), compound data such as lists and
-vectors, many more primitive forms of data and operations such as
-Scheme's numeric tower including exact rationals, complex, and
-floating point numbers.
+All benchmarks are calculated as an average of 5 runs, done in
+parallel, on an 11-core, 64-bit Intel Xeon machine running at 2.40GHz
+with 11Gb of memory.
 
 Many benchmarks cause the baseline analyzer to take longer than 30
 minutes or to consume more 1 gigabyte of memory, at which point the
@@ -1268,7 +1263,9 @@ analysis is stopped.  This is the case for the largest benchmark
 program, which is 3,500 lines of code and takes under a minute in the
 most optimized analyzer.  For those benchmarks that did complete on
 the baseline, the optimized analyzer outperformed the baseline by a
-factor of 475 to 4,382.
+factor of two to three orders of magnitude.
+% safer to not give exact factors
+% 475 to 4,382.
 
 \begin{figure}
 \centering
@@ -1288,10 +1285,10 @@ factor of 475 to 4,382.
   It is a constraint satisfaction algorithm used to determine the
   three-dimensional structure of nucleic acids.
 
-\item {\bf matrix} tests whether M is maximal among all matrices of
-  the same dimension obtainable by simple reordering of rows and
-  columns and negation of any subset of rows and columns.  It is
-  written in continuation-passing style (used in
+\item {\bf matrix} tests whether a matrix is maximal among all
+  matrices of the same dimension obtainable by simple reordering of
+  rows and columns and negation of any subset of rows and columns.  It
+  is written in continuation-passing style (used in
   \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 
 
@@ -1300,7 +1297,10 @@ factor of 475 to 4,382.
   in a cube (used in
   \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 
-\item {\bf earley}:  Earley's parser written by Marc Feeley.
+\item {\bf earley}: Earley's parsing algorithm, applied to a 15-symbol
+  input according to a simple ambiguous grammar.  A real program,
+  applied to small data whose exponential behavior leads to a peak
+  heap size of half a gigabyte or more during concrete execution.
 
 \item {\bf maze}: generates a random maze using Scheme's {\tt
   call/cc} operation and finds a path solving
@@ -1311,7 +1311,8 @@ factor of 475 to 4,382.
   addition for Church numerals (introduced by
   \cite{dvanhorn:Vardoulakis2011CFA2}).
 
-\item {\bf lattice}: enumerates the maps between two lattices (used in
+\item {\bf lattice}: enumerates the order-preserving maps between two
+  finite lattices (used in
   \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 
 \item {\bf boyer}: a term-rewriting theorem prover (used in
@@ -1322,8 +1323,9 @@ factor of 475 to 4,382.
 
 \item {\bf graphs}: counts the number of directed graphs with a
   distinguished root and \(k\) vertices, each having out-degree at
-  most 2. It makes extensive use of higher-order procedures and is
-  written in a continuation-passing style (used by
+  most 2. It is written in a continuation-passing style and makes
+  extensive use of higher-order procedures---it creates closures
+  almost as often as it performs non-tail procedure calls--- (used by
   \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 \end{enumerate}
 
@@ -1360,15 +1362,16 @@ Our implementation of the analysis used in the evaluation is roughly
 
 \paragraph{Comparison with other flow analysis implementations}
 
-The analysis considered here computes results more like Earl, et al.'s
-0-CFA, which times out on the \Church{} benchmark because it does not
-widen the store as described for our baseline evaluator.  So even
-though it offers a fair point of comparison, a more thorough
-evaluation is probably uninformative as the other benchmarks are
-likely to timeout as well (and it would require significant effort to
-extend their implementation with the features needed to analyze our
-benchmark suite).  That implementation is evaluated against much
-smaller benchmarks: the largest program is 30 lines.
+The analysis considered here computes results similar Earl, et al.'s
+0-CFA implementation, which times out on the \Church{} benchmark
+because it does not widen the store as described for our baseline
+evaluator.  So even though it offers a fair point of comparison, a
+more thorough evaluation is probably uninformative as the other
+benchmarks are likely to timeout as well (and it would require
+significant effort to extend their implementation with the features
+needed to analyze our benchmark suite).  That implementation is
+evaluated against much smaller benchmarks: the largest program is 30
+lines.
 
 Vardoulakis and Shivers evaluate their CFA2
 analyzer~\cite{dvanhorn:Vardoulakis2011CFA2} against a variant of
