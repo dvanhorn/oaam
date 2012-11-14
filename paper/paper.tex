@@ -1127,24 +1127,39 @@ store or (if memory is no concern) the entire store.
 
 \subsection{Abstracting literal compound data}
 
-Performance issues arise when one chooses the
-``obvious,'' or ``natural'' abstraction for compound data structures like list. 
+The abstraction of compound data structures like lists has deep implications 
+for precision and performance.
 %
-Our running
-example will be the classic Boyer benchmark. The detail of note for
-the Boyer benchmark is that it has large list literals, the exact
-values of which do not matter for many analyses. If we
-interpret a list literal of 30 elements (that again have 10 elements
-each) as 300 applications of {\tt cons}, and then interpret a function
-that traverses the tree, we will end up interpreting that function at
-least 300 times, when once or twice would do.
+The classic list-heavy benchmark {\tt boyer}---a simplified implementation
+of the Boyer-Moore theorem-prover---drove our own considerations for
+abstractions for compound data structures.
+%
+Boyer's fluent use of literal list dooms the ``natural'' abstraction
+of lists to fail from overprecision.
+%
+In short, if we interpret a literal list {\tt '(a b c)} as {\tt (cons 'a (cons 'b
+(cons 'c '())))}, even a monovariant allocation stategy for abstract
+cons cells will precisely and exactly create a 3-cell list.
 
+If code contains a length-300 literal list, then its analysis yields a length-300 abstract
+list as well.
+%
+In many cases, the specific contents of the list add little precision
+to the resulting analysis, and yet the analyzer will dutifully execute
+recursive functions over the entirety of these structures at every
+encounter.
+%
+An alternative in this case is to explicitly flatten literal lists
+into single abstract cells.
+
+We will explore both options here.
+%
 We will first explain the natural abstraction of tuples, and then we
 will explain a less precise allocation strategy from uniform $k$-CFA
 that we use for large compound data literals that we modified from the
 implementation in \citep{dvanhorn:wright-jagannathan-toplas98}.
 
-\subsubsection{\Naively}
+\subsubsection{Option 1: The natural abstraction}
 
 The uniform way AAM approaches a simple abstraction strategy is to cut
 recursion out of the data definition by tying the recursive knot
@@ -1169,7 +1184,7 @@ even in our fastest implementation, this abstraction causes the
 analysis of Boyer to be 430 times slower than the approach we will now
 describe.
 
-\subsubsection{Less \naively{} and less precisely}
+\subsubsection{Option 2: A precise yet compact abstraction}
 
 The number of syntactic uses of {\tt cons} versus implicit uses via
 literal lists is smaller in typical Scheme programs. We use the above
@@ -1247,7 +1262,7 @@ drawn from the literature.
 %
 For each benchmark, we collect analysis times, peak memory usage, and
 the rate of states-per-second explored by the analysis for each of the
-optimizations discussed in section~\ref{sec:opt}, culmulatively
+optimizations discussed in section~\ref{sec:opt}, cumulatively
 applied.  The analysis is stopped after consuming 30 minutes of time
 or 1 gigabyte of space.  When presenting \emph{relative} numbers, we
 use the timeout limits as a lower bound on the actual time required,
