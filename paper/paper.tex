@@ -1072,7 +1072,7 @@ to false.
 \begin{alltt}
 eval(\(e\)) :=
   \(\msto\), todo, seen, T := \(\varnothing\), \(\varnothing\), [], 0
-  \(\compile{e}\)(\(\mtcntr, \varnothing, \varnothing, \kmt\))
+  \(\compile{e}\)(\(\mtcntr, \varnothing, \varnothing, \mtlst, \kmt\))
   while(true):
     if todo = \(\varnothing\): return (keys(seen), \(\msto\))
     else:
