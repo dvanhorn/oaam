@@ -2,7 +2,7 @@
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          "store-passing.rkt" "context.rkt" "fix.rkt"
          "handle-limits.rkt"
-         "graph.rkt")
+         "graph.rkt" racket/stxparam)
 (provide bind-join-∆s bind-join*-∆s mk-∆-fix^ mk-timestamp-∆-fix^ with-σ-∆s)
 
 ;; Utility function for combining multiple σ-∆s
@@ -64,19 +64,19 @@
               last-σ final-cs))))
 
 ;; Uses counting and merges stores between stepping all states.
-(define-syntax-rule (mk-timestamp-∆-fix^ name ans^?)
+(define-simple-macro* (mk-timestamp-∆-fix^ name ans^?)
  (define-syntax-rule (name step fst)
    (let ()
      (define start-time (current-milliseconds))
      (define-values (∆ cs) fst)
      (define num-states 0)
-     (define graph (make-hash))
+     #,@(if (syntax-parameter-value #'generate-graph?) #'((define graph (make-hash))) #'())
      (define-values (last-σ final-cs)
        (with-limit-handler (start-time num-states)
          (let loop ([accum (hash)] [front cs] [σ (update ∆ (hash))] [σ-count 0])
            (cond [(∅? front)
                   (state-rate start-time num-states)
-                  (dump-dot graph)
+                  #,@(if (syntax-parameter-value #'generate-graph?) #'((dump-dot graph)) #'())
                   (values σ (for/set ([(c _) (in-hash accum)]) c))]
                  [else
                   ;; If a state is revisited with a different store, that counts as
@@ -96,7 +96,7 @@
                                  ([c* (in-set cs*)]
                                   #:when (or change?
                                              (not (= σ-count (hash-ref accum c* -1)))))
-                               (add-edge! graph c c*)
+                               #,@(if (syntax-parameter-value #'generate-graph?) #'((add-edge! graph c c*)) #'())
                                (values (hash-set accum* c* σ-count) (∪1 front* c*))))
                            (step/join accum* todo* front* ∆**)]))]))))
      ;; filter the final results

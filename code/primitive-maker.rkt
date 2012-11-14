@@ -325,10 +325,10 @@
 
 (define-syntax (mk-primitive-meaning stx)
   (syntax-parse stx
-         [(_ gb?:boolean σtb?:boolean σdb?:boolean cb?:boolean 0b?:boolean
+         [(_ gb?:boolean σpb?:boolean σdb?:boolean cb?:boolean 0b?:boolean
              mean:id compile:id co:id defines ... ((~var p (prim-entry (syntax-e #'gb?))) ...))
           (define global-σ? (syntax-e #'gb?))
-          (define σ-threading? (syntax-e #'σtb?))
+          (define σ-passing? (syntax-e #'σpb?))
           (define σ-∆s? (syntax-e #'σdb?))
           (define compiled? (syntax-e #'cb?))
           (define 0cfa? (syntax-e #'0b?))          
@@ -338,7 +338,7 @@
                 (datum->syntax arg-stx (cons m arg-stx) arg-stx)))
           (define hidden-σ (and σ-∆s? (not global-σ?) (generate-temporary #'hidden)))
           (with-syntax ([(σ-op ...) (if global-σ? #'() #'(pσ))]
-                        [(σ-gop ...) (if σ-threading? #'(pσ) #'())]
+                        [(σ-gop ...) (if σ-passing? #'(pσ) #'())]
                         [(top ...) (listy hidden-σ)]
                         [topp (or hidden-σ #'pσ)]
                         [(top-op ...) (if (and σ-∆s? (not global-σ?)) #'(top-σ) #'())]
