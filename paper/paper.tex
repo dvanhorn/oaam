@@ -1289,7 +1289,12 @@ Figure~\ref{fig:bench-overview} gives an overview of the benchmark
 results in terms of absolute time, space, and speed between the
 baseline and most optimized analyzer.  Figure~\ref{fig:bench-all}
 plots the factors of improvement over the baseline for each
-optimization step.
+optimization step. The dip we see in transition rate even though time
+taken decreases is to be expected - fewer ``easy'' states are added by
+abstract compilation. It increases again with the introduced
+algorithmic improvements. Accumulating store changes in addition to
+maintaining the store accounts for the higher memory usage when using
+the store delta technique without further improvements.
 
 \begin{figure*}
 \begin{center}
