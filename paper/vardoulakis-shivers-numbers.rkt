@@ -101,7 +101,7 @@
          #:y-max 270
          #:x-label ""
          #:x-min 0
-         #:x-max 5.5
+         #:x-max 5.2
          #:y-label "" #;"Factor improvement over baseline"
          #:out-file "church-relative-time.ps")
    
@@ -113,7 +113,7 @@
          #:y-max 65
          #:x-min 0
          #:x-label ""
-         #:x-max 5.5
+         #:x-max 5.2
          #:y-label ""
          #:out-file "church-relative-speed.ps")
    
@@ -125,7 +125,7 @@
          #:y-max 1.49 
          #:x-label ""
          #:x-min 0
-         #:x-max 5.5
+         #:x-max 5.2
          #:y-label ""
          #:out-file "church-relative-space.ps")))
 
