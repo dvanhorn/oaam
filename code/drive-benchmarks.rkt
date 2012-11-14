@@ -2,7 +2,7 @@
 
 (define base-num 15)
 (define run-num (make-parameter 5))
-(define num-threads 5)
+(define num-threads 11)
 
 (define (construct-cmd which n file)
   (define path (string->path file))
@@ -82,6 +82,7 @@
   (for* ([n (in-range (run-num))]
          [timeout (in-value (hash-ref known-timeout which (set)))]
          [exhaust (in-value (hash-ref known-timeout which (set)))]
+#;#;
          #:unless (or (set-member? timeout file)
                       (set-member? exhaust file)))
     (printf "Running ~a (count ~a): ~a~%" which n file)
