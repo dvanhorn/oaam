@@ -21,7 +21,8 @@
          (~optional (~seq #:fixpoint fixpoint:expr)
                     #:defaults ([fixpoint #'fix]))
          (~once (~seq #:aval aval:id)) ;; name the evaluator to use/provide
-         (~once (~seq #:ans ans:id)) ;; name the answer struct to use/provide
+         (~optional (~seq #:ans ans:id)  ;; name the answer struct to use/provide
+                    #:defaults ([ans (generate-temporary #'ans)]))
          (~optional (~seq #:touches touches:id)) ;; Touch relation specialized for clos
          ;; Analysis strategies flags (requires the right parameters too)
          (~optional (~and #:compiled compiled?))
@@ -45,7 +46,8 @@
                          (~and #:set-monad set-monad?)))) ...)
      #:do [(define-syntax-rule (given kw) (syntax? (attribute kw)))
            (define-syntax-rule (implies ante concl) (if ante concl #t))
-           (define σ-threading? (or (given σ-passing?) (given σ-∆s?)))
+           (define σ-passing?* (or (given σ-passing?) (given σ-∆s?)))
+           (define σ-threading? (and (given wide?) σ-passing?*))
            (define c-passing? (given set-monad?))]
      #:fail-unless (implies (given global-σ?) (given wide?))
      "Cannot globalize narrow stores."
@@ -62,7 +64,7 @@
                    ;; represent rσ explicitly in all states?
                    [(σ-op ...) (if (given wide?) #'() #'(rσ))]
                    ;; explicitly pass σ/∆ to compiled forms?
-                   [(σ-gop ...) (if σ-threading? #'(gσ) #'())]
+                   [(σ-gop ...) (if σ-passing?* #'(gσ) #'())]
                    ;; If rσ not part of state and not global, it is passed
                    ;; in as (cons rσ state), so expand accordingly.
                    [(expander-flags ...)
@@ -84,7 +86,8 @@
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([v #:in-delay ev-σ (lookup-env ρ x)])
                     (yield (co ev-σ k v)))
-                  ;; Needed for strict/compiled, but for lazy this is an unnecessary state
+                  ;; Needed for strict/compiled, but for lazy this introduces
+                  ;; an unnecessary administrative reduction.
                   #;
                   (do (ev-σ) ()
                     (yield (dr ev-σ k (lookup-env ρ x)))))]
@@ -363,7 +366,7 @@
 
            #,@compile-def
 
-           (define-syntax mk-prims (mk-mk-prims #,(given global-σ?) #,σ-threading?
+           (define-syntax mk-prims (mk-mk-prims #,(given global-σ?) #,σ-passing?*
                                                 #,(given σ-∆s?) #,(given compiled?)
                                                 #,(attribute K)))
            (mk-prims prim-meaning compile-primop co clos? rlos?)

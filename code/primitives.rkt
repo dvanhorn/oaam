@@ -732,12 +732,12 @@
 
 (mk-static-prims primitive? changes-store? reads-store?)
 
-(define-for-syntax ((mk-mk-prims global-σ? σ-threading? σ-∆s? compiled? K) stx)
+(define-for-syntax ((mk-mk-prims global-σ? σ-passing? σ-∆s? compiled? K) stx)
   (syntax-parse stx
     [(_ mean:id compile:id co:id clos?:id rlos?:id)
      (quasisyntax/loc stx
        (mk-primitive-meaning
-        #,global-σ? #,σ-threading? #,σ-∆s? #,compiled? #,(= K 0)
+        #,global-σ? #,σ-passing? #,σ-∆s? #,compiled? #,(= K 0)
         mean compile co #,@(prim-defines #'clos? #'rlos? (= K +inf.0)) 
         #,prim-table))]))
 
