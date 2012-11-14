@@ -138,8 +138,9 @@ feasible implementation of an abstract-machine-based analyzer.
 \vspace{-1.5em}
 \end{center}
 \caption{Relative improvements over the baseline analyzer for the
-  Vardoulakis and Shivers benchmark in terms of peak memory usage, the
-  rate of state transitions, and total analysis time.}
+  \Church{} benchmark in terms of peak memory usage, the rate of state
+  transitions, and total analysis time. Each point is marked with the
+  section that introduces the optimization.}
 \label{fig:churchtime}
 \end{figure}
 
@@ -154,10 +155,9 @@ analyzer for a realistic untyped, higher-order imperative language
 with a number of interesting features.
 
 At each step during the initial development, we evaluate the
-implementation on an example, shown in figure~\ref{fig:church}, taken
-from the flow analysis literature~\cite{dvanhorn:Vardoulakis2011CFA2}
-that tests distributivity of multiplication over addition on Church
-numerals.
+implementation on a benchmark from Vardoulakis and
+Shivers~\cite{dvanhorn:Vardoulakis2011CFA2} that tests distributivity
+of multiplication over addition on Church numerals.
 %% \footnote{It is
 %%   written here using Scheme notation and makes use of the shorthands:
 %% %

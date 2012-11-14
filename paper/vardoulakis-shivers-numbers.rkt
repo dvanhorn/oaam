@@ -78,6 +78,30 @@
             (/ (vector-avg (numbers-state-rate (hash-ref bench-timing key)))
                baseline-rate))))
  
+(define (sec->anchor l)
+  (case l
+    (("§4") 'bottom-left)
+    (("§5.4" "§5.5") 'top)
+    (else 'bottom)))
+
+(define (sec-mem->anchor l)
+  (case l
+    (("§4") 'bottom-left)
+    (else 'top)))    
+
+(define sections
+  (list "§4"
+        "§5.1"
+        "§5.2"
+        "§5.3"
+        "§5.4"
+        "§5.5"))
+
+(define (sec-labels sec->anchor data)
+  (map (λ (v l) (point-label v l #:anchor (sec->anchor l) #:point-size 12))
+       data
+       sections))
+
 (parameterize ([plot-x-ticks  no-ticks]
                [plot-font-size 30]
                [plot-width (* (plot-width) 2)]
@@ -86,7 +110,7 @@
    (plot (list
           (lines rel-time-data #:color 2 #:width 4 
                  #:label "Total analysis time")
-          (points rel-time-data #:color 1 #:line-width 2))
+          (sec-labels sec->anchor rel-time-data))
          #:y-min -25 
          #:y-max 270
          #:x-label ""
@@ -98,7 +122,7 @@
    (plot (list
           (lines rel-states-per-sec-data #:color 6 #:width 4
                  #:label "Rate of state transitions")
-          (points rel-states-per-sec-data #:color 5 #:line-width 2))
+          (sec-labels sec->anchor rel-states-per-sec-data))
          #:y-min -9
          #:y-max 65
          #:x-min 0
@@ -110,7 +134,7 @@
    (plot (list
           (lines rel-mem-data #:color 4 #:width 4
                  #:label "Peak memory")
-          (points rel-mem-data #:color 3 #:line-width 2))
+          (sec-labels sec-mem->anchor rel-mem-data))
          #:y-min 1
          #:y-max 1.49 
          #:x-label ""
