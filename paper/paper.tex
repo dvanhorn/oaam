@@ -10,6 +10,11 @@
 
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}{Lemma}
+
+\newcommand{\naive}{na\"ive}
+\newcommand{\naively}{na\"ively}
+\newcommand{\Naive}{Na\"ive}
+\newcommand{\Naively}{Na\"ively}
 % \usepackage{xltxtra}
 % \setmonofont[Scale=MatchLowercase]{DejaVu Sans Mono}
 %
@@ -48,7 +53,7 @@ languages with features widely considered difficult to analyze.
 Although analyzers are straightforward to build under this approach,
 the result is prohibitively inefficient.
 
-This article contributes a step by step process for going from a naive
+This article contributes a step by step process for going from a \naive
 analyzer derived under the abstracting abstract machine approach, to
 an efficient program analyzer.  The end result of the process is a two
 to three order-of-magnitude improvement over the systematically
@@ -597,14 +602,14 @@ Internally, this global transfer function computes the successors of all supplie
 \begin{equation*}
   F_{\varsigma_0}(S) = \{ \varsigma_0 \} \cup \{ \varsigma' \mathrel{|} \varsigma \in S \text{ and } \varsigma \machstep \varsigma' \}\text. 
 \end{equation*}
-Then, the evaluator for the analysis computes the least fixed point of the global transfer function:
+Then, the evaluator for the analysis computes the least fixed-point of the global transfer function:
 \begin{equation*}
  \eval(e) = \mathrm{lfp}(F_{\varsigma_0})\text{,}
 \end{equation*}
 where $\varsigma_0 = \ev[^\mtcntr]{e, \varnothing, \varnothing, \kmt}$.
 
 
-To conduct this naive exploration on the \Church{} example would require
+To conduct this \naive exploration on the \Church{} example would require
 considerable time.  Even though the state space is finite, it is exponential in
 the size of the program.  Even with $k = 0$, there are exponentially many
 stores in the AAM framework.
@@ -1115,7 +1120,7 @@ will explain a less precise allocation strategy from uniform $k$-CFA
 that we use for large compound data literals that we modified from the
 implementation in \citep{dvanhorn:wright-jagannathan-toplas98}.
 
-\subsubsection{Na\"ively}
+\subsubsection{\Naively}
 
 The uniform way AAM approaches a simple abstraction strategy is to cut
 recursion out of the data definition by tying the recursive knot
@@ -1140,7 +1145,7 @@ even in our fastest implementation, this abstraction causes the
 analysis of Boyer to be 430 times slower than the approach we will now
 describe.
 
-\subsubsection{Less na\"ively and less precisely}
+\subsubsection{Less \naively and less precisely}
 
 The number of syntactic uses of {\tt cons} versus implicit uses via
 literal lists is smaller in typical Scheme programs. We use the above
