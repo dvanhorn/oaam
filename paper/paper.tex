@@ -171,9 +171,10 @@ setting of a core functional language.  This allows us to explicate
 the optimizations with a minimal amount of inessential technical
 overhead.  In the second half, we scale this approach up to an
 analyzer for a realistic untyped, higher-order imperative language
-with a number of interesting features.
+with a number of interesting features and then measure
+improvements across a suite of benchmarks.
 
-At each step during the initial development, we evaluate the
+At each step during the initial presentation and development, we evaluate the
 implementation on a benchmark from Vardoulakis and
 Shivers~\cite{dvanhorn:Vardoulakis2011CFA2} that tests distributivity
 of multiplication over addition on Church numerals.
@@ -189,7 +190,8 @@ of multiplication over addition on Church numerals.
 %% \begin{alltt}
 %%    \church{n} \(\equiv\) (\(\lambda\) (s) (\(\lambda\) (z) (s\(\subscript1\) (s\(\subscript2\) ... (s\(\subscript{n}\) z)))))
 %% \end{alltt}}
-The example, while small, is informative:
+For the step-by-step development, 
+this benchmark is particularly informative:
 \begin{enumerate}
 \item it can be written in most modern programming languages,
 %
