@@ -132,10 +132,14 @@ feasible implementation of an abstract-machine-based analyzer.
 
 \begin{figure}[t]
 \begin{center}
-\includegraphics[width=2.5in]{rel-time-church.ps}
+\includegraphics[width=3.2in]{church-relative-space.ps}
+\includegraphics[width=3.2in]{church-relative-speed.ps}
+\includegraphics[width=3.2in]{church-relative-time.ps}
+\vspace{-1.5em}
 \end{center}
-\caption{Relative run-time of
-optimized analyzers to baseline for Church numeral example.}
+\caption{Relative improvements over the baseline analyzer for the
+  Vardoulakis and Shivers benchmark in terms of peak memory usage, the
+  rate of state transitions, and total analysis time.}
 \label{fig:churchtime}
 \end{figure}
 
@@ -198,46 +202,46 @@ nearly a factor of 500, dropping the analys time to a fraction of a
 second.  Figure~\ref{fig:churchtime} shows the step-wise improvement
 of the analysis time for this example.
 
-\newcommand{\church}[1]{\(\ulcorner{\tt #1}\urcorner\)}
-\begin{figure}
-\hrule
-\vspace{2mm}
-\begin{alltt}
-(define (zero? n) ((n (\(\lambda\) (zx) #f)) #t))
-(define (((mult m1) m2) mf) (m2 (m1 mf)))
-(define ((((plus p1) p2) pf) x)
-  ((p1 pf) ((p2 pf) x)))
+%% \newcommand{\church}[1]{\(\ulcorner{\tt #1}\urcorner\)}
+%% \begin{figure}
+%% \hrule
+%% \vspace{2mm}
+%% \begin{alltt}
+%% (define (zero? n) ((n (\(\lambda\) (zx) #f)) #t))
+%% (define (((mult m1) m2) mf) (m2 (m1 mf)))
+%% (define ((((plus p1) p2) pf) x)
+%%   ((p1 pf) ((p2 pf) x)))
 
-(define (((pred n) rf) rx)
-  (((n (\(\lambda\) (g) (\(\lambda\) (h) (h (g rf)))))
-    (\(\lambda\) (ignored) rx))
-   (\(\lambda\) (id) id)))
+%% (define (((pred n) rf) rx)
+%%   (((n (\(\lambda\) (g) (\(\lambda\) (h) (h (g rf)))))
+%%     (\(\lambda\) (ignored) rx))
+%%    (\(\lambda\) (id) id)))
 
-(define ((church=? e1) e2)
-  (if (zero? e1) (zero? e2)
-      (if (zero? e2) #f
-          ((church=? (pred e1)) (pred e2)))))
+%% (define ((church=? e1) e2)
+%%   (if (zero? e1) (zero? e2)
+%%       (if (zero? e2) #f
+%%           ((church=? (pred e1)) (pred e2)))))
 
-;; multiplication distributes over addition
-((church=? ((mult \church2) ((plus \church1) \church3)))
- ((plus ((mult \church2) \church1)) ((mult \church2) \church3)))
-\end{alltt}
-\caption{Church-numeral calculation}
-\label{fig:church}
-\end{figure}
+%% ;; multiplication distributes over addition
+%% ((church=? ((mult \church2) ((plus \church1) \church3)))
+%%  ((plus ((mult \church2) \church1)) ((mult \church2) \church3)))
+%% \end{alltt}
+%% \caption{Church-numeral calculation}
+%% \label{fig:church}
+%% \end{figure}
 
 \begin{figure}[t]
-\hrule
-\vspace{2mm}
-\begin{alltt}
-(define (id x) x)
-(define (f n)
-  (if (<= n 1) 1 (* n (f (- n 1)))))
-(define (g n)
-  (if (<= n 1) 1 (+ (* n n) (g (- n 1)))))
-(print (+ ((id f) 3) ((id g) 4)))
-\end{alltt}
-\hrule
+%% \hrule
+%% \vspace{2mm}
+%% \begin{alltt}
+%% (define (id x) x)
+%% (define (f n)
+%%   (if (<= n 1) 1 (* n (f (- n 1)))))
+%% (define (g n)
+%%   (if (<= n 1) 1 (+ (* n n) (g (- n 1)))))
+%% (print (+ ((id f) 3) ((id g) 4)))
+%% \end{alltt}
+%% \hrule
 \begin{center}
 \begin{tabular}{ccc}
 \raisebox{1ex-\height}{
@@ -320,7 +324,7 @@ three orders of magnitude.
 Section~\ref{sec:related} relates this work to the literature and
 section~\ref{sec:conclusion} concludes.
 
-\newpage
+%\newpage
 \section{An abstract$^{\text 2}$ machine for ISWIM}
 \label{sec:aam}
 

@@ -66,36 +66,70 @@
 (define rel-time-data
   (for/list ([(key desc) (in-pairs algo-name)]
              [n (in-naturals)])
-    (vector n #;key #;desc (/ baseline-time 
-                              (vector-avg (numbers-run (hash-ref ct key)))))))
+    (vector n 
+            (/ baseline-time 
+               (vector-avg (numbers-run (hash-ref ct key)))))))
  
 (define rel-mem-data
   (for/list ([(key desc) (in-pairs algo-name)]
              [n (in-naturals)])
-    (vector n #;key #;desc (/ baseline-mem 
-                              (vector-avg (numbers-peak-mem (hash-ref ct key)))))))
+    (vector n 
+            (/ baseline-mem 
+               (vector-avg (numbers-peak-mem (hash-ref ct key)))))))
  
 
 (define rel-states-per-sec-data
   (for/list ([(key desc) (in-pairs algo-name)]
              [n (in-naturals)])
-    (vector n #;key #;desc (/ (vector-avg (numbers-state-rate (hash-ref ct key)))
-                              baseline-rate))))
+    (vector n 
+            (/ (vector-avg (numbers-state-rate (hash-ref ct key)))
+               baseline-rate))))
  
 
 (require plot)
-(define data
-  (list #(0 0) #(15 0.6) #(30 9.5) #(45 10.0) #(60 16.6)
-            #(75 41.6) #(90 42.7) #(105 65.5) #(120 78.9)
-            #(135 78.9) #(150 131.1) #(165 151.1) #(180 176.2)))
-(plot (list
-       (lines rel-time-data #:color 2 #:width 2 #:label "Speedup")
-       (points rel-time-data #:color 1 #:line-width 2)
-       #;(lines rel-mem-data #:color 4 #:width 2 #:label "Memory")
-       #;(points rel-mem-data #:color 3 #:line-width 2)
-       (lines rel-states-per-sec-data #:color 6 #:width 2 #:label "Rate")
-       (points rel-states-per-sec-data #:color 5 #:line-width 2))
-      #:y-min 1 #:x-label "Optimiziation")
 
+(parameterize ([plot-x-ticks  no-ticks]
+               [plot-font-size 30]
+               [plot-width (* (plot-width) 2)]
+               [plot-height (quotient (plot-height) 2)])
+  (list 
+   (plot (list
+          (lines rel-time-data #:color 2 #:width 2 
+                 #:label "Total analysis time")
+          (points rel-time-data #:color 1 #:line-width 2))
+         #:y-min -25 
+         #:y-max 270
+         #:x-label ""
+         #:x-min 0
+         #:x-max 5.5
+         #:y-label "" #;"Factor improvement over baseline"
+         #:out-file "church-relative-time.ps")
+   
+   (plot (list
+          (lines rel-states-per-sec-data #:color 6 #:width 2
+                 #:label "Rate of state transitions")
+          (points rel-states-per-sec-data #:color 5 #:line-width 2))
+         #:y-min -9
+         #:y-max 65
+         #:x-min 0
+         #:x-label ""
+         #:x-max 5.5
+         #:y-label ""
+         #:out-file "church-relative-speed.ps")
+   
+   (plot (list
+          (lines rel-mem-data #:color 4 #:width 2
+                 #:label "Peak memory")
+          (points rel-mem-data #:color 3 #:line-width 2))
+         #:y-min 1
+         #:y-max 1.49 
+         #:x-label ""
+         #:x-min 0
+         #:x-max 5.5
+         #:y-label ""
+         #:out-file "church-relative-space.ps")))
 
-discrete-histogram
+  
+  
+  
+  

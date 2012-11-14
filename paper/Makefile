@@ -4,7 +4,8 @@ WGETDVANHORNBIB=curl -o dvanhorn.bib "http://www.citeulike.org/bibtex/user/dvanh
 
 WGETIANJBIB=curl -o ianj.bib "http://www.citeulike.org/bibtex/user/ianjohnson?fieldmap=posted-at:date-added&do_username_prefix=1&key_type=4&fieldmap=url:x-url&fieldmap=doi:x-doi&fieldmap=address:x-address&fieldmap=isbn:x-isbn&fieldmap=issn:x-issn&fieldmap=month:x-month&fieldmap=comment:comment&fieldmap=booktitle:booktitle&fieldmap=abstract:x-abstract&fieldmap=pages:pages&volume:volume"
 
-default: introspective-base.pdf introspective-lazy.pdf introspective-lazyc.pdf
+default: introspective-base.pdf introspective-lazy.pdf introspective-lazyc.pdf \
+	 church-relative-space.ps church-relative-time.ps church-relative-speed.ps
 	xelatex $(CURRENT)
 
 refresh: getbib
@@ -30,6 +31,15 @@ introspective-lazy.pdf: introspective-lazy.dot
 
 introspective-lazyc.pdf: introspective-lazyc.dot
 	dot -Tpdf introspective-lazyc.dot -o introspective-lazyc.pdf
+
+church-relative-speed.ps: vardoulakis-shivers-numbers.rkt
+	racket vardoulakis-shivers-numbers.rkt
+
+church-relative-time.ps: vardoulakis-shivers-numbers.rkt
+	racket vardoulakis-shivers-numbers.rkt
+
+church-relative-space.ps: vardoulakis-shivers-numbers.rkt
+	racket vardoulakis-shivers-numbers.rkt
 
 #%.pdf: %.dvi
 #	dvipdfm -o $(basename $@).pdf $(basename $@).dvi
