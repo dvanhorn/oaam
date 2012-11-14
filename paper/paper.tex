@@ -1042,18 +1042,18 @@ change is straightforward.
 The current state of the state-space search now has six components:
 
 \begin{itemize}
- \item{{\tt $\msto$}, the store}
+ \item{$\msto$, the store}
  \item{{\tt todo}, the workset}
  \item{{\tt seen}, a map from states to the timestamps at which they were last seen}
- \item{{\tt $\msdiff$}, the store changes for the current step}
- \item{{\tt $\msdiff$?}, a boolean tracking whether the stepped state contributed a store change}
+ \item{$\msdiff$, the store changes for the current step}
+ \item{$\changep$, a boolean tracking whether the stepped state contributed a store change}
  \item{{\tt T}, the timestamp of the store}
 \end{itemize}
 
 The new $eval$ calculation is defined in
 figure~\ref{fig:imperative}.  To ensure termination, we guard adding
 $c$ to {\tt todo} by the following check:
-\begin{align*}\msdiff\mbox{{\tt ?}} \vee {\tt seen}(c) \neq {\tt T}\end{align*}
+\begin{align*}\changep \vee {\tt seen}(c) \neq {\tt T}\end{align*}
 If it succeeds, {\tt todo} gets $c$ and we update {\tt seen} to map $c$ to {\tt T}.
 
 After all steps complete, we apply $\msdiff$ to $\msto$ imperatively
@@ -1063,7 +1063,7 @@ know that each $\ttuple{\maddr}{\mval{s}}$ in $\msdiff$ would change
 the value of $\maddr$ in the current store. Thus, we also guard
 additions to $\msdiff$ so that only updates that would change the
 store are permitted. Each time $\msdiff$ is successfully extended, we
-set {\tt $\msdiff$?} to true. Before each individual step, we set it
+set $\changep$ to true. Before each individual step, we set it
 to false.
 
 \begin{figure}
@@ -1076,7 +1076,7 @@ eval(\(e\)) :=
     else:
       let old := todo
       todo, \(\msdiff\) := \(\varnothing\), \(\mtlst\)
-      foreach c \(\in\) old: \(\msdiff\)? := false; c()
+      foreach c \(\in\) old: \(\changep\) := false; c()
       unless \(\msdiff\) = \(\mtlst\): T += 1; replay!(\(\msdiff, \msto\))
 \end{alltt}
 \caption{Imperative algorithm}
