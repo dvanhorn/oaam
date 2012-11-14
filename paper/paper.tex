@@ -782,18 +782,20 @@ delayed lookup of $\maddr$. This acts to quotient the state space by
 the values at the delayed address. The following rules highlight the
 changes to the semantics:
 
+\renewcommand{\ext}{\mathit{ext}}
+
 \begin{align*}
-force &: \Store \times \Addr \to \Set(\Value) \\
-force(\msto,\saddr\maddralt) &= \msto(\maddralt)\\
-force(\msto,\mval) &= \{\mval\} \\
-ext(\msto, \maddr, \mval) &= \msto \sqcup[\maddr \mapsto force(\msto, \mval)] \\
+\force &: \Store \times \Addr \to \Set(\Value) \\
+\force(\msto,\saddr\maddralt) &= \msto(\maddralt)\\
+\force(\msto,\mval) &= \{\mval\} \\
+\ext(\msto, \maddr, \mval) &= \msto \sqcup[\maddr \mapsto \force(\msto, \mval)] \\
 \ev{\svar{\mvar},\menv,\mkont,\msto} &\machstep\;
 \co{\mkont,\saddr{\menv(\mvar)},\msto} \\
 \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto}
 &\machstep\;
-\ev[^\mcntr]{\mexp,\menv,ext(\msto, \maddr^f,\mval),\kfn[^\mcntr_\mlab]{\maddr^f,\maddr}} \\
+\ev[^\mcntr]{\mexp,\menv,\ext(\msto, \maddr^f,\mval),\kfn[^\mcntr_\mlab]{\maddr^f,\maddr}} \\
 \mathit{bind\,}^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
-  \maddr], ext(\msto,\maddr, \mval), \mcntr' \\
+  \maddr], \ext(\msto,\maddr, \mval), \mcntr' \\
 \mbox{where } \mcntr' &= \lfloor\mlab\mcntr\rfloor_k \\
               \maddr &= \mvar\mcntr'
 \end{align*}
@@ -977,7 +979,7 @@ that lookups are possible. Example rule:
 \text{ where }\menv',\msdiff',\mcntr' &= \mathit{bind\,}^{ \mcntr}_\mlab(\menv,\msto,\msdiff,\mvar,\mval)
 \end{align*}
 \begin{align*}
-bind^{\mcntr}_\mlab(\menv, \msto, \msdiff, \mvar, \mval) &= \menv[\mvar \mapsto \maddr], \cons{\ttuple{\maddr}{force(\msto,\mval)}}{\msdiff}, \mcntr' \\
+\mathit{bind\,}^{\mcntr}_\mlab(\menv, \msto, \msdiff, \mvar, \mval) &= \menv[\mvar \mapsto \maddr], \cons{\ttuple{\maddr}{\force(\msto,\mval)}}{\msdiff}, \mcntr' \\
 \text{ where } \mcntr' &= \lfloor \mlab \mcntr\rfloor_k \\
                \maddr &= \mvar\mcntr'
 \end{align*}
