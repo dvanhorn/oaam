@@ -1214,23 +1214,7 @@ the baseline, the optimized analyzer outperformed the baseline by a
 factor of 475 to 4,382.
 
 \begin{figure}
-\begin{tabular}{@{}l|r|r|r|r|r|r|r@{}}
-Program & LOC
-& \multicolumn{2}{c|}{Time (ms)}
-& \multicolumn{2}{c|}{Space (mb)}
-& \multicolumn{2}{c@{}}{Speed (state/sec)}
-\\
-\hline\hline
-nucleic &  3508 & 0 & 0 & 0 & 0 & 0 & 0\\
-matrix  &  747  & ? & ? & ? & ? & ? & ?\\
-nbody   & 1434  & ? & ? & ? & ? & ? & ?\\
-earley  &  667  & ? & ? & ? & ? & ? & ?\\
-maze    &  681  & ? & ? & ? & ? & ? & ?\\
-church  &   41  & ? & ? & ? & ? & ? & ?\\
-lattice &  214  & ? & ? & ? & ? & ? & ?\\
-boyer   &  642  & ? & ? & ? & ? & ? & ?\\
-mbrotz  &   68  & ? & ? & ? & ? & ? & ?
-\end{tabular}
+\include{bench-overview}
 \caption{Overview performance comparison between baseline and
   optimized analyzer.}
 \label{fig:bench-overview}
