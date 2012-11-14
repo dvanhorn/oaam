@@ -1,5 +1,5 @@
 #lang racket
-(require plot "proctime.rkt" #;"procmem.rkt")
+(require plot "proctime.rkt" "../code/notation.rkt")
 
 (define (average v) ;; 'unset means no average
   (and (number? (vector-ref v 0))
@@ -57,3 +57,53 @@
                [interval-line1-color "black"]
                [interval-line2-color "black"])
   (p))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Generate numbers tabular (Program, LOC, Time (ms), Space (mb), Speed (states/sec)
+(require (submod "../code/drive-benchmarks.rkt" data))
+
+(define (file->name s)
+  (define path (string->path s))
+  (define-values (base filename dir?) (split-path path))
+  (path->string (path-replace-suffix filename "")))
+(define (loc f)
+  (with-input-from-file f
+    (λ ()
+       (for/sum ([l (in-port read-line)]) #:break (eq? l 'eof) 1))))
+(define (entry name fn n)
+  (match (average (fn n))
+    [#f (cond [(vector-ref (numbers-timeout? n) 0)
+               "t"]
+              [(vector-ref (numbers-exhaust? n) 0)
+               "m"]
+              [else (error 'bench-overview "No numbers, timeout or oom!: ~a" name)])]
+    [n (number->string (inexact->exact (truncate n)))]))
+
+(define files (list nucleic matrix nbody earley maze church lattice boyer mbrotZ))
+(define comparisons (list numbers-run numbers-peak-mem numbers-state-rate))
+(define algos (list "sp" "pd"))
+
+(with-output-to-file "bench-overview.tex" #:mode 'text #:exists 'replace
+  (λ ()
+     (printf "\\begin{tabular}{@{}l|r|r|r|r|r|r|r@{}}~%")
+     (printf "Program & LOC~%")
+     (printf "& \\multicolumn{2}{c|}{Time (ms)}~%")
+     (printf "& \\multicolumn{2}{c|}{Space (mb)}~%")
+     (printf "& \\multicolumn{2}{c@{}}{Speed (state/sec)}~%")
+     (printf "\\\\~%")
+     (printf "\\hline\\hline~%")
+     (printf
+      (string-join
+       (for/list ([file files])
+         (define name (file->name file))
+         (define numbers (hash-ref timings name))
+         (format "~a & ~a & ~a"
+                 name
+                 (loc file)
+                 (string-join
+                  (for/append ([fn comparisons])
+                    (for/list ([algo algos])
+                      (entry `(,name ,algo) fn (hash-ref numbers algo))))
+                  " & ")))
+       " \\\\~%"))
+     (printf "~%\\end{\\tabular}~%")))

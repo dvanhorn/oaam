@@ -28,6 +28,8 @@
    ;;"../benchmarks/toplas98/handle.scm" ;; old match and defmacro
    ))
 
+(module+ data (provide church mbrotZ earley boyer graphs lattice matrix maze nbody nucleic to-test))
+
 (define baseline "bl")
 (define specialized "sp")
 (define lazy "ls")
@@ -95,12 +97,13 @@
            (define-values (this rest) (split-at w even))
            (loop rest (cons this per-thread) (add1 thread-num))])))
 
-(define running-threads
-  (let ([distributed (distribute-threads
-                      (for*/list ([file (in-list to-test)]
-                                  [which (reverse which-analyses)])
-                        (cons which file)))])
-  (for/list ([work-for-thread distributed])
-    (thread (λ () (for ([work (in-list work-for-thread)])
-                    (run (car work) (cdr work))))))))
-(for ([w running-threads]) (thread-wait w))
+(module+ main
+  (define running-threads
+    (let ([distributed (distribute-threads
+                        (for*/list ([file (in-list to-test)]
+                                    [which (reverse which-analyses)])
+                          (cons which file)))])
+      (for/list ([work-for-thread distributed])
+        (thread (λ () (for ([work (in-list work-for-thread)])
+                        (run (car work) (cdr work))))))))
+  (for ([w running-threads]) (thread-wait w)))
