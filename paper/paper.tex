@@ -11,10 +11,10 @@
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}{Lemma}
 
-\newcommand{\naive}{na\"ive}
-\newcommand{\naively}{ na\"ively}
-\newcommand{\Naive}{Na\"ive}
-\newcommand{\Naively}{Na\"ively}
+\newcommand{\naive}{naive}
+\newcommand{\naively}{naively}
+\newcommand{\Naive}{Naive}
+\newcommand{\Naively}{Naively}
 % \usepackage{xltxtra}
 % \setmonofont[Scale=MatchLowercase]{DejaVu Sans Mono}
 %
@@ -45,17 +45,17 @@
 \maketitle
 
 \begin{abstract}
-Abstracting abstract machines has recently been proposed as a
+Abstracting abstract machines has been proposed as a
 lightweight approach to designing sound and computable program
-analyses.  The approach involves deriving abstract interpreters from
+analyses.  The approach derives abstract interpreters from
 existing machine semantics and has been applied to a variety of
 languages with features widely considered difficult to analyze.
-Although analyzers are straightforward to build under this approach,
-the result is prohibitively inefficient.
+Although sound analyzers are straightforward to build under this approach,
+they are also prohibitively inefficient.
 
-This article contributes a step by step process for going from a
-\naive analyzer derived under the abstracting abstract machine
-approach, to an efficient program analyzer.  The end result of the
+This article contributes a step-by-step process for going from a
+\naive{} analyzer derived under the abstracting abstract machine
+approach to an efficient program analyzer.  The end result of the
 process is a two to three order-of-magnitude improvement over the
 systematically derived analyzer, making it competitive with
 hand-optimized implementations that compute fundamentally less precise
@@ -676,7 +676,7 @@ In effect, the new store is computed as the least upper bound of all subsequent 
 The final approximation we make to get to our point of departure is
 store-allocating results of application sub-expressions. 
 The AAM approach stops at the previous optimization. 
-However, the $\kfn{}$ continuation stores a value, and this makes the space of
+However, the {\tt fn} continuation stores a value, and this makes the space of
 continuations quadratic rather than linear in the size of the program---even for a monovariant analysis like 0CFA.
 Having the space of continuations grow linearly with the size of the program 
 will drop the overall complexity to cubic (as expected).
@@ -883,10 +883,11 @@ makes the following transitions:
 \co{\kar{\mexp_1,\menv},\mval,\msto_4} % {\mexp_1}{\mexp_2}
 \mbox{ where } \mval \in \msto(\menv(\maddr))
 \end{align}
+where \(
+\msto_4 = \msto_0 \sqcup \{ [\maddr_1 \mapsto \{ \mkont \}],
+[\maddr_2 \mapsto \kar{\mexp_3,\menv,\maddr_1}],
+[\maddr_3 \mapsto \kar{\mexp_2,\menv,\maddr_2}]\).
 
-where $\msto_4 = \msto_0 \sqcup \{ [\maddr_1 \mapsto \{ \mkont \}],
-[\maddr_2 \mapsto \kar{\mexp_3,\menv,\maddr_1}]
-[\maddr_3 \mapsto \kar{\mexp_2,\menv,\maddr_2}]$.
 
 The compilation step converts expressions into functions that expect
 the other components of the {\tt ev} state. Its definition in figure
@@ -922,9 +923,12 @@ the other components of the {\tt ev} state. Its definition in figure
 \end{figure}
 
 \begin{figure}
+\begin{gather*}
 \begin{align*}
 \mathit{eval}(\mexp) &= \{ \mstate\ |\ \compile{\mexp}(\epsilon,\varnothing,\varnothing,\kmt) \multimachstep \mstate \} \text{ where }
+\end{align*}
 \\[2mm]
+\begin{align*}
 %% CONTINUE
 \co{\kmt,\mval,\msto} &\machstep
 \ans{\msto,\mval}
@@ -954,7 +958,8 @@ the other components of the {\tt ev} state. Its definition in figure
 \text{ where }\mkont &\in\msto(\maddr)
 \text{ and } \mval'\in\interpdelta(\mop,\mval)
 \end{align*}
-\caption{Abstract$^2$ machine for compiled ISWIM}
+\end{gather*}
+\caption{Abstract abstract machine for compiled ISWIM}
 \label{fig:caam}
 \end{figure}
 
@@ -1241,14 +1246,6 @@ There are a few steps to consider:
 \caption{Quoted list primitive}
 \label{fig:qlist}
 \end{figure}
-
-\paragraph{Mutable literal data}
-The Scheme we model is nonstandard in that it has immutable literal
-data (the Scheme benchmarks did not mutate their literal data). To
-support mutable literal data, abstract values like {\tt QPair} would
-be like regular conses, only point to a preallocated pair of addresses
-that hold {\tt QData} as well. This is because conses can be mutated
-to hold any value, not just quoted data.
 
 \section{Evaluation}
 \label{sec:eval}
