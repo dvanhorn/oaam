@@ -1176,7 +1176,7 @@ simpler semantics.
 There are a few steps to consider:
 \begin{itemize}
  \item{Define special value lattice elements for compound data domains that can be quoted
-       (e.g. {\tt QPair} for $\left\{ ({\tt cons} a_i d_i)\right\}_i$, {\tt QVector} for immutable vectors, etc.)}
+       (e.g. {\tt QPair} for $\left\{ ({\tt cons}\ a_i\ d_i)\right\}_i$, {\tt QVector} for immutable vectors, etc.)}
  \item{Define a ``larger'' value lattice element for all quotable data, {\tt QData}}
  \item{Interpret {\tt (quote (a ...))} as {\tt (qlist a ...)}, a new primitive function defined in figure \ref{fig:qlist},
        and similar definitions for immutable vectors.}
