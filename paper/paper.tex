@@ -681,16 +681,18 @@ continuations quadratic rather than linear in the size of the program---even for
 Having the space of continuations grow linearly with the size of the program 
 will drop the overall complexity to cubic (as expected).
 
-To achieve this linearity for continuation, we allocate an address for the value position
-when we create the continuation.  This address and the tail address
-are both determined by the label of the application point, so the
-space becomes linear and the overall complexity drops to cubic. 
-This is a critical abstraction in languages with $n$-ary functions,
-since otherwise the continuation space grows super-exponentially.
+To achieve this linearity for continuations, we allocate an address
+for the value position when we create the continuation.  This address
+and the tail address are both determined by the label of the
+application point, so the space becomes linear and the overall
+complexity drops to cubic.  This is a critical abstraction in
+languages with $n$-ary functions, since otherwise the continuation
+space grows super-exponentially.
 % In theory, this aggressive distinction between continuations might buy
 % additional precision, but in practice, it does not.
 
-The important rules that change are the following, specialized to 0-CFA:
+If we specialize to 0CFA, the evaluation rules become:
+
 
 \newcommand{\ext}[3]{#1\sqcup[#2\mapsto#3]}
 %\newcommand{\ext}[3]{ext(#1,#2,#3)}
@@ -717,12 +719,12 @@ The important rules that change are the following, specialized to 0-CFA:
 \text{ where }& \mval'\in \{\interpdelta(\mop,\mval) \mid \mval \in \msto(\mlab^a)\}
 \end{align*}
 
-This extra store-allocation is effectively naming all intermediate
-results, and thus the precision aligns with an analysis specialized to
-ANF. We can also play a representation trick in 0-CFA and remove
-$\menv$. In monovariant analyses, variables map to themselves, meaning
-$\menv$ is effectively the identity function. That degeneration, in
-turn, allows us to discard it from the analysis.
+% This extra store-allocation is effectively naming all intermediate
+% results, and thus the precision aligns with an analysis specialized to
+% ANF. We can also play a representation trick in 0-CFA and remove
+% $\menv$. In monovariant analyses, variables map to themselves, meaning
+% $\menv$ is effectively the identity function. That degeneration, in
+% turn, allows us to discard it from the analysis.
 
 % Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 
@@ -1073,7 +1075,7 @@ to false.
 \begin{alltt}
 eval(\(e\)) :=
   \(\msto\), todo, seen, T := \(\varnothing\), \(\varnothing\), [], 0
-  \(\compile{e}\)(\(\mtcntr, \varnothing, \varnothing, \kmt\))
+  \(\compile{e}\)(\(\mtcntr, \varnothing, \varnothing, \mtlst, \kmt\))
   while(true):
     if todo = \(\varnothing\): return (keys(seen), \(\msto\))
     else:
