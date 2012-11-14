@@ -1045,28 +1045,25 @@ eval(\(e\)) :=
 \end{figure}
 
 \subsection{Pre-allocating the store}
-Hashes are not the most efficent for raw speed. If we commit to using
-sequential natural numbers for variables and expression labels, by the
-time we finish parsing the input program, we will know exactly how
-many addresses we will need. Thus the store can be represented by a
-vector the size of the largest label (call it $\mlab_{max}$) assigned, plus
-1. The parser should be assigning new, fresh names to variables
-anyway, so this change is a one-liner.
 
-This technique by itself only works in 0-CFA, since there are many
-more addresses that can be allocated in 1-CFA and higher. To support
-general $k$-CFA in a vector representation, we use a growable vector
-and a map from addresses to assigned indices. When assignable indices
-run out, we grow the vector. The cost of this map is less than a hash
-representation for the whole store since typically there are more
-references to an address than allocations of it. This is more
-space-efficient than preallocating $(\mlab_{max}+1)^k$ addresses
-up-front and addressing by the contour converted to polynomial, since
-a majority of combinations of labels will not occur, except in
-pathological programs. The all up-front allocation again breaks down
-when we add compound data, which introduce new kinds of labels
-(e.g. left and right components of a tuple at the contour of
-creation).
+Internally, the algorithm at this stage uses hash tables to model the store.
+%
+This is because stores used to be distributed to all states, which
+required a compact, dynamic representation.
+%
+But, such a dynamic structure isn't necessary when we know the
+structure of the store in advance: we know all possible entries, and
+we know its maximum size.
+
+In a monovariant analysis, the domain of the store is
+exactly the set of expressions in the program.
+%
+If we label each expression with a unique natural, the analysis can
+index directly into the store without a hash or a collision.
+%
+Even for polyvariant analyses, it is possible to compute the maximum
+number of addresses and similarly pre-allocate either the spine of the
+store or (if memory is no concern) the entire store.
 
 \subsection{Abstracting literal compound data}
 
