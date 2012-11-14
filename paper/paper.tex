@@ -194,7 +194,7 @@ interpreter as the baseline for our evaluation.
 
 Section~\ref{sec:opt} gives a series of simple abstractions and
 implementation techniques that, in total, speed up the analysis by
-nearly a factor of 500, dropping the analys time to a fraction of a
+nearly a factor of 500, dropping the analysis time to a fraction of a
 second.  Figure~\ref{fig:churchtime} shows the step-wise improvement
 of the analysis time for this example.
 
@@ -283,7 +283,7 @@ following categories:
 \begin{enumerate}
 \item generate fewer states by avoiding the eager exploration of
   non-deterministic choices that will later collapse into a single
-  join point.  We accompish this by applying lazy evaluation
+  join point.  We accomplish this by applying lazy evaluation
   techniques so that non-determinism is evaluated \emph{by need}.
 
 \item generate fewer states by avoiding unnecessary, intermediate
@@ -292,7 +292,7 @@ following categories:
   in the machine transition system.
 
 \item generate states faster.  We accomplish this by better algorithm
-  design in the fixpoint computation we use to generate state graphs.
+  design in the fixed-point computation we use to generate state graphs.
 \end{enumerate}
 Figure~\ref{fig:state-graphs} shows the effect of (1) and (2) for a
 small example due to Earl, et
@@ -653,20 +653,24 @@ in practice.
 
 The important rules that change are the following, specialized to 0-CFA:
 
+\newcommand{\ext}[3]{#1\sqcup[#2\mapsto#3]}
+%\newcommand{\ext}[3]{ext(#1,#2,#3)}
+
 \begin{align*}
+%ext(\msto, \maddr, s) &= \msto \sqcup [\maddr \mapsto s] \\
 \ev{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &\machstep
-\ev{\mexpi{0},\menv,\msto\sqcup[\mlab \mapsto \{\mkont\}],\kar{\mexpi{1},\mlab}}
+\ev{\mexpi{0},\menv,\ext{\msto}{\mlab}{\{\mkont\}},\kar{\mexpi{1},\mlab}}
 \\
 \co{\kar{\mexp,\menv,\mlab},\mval,\msto} & \machstep
-\ev{\mexp,\menv,\msto\sqcup[\mlab^f \mapsto \{\mval\}],\kfn{\mlab^f,\mlab}}
+\ev{\mexp,\menv,\ext{\msto}{\mlab^f}{\{\mval\}},\kfn{\mlab^f,\mlab}}
 \\
 \co{\kfn{\mlab^f,\mlab},\mval,\msto} & \machstep
-\ap[_\mlab]{\mvalx{u},\mlab^a,\mkont,\msto\sqcup[\mlab^a \mapsto \{\mval\}]}
+\ap[_\mlab]{\mvalx{u},\mlab^a,\mkont,\ext{\msto}{\mlab^a}{\{\mval\}}}
 \\
 \text{ where } &\mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddr^f)
 \\
 \ap[_\mlab]{\clos{\mvar,\mexp,\menv},\mlab^a, \msto,\mkont} & \machstep
-\ev{\mexp,\menv[\mvar\mapsto\mvar],\msto\sqcup[\mvar \mapsto \msto(\mlab^a)],\mkont}
+\ev{\mexp,\menv[\mvar\mapsto\mvar],\ext{\msto}{\mvar}{\msto(\mlab^a)},\mkont}
 \\
 \ap[_\mlab]{\mop,\mlab^a,\msto,\mkont} & \machstep
 \co{\mkont,\mval',\msto}
@@ -741,16 +745,17 @@ the values at the delayed address. The following rules highlight the
 changes to the semantics:
 
 \begin{align*}
-force &: Store \times Addr \to \Set(Value) \\
+force &: \Store \times \Addr \to \Set(\Value) \\
 force(\msto,\saddr\maddralt) &= \msto(\maddralt)\\
-force(\msto,\mval) &= \{\mval\}\\
+force(\msto,\mval) &= \{\mval\} \\
+ext(\msto, \maddr, \mval) &= \msto \sqcup[\maddr \mapsto force(\msto, \mval)] \\
 \ev{\svar{\mvar},\menv,\mkont,\msto} &\machstep\;
 \co{\mkont,\saddr{\menv(\mvar)},\msto} \\
 \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto}
 &\machstep\;
-\ev[^\mcntr]{\mexp,\menv,\msto\sqcup[\maddr^f \mapsto force(\msto,\mval)],\kfn[^\mcntr_\mlab]{\maddr^f,\maddr}} \\
+\ev[^\mcntr]{\mexp,\menv,ext(\msto, \maddr^f,\mval),\kfn[^\mcntr_\mlab]{\maddr^f,\maddr}} \\
 bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
-  \maddr], \msto\sqcup[\maddr \mapsto force(\msto, \mval)], \mcntr' \\
+  \maddr], ext(\msto,\maddr, \mval), \mcntr' \\
 \mbox{where } \mcntr' &= \lfloor\mlab\mcntr\rfloor_k \\
               \maddr &= \mvar\mcntr'
 \end{align*}
@@ -834,7 +839,7 @@ the other components of the {\tt ev} state. Its definition in figure
 
 \begin{figure}
 \begin{align*}
-\compile{\_} &: Expr \to Env \times Store \times Kont \to State \\
+\compile{\_} &: \Expr \to \Env \times \Store \times \Kont \to \State \\
 \compile{\svar\mvar} &= \lambda(\menv,\msto,\mkont) .\co{\mkont,\saddr{\menv(\mvar)},\msto}
 \\
 \compile{\slit\mlit} &= \lambda(\menv,\msto,\mkont) .
@@ -911,15 +916,15 @@ of memory and time. We can instead log store changes and replay the
 change log on the full store after all steps have completed. This uses
 far fewer join operations, leading to less overhead, and is \emph{precision preserving}.
 
-We represent changes as $\msdiff \in Store\msdiff = List[Addr \times
-  \Set(Storeable)]$. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$
+We represent changes as $\msdiff \in \StoreDelta = List[\Addr \times
+  \Set(\Storeable)]$. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$
 instead becomes a log addition
 $\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$ begins
 empty ($\mtlst$) for each step. Applying the changes to the full store
 is straightforward:
 
 \begin{align*}
-replay &: Store\msdiff \times Store \to Store \\
+replay &: \StoreDelta \times \Store \to \Store \\
 replay(\mtlst, \msto) &= \msto \\
 replay(\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}, \msto) &= replay(\msdiff, \msto\sqcup[\maddr \mapsto \mval{s}])
 \end{align*}
@@ -955,7 +960,7 @@ cs^* &= \{c' \mid (c,\msto,\msdiff) \machstep (c',\msdiff^c) \} \\
 \msdiff^* &= concat\{\msdiff^c \mid (c, \msto,\msdiff) \machstep (c', \msdiff^c)\}
 \end{align*}
 
-Here $concat : \Set(Store\msdiff) \to Store\msdiff$ flattens the lists
+Here $concat : \Set(\StoreDelta) \to \StoreDelta$ flattens the lists
 of changes to one; order it appends does not matter:
 \begin{align*}
 concat(\varnothing) &= \mtlst \\
@@ -1088,9 +1093,10 @@ recursion out of the data definition by tying the recursive knot
 through the abstract store. For Scheme, the grammar for values looks
 like the following:
 
-\begin{alltt}
-Value ::= #t | #f | (cons Value Value) | '() | ...
-\end{alltt}
+\newcommand{\alt}{\;\mid\;}
+\begin{align*}
+\Value &::= \mbox{{\tt \#t}} \alt \mbox{{\tt \#f}} \alt \mbox{{\tt(cons $\Value$ $\Value$)}} \alt \mbox{{\tt '()}} \alt ...
+\end{align*}
 
 Upon evaluating a {\tt cons} application, we instead allocate two
 addresses $a$ and $d$, join them to the respective values in the
