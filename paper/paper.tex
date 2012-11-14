@@ -74,12 +74,25 @@ results.
 
 The \emph{abstracting abstract machines} (AAM)
 approach~\cite{dvanhorn:VanHorn2011Abstracting,dvanhorn:VanHorn2012Systematic}
-to deriving program analyses provides a straightforward way of
-transforming a programming language semantics in the form of an
-abstract machine, into a family of abstract interpreters parameterized
-over policies for regulating the analytic precision of the control,
-environment, store, and base value domains.  By taking a
-machine-oriented view of computation, it becomes possible to design,
+to deriving program analyses provides a systematic way of transforming a
+programming language semantics in the form of an abstract machine into a family
+of abstract interpreters.
+%
+The approach parameterizes these families with policies for regulating analytic
+precision.
+%
+While flexible and robust, the AAM approach unfortunately yields analyzers with
+poor performance relative to hand-optimized analyzers.
+%
+Our work takes aim squarely at this ``efficiency gap,'' and narrows it in an
+equally systematic way.
+
+%
+% Specifically, these policies tune precision for control,
+% the environment, the store, and base value domains.  
+
+By taking a
+machine-oriented view of computation, AAM makes it possible to design,
 verify, and implement program analyzers for realistic language
 features typically considered difficult to model.  The approach was
 originally applied to features such as higher-order functions,
@@ -140,13 +153,15 @@ setting of a core functional language.  This allows us to explicate
 the optimizations with a minimal amount of inessential technical
 overhead.  In the second half, we scale this approach up to an
 analyzer for a realistic untyped, higher-order imperative language
-with a number of interesting features.
+with a number of interesting features and then measure
+improvements across a suite of benchmarks.
 
-At each step during the initial development, we evaluate the
+At each step during the initial presentation and development, we evaluate the
 implementation on a benchmark from Vardoulakis and
 Shivers~\cite{dvanhorn:Vardoulakis2011CFA2} that tests distributivity
 of multiplication over addition on Church numerals.
-The example, while small, is informative:
+For the step-by-step development, 
+this benchmark is particularly informative:
 \begin{enumerate}
 \item it can be written in most modern programming languages,
 %
@@ -1229,8 +1244,8 @@ use the timeout limits as a lower bound on the actual time required,
 thus giving a conservative estimate of improvements.
 
 All benchmarks are calculated as an average of 5 runs, done in
-parallel, on an 11-core, 64-bit Intel Xeon machine running at 2.40GHz
-with 11Gb of memory.
+parallel, on an 12-core, 64-bit Intel Xeon machine running at 2.40GHz
+with 12Gb of memory.
 
 Many benchmarks cause the baseline analyzer to take longer than 30
 minutes or to consume more 1 gigabyte of memory, at which point the
