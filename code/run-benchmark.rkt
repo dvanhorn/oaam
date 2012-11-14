@@ -1,5 +1,6 @@
 #lang racket
 (require "parse.rkt" "kcfa-instantiations.rkt" "LK-instantiations.rkt"
+         "handle-limits.rkt"
          racket/sandbox)
 (provide test aval prep)
 
@@ -27,12 +28,7 @@
     (collect-garbage)
     (collect-garbage)
     (collect-garbage)
-    (with-handlers ([exn:fail:resource?
-                     (λ (e) (case (exn:fail:resource-resource e)
-                              [(time) (dump-memory-stats) (flush-output)
-                               (printf "Result: Timeout~%")]
-                              [(memory) (printf "Result: Exhausted memory~%")]))]
-                    [exn:fail? (λ (e) (printf "Barf ~a ~%" e))])
+    (with-limit-handler
       (with-limits (* 10 #;run-for-10-minutes
                       60 #;seconds-in-minutes)
                    1024 ;; Max memory: 1GiB

@@ -62,15 +62,15 @@
      #,@(if (syntax-parameter-value #'generate-graph?)
             #'((define graph (make-hash)))
             #'())
-     (define state-count (box 0))
-     (define step^ ((wide-step-specialized step) state-count
+     (define state-count* (state-count))
+     (set-box! state-count* 0)
+     (define step^ ((wide-step-specialized step) state-count*
                     #,@(if (syntax-parameter-value #'generate-graph?)
                            #'(graph)
                            #'())))
-     (define start-time (current-milliseconds))
-     (define ss (with-limit-handler (start-time state-count)
-                  (fix step^ (set (cons f^σ cs)))))
-     (state-rate start-time state-count)
+     (set-box! (start-time) (current-milliseconds))
+     (define ss (fix step^ (set (cons f^σ cs))))
+     (state-rate)
      (define-values (σ final-cs)
        (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
          (match s
@@ -79,7 +79,7 @@
             (values (join-store last-σ fsσ) (∪ final-cs cs))]
            [_ (error 'name "bad output ~a~%" s)])))
      ;; filter the final results
-     (values (format "State count: ~a" (unbox state-count))
+     (values (format "State count: ~a" (unbox state-count*))
              (format "Point count: ~a" (set-count final-cs))
              σ
              (for/set ([c (in-set final-cs)]
@@ -91,26 +91,26 @@
  (define-syntax-rule (name step fst)
    (let ()
      (define-values (f^σ cs) fst)
-     (define state-count 0)
-     (define start-time (current-milliseconds))
+     (define state-count* (state-count))
+     (set-box! state-count* 0)
+     (set-box! (start-time) (current-milliseconds))
      (define-values (σ final-cs)
-       (with-limit-handler (start-time state-count)
-         (let loop ([accum (hash)] [front cs] [σ f^σ])
-           (match (for/first ([c (in-set front)]) c)
-             [#f 
-              (state-rate start-time state-count)
-              (values σ (for/set ([(c _) (in-hash accum)]) c))]
-             [c
-              (set! state-count (add1 state-count))
-              (define-values (σ* cs*) (step (cons σ c)))
-              (define-values (accum* front*)
-                (for/fold ([accum* accum] [front* (front . ∖1 . c)])
-                    ([c* (in-set cs*)]
-                     #:unless (equal? σ* (hash-ref accum c* (hash))))                
-                  (values (hash-set accum* c* σ*) (∪1 front* c*))))
-              (loop accum* front* σ*)]))))
+       (let loop ([accum (hash)] [front cs] [σ f^σ])
+         (match (for/first ([c (in-set front)]) c)
+           [#f 
+            (state-rate)
+            (values σ (for/set ([(c _) (in-hash accum)]) c))]
+           [c
+            (set-box! state-count* (add1 (unbox state-count)))
+            (define-values (σ* cs*) (step (cons σ c)))
+            (define-values (accum* front*)
+              (for/fold ([accum* accum] [front* (front . ∖1 . c)])
+                  ([c* (in-set cs*)]
+                   #:unless (equal? σ* (hash-ref accum c* (hash))))                
+                (values (hash-set accum* c* σ*) (∪1 front* c*))))
+            (loop accum* front* σ*)])))
      ;; filter the final results
-     (values (format "State count: ~a" state-count)
+     (values (format "State count: ~a" (unbox state-count*))
              (format "Point count: ~a" (set-count final-cs))
              σ
              (for/set ([c (in-set final-cs)]
@@ -122,17 +122,17 @@
  (define-syntax-rule (name step fst)
    (let ()
      (define-values (f^σ cs) fst)
-     (define state-count 0)
-     (define start-time (current-milliseconds))
+     (define state-count* (state-count))
+     (set-box! state-count* 0)
+     (set-box! (start-time) (current-milliseconds))
      (define-values (σ final-cs)
-       (with-limit-handler (start-time state-count)
-         (let loop ([accum (hash)] [front cs] [σ f^σ] [σ-count 0])
+       (let loop ([accum (hash)] [front cs] [σ f^σ] [σ-count 0])
            (match (for/first ([c (in-set front)]) c)
              [#f 
-              (state-rate start-time state-count)
+              (state-rate)
               (values σ (for/set ([(c _) (in-hash accum)]) c))]
              [c
-              (set! state-count (add1 state-count))
+              (set-box! state-count* (add1 (unbox state-count)))
               (define-values (σ* cs*) (step (cons σ c)))
               (define count* (if (equal? σ σ*) σ-count (add1 σ-count)))
               (define-values (accum* front*)
@@ -140,9 +140,9 @@
                     ([c* (in-set cs*)]
                      #:unless (= count* (hash-ref accum c* -1)))
                   (values (hash-set accum c* count*) (∪1 front c*))))
-              (loop accum* front* σ* count*)]))))
+              (loop accum* front* σ* count*)])))
      ;; filter the final results
-     (values (format "State count: ~a" state-count)
+     (values (format "State count: ~a" (unbox state-count*))
              (format "Point count: ~a" (set-count final-cs))
              σ
              (for/set ([c (in-set final-cs)]
@@ -153,12 +153,12 @@
  (define-syntax-rule (name step fst)
    (let ()
      (define-values (f^σ cs) fst)
-     (define state-count (box 0))
-     (define step^ ((wide-step step) state-count))
-     (define start-time (current-milliseconds))
-     (define ss (with-limit-handler (start-time state-count)
-                  (fix step^ (set (cons f^σ cs)))))
-     (state-rate start-time (unbox state-count))
+     (define state-count* (state-count))
+     (set-box! state-count* 0)
+     (define step^ ((wide-step step) state-count*))
+     (set-box! (start-time) (current-milliseconds))
+     (define ss (fix step^ (set (cons f^σ cs))))
+     (state-rate)
      (define-values (last-σ final-cs)
        (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
          (match s
@@ -168,7 +168,7 @@
                                                  #:when (ans^? c))
                              c))]
            [_ (error 'name "bad output ~a~%" s)])))
-     (values (format "State count: ~a" (unbox state-count))
+     (values (format "State count: ~a" (unbox state-count*))
              (format "Point count: ~a" (set-count (for/union ([p (in-set ss)]) (cdr p))))
              last-σ final-cs))))
 
