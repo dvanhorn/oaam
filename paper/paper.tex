@@ -138,8 +138,9 @@ feasible implementation of an abstract-machine-based analyzer.
 \vspace{-1.5em}
 \end{center}
 \caption{Relative improvements over the baseline analyzer for the
-  Vardoulakis and Shivers benchmark in terms of peak memory usage, the
-  rate of state transitions, and total analysis time.}
+  \Church{} benchmark in terms of peak memory usage, the rate of state
+  transitions, and total analysis time. Each point is marked with the
+  section that introduces the optimization.}
 \label{fig:churchtime}
 \end{figure}
 
@@ -154,10 +155,9 @@ analyzer for a realistic untyped, higher-order imperative language
 with a number of interesting features.
 
 At each step during the initial development, we evaluate the
-implementation on an example, shown in figure~\ref{fig:church}, taken
-from the flow analysis literature~\cite{dvanhorn:Vardoulakis2011CFA2}
-that tests distributivity of multiplication over addition on Church
-numerals.
+implementation on a benchmark from Vardoulakis and
+Shivers~\cite{dvanhorn:Vardoulakis2011CFA2} that tests distributivity
+of multiplication over addition on Church numerals.
 %% \footnote{It is
 %%   written here using Scheme notation and makes use of the shorthands:
 %% %
@@ -569,72 +569,100 @@ has no interesting ordering, $\sqcup$ can be read as $\cup$.
 
 The uniform $k$-CFA allocation strategy would make $eval$ in figure
 \ref{fig:aam} a computable abstraction of reachable states, but not an
-effective one. This is not the strategy that AAM, nor we,
-recommend. We explain a succession of approximations to reach the
-baseline analysis that we compare performance against. But first, we
-need a fixed-point combinator to drive the succession of reduction
-relations we define.
+efficient one. This is not the strategy that AAM, nor we, recommend. Through
+this and the following section, we will explain a succession of approximations
+to reach the baseline analysis.  We'll compare performance at each stage to
+identify the criticality of each optimization. 
+%
+We ground this journey by first formulating the analysis in terms of a classic
+fixed-point computation.
 
-\subsection{Generic fixed-point calculator}
+
+\subsection{Static analysis as fixed-point computation}
 \label{sec:fixpoint}
 
-We compute the semantics of a program by iterating the state
-transition relation until a fixed-point in the reachable states is
-reached. We begin with Kleene's fixed-point combinator, ${\mathcal F}$,
-operationalized in the frontier/accumulator style:
+Conceptually, the AAM approach calls for computing an analysis as a graph
+exploration: (1) start with an initial state, and (2) compute the transitive
+closure of the transition relation starting from that state.
 
-\begin{align*}
-{\mathcal F}(f)(X) &= {\mathcal G}(f, X, \varnothing) \\
-{\mathcal G}(f, \varnothing, S) &= S \\
-{\mathcal G}(f, X, S) &= {\mathcal G}(f, f(X) \setminus S, S \cup X) \\
-\end{align*}
+We can cast this exploration process in terms of a fixed-point calculation.
+%
+Given the initial state $\varsigma_0$ and the transition relation $\machstep$,
+we define the global transfer function:
+\begin{equation*}
+ F_{\varsigma_0} : \mathcal{P}(\mathit{State}) \to \mathcal{P}(\mathit{State})
+ \text.
+\end{equation*}
+Internally, this global transfer function computes the successors of all supplied states, and then includes the inital state:
+\begin{equation*}
+  F_{\varsigma_0}(S) = \{ \varsigma_0 \} \cup \{ \varsigma' \mathrel{|} \varsigma \in S \text{ and } \varsigma \machstep \varsigma' \}\text. 
+\end{equation*}
+Then, the evaluator for the analysis computes the least fixed point of the global transfer function:
+\begin{equation*}
+ \eval(e) = \mathrm{lfp}(F_{\varsigma_0})\text{,}
+\end{equation*}
+where $\varsigma_0 = \ev[^\mtcntr]{e, \varnothing, \varnothing, \kmt}$.
 
-The $\machstep$ relation is most naturally written as a function from
-a state to a set of all next states. To calculate $eval$, we find a fixed-point of
-$\machstep$ lifted to step a set of states. The lifting is a natural one:
 
-\begin{align*}
-\lift(f)(X) &= \bigcup\{f(x) \mid x \in X\}
-\end{align*}
+To conduct this naive exploration on the \Church{} example would require
+considerable time.  Even though the state space is finite, it is exponential in
+the size of the program.  Even with $k = 0$, there are exponentially many
+stores in the AAM framework.
 
-Then $\eval(e) = {\mathcal F}(\lift(\machstep))(\{\ev[^\mtcntr]{e, \varnothing, \varnothing, \kmt}\})$.
+In the next subsection, we'll fix this with a widening and reach polynomial
+(albeit of a high degree) complexity.
+%
+This widening effictively lifts the store out of individual states to create
+a single, global shared store for all.
 
-If we run this on our Church numeral example, we must be
-patient. Indeed, the state space is finite, but it is exponential in
-the size of the program. With $k = 0$, the store can be in one of ${\mathcal
-  O}(2^n)$ many configurations! We take a step toward a polynomial
-complexity baseline by lifting the store out so that there is one
-shared amongst all states.
 
 \subsection{Store widening}
 \label{sec:storewiden}
 
-A common technique to accelerate convergence in flow analyses is to share
-a common store that is monotonically updated as interpretation
-continues. In the ISWIM language with only unary operators, this makes
-our 0-CFA quartic in the size of the program, which in one step drops the
-complexity from intractable exponentiality to merely daunting
-polynomiality.
+A common technique to accelerate convergence in flow analyses is to share a
+common, global store.
+%
+To retain soundness, this store grows monotonically.
+%
+Formally, we can cast this optimization as a second abstraction or as the
+application of a widening operator during the fixed-point iteration.
+%
+In the ISWIM language, such a widening makes 0CFA quartic in the size of the
+program.
+%
+Thus, in one step, complexity drops from intractable exponentiality to merely
+daunting polynomiality.
 
-We can reuse the reduction relation we have defined, but with some
-scaffolding around it. A state in the store-widened machine is a pair
-of a set of ISWIM states without a store, and a store. A step of this
-machine will pair the store with each of the states in this set,
-reduce, and combine the output stores to create the next. The
-scaffolded reduction relation, $\widehat{\machstep}$, is as follows:
+Since we can cast this optimization as a widening, there is no need to change
+the transition relation itself.
+%
+Rather, what changes is the structure of the fixed-point iteration.
+%
+In each pass, the algorithm will collect all newly produced stores and join
+them together.
+%
+Then, before each transition, it will install this joined store into current
+state.
 
+To describe this process, we'll refactor the transition relation so that it operates on
+a pair of a set of contexts ($C$) and a store ($\sigma$).
+%
+A context includes all non-store components, \emph{e.g.}, the expression, the environment and the stack.
+%
+The refactored relation, $\widehat{\machstep}$, becomes:
+%
 \begin{align*}
-(cs, \msto) &\mathrel{\widehat{\machstep}} (cs', \msto') \\
-\mbox{where } cs' &= \{c' \mid wn(c, \msto) \mathrel{\machstep} wn(c, \msto^c), c \in cs\} \\
-              \msto' &= \bigsqcup\{\msto^c \mid wn(c,\msto)\mathrel{\machstep} wn(c', \msto^c), c \in cs\} \\
+(C, \msto) &\mathrel{\widehat{\machstep}} (C', \msto') \\
+\mbox{where } C' &= \{c' \mid wn(c, \msto) \mathrel{\machstep} wn(c, \msto^c), c \in C\} \\
+              \msto' &= \bigsqcup\; \{\msto^c \mid wn(c,\msto)\mathrel{\machstep} wn(c', \msto^c), c \in C\} \\
 wn(\ev{\mexp, \menv, \mkont}, \msto) &= \ev{\mexp, \menv, \msto, \mkont} \\
 wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \msto, \mkont} \\
 wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont} \\
 wn(\ans{\mval}, \msto) &= \ans{\msto, \mval}
 \end{align*}
-That is, the next set of states is what we get by stepping each
-given state, without its store. The next store is the combination of all produced
-stores. For simplicity, assume that stuck states step to themselves.
+%
+In effect, the new store is computed as the least upper bound of all subsequent stores.
+
 
 \subsection{Store-allocated results}
 \label{sec:baselineeval}
