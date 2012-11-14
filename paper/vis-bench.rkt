@@ -76,11 +76,11 @@
                 (0 . 5.2)
                 (0 . 5.2)))
 (define ymins '((0.9 . 4300)
-                (0 . 8)
+                (0 . 18)
                 (0.1 . 2000)))
 (define ytranss (list log-transform #f log-transform))
 (define ytickss (list log-ticks #f log-ticks))
-(define defaults (list (* 30 60 1000) (* 1024 1024 1024) 1))
+(define defaults (list (* 30 60 1000) (* 1024 1024 1024) 150))
 
 (define (sec-labels sec->anchor data)
   (map (λ (v l) (point-label v l #:anchor (sec->anchor l) #:point-size 12))

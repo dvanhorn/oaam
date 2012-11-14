@@ -281,8 +281,8 @@
 ./nbody.id.time.15:States/second: 47362.203444913874
 ./nucleic.it.time.15:States/second: 7522.679395216128
 ./boyer.it.time.15:States/second: 28363.73281890523
-./nucleic.sp.time.15:States/second: 45.35467096348921
-./nucleic.ls.time.15:States/second: 46.35104790419162
+./nucleic.sp.time.15:States/second: 42.71904938473876
+./nucleic.ls.time.15:States/second: 40.765274634848794
 ./church.bl.time.15:States/second: 487.3276126264174
 ./church.pd.time.15:States/second: 43668.57142857143
 ./mbrotZ.id.time.15:States/second: 32119.26605504587
@@ -291,7 +291,7 @@
 ./church.ld.time.15:States/second: 18515.81027667984
 ./lattice.lc.time.15:States/second: 625.0449577006677
 ./matrix.ia.time.15:States/second: 61940.45212277155
-./nbody.ld.time.15:States/second: 243.6327726644894
+./nbody.ld.time.15:States/second: 246.7852704558833
 ./graphs.id.time.15:States/second: 70671.08108108108
 ./church.pt.time.15:States/second: 36520.54794520548
 ./nucleic.pt.time.15:States/second: 8040.591070865432
@@ -299,6 +299,7 @@
 ./graphs.ia.time.15:States/second: 70461.60064672594
 ./mbrotZ.fd.time.15:States/second: 45467.53246753247
 ./nbody.fd.time.15:States/second: 12708.680594486179
+./graphs.lc.time.15:States/second: 120.96043910867162
 ./nbody.lc.time.15:States/second: 26.027013693515915
 ./mbrotZ.sp.time.15:States/second: 541.6127629578215
 ./maze.id.time.15:States/second: 70881.55555555556
@@ -351,10 +352,10 @@
 ./maze.lc.time.15:States/second: 39.22300647494604
 ./matrix.id.time.15:States/second: 61951.83823529412
 ./graphs.pt.time.15:States/second: 80848.93617021276
-./boyer.lc.time.15:States/second: 29.505693509492286
+./boyer.lc.time.15:States/second: 34.40899910964407
 ./boyer.ls.time.15:States/second: 35.049715319622194
 ./maze.ld.time.15:States/second: 1860.068824035471
-./boyer.sp.time.15:States/second: 35.19283976132538
+./boyer.sp.time.15:States/second: 41.10415713604376
 ./lattice.fd.time.15:States/second: 42440.74567243675
 ./earley.fd.time.15:States/second: 49281.15015974441
 ./earley.it.time.15:States/second: 37321.83908045977
@@ -389,6 +390,7 @@
 ./mbrotZ.pd.time.15:States/second: 33990.29126213592
 ./church.sp.time.15:States/second: 721.7128852176281
 ./church.fd.time.15:States/second: 18849.75369458128
+./graphs.lc.time.15:Result: Timeout
 ./nbody.lc.time.15:Result: Timeout
 ./maze.sp.time.15:Result: Timeout
 ./matrix.lc.time.15:Result: Timeout
@@ -469,6 +471,7 @@
 ./nbody.ia.mem.15:Peak memory use after a collection: 131735288
 ./mbrotZ.lc.mem.15:Peak memory use after a collection: 140026504
 ./church.ia.mem.15:Peak memory use after a collection: 63087640
+./graphs.lc.mem.15:Peak memory use after a collection: 350175248
 ./matrix.ia.mem.15:Peak memory use after a collection: 68601872
 ./matrix.pd.mem.15:Peak memory use after a collection: 66536368
 ./maze.it.mem.15:Peak memory use after a collection: 67899648
@@ -573,6 +576,7 @@
 ./nbody.ia.mem.15:Current memory use: 132249984
 ./mbrotZ.lc.mem.15:Current memory use: 173167312
 ./church.ia.mem.15:Current memory use: 60136624
+./graphs.lc.mem.15:Current memory use: 285397624
 ./matrix.ia.mem.15:Current memory use: 92876832
 ./matrix.pd.mem.15:Current memory use: 89537600
 ./maze.it.mem.15:Current memory use: 95511624
@@ -900,7 +904,7 @@
 ./mbrotZ.pt.time.16:States/second: 30448.979591836734
 ./earley.pt.time.16:States/second: 40958.333333333336
 ./boyer.pd.time.16:States/second: 33557.077625570775
-./nucleic.ls.time.16:States/second: 45.88736569099667
+./nucleic.ls.time.16:States/second: 42.19685158175326
 ./maze.ld.time.16:States/second: 1768.2121288374433
 ./church.pa.time.16:States/second: 43175.141242937854
 ./nbody.ls.time.16:States/second: 63.175403158603494
@@ -909,7 +913,7 @@
 ./nucleic.ia.time.16:States/second: 6843.559741248097
 ./graphs.fd.time.16:States/second: 28081.726896847984
 ./mbrotZ.bl.time.16:States/second: 466.55390786039004
-./boyer.sp.time.16:States/second: 35.57558653805653
+./boyer.sp.time.16:States/second: 39.15971108271481
 ./lattice.pa.time.16:States/second: 72769.40639269406
 ./maze.pd.time.16:States/second: 77853.79546009275
 ./matrix.sp.time.16:States/second: 68.07587244815477
@@ -929,7 +933,7 @@
 ./lattice.it.time.16:States/second: 62687.6404494382
 ./maze.sp.time.16:States/second: 55.22380348425784
 ./graphs.ld.time.16:States/second: 31563.989986520315
-./nucleic.sp.time.16:States/second: 46.450572427825335
+./nucleic.sp.time.16:States/second: 43.295404701086255
 ./maze.ls.time.16:States/second: 53.206914482280474
 ./lattice.id.time.16:States/second: 64651.11561866126
 ./boyer.fd.time.16:States/second: 3149.777438111271
@@ -944,7 +948,7 @@
 ./lattice.pt.time.16:States/second: 70247.52475247525
 ./nbody.ia.time.16:States/second: 48032.32337500294
 ./earley.bl.time.16:States/second: 235.1582964825644
-./boyer.lc.time.16:States/second: 27.899319464375324
+./boyer.lc.time.16:States/second: 34.685694576183494
 ./nucleic.pa.time.16:States/second: 7498.384406920993
 ./mbrotZ.lc.time.16:States/second: 857.8838174273859
 ./earley.fd.time.16:States/second: 49598.07073954984
@@ -971,7 +975,7 @@
 ./maze.pa.time.16:States/second: 81639.87714358843
 ./church.ls.time.16:States/second: 760.1808331240358
 ./matrix.id.time.16:States/second: 60625.652095700665
-./nbody.ld.time.16:States/second: 251.78430875545297
+./nbody.ld.time.16:States/second: 239.5543717068808
 ./graphs.ia.time.16:States/second: 74148.02211824755
 ./church.ia.time.16:States/second: 39549.22279792746
 ./nucleic.pt.time.16:States/second: 7922.891673232934
@@ -1524,12 +1528,12 @@
 ./matrix.ld.time.17:States/second: 474.01755055322394
 ./maze.pa.time.17:States/second: 81182.74370068719
 ./graphs.pa.time.17:States/second: 83621.04253277901
-./nbody.ld.time.17:States/second: 264.4458455933866
+./nbody.ld.time.17:States/second: 219.05557728549584
 ./mbrotZ.pd.time.17:States/second: 33990.29126213592
 ./mbrotZ.it.time.17:States/second: 28851.85185185185
 ./graphs.pd.time.17:States/second: 83902.77554949463
 ./nucleic.pa.time.17:States/second: 7364.436709832626
-./boyer.lc.time.17:States/second: 27.982587042711195
+./boyer.lc.time.17:States/second: 33.32159794561683
 ./earley.ld.time.17:States/second: 36054.8604427334
 ./lattice.it.time.17:States/second: 62970.6546275395
 ./mbrotZ.ld.time.17:States/second: 38949.61664841183
@@ -1561,7 +1565,7 @@
 ./nbody.ia.time.17:States/second: 48152.48637039484
 ./lattice.sp.time.17:States/second: 387.1877271175013
 ./church.sp.time.17:States/second: 708.6229946524064
-./boyer.sp.time.17:States/second: 35.91780495687822
+./boyer.sp.time.17:States/second: 37.3614401577118
 ./nbody.id.time.17:States/second: 48257.267201211005
 ./mbrotZ.pt.time.17:States/second: 29840.0
 ./boyer.ls.time.17:States/second: 35.88270781466407
@@ -1586,7 +1590,7 @@
 ./mbrotZ.id.time.17:States/second: 32119.26605504587
 ./matrix.lc.time.17:States/second: 17.606402570628106
 ./mbrotZ.ls.time.17:States/second: 528.5320790998622
-./nucleic.sp.time.17:States/second: 45.42328745770793
+./nucleic.sp.time.17:States/second: 45.03529285465069
 ./maze.ld.time.17:States/second: 1933.2485040236604
 ./earley.lc.time.17:States/second: 408.3699432047355
 ./church.bl.time.17:States/second: 485.65320302359316
@@ -1615,7 +1619,7 @@
 ./nbody.lc.time.17:States/second: 26.493421644738817
 ./earley.sp.time.17:States/second: 250.9666959896326
 ./earley.bl.time.17:States/second: 233.70984514184136
-./nucleic.ls.time.17:States/second: 46.00625922864758
+./nucleic.ls.time.17:States/second: 41.55728366932488
 ./lattice.fd.time.17:States/second: 41938.15789473684
 ./boyer.it.time.17:States/second: 28209.99616270146
 ./boyer.ld.time.17:States/second: 28.96309197423355
@@ -2142,12 +2146,12 @@
 ./mbrotZ.id.time.18:States/second: 32119.26605504587
 ./lattice.sp.time.18:States/second: 380.90507092402225
 ./graphs.ld.time.18:States/second: 31397.119105083708
-./nbody.ld.time.18:States/second: 253.10402856732406
+./nbody.ld.time.18:States/second: 248.48073355024334
 ./maze.ld.time.18:States/second: 1812.8023218316673
 ./graphs.pa.time.18:States/second: 83795.22512417882
 ./nbody.it.time.18:States/second: 48165.558528250906
 ./nbody.id.time.18:States/second: 47511.09610413804
-./boyer.sp.time.18:States/second: 35.631417747365404
+./boyer.sp.time.18:States/second: 37.15806581991108
 ./mbrotZ.pd.time.18:States/second: 34323.529411764706
 ./maze.sp.time.18:States/second: 55.224079598673356
 ./nbody.pa.time.18:States/second: 52588.52488594479
@@ -2181,7 +2185,7 @@
 ./mbrotZ.sp.time.18:States/second: 546.2839117062979
 ./maze.it.time.18:States/second: 77104.92107706593
 ./nucleic.ld.time.18:States/second: 20.70354036873702
-./nucleic.ls.time.18:States/second: 46.55140011276076
+./nucleic.ls.time.18:States/second: 42.32137002194255
 ./matrix.id.time.18:States/second: 59786.76601028916
 ./church.id.time.18:States/second: 39345.36082474227
 ./matrix.fd.time.18:States/second: 22010.05747126437
@@ -2227,7 +2231,7 @@
 ./boyer.pt.time.18:States/second: 30781.93726715539
 ./nucleic.ia.time.18:States/second: 6810.1954844511765
 ./nucleic.it.time.18:States/second: 7537.553103374569
-./nucleic.sp.time.18:States/second: 45.763588663488896
+./nucleic.sp.time.18:States/second: 45.4127198917456
 ./lattice.ia.time.18:States/second: 64520.24291497975
 ./maze.ia.time.18:States/second: 70661.71909614533
 ./nbody.sp.time.18:States/second: 66.56244583405555
@@ -2239,7 +2243,7 @@
 ./maze.fd.time.18:States/second: 31146.07948442535
 ./matrix.pt.time.18:States/second: 69542.77446192801
 ./mbrotZ.it.time.18:States/second: 28587.155963302754
-./boyer.lc.time.18:States/second: 28.08998723585307
+./boyer.lc.time.18:States/second: 33.22149383162133
 ./matrix.ia.time.18:States/second: 61567.04420898794
 ./boyer.id.time.18:States/second: 28728.664280331574
 ./mbrotZ.ls.time.18:States/second: 536.8534966280865
@@ -2752,7 +2756,7 @@
 ./boyer.ia.time.19:"Point count: 13902"
 ./lattice.ls.time.19:States/second: 384.9895851698042
 ./nucleic.pd.time.19:States/second: 7458.090712742981
-./nucleic.sp.time.19:States/second: 46.51293799526796
+./nucleic.sp.time.19:States/second: 45.356663393009995
 ./earley.lc.time.19:States/second: 414.6668142572504
 ./maze.ia.time.19:States/second: 71341.31066875419
 ./lattice.bl.time.19:States/second: 299.03630482073015
@@ -2783,7 +2787,7 @@
 ./lattice.pd.time.19:States/second: 71464.12556053812
 ./church.lc.time.19:States/second: 1483.1407313598227
 ./earley.ia.time.19:States/second: 39199.4917407878
-./boyer.sp.time.19:States/second: 35.10859615544645
+./boyer.sp.time.19:States/second: 40.53356847368273
 ./nbody.ia.time.19:States/second: 48696.09527901093
 ./matrix.pa.time.19:States/second: 68527.45018300122
 ./nbody.lc.time.19:States/second: 26.493509956733046
@@ -2824,7 +2828,7 @@
 ./earley.sp.time.19:States/second: 248.73682440689248
 ./earley.pa.time.19:States/second: 42669.43291839557
 ./matrix.pt.time.19:States/second: 71775.62068321822
-./boyer.lc.time.19:States/second: 28.386646004460886
+./boyer.lc.time.19:States/second: 33.52886629088219
 ./boyer.pt.time.19:States/second: 30380.322618906415
 ./boyer.it.time.19:States/second: 28580.134123821557
 ./lattice.it.time.19:States/second: 62970.6546275395
@@ -2834,7 +2838,7 @@
 ./church.sp.time.19:States/second: 710.1737305167254
 ./earley.ls.time.19:States/second: 240.55359688085062
 ./nucleic.pa.time.19:States/second: 7416.061027782073
-./nbody.ld.time.19:States/second: 265.2132062082388
+./nbody.ld.time.19:States/second: 258.8880484114977
 ./mbrotZ.pt.time.19:States/second: 29840.0
 ./church.ld.time.19:States/second: 17544.94382022472
 ./mbrotZ.pa.time.19:States/second: 33990.29126213592
@@ -2853,7 +2857,7 @@
 ./boyer.ld.time.19:States/second: 28.953092057566188
 ./lattice.id.time.19:States/second: 64782.52032520325
 ./boyer.pa.time.19:States/second: 33645.92641623918
-./nucleic.ls.time.19:States/second: 46.51599515497507
+./nucleic.ls.time.19:States/second: 44.70375106564365
 ./maze.pa.time.19:States/second: 81162.08651399492
 ./graphs.pd.time.19:States/second: 83248.32855778415
 ./maze.ld.time.19:States/second: 1829.2603559923205
