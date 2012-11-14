@@ -386,7 +386,7 @@ different in the following ways:
 \begin{figure}
 \begin{gather*}
 \begin{align*}
-\mathit{eval}(\mexp) &= \{ \mstate\ |\ \ev[^{\mtcntr}]{\mexp,\varnothing,\varnothing,\kmt} \multimachstep \mstate \} \text{ where }
+\eval(\mexp) &= \{ \mstate\ |\ \ev[^{\mtcntr}]{\mexp,\varnothing,\varnothing,\kmt} \multimachstep \mstate \} \text{ where }
 \end{align*}
 \\[2mm]
 \begin{array}{@{}r@{\ }c@{\ }l@{}}
@@ -573,7 +573,7 @@ has no interesting ordering, $\sqcup$ can be read as $\cup$.
 \section{Reduction semantics to baseline analyzer}
 \label{sec:baseline}
 
-The uniform $k$-CFA allocation strategy would make $eval$ in figure
+The uniform $k$-CFA allocation strategy would make $\eval$ in figure
 \ref{fig:aam} a computable abstraction of reachable states, but not an
 efficient one. This is not the strategy that AAM, nor we, recommend. Through
 this and the following section, we will explain a succession of approximations
@@ -659,12 +659,12 @@ The refactored relation, $\widehat{\machstep}$, becomes:
 %
 \begin{align*}
 (C, \msto) &\mathrel{\widehat{\machstep}} (C', \msto') \\
-\mbox{where } C' &= \{c' \mid wn(c, \msto) \mathrel{\machstep} wn(c, \msto^c), c \in C\} \\
-              \msto' &= \bigsqcup\; \{\msto^c \mid wn(c,\msto)\mathrel{\machstep} wn(c', \msto^c), c \in C\} \\
-wn(\ev{\mexp, \menv, \mkont}, \msto) &= \ev{\mexp, \menv, \msto, \mkont} \\
-wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \msto, \mkont} \\
-wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont} \\
-wn(\ans{\mval}, \msto) &= \ans{\msto, \mval}
+\mbox{where } C' &= \{c' \mid \wn(c, \msto) \mathrel{\machstep} \wn(c, \msto^c), c \in C\} \\
+              \msto' &= \bigsqcup\; \{\msto^c \mid \wn(c,\msto)\mathrel{\machstep} \wn(c', \msto^c), c \in C\} \\
+\wn(\ev{\mexp, \menv, \mkont}, \msto) &= \ev{\mexp, \menv, \msto, \mkont} \\
+\wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \msto, \mkont} \\
+\wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont} \\
+\wn(\ans{\mval}, \msto) &= \ans{\msto, \mval}
 \end{align*}
 %
 In effect, the new store is computed as the least upper bound of all subsequent stores.
@@ -792,7 +792,7 @@ ext(\msto, \maddr, \mval) &= \msto \sqcup[\maddr \mapsto force(\msto, \mval)] \\
 \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto}
 &\machstep\;
 \ev[^\mcntr]{\mexp,\menv,ext(\msto, \maddr^f,\mval),\kfn[^\mcntr_\mlab]{\maddr^f,\maddr}} \\
-bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
+\mathit{bind\,}^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
   \maddr], ext(\msto,\maddr, \mval), \mcntr' \\
 \mbox{where } \mcntr' &= \lfloor\mlab\mcntr\rfloor_k \\
               \maddr &= \mvar\mcntr'
@@ -962,9 +962,9 @@ empty ($\mtlst$) for each step. Applying the changes to the full store
 is straightforward:
 
 \begin{align*}
-replay &: \StoreDelta \times \Store \to \Store \\
-replay(\mtlst, \msto) &= \msto \\
-replay(\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}, \msto) &= replay(\msdiff, \msto\sqcup[\maddr \mapsto \mval{s}])
+\replay &: \StoreDelta \times \Store \to \Store \\
+\replay(\mtlst, \msto) &= \msto \\
+\replay(\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}, \msto) &= \replay(\msdiff, \msto\sqcup[\maddr \mapsto \mval{s}])
 \end{align*}
 
 The reduction relation does have to change to accommodate this
@@ -990,19 +990,19 @@ in the input and output. For each state that is stepped, we feed the
 output changes to the next so that all changes get accumulated:
 
 \begin{align*}
-(cs, \msto) &\mathrel{\widehat{\machstep}} (cs\cup cs', replay(\msdiff,\msto)) \\
-\mbox{ where } (cs', \msdiff) &= step^*(\varnothing, cs, \mtlst) \\
-step^*(S, \varnothing, \msdiff) &= (S, \msdiff) \\
-step^*(S, \{c\}\cup cs, \msdiff &= step^*(S\cup cs^*, cs, \msdiff^*) \\
-cs^* &= \{c' \mid (c,\msto,\msdiff) \machstep (c',\msdiff^c) \} \\
-\msdiff^* &= concat\{\msdiff^c \mid (c, \msto,\msdiff) \machstep (c', \msdiff^c)\}
+(\states, \msto) &\mathrel{\widehat{\machstep}} (\states\cup \states', \replay(\msdiff,\msto)) \\
+\mbox{ where } (\states', \msdiff) &= \step^*(\varnothing, \states, \mtlst) \\
+\step^*(S, \varnothing, \msdiff) &= (S, \msdiff) \\
+\step^*(S, \{c\}\cup \states, \msdiff &= \step^*(S\cup cs^*, \states, \msdiff^*) \\
+\states^* &= \{c' \mid (c,\msto,\msdiff) \machstep (c',\msdiff^c) \} \\
+\msdiff^* &= \concat\{\msdiff^c \mid (c, \msto,\msdiff) \machstep (c', \msdiff^c)\}
 \end{align*}
 
-Here $concat : \Set(\StoreDelta) \to \StoreDelta$ flattens the lists
+Here $\concat : \Set(\StoreDelta) \to \StoreDelta$ flattens the lists
 of changes to one; order it appends does not matter:
 \begin{align*}
-concat(\varnothing) &= \mtlst \\
-concat(\{\msdiff\}\cup D) &= append(\msdiff, concat(D))
+\concat(\varnothing) &= \mtlst \\
+\concat(\{\msdiff\}\cup D) &= \append(\msdiff, \concat(D))
 \end{align*}
 
 %% Delta Store +k Compile + Lazy:
@@ -1186,18 +1186,18 @@ There are a few steps to consider:
 
 \begin{figure}
 \begin{align*}
-\interpdelta(\msto, qlist) &= (\mbox{{\tt '()}}, \msto) \\
-\interpdelta(\msto, qlist, v ..._+) &= (({\tt cons}\ a\ d), \msto') \\
+\interpdelta(\msto,\ {\tt qlist}) &= (\mbox{{\tt '()}}, \msto) \\
+\interpdelta(\msto,\ {\tt qlist}, v ..._+) &= (({\tt cons}\ a\ d), \msto') \\
 \qquad \mbox{where } \msto' &= \msto\sqcup[a \mapsto \bigsqcup(v ...)] \\
                             &\qquad \sqcup[d \mapsto \{ \mbox{{\tt '()}}, ({\tt cons}\ a\ d)\}] \\
 \bigsqcup(v) &= v \\
-\bigsqcup(v, vs ...) &= merge(v, \bigsqcup(vs ...)) \\
-merge(v, v) &= v \\
-merge(n, m) &= {\tt Number} \\
-merge(n, v) &= {\tt QData} \\
-merge(({\tt cons}\ a\ d), ({\tt cons}\ a'\ d')) &= {\tt QPair} \\
-merge({\tt QPair}, ({\tt cons}\ a\ d)) &= {\tt QPair} \\
-merge({\tt QPair}, v) &= {\tt QData} \\
+\bigsqcup(v, vs ...) &= \merge(v, \bigsqcup(vs ...)) \\
+\merge(v, v) &= v \\
+\merge(n, m) &= {\tt Number} \\
+\merge(n, v) &= {\tt QData} \\
+\merge(({\tt cons}\ a\ d), ({\tt cons}\ a'\ d')) &= {\tt QPair} \\
+\merge({\tt QPair}, ({\tt cons}\ a\ d)) &= {\tt QPair} \\
+\merge({\tt QPair}, v) &= {\tt QData} \\
 \vdots
 \end{align*}
 \caption{Quoted list primitive}
