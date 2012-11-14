@@ -1,5 +1,7 @@
 #lang racket
-(require "proctime.rkt")
+(require "proctime.rkt"
+         unstable/sequence
+         plot)
 
 (define (vector-avg v)
   (define t (vector-filter (negate (λ (x) (eq? x 'unset))) v))
@@ -45,49 +47,37 @@
     #;("it" . "imperative timestamp")
     #;("pt" . "preallocated timestamp")))
 
+
+;; You can change this to get charts for other benchmarks but
+;; likely that you have to tweak the max/min parameters below.
+(define bench-name "church")
+
+(define bench-timing (hash-ref timings bench-name))
 (define baseline-time
-  (vector-avg (numbers-run (hash-ref (hash-ref timings "church") "sp"))))
-
+  (vector-avg (numbers-run (hash-ref (hash-ref timings bench-name) "sp"))))
 (define baseline-mem
-  (vector-avg (numbers-peak-mem (hash-ref (hash-ref timings "church") "sp"))))
-
+  (vector-avg (numbers-peak-mem (hash-ref (hash-ref timings bench-name) "sp"))))
 (define baseline-rate
-  (vector-avg (numbers-state-rate (hash-ref (hash-ref timings "church") "sp"))))
-
-(define ct (hash-ref timings "church"))
-
-(for/list ([(alg nums) (in-hash (hash-ref timings "church"))]
-           #:unless (string=? alg "bl"))
-  (list alg (/ baseline-time (vector-avg (numbers-run nums)))))
-
-
-(require unstable/sequence)
-
+  (vector-avg (numbers-state-rate (hash-ref (hash-ref timings bench-name) "sp"))))
 (define rel-time-data
   (for/list ([(key desc) (in-pairs algo-name)]
              [n (in-naturals)])
     (vector n 
             (/ baseline-time 
-               (vector-avg (numbers-run (hash-ref ct key)))))))
- 
+               (vector-avg (numbers-run (hash-ref bench-timing key)))))))
 (define rel-mem-data
   (for/list ([(key desc) (in-pairs algo-name)]
              [n (in-naturals)])
     (vector n 
             (/ baseline-mem 
-               (vector-avg (numbers-peak-mem (hash-ref ct key)))))))
- 
-
+               (vector-avg (numbers-peak-mem (hash-ref bench-timing key)))))))
 (define rel-states-per-sec-data
   (for/list ([(key desc) (in-pairs algo-name)]
              [n (in-naturals)])
     (vector n 
-            (/ (vector-avg (numbers-state-rate (hash-ref ct key)))
+            (/ (vector-avg (numbers-state-rate (hash-ref bench-timing key)))
                baseline-rate))))
  
-
-(require plot)
-
 (parameterize ([plot-x-ticks  no-ticks]
                [plot-font-size 30]
                [plot-width (* (plot-width) 2)]
@@ -103,7 +93,7 @@
          #:x-min 0
          #:x-max 5.2
          #:y-label "" #;"Factor improvement over baseline"
-         #:out-file "church-relative-time.ps")
+         #:out-file (format "~a-relative-time.ps" bench-name))
    
    (plot (list
           (lines rel-states-per-sec-data #:color 6 #:width 4
@@ -115,7 +105,7 @@
          #:x-label ""
          #:x-max 5.2
          #:y-label ""
-         #:out-file "church-relative-speed.ps")
+         #:out-file (format "~a-relative-speed.ps" bench-name))
    
    (plot (list
           (lines rel-mem-data #:color 4 #:width 4
@@ -127,7 +117,7 @@
          #:x-min 0
          #:x-max 5.2
          #:y-label ""
-         #:out-file "church-relative-space.ps")))
+         #:out-file (format "~a-relative-space.ps" bench-name))))
 
   
   
