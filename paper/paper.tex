@@ -132,10 +132,14 @@ feasible implementation of an abstract-machine-based analyzer.
 
 \begin{figure}[t]
 \begin{center}
-\includegraphics[width=2.5in]{rel-time-church.ps}
+\includegraphics[width=3.2in]{church-relative-space.ps}
+\includegraphics[width=3.2in]{church-relative-speed.ps}
+\includegraphics[width=3.2in]{church-relative-time.ps}
+\vspace{-1.5em}
 \end{center}
-\caption{Relative run-time of
-optimized analyzers to baseline for Church numeral example.}
+\caption{Relative improvements over the baseline analyzer for the
+  Vardoulakis and Shivers benchmark in terms of peak memory usage, the
+  rate of state transitions, and total analysis time.}
 \label{fig:churchtime}
 \end{figure}
 
@@ -198,46 +202,46 @@ nearly a factor of 500, dropping the analysis time to a fraction of a
 second.  Figure~\ref{fig:churchtime} shows the step-wise improvement
 of the analysis time for this example.
 
-\newcommand{\church}[1]{\(\ulcorner{\tt #1}\urcorner\)}
-\begin{figure}
-\hrule
-\vspace{2mm}
-\begin{alltt}
-(define (zero? n) ((n (\(\lambda\) (zx) #f)) #t))
-(define (((mult m1) m2) mf) (m2 (m1 mf)))
-(define ((((plus p1) p2) pf) x)
-  ((p1 pf) ((p2 pf) x)))
+%% \newcommand{\church}[1]{\(\ulcorner{\tt #1}\urcorner\)}
+%% \begin{figure}
+%% \hrule
+%% \vspace{2mm}
+%% \begin{alltt}
+%% (define (zero? n) ((n (\(\lambda\) (zx) #f)) #t))
+%% (define (((mult m1) m2) mf) (m2 (m1 mf)))
+%% (define ((((plus p1) p2) pf) x)
+%%   ((p1 pf) ((p2 pf) x)))
 
-(define (((pred n) rf) rx)
-  (((n (\(\lambda\) (g) (\(\lambda\) (h) (h (g rf)))))
-    (\(\lambda\) (ignored) rx))
-   (\(\lambda\) (id) id)))
+%% (define (((pred n) rf) rx)
+%%   (((n (\(\lambda\) (g) (\(\lambda\) (h) (h (g rf)))))
+%%     (\(\lambda\) (ignored) rx))
+%%    (\(\lambda\) (id) id)))
 
-(define ((church=? e1) e2)
-  (if (zero? e1) (zero? e2)
-      (if (zero? e2) #f
-          ((church=? (pred e1)) (pred e2)))))
+%% (define ((church=? e1) e2)
+%%   (if (zero? e1) (zero? e2)
+%%       (if (zero? e2) #f
+%%           ((church=? (pred e1)) (pred e2)))))
 
-;; multiplication distributes over addition
-((church=? ((mult \church2) ((plus \church1) \church3)))
- ((plus ((mult \church2) \church1)) ((mult \church2) \church3)))
-\end{alltt}
-\caption{Church-numeral calculation}
-\label{fig:church}
-\end{figure}
+%% ;; multiplication distributes over addition
+%% ((church=? ((mult \church2) ((plus \church1) \church3)))
+%%  ((plus ((mult \church2) \church1)) ((mult \church2) \church3)))
+%% \end{alltt}
+%% \caption{Church-numeral calculation}
+%% \label{fig:church}
+%% \end{figure}
 
 \begin{figure}[t]
-\hrule
-\vspace{2mm}
-\begin{alltt}
-(define (id x) x)
-(define (f n)
-  (if (<= n 1) 1 (* n (f (- n 1)))))
-(define (g n)
-  (if (<= n 1) 1 (+ (* n n) (g (- n 1)))))
-(print (+ ((id f) 3) ((id g) 4)))
-\end{alltt}
-\hrule
+%% \hrule
+%% \vspace{2mm}
+%% \begin{alltt}
+%% (define (id x) x)
+%% (define (f n)
+%%   (if (<= n 1) 1 (* n (f (- n 1)))))
+%% (define (g n)
+%%   (if (<= n 1) 1 (+ (* n n) (g (- n 1)))))
+%% (print (+ ((id f) 3) ((id g) 4)))
+%% \end{alltt}
+%% \hrule
 \begin{center}
 \begin{tabular}{ccc}
 \raisebox{1ex-\height}{
@@ -320,7 +324,7 @@ three orders of magnitude.
 Section~\ref{sec:related} relates this work to the literature and
 section~\ref{sec:conclusion} concludes.
 
-\newpage
+%\newpage
 \section{An abstract$^{\text 2}$ machine for ISWIM}
 \label{sec:aam}
 
@@ -1046,28 +1050,25 @@ eval(\(e\)) :=
 \end{figure}
 
 \subsection{Pre-allocating the store}
-Hashes are not the most efficent for raw speed. If we commit to using
-sequential natural numbers for variables and expression labels, by the
-time we finish parsing the input program, we will know exactly how
-many addresses we will need. Thus the store can be represented by a
-vector the size of the largest label (call it $\mlab_{max}$) assigned, plus
-1. The parser should be assigning new, fresh names to variables
-anyway, so this change is a one-liner.
 
-This technique by itself only works in 0-CFA, since there are many
-more addresses that can be allocated in 1-CFA and higher. To support
-general $k$-CFA in a vector representation, we use a growable vector
-and a map from addresses to assigned indices. When assignable indices
-run out, we grow the vector. The cost of this map is less than a hash
-representation for the whole store since typically there are more
-references to an address than allocations of it. This is more
-space-efficient than preallocating $(\mlab_{max}+1)^k$ addresses
-up-front and addressing by the contour converted to polynomial, since
-a majority of combinations of labels will not occur, except in
-pathological programs. The all up-front allocation again breaks down
-when we add compound data, which introduce new kinds of labels
-(e.g. left and right components of a tuple at the contour of
-creation).
+Internally, the algorithm at this stage uses hash tables to model the store.
+%
+This is because stores used to be distributed to all states, which
+required a compact, dynamic representation.
+%
+But, such a dynamic structure isn't necessary when we know the
+structure of the store in advance: we know all possible entries, and
+we know its maximum size.
+
+In a monovariant analysis, the domain of the store is
+exactly the set of expressions in the program.
+%
+If we label each expression with a unique natural, the analysis can
+index directly into the store without a hash or a collision.
+%
+Even for polyvariant analyses, it is possible to compute the maximum
+number of addresses and similarly pre-allocate either the spine of the
+store or (if memory is no concern) the entire store.
 
 \subsection{Abstracting literal compound data}
 
