@@ -1,6 +1,7 @@
 #lang racket
 (require parser-tools/lex)
-(provide timings (struct-out numbers))
+(provide timings (struct-out numbers)
+         average variance stddev)
 
 (struct numbers (cpu run gc state-rate peak-mem current-mem states points timeout? exhaust?) #:transparent)
 
@@ -12,6 +13,18 @@
   (define names '("church" "mbrotZ" "earley" "boyer" "graphs"
                   "lattice" "matrix" "maze" "nbody" "nucleic")))
 (require 'data (for-syntax 'data))
+
+;; operations for the vectors of numbers
+(define (average v) ;; 'unset means no average
+  (and (number? (vector-ref v 0))
+       (/ (for/sum ([i v]) i) (vector-length v))))
+(define (variance v)
+  (define avg (average v))
+  (and avg
+       (/ (for/sum ([i v]) (sqr (- i avg))) (vector-length v))))
+(define (stddev v)
+  (define var (variance v))
+  (and var (sqrt var)))
 
 ;; Quick and dirty parser to reformat cpu/run time of benchmark output into
 ;; Map[benchmark,Map[algo,(Vector Vector[Number] Vector[Number] Vector[Number])]]
