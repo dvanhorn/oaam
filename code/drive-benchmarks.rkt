@@ -22,7 +22,8 @@
 (define nbody "../benchmarks/toplas98/nbody.sch")
 (define nucleic "../benchmarks/toplas98/nucleic.sch")
 (define to-test
-  (list church mbrotZ earley boyer graphs lattice matrix maze nbody nucleic
+  (list ;; church mbrotZ earley lattice graphs 
+        boyer matrix maze nbody nucleic
    ;;"../benchmarks/toplas98/splay.scm" ;; old match
    ;;"../benchmarks/toplas98/nucleic2.sch" ;; define-syntax
    ;;"../benchmarks/toplas98/handle.scm" ;; old match and defmacro
@@ -44,8 +45,9 @@
 (define preallocated "pt")
 
 (define which-analyses
-  (list deltasfd
-#|
+  (list
+#| deltasfd
+
         deltas
         imperative
         preallocated
@@ -54,10 +56,11 @@
         deltaspa
         deltaspd
         baseline 
+|#
         specialized
         lazy
         compiled
-|#
+
 ))
 
 (define known-timeout (hash baseline    (set maze graphs matrix nbody)
