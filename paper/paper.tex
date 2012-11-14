@@ -601,10 +601,8 @@ Then, the evaluator for the analysis computes the least fixed point of the globa
 \begin{equation*}
  \eval(e) = \mathrm{lfp}(F_{\varsigma_0})\text{,}
 \end{equation*}
-where:
-\begin{equation*}
-\varsigma_0 = \ev[^\mtcntr]{e, \varnothing, \varnothing, \kmt}\text.
-\end{equation*}
+where $\varsigma_0 = \ev[^\mtcntr]{e, \varnothing, \varnothing, \kmt}$.
+
 
 To conduct this naive exploration on the \Church{} example would require
 considerable time.  Even though the state space is finite, it is exponential in
@@ -621,32 +619,50 @@ a single, global shared store for all.
 \subsection{Store widening}
 \label{sec:storewiden}
 
-A common technique to accelerate convergence in flow analyses is to share
-a common store that is monotonically updated as interpretation
-continues. In the ISWIM language with only unary operators, this makes
-our 0-CFA quartic in the size of the program, which in one step drops the
-complexity from intractable exponentiality to merely daunting
-polynomiality.
+A common technique to accelerate convergence in flow analyses is to share a
+common, global store.
+%
+To retain soundness, this store grows monotonically.
+%
+Formally, we can cast this optimization as a second abstraction or as the
+application of a widening operator during the fixed-point iteration.
+%
+In the ISWIM language, such a widening makes 0CFA quartic in the size of the
+program.
+%
+Thus, in one step, complexity drops from intractable exponentiality to merely
+daunting polynomiality.
 
-We can reuse the reduction relation we have defined, but with some
-scaffolding around it. A state in the store-widened machine is a pair
-of a set of ISWIM states without a store, and a store. A step of this
-machine will pair the store with each of the states in this set,
-reduce, and combine the output stores to create the next. The
-scaffolded reduction relation, $\widehat{\machstep}$, is as follows:
+Since we can cast this optimization as a widening, there is no need to change
+the transition relation itself.
+%
+Rather, what changes is the structure of the fixed-point iteration.
+%
+In each pass, the algorithm will collect all newly produced stores and join
+them together.
+%
+Then, before each transition, it will install this joined store into current
+state.
 
+To describe this process, we'll refactor the transition relation so that it operates on
+a pair of a set of contexts ($C$) and a store ($\sigma$).
+%
+A context includes all non-store components, \emph{e.g.}, the expression, the environment and the stack.
+%
+The refactored relation, $\widehat{\machstep}$, becomes:
+%
 \begin{align*}
-(cs, \msto) &\mathrel{\widehat{\machstep}} (cs', \msto') \\
-\mbox{where } cs' &= \{c' \mid wn(c, \msto) \mathrel{\machstep} wn(c, \msto^c), c \in cs\} \\
-              \msto' &= \bigsqcup\{\msto^c \mid wn(c,\msto)\mathrel{\machstep} wn(c', \msto^c), c \in cs\} \\
+(C, \msto) &\mathrel{\widehat{\machstep}} (C', \msto') \\
+\mbox{where } C' &= \{c' \mid wn(c, \msto) \mathrel{\machstep} wn(c, \msto^c), c \in C\} \\
+              \msto' &= \bigsqcup\; \{\msto^c \mid wn(c,\msto)\mathrel{\machstep} wn(c', \msto^c), c \in C\} \\
 wn(\ev{\mexp, \menv, \mkont}, \msto) &= \ev{\mexp, \menv, \msto, \mkont} \\
 wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \msto, \mkont} \\
 wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont} \\
 wn(\ans{\mval}, \msto) &= \ans{\msto, \mval}
 \end{align*}
-That is, the next set of states is what we get by stepping each
-given state, without its store. The next store is the combination of all produced
-stores. For simplicity, assume that stuck states step to themselves.
+%
+In effect, the new store is computed as the least upper bound of all subsequent stores.
+
 
 \subsection{Store-allocated results}
 \label{sec:baselineeval}
