@@ -801,7 +801,7 @@ changes to the semantics:
 \renewcommand{\ext}{\mathit{ext}}
 
 \begin{align*}
-\force &: \Store \times \Addr \to \Set(\Value) \\
+\force &: \Store \times \Value \to \Set(\Value) \\
 \force(\msto,\saddr\maddralt) &= \msto(\maddralt)\\
 \force(\msto,\mval) &= \{\mval\} \\
 \ext(\msto, \maddr, \mval) &= \msto \sqcup[\maddr \mapsto \force(\msto, \mval)] \\
@@ -852,22 +852,22 @@ two approaches are the same.
 
 \subsection{Abstract compilation}
 
-The laziness optimization saved time by doing the same amount of
+The prior optimization saved time by doing the same amount of
 reasoning as before but in fewer transitions. We can exploit the same
-idea - same reasoning, fewer transitions - with abstract
+idea---same reasoning, fewer transitions---with abstract
 compilation. Abstract compilation is \emph{precision-preserving} and
 transforms complex expressions whose \emph{abstract} evaluation is
 deterministic into ``abstract bytecodes.''  The abstract interpreter
-then does in one transition what previously took many. Abstract
+then does in one transition what previously took many. In short, abstract
 compilation eliminates unnecessary allocation, deallocation and
 branching.
 
-The essence of the compilation effect can be seen by considering an
-example such as
+The following example illustrates
+the essence of abstract compilation effect:
 \[
 \sapp{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2}}{\mexp_3}
 \]
-which makes the following transitions:
+makes the following transitions:
 \begin{align}
 & \ev{\sapp{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2}}{\mexp_3},\menv,\mkont,\msto_0}\\
 \machstep\; &
@@ -972,24 +972,24 @@ joining large stores together. Not every step will modify all
 addresses of the store, so joining entire stores is wasteful in terms
 of memory and time. We can instead log store changes and replay the
 change log on the full store after all steps have completed. This uses
-far fewer join operations, leading to less overhead, and is \emph{precision preserving}.
+far fewer join operations, leading to less overhead, and is \emph{precision-preserving}.
 
-We represent changes as $\msdiff \in \StoreDelta = List[\Addr \times
-  \Set(\Storeable)]$. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$
-instead becomes a log addition
+We represent change logs as $\msdiff \in \StoreDelta = (\Addr \times
+  \Set(\Storeable))^*$. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$
+ becomes a log addition
 $\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$ begins
 empty ($\mtlst$) for each step. Applying the changes to the full store
 is straightforward:
-
+% TODO: Turn the recursion here into ...:
 \begin{align*}
 \replay &: \StoreDelta \times \Store \to \Store \\
 \replay(\mtlst, \msto) &= \msto \\
 \replay(\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}, \msto) &= \replay(\msdiff, \msto\sqcup[\maddr \mapsto \mval{s}])
 \end{align*}
 
-The reduction relation does have to change to accommodate this
-technique, but only in this regard. The whole store is still given so
-that lookups are possible. Example rule:
+The transition relation is identical except for the addition of this change log.
+%
+Lookups will never rely on the change log, and can use the originally supplied store unmodified:
 
 \begin{align*}
 (\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont},\msto,\msdiff) & \machstep
@@ -1019,7 +1019,7 @@ output changes to the next so that all changes get accumulated:
 \end{align*}
 
 Here $\concat : \Set(\StoreDelta) \to \StoreDelta$ flattens the lists
-of changes to one; order it appends does not matter:
+of changes to one; the order in which it appends does not matter:
 \begin{align*}
 \concat(\varnothing) &= \mtlst \\
 \concat(\{\msdiff\}\cup D) &= \append(\msdiff, \concat(D))
@@ -1041,7 +1041,7 @@ every other. Hashes can sometimes rule out inequality relatively
 quickly, but the incidence of collisions and actual equality is
 costly.
 
-And, there is a better way. Shivers' original work on k-CFA was
+And, there is a better way. Shivers' original work on $k$-CFA was
 susceptible to the same problem, and he suggested three complementary
 optimizations: (1) make the store global; (2) update the store
 imperatively; and (3) associate every change in the store with a
@@ -1050,7 +1050,7 @@ where previously there were stores. Given two states, the analysis can
 now compare their stores just by comparing their timestamps -- a
 constant-time operation.
 
-There is a subtle loss of precision and Shivers' original time-stamp
+There is a subtle loss of precision in Shivers' original time-stamp
 technique that we can fix. For a given abstract state, all writes to
 the global store need to be delayed until the analysis considers all
 branches from that abstract state. This avoids cross-branch pollution
@@ -1059,19 +1059,20 @@ address $\maddr$ and another branch reads from address
 $\maddr$. Fortunately, given our conversion to log-based stores this
 change is straightforward.
 
-The current state of the state-space search now has six components:
-
+At this point, we can begin to think of the analysis as an imperative
+algorithm with six major components:
+%
 \begin{itemize}
- \item{$\msto$, the store}
- \item{{\tt todo}, the workset}
- \item{{\tt seen}, a map from states to the timestamps at which they were last seen}
- \item{$\msdiff$, the store changes for the current step}
- \item{$\changep$, a boolean tracking whether the stepped state contributed a store change}
- \item{{\tt T}, the timestamp of the store}
+ \item{$\msto$, the store;}
+ \item{{\tt todo}, the workset;}
+ \item{{\tt seen}, a map from states to the timestamps at which they were last seen;}
+ \item{$\msdiff$, the store changes for the current step;}
+ \item{$\changep$, a boolean tracking whether the stepped state contributed a store change; and}
+ \item{{\tt T}, the timestamp of the store.}
 \end{itemize}
 
-The new $eval$ calculation is defined in
-figure~\ref{fig:imperative}.  To ensure termination, we guard adding
+The new $\eval$ calculation is defined in
+figure~\ref{fig:imperative}.  To ensure termination, we guard against adding
 $c$ to {\tt todo} by the following check:
 \begin{align*}\changep \vee {\tt seen}(c) \neq {\tt T}\end{align*}
 If it succeeds, {\tt todo} gets $c$ and we update {\tt seen} to map $c$ to {\tt T}.
@@ -1126,8 +1127,10 @@ store or (if memory is no concern) the entire store.
 
 \subsection{Abstracting literal compound data}
 
-Practical issues of performance arise when one chooses the
-``obvious,'' or ``natural'' abstraction for compound data. Our running
+Performance issues arise when one chooses the
+``obvious,'' or ``natural'' abstraction for compound data structures like list. 
+%
+Our running
 example will be the classic Boyer benchmark. The detail of note for
 the Boyer benchmark is that it has large list literals, the exact
 values of which do not matter for many analyses. If we
