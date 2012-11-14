@@ -74,12 +74,25 @@ results.
 
 The \emph{abstracting abstract machines} (AAM)
 approach~\cite{dvanhorn:VanHorn2011Abstracting,dvanhorn:VanHorn2012Systematic}
-to deriving program analyses provides a straightforward way of
-transforming a programming language semantics in the form of an
-abstract machine, into a family of abstract interpreters parameterized
-over policies for regulating the analytic precision of the control,
-environment, store, and base value domains.  By taking a
-machine-oriented view of computation, it becomes possible to design,
+to deriving program analyses provides a systematic way of transforming a
+programming language semantics in the form of an abstract machine into a family
+of abstract interpreters.
+%
+The approach parameterizes these families with policies for regulating analytic
+precision.
+%
+While flexible and robust, the AAM approach unfortunately yields analyzers with
+poor performance relative to hand-optimized analyzers.
+%
+Our work takes aim squarely at this ``efficiency gap,'' and narrows it in an
+equally systematic way.
+
+%
+% Specifically, these policies tune precision for control,
+% the environment, the store, and base value domains.  
+
+By taking a
+machine-oriented view of computation, AAM makes it possible to design,
 verify, and implement program analyzers for realistic language
 features typically considered difficult to model.  The approach was
 originally applied to features such as higher-order functions,
