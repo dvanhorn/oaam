@@ -681,12 +681,13 @@ continuations quadratic rather than linear in the size of the program---even for
 Having the space of continuations grow linearly with the size of the program 
 will drop the overall complexity to cubic (as expected).
 
-To achieve this linearity for continuation, we allocate an address for the value position
-when we create the continuation.  This address and the tail address
-are both determined by the label of the application point, so the
-space becomes linear and the overall complexity drops to cubic. 
-This is a critical abstraction in languages with $n$-ary functions,
-since otherwise the continuation space grows super-exponentially.
+To achieve this linearity for continuations, we allocate an address
+for the value position when we create the continuation.  This address
+and the tail address are both determined by the label of the
+application point, so the space becomes linear and the overall
+complexity drops to cubic.  This is a critical abstraction in
+languages with $n$-ary functions, since otherwise the continuation
+space grows super-exponentially.
 % In theory, this aggressive distinction between continuations might buy
 % additional precision, but in practice, it does not.
 
