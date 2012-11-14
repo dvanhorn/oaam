@@ -691,7 +691,8 @@ space grows super-exponentially.
 % In theory, this aggressive distinction between continuations might buy
 % additional precision, but in practice, it does not.
 
-The important rules that change are the following, specialized to 0-CFA:
+If we specialize to 0CFA, the evaluation rules become:
+
 
 \newcommand{\ext}[3]{#1\sqcup[#2\mapsto#3]}
 %\newcommand{\ext}[3]{ext(#1,#2,#3)}
@@ -718,12 +719,12 @@ The important rules that change are the following, specialized to 0-CFA:
 \text{ where }& \mval'\in \{\interpdelta(\mop,\mval) \mid \mval \in \msto(\mlab^a)\}
 \end{align*}
 
-This extra store-allocation is effectively naming all intermediate
-results, and thus the precision aligns with an analysis specialized to
-ANF. We can also play a representation trick in 0-CFA and remove
-$\menv$. In monovariant analyses, variables map to themselves, meaning
-$\menv$ is effectively the identity function. That degeneration, in
-turn, allows us to discard it from the analysis.
+% This extra store-allocation is effectively naming all intermediate
+% results, and thus the precision aligns with an analysis specialized to
+% ANF. We can also play a representation trick in 0-CFA and remove
+% $\menv$. In monovariant analyses, variables map to themselves, meaning
+% $\menv$ is effectively the identity function. That degeneration, in
+% turn, allows us to discard it from the analysis.
 
 % Wide Store: cpu time: 551571 real time: 571319 gc time: 4003
 
