@@ -731,27 +731,33 @@ If we specialize to 0CFA, the evaluation rules become:
 \section{Implementation techniques}
 \label{sec:opt}
 
-We discuss a succession of techniques for increasing performance by
-decreasing the interpretive overhead of abstract interpretation. They
-come in two flavors: decreasing the size of the state space with domain-specific knowledge [DSK], and
-decreasing the amount of intermediate data structures [Eng](ineering).
-
+In this section, we discuss the optimizations for abstract interpreters that
+yield our ultimate performance gains.
+%
+We have two broad categories of these optimizations: (1) transition elimination
+and (2) pragmatic improvement.
+%
+The transition-elimination optimizations reduce the overall number of transitions
+made by the analyzer by performing:
 \begin{enumerate}
- \item{[DSK] lazy non-determinism: quotient by sets of values}
- \item{[DSK] abstract compilation: eliminate {\tt ev} states}
- \item{[Eng] store deltas: operate on store changes rather than whole stores}
- \item{[DSK/Eng] timestamp: represent the store as a global, mutable
-   hash and determine a state's store by the number of changes made to
-   the global store at the time of visiting}
- \item{[Eng] preallocation: represent the global store as a global, mutable vector}
- \item{[DSK] uniform literal approximation: coarsely abstract literal data}
+ \item lazy non-determinism;
+ \item abstract compilation; and
+ \item uniform literal approximation.
+\end{enumerate}
+The pragmatic improvements reduce overhead and trade space for time
+by utilizing:
+\begin{enumerate}
+ \item store deltas;
+ \item timestamped stores; and
+ \item preallocated data structures.
 \end{enumerate}
 
-Some techniques preserve the precision of the underlying analysis, and
-others do not. We will discuss the design decisions behind the
-precision-lossy techniques.  Each technique requires minimal changes
-to the reduction relation, and each improves performance by
-integer factors.
+Some techniques preserve the precision of the underlying analysis, and others
+do not.
+%
+For any technique that loses precision, we will discuss the design rationale
+for the move.
+
 
 \subsection{Lazy non-determinism}
 
