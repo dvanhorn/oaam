@@ -18,19 +18,35 @@
               [(vector-ref (numbers-exhaust? n) 0)
                "\\text{{\\small $m$}}"]
               [else (error 'bench-overview "No numbers, timeout or oom!: ~a" name)])]
-    [n (number->string (conv n))]))
+    [n (conv n)]))
 
 (define (byte->mib b) (/ b (* 1024 1024)))
 (define (nfigs n)
-  (cond [(zero? n) (compose inexact->exact round)]
-        [else 
-         (define factor (expt 10 n))
-         (λ (x) (exact->inexact (/ (round (* factor x)) factor)))]))
+  (compose number->string
+           (cond [(zero? n) (compose inexact->exact round)]
+                 [else 
+                  (define factor (expt 10 n))
+                  (λ (x)
+                     (if (integer? x)
+                         x
+                         (exact->inexact (/ (round (* factor x)) factor))))])))
+
+(define ((suffixed-number figs) n)
+  (define num-zeros (truncate (/ (log n) (log 10))))
+  (define (order k suff)
+    (and (>= num-zeros k)
+         (format "~a~a" ((nfigs figs) (/ n (expt 10 k))) suff)))
+  (or (order 9 "G")
+      (order 6 "M")
+      (order 3 "K")
+      ((nfigs figs) n)))
 
 
 (define files (list nucleic matrix nbody earley maze church lattice boyer mbrotZ))
 (define comparisons (list numbers-run numbers-peak-mem numbers-state-rate))
-(define conversions (list (nfigs 0) (compose (nfigs 0) byte->mib) (nfigs 0)))
+(define conversions (list (compose (suffixed-number 1)  (λ (x) (/ x 1000)))
+                          (compose (nfigs 0) byte->mib)
+                          (suffixed-number 0)))
 (define algos (list "sp" "pd"))
 
 (define-syntax-rule (for/append guards body ...)
@@ -40,9 +56,9 @@
   (λ ()
      (printf "\\begin{tabular}{@{}l|r|r|r|r|r|r|r@{}}~%")
      (printf "Program & LOC~%")
-     (printf "& \\multicolumn{2}{c|}{Time (ms)}~%")
-     (printf "& \\multicolumn{2}{c|}{Space (mb)}~%")
-     (printf "& \\multicolumn{2}{c@{}}{Speed (state/sec)}~%")
+     (printf "& \\multicolumn{2}{c|}{Time {\\small (s)}}~%")
+     (printf "& \\multicolumn{2}{c|}{Space {\\small (MB)}}~%")
+     (printf "& \\multicolumn{2}{c@{}}{Speed {\\small (state/s)}}~%")
      (printf "\\\\~%")
      (printf "\\hline\\hline~%")
      (printf
