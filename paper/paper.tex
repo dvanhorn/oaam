@@ -12,7 +12,7 @@
 \newtheorem{lemma}{Lemma}
 
 \newcommand{\naive}{na\"ive}
-\newcommand{\naively}{na\"ively}
+\newcommand{\naively}{ na\"ively}
 \newcommand{\Naive}{Na\"ive}
 \newcommand{\Naively}{Na\"ively}
 % \usepackage{xltxtra}
@@ -53,12 +53,13 @@ languages with features widely considered difficult to analyze.
 Although analyzers are straightforward to build under this approach,
 the result is prohibitively inefficient.
 
-This article contributes a step by step process for going from a \naive
-analyzer derived under the abstracting abstract machine approach, to
-an efficient program analyzer.  The end result of the process is a two
-to three order-of-magnitude improvement over the systematically
-derived analyzer, making it competitive with hand-optimized
-implementations that compute fundamentally less precise results.
+This article contributes a step by step process for going from a
+\naive analyzer derived under the abstracting abstract machine
+approach, to an efficient program analyzer.  The end result of the
+process is a two to three order-of-magnitude improvement over the
+systematically derived analyzer, making it competitive with
+hand-optimized implementations that compute fundamentally less precise
+results.
 \end{abstract}
 
 %% \category{CR-number}{subcategory}{third-level}
@@ -609,7 +610,7 @@ Then, the evaluator for the analysis computes the least fixed-point of the globa
 where $\varsigma_0 = \ev[^\mtcntr]{e, \varnothing, \varnothing, \kmt}$.
 
 
-To conduct this \naive exploration on the \Church{} example would require
+To conduct this \naive{} exploration on the \Church{} example would require
 considerable time.  Even though the state space is finite, it is exponential in
 the size of the program.  Even with $k = 0$, there are exponentially many
 stores in the AAM framework.
@@ -1145,7 +1146,7 @@ even in our fastest implementation, this abstraction causes the
 analysis of Boyer to be 430 times slower than the approach we will now
 describe.
 
-\subsubsection{Less \naively and less precisely}
+\subsubsection{Less \naively{} and less precisely}
 
 The number of syntactic uses of {\tt cons} versus implicit uses via
 literal lists is smaller in typical Scheme programs. We use the above
