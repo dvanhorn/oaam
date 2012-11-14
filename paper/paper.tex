@@ -29,7 +29,8 @@
 % \titlebanner{banner above paper title}        % These are ignored unless
 % \preprintfooter{short description of paper}   % 'preprint' option specified.
 
-\title{Optimizing Abstract Abstract Machines}
+\title{Optimizing Abstract Abstract Machines
+\vskip -1.5cm}
 
 %% \authorinfo{J. Ian Johnson}
 %%            {Northeastern University}
@@ -527,7 +528,7 @@ fixed-point computation.
 
 Conceptually, the AAM approach calls for computing an analysis as a graph
 exploration: (1) start with an initial state, and (2) compute the transitive
-closure of the transition relation starting from that state.
+closure of the transition relation from that state.
 
 We can cast this exploration process in terms of a fixed-point calculation.
 %
@@ -754,6 +755,7 @@ changes to the semantics:
               \maddr &= \mvar\mcntr'
 \end{align*}
 
+\noindent
 We have two choices for how to implement lazy non-determinism.
 
 \paragraph{Option 1: Lose precision; simplify implementation}
@@ -1095,7 +1097,7 @@ encounter.
 An alternative in this case is to explicitly flatten literal lists
 into single abstract cells.
 
-We will explore both options here.
+We explore both options here.
 %
 We will first explain the natural abstraction of tuples, and then we
 will explain a less precise allocation strategy from uniform $k$-CFA
@@ -1276,7 +1278,7 @@ We use the following set of benchmarks:
   distinguished root and \(k\) vertices, each having out-degree at
   most 2. It is written in a continuation-passing style and makes
   extensive use of higher-order procedures---it creates closures
-  almost as often as it performs non-tail procedure calls--- (used by
+  almost as often as it performs non-tail procedure calls (used by
   \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 \end{enumerate}
 
@@ -1340,8 +1342,7 @@ Cartwright~\cite{dvanhorn:Wright1997Practical} and, in many ways its
 successor, the Polymorphic splitting system of Wright and
 Jagannathan~\cite{dvanhorn:wright-jagannathan-toplas98}.\footnote{This
   is not a coincidence; these papers set a high standard for
-  evaluation, which we consciously aimed to approach.  Many of our
-  benchmarks are drawn from these papers.}  Unfortunately, these
+  evaluation, which we consciously aimed to approach.}  Unfortunately, these
 analyses compute an inherently different and uncomparable form of
 analysis.  Consequently, we have omitted a complete comparison with
 these implementations,.  The AAM approach provides more precision in
@@ -1404,9 +1405,9 @@ effect.
 Constraint-based program analyses
 (e.g.~\cite{dvanhorn:nielson-nielson-popl97,dvanhorn:wright-jagannathan-toplas98,dvanhorn:Meunier2006Modular})
 typically compute sets of abstract values for each program point.
-These values approximate the values arising at run-time for each
+These values approximate values arising at run-time for each
 program point.  Value sets are computed as the least solution to a set
-of constraints (either inclusion or equality constraints).  The
+of (inclusion or equality) constraints.  The
 constraints must be designed and proved as a sound approximation of
 the semantics.  Efficient implementations of these kinds of analyses
 often take the form of worklist-based graph algorithms for constraint
@@ -1431,7 +1432,7 @@ the \Church{} benchmark about 25 times faster than the fastest
 implementation considered here.  These analyses compute very different
 things, so the performance comparison is not apples-to-apples.
 
-The AAM approach, and the state transition graphs it generates, encode
+The AAM approach, and the state transition graphs it generates, encodes
 temporal properties not found in classical constraint-based analyses
 for higher-order programs.
 %
@@ -1458,7 +1459,7 @@ performant constraint-based analyses.
 \label{sec:conclusion}
 
 Abstract machines are not only a good model for rapid analysis
-development, they also can be systematically developed into efficient
+development, they can be systematically developed into efficient
 algorithms.
 
 %% \acks Sam Tobin-Hochstadt for encouragement and feedback -- he was
@@ -1470,6 +1471,7 @@ algorithms.
 
 %% NSF, DARPA
 
+
 \paragraph{Acknowledgments}
 
 We thank Suresh Jagannathan for providing source code to the
@@ -1478,9 +1480,11 @@ analyzer~\cite{dvanhorn:wright-jagannathan-toplas98} and Ilya Sergey
 for the introspective pushdown
 analyzer~\cite{dvanhorn:Earl2012Introspective}.
 
+
 \balance
 \bibliographystyle{plain}
-\bibliography{local,bibliography}
+\input{paper.bbl}
+%\bibliography{local,bibliography}
 
 % \include{appendix}
 
