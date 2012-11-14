@@ -10,7 +10,7 @@
 (define (loc f)
   (with-input-from-file f
     (λ ()
-       (for/sum ([l (in-port read-line)]) #:break (eq? l 'eof) 1))))
+       (for/sum ([l (in-port read-line)]) 1))))
 (define (entry name fn conv n)
   (match (average (fn n))
     [#f (cond [(vector-ref (numbers-timeout? n) 0)
