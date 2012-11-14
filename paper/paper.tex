@@ -10,6 +10,11 @@
 
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}{Lemma}
+
+\newcommand{\naive}{na\"ive}
+\newcommand{\naively}{ na\"ively}
+\newcommand{\Naive}{Na\"ive}
+\newcommand{\Naively}{Na\"ively}
 % \usepackage{xltxtra}
 % \setmonofont[Scale=MatchLowercase]{DejaVu Sans Mono}
 %
@@ -48,12 +53,13 @@ languages with features widely considered difficult to analyze.
 Although analyzers are straightforward to build under this approach,
 the result is prohibitively inefficient.
 
-This article contributes a step by step process for going from a naive
-analyzer derived under the abstracting abstract machine approach, to
-an efficient program analyzer.  The end result of the process is a two
-to three order-of-magnitude improvement over the systematically
-derived analyzer, making it competitive with hand-optimized
-implementations that compute fundamentally less precise results.
+This article contributes a step by step process for going from a
+\naive analyzer derived under the abstracting abstract machine
+approach, to an efficient program analyzer.  The end result of the
+process is a two to three order-of-magnitude improvement over the
+systematically derived analyzer, making it competitive with
+hand-optimized implementations that compute fundamentally less precise
+results.
 \end{abstract}
 
 %% \category{CR-number}{subcategory}{third-level}
@@ -380,7 +386,7 @@ different in the following ways:
 \begin{figure}
 \begin{gather*}
 \begin{align*}
-\mathit{eval}(\mexp) &= \{ \mstate\ |\ \ev[^{\mtcntr}]{\mexp,\varnothing,\varnothing,\kmt} \multimachstep \mstate \} \text{ where }
+\eval(\mexp) &= \{ \mstate\ |\ \ev[^{\mtcntr}]{\mexp,\varnothing,\varnothing,\kmt} \multimachstep \mstate \} \text{ where }
 \end{align*}
 \\[2mm]
 \begin{array}{@{}r@{\ }c@{\ }l@{}}
@@ -567,7 +573,7 @@ has no interesting ordering, $\sqcup$ can be read as $\cup$.
 \section{Reduction semantics to baseline analyzer}
 \label{sec:baseline}
 
-The uniform $k$-CFA allocation strategy would make $eval$ in figure
+The uniform $k$-CFA allocation strategy would make $\eval$ in figure
 \ref{fig:aam} a computable abstraction of reachable states, but not an
 efficient one. This is not the strategy that AAM, nor we, recommend. Through
 this and the following section, we will explain a succession of approximations
@@ -597,16 +603,14 @@ Internally, this global transfer function computes the successors of all supplie
 \begin{equation*}
   F_{\varsigma_0}(S) = \{ \varsigma_0 \} \cup \{ \varsigma' \mathrel{|} \varsigma \in S \text{ and } \varsigma \machstep \varsigma' \}\text. 
 \end{equation*}
-Then, the evaluator for the analysis computes the least fixed point of the global transfer function:
+Then, the evaluator for the analysis computes the least fixed-point of the global transfer function:
 \begin{equation*}
  \eval(e) = \mathrm{lfp}(F_{\varsigma_0})\text{,}
 \end{equation*}
-where:
-\begin{equation*}
-\varsigma_0 = \ev[^\mtcntr]{e, \varnothing, \varnothing, \kmt}\text.
-\end{equation*}
+where $\varsigma_0 = \ev[^\mtcntr]{e, \varnothing, \varnothing, \kmt}$.
 
-To conduct this naive exploration on the \Church{} example would require
+
+To conduct this \naive{} exploration on the \Church{} example would require
 considerable time.  Even though the state space is finite, it is exponential in
 the size of the program.  Even with $k = 0$, there are exponentially many
 stores in the AAM framework.
@@ -621,32 +625,50 @@ a single, global shared store for all.
 \subsection{Store widening}
 \label{sec:storewiden}
 
-A common technique to accelerate convergence in flow analyses is to share
-a common store that is monotonically updated as interpretation
-continues. In the ISWIM language with only unary operators, this makes
-our 0-CFA quartic in the size of the program, which in one step drops the
-complexity from intractable exponentiality to merely daunting
-polynomiality.
+A common technique to accelerate convergence in flow analyses is to share a
+common, global store.
+%
+To retain soundness, this store grows monotonically.
+%
+Formally, we can cast this optimization as a second abstraction or as the
+application of a widening operator during the fixed-point iteration.
+%
+In the ISWIM language, such a widening makes 0-CFA quartic in the size of the
+program.
+%
+Thus, in one step, complexity drops from intractable exponentiality to merely
+daunting polynomiality.
 
-We can reuse the reduction relation we have defined, but with some
-scaffolding around it. A state in the store-widened machine is a pair
-of a set of ISWIM states without a store, and a store. A step of this
-machine will pair the store with each of the states in this set,
-reduce, and combine the output stores to create the next. The
-scaffolded reduction relation, $\widehat{\machstep}$, is as follows:
+Since we can cast this optimization as a widening, there is no need to change
+the transition relation itself.
+%
+Rather, what changes is the structure of the fixed-point iteration.
+%
+In each pass, the algorithm will collect all newly produced stores and join
+them together.
+%
+Then, before each transition, it will install this joined store into current
+state.
 
+To describe this process, we'll refactor the transition relation so that it operates on
+a pair of a set of contexts ($C$) and a store ($\sigma$).
+%
+A context includes all non-store components, \emph{e.g.}, the expression, the environment and the stack.
+%
+The refactored relation, $\widehat{\machstep}$, becomes:
+%
 \begin{align*}
-(cs, \msto) &\mathrel{\widehat{\machstep}} (cs', \msto') \\
-\mbox{where } cs' &= \{c' \mid wn(c, \msto) \mathrel{\machstep} wn(c, \msto^c), c \in cs\} \\
-              \msto' &= \bigsqcup\{\msto^c \mid wn(c,\msto)\mathrel{\machstep} wn(c', \msto^c), c \in cs\} \\
-wn(\ev{\mexp, \menv, \mkont}, \msto) &= \ev{\mexp, \menv, \msto, \mkont} \\
-wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \msto, \mkont} \\
-wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont} \\
-wn(\ans{\mval}, \msto) &= \ans{\msto, \mval}
+(C, \msto) &\mathrel{\widehat{\machstep}} (C', \msto') \\
+\mbox{where } C' &= \{c' \mid \wn(c, \msto) \mathrel{\machstep} \wn(c, \msto^c), c \in C\} \\
+              \msto' &= \bigsqcup\; \{\msto^c \mid \wn(c,\msto)\mathrel{\machstep} \wn(c', \msto^c), c \in C\} \\
+\wn(\ev{\mexp, \menv, \mkont}, \msto) &= \ev{\mexp, \menv, \msto, \mkont} \\
+\wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \msto, \mkont} \\
+\wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont} \\
+\wn(\ans{\mval}, \msto) &= \ans{\msto, \mval}
 \end{align*}
-That is, the next set of states is what we get by stepping each
-given state, without its store. The next store is the combination of all produced
-stores. For simplicity, assume that stuck states step to themselves.
+%
+In effect, the new store is computed as the least upper bound of all subsequent stores.
+
 
 \subsection{Store-allocated results}
 \label{sec:baselineeval}
@@ -770,7 +792,7 @@ ext(\msto, \maddr, \mval) &= \msto \sqcup[\maddr \mapsto force(\msto, \mval)] \\
 \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto}
 &\machstep\;
 \ev[^\mcntr]{\mexp,\menv,ext(\msto, \maddr^f,\mval),\kfn[^\mcntr_\mlab]{\maddr^f,\maddr}} \\
-bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
+\mathit{bind\,}^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
   \maddr], ext(\msto,\maddr, \mval), \mcntr' \\
 \mbox{where } \mcntr' &= \lfloor\mlab\mcntr\rfloor_k \\
               \maddr &= \mvar\mcntr'
@@ -940,9 +962,9 @@ empty ($\mtlst$) for each step. Applying the changes to the full store
 is straightforward:
 
 \begin{align*}
-replay &: \StoreDelta \times \Store \to \Store \\
-replay(\mtlst, \msto) &= \msto \\
-replay(\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}, \msto) &= replay(\msdiff, \msto\sqcup[\maddr \mapsto \mval{s}])
+\replay &: \StoreDelta \times \Store \to \Store \\
+\replay(\mtlst, \msto) &= \msto \\
+\replay(\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}, \msto) &= \replay(\msdiff, \msto\sqcup[\maddr \mapsto \mval{s}])
 \end{align*}
 
 The reduction relation does have to change to accommodate this
@@ -968,19 +990,19 @@ in the input and output. For each state that is stepped, we feed the
 output changes to the next so that all changes get accumulated:
 
 \begin{align*}
-(cs, \msto) &\mathrel{\widehat{\machstep}} (cs\cup cs', replay(\msdiff,\msto)) \\
-\mbox{ where } (cs', \msdiff) &= step^*(\varnothing, cs, \mtlst) \\
-step^*(S, \varnothing, \msdiff) &= (S, \msdiff) \\
-step^*(S, \{c\}\cup cs, \msdiff &= step^*(S\cup cs^*, cs, \msdiff^*) \\
-cs^* &= \{c' \mid (c,\msto,\msdiff) \machstep (c',\msdiff^c) \} \\
-\msdiff^* &= concat\{\msdiff^c \mid (c, \msto,\msdiff) \machstep (c', \msdiff^c)\}
+(\states, \msto) &\mathrel{\widehat{\machstep}} (\states\cup \states', \replay(\msdiff,\msto)) \\
+\mbox{ where } (\states', \msdiff) &= \step^*(\varnothing, \states, \mtlst) \\
+\step^*(S, \varnothing, \msdiff) &= (S, \msdiff) \\
+\step^*(S, \{c\}\cup \states, \msdiff &= \step^*(S\cup cs^*, \states, \msdiff^*) \\
+\states^* &= \{c' \mid (c,\msto,\msdiff) \machstep (c',\msdiff^c) \} \\
+\msdiff^* &= \concat\{\msdiff^c \mid (c, \msto,\msdiff) \machstep (c', \msdiff^c)\}
 \end{align*}
 
-Here $concat : \Set(\StoreDelta) \to \StoreDelta$ flattens the lists
+Here $\concat : \Set(\StoreDelta) \to \StoreDelta$ flattens the lists
 of changes to one; order it appends does not matter:
 \begin{align*}
-concat(\varnothing) &= \mtlst \\
-concat(\{\msdiff\}\cup D) &= append(\msdiff, concat(D))
+\concat(\varnothing) &= \mtlst \\
+\concat(\{\msdiff\}\cup D) &= \append(\msdiff, \concat(D))
 \end{align*}
 
 %% Delta Store +k Compile + Lazy:
@@ -1020,18 +1042,18 @@ change is straightforward.
 The current state of the state-space search now has six components:
 
 \begin{itemize}
- \item{{\tt $\msto$}, the store}
+ \item{$\msto$, the store}
  \item{{\tt todo}, the workset}
  \item{{\tt seen}, a map from states to the timestamps at which they were last seen}
- \item{{\tt $\msdiff$}, the store changes for the current step}
- \item{{\tt $\msdiff$?}, a boolean tracking whether the stepped state contributed a store change}
+ \item{$\msdiff$, the store changes for the current step}
+ \item{$\changep$, a boolean tracking whether the stepped state contributed a store change}
  \item{{\tt T}, the timestamp of the store}
 \end{itemize}
 
 The new $eval$ calculation is defined in
 figure~\ref{fig:imperative}.  To ensure termination, we guard adding
 $c$ to {\tt todo} by the following check:
-\begin{align*}\msdiff\mbox{{\tt ?}} \vee {\tt seen}(c) \neq {\tt T}\end{align*}
+\begin{align*}\changep \vee {\tt seen}(c) \neq {\tt T}\end{align*}
 If it succeeds, {\tt todo} gets $c$ and we update {\tt seen} to map $c$ to {\tt T}.
 
 After all steps complete, we apply $\msdiff$ to $\msto$ imperatively
@@ -1041,7 +1063,7 @@ know that each $\ttuple{\maddr}{\mval{s}}$ in $\msdiff$ would change
 the value of $\maddr$ in the current store. Thus, we also guard
 additions to $\msdiff$ so that only updates that would change the
 store are permitted. Each time $\msdiff$ is successfully extended, we
-set {\tt $\msdiff$?} to true. Before each individual step, we set it
+set $\changep$ to true. Before each individual step, we set it
 to false.
 
 \begin{figure}
@@ -1054,7 +1076,7 @@ eval(\(e\)) :=
     else:
       let old := todo
       todo, \(\msdiff\) := \(\varnothing\), \(\mtlst\)
-      foreach c \(\in\) old: \(\msdiff\)? := false; c()
+      foreach c \(\in\) old: \(\changep\) := false; c()
       unless \(\msdiff\) = \(\mtlst\): T += 1; replay!(\(\msdiff, \msto\))
 \end{alltt}
 \caption{Imperative algorithm}
@@ -1099,7 +1121,7 @@ will explain a less precise allocation strategy from uniform $k$-CFA
 that we use for large compound data literals that we modified from the
 implementation in \citep{dvanhorn:wright-jagannathan-toplas98}.
 
-\subsubsection{Na\"ively}
+\subsubsection{\Naively}
 
 The uniform way AAM approaches a simple abstraction strategy is to cut
 recursion out of the data definition by tying the recursive knot
@@ -1124,7 +1146,7 @@ even in our fastest implementation, this abstraction causes the
 analysis of Boyer to be 430 times slower than the approach we will now
 describe.
 
-\subsubsection{Less na\"ively and less precisely}
+\subsubsection{Less \naively{} and less precisely}
 
 The number of syntactic uses of {\tt cons} versus implicit uses via
 literal lists is smaller in typical Scheme programs. We use the above
@@ -1164,18 +1186,18 @@ There are a few steps to consider:
 
 \begin{figure}
 \begin{align*}
-\interpdelta(\msto, qlist) &= (\mbox{{\tt '()}}, \msto) \\
-\interpdelta(\msto, qlist, v ..._+) &= (({\tt cons}\ a\ d), \msto') \\
+\interpdelta(\msto,\ {\tt qlist}) &= (\mbox{{\tt '()}}, \msto) \\
+\interpdelta(\msto,\ {\tt qlist}, v ..._+) &= (({\tt cons}\ a\ d), \msto') \\
 \qquad \mbox{where } \msto' &= \msto\sqcup[a \mapsto \bigsqcup(v ...)] \\
                             &\qquad \sqcup[d \mapsto \{ \mbox{{\tt '()}}, ({\tt cons}\ a\ d)\}] \\
 \bigsqcup(v) &= v \\
-\bigsqcup(v, vs ...) &= merge(v, \bigsqcup(vs ...)) \\
-merge(v, v) &= v \\
-merge(n, m) &= {\tt Number} \\
-merge(n, v) &= {\tt QData} \\
-merge(({\tt cons}\ a\ d), ({\tt cons}\ a'\ d')) &= {\tt QPair} \\
-merge({\tt QPair}, ({\tt cons}\ a\ d)) &= {\tt QPair} \\
-merge({\tt QPair}, v) &= {\tt QData} \\
+\bigsqcup(v, vs ...) &= \fmerge(v, \bigsqcup(vs ...)) \\
+\fmerge(v, v) &= v \\
+\fmerge(n, m) &= {\tt Number} \\
+\fmerge(n, v) &= {\tt QData} \\
+\fmerge(({\tt cons}\ a\ d), ({\tt cons}\ a'\ d')) &= {\tt QPair} \\
+\fmerge({\tt QPair}, ({\tt cons}\ a\ d)) &= {\tt QPair} \\
+\fmerge({\tt QPair}, v) &= {\tt QData} \\
 \vdots
 \end{align*}
 \caption{Quoted list primitive}
@@ -1226,25 +1248,10 @@ the baseline, the optimized analyzer outperformed the baseline by a
 factor of 475 to 4,382.
 
 \begin{figure}
-\begin{tabular}{@{}l|r|r|r|r|r|r|r@{}}
-Program & LOC
-& \multicolumn{2}{c|}{Time (ms)}
-& \multicolumn{2}{c|}{Space (mb)}
-& \multicolumn{2}{c@{}}{Speed (state/sec)}
-\\
-\hline\hline
-nucleic &  3508 & 0 & 0 & 0 & 0 & 0 & 0\\
-matrix  &  747  & ? & ? & ? & ? & ? & ?\\
-nbody   & 1434  & ? & ? & ? & ? & ? & ?\\
-earley  &  667  & ? & ? & ? & ? & ? & ?\\
-maze    &  681  & ? & ? & ? & ? & ? & ?\\
-church  &   41  & ? & ? & ? & ? & ? & ?\\
-lattice &  214  & ? & ? & ? & ? & ? & ?\\
-boyer   &  642  & ? & ? & ? & ? & ? & ?\\
-mbrotz  &   68  & ? & ? & ? & ? & ? & ?
-\end{tabular}
+\centering
+\include{bench-overview}
 \caption{Overview performance comparison between baseline and
-  optimized analyzer.}
+  optimized analyzer (entries of \text{{\small $t$}} mean timeout, and \text{{\small $m$}} mean out of memory).}
 \label{fig:bench-overview}
 \end{figure}
 
@@ -1331,7 +1338,7 @@ Our implementation of the analysis used in the evaluation is roughly
 
 \paragraph{Comparison with other flow analysis implementations}
 
-[Computes results more like Earl, et al.'s 0CFA, which times out on
+[Computes results more like Earl, et al.'s 0-CFA, which times out on
   the Church numeral benchmark and so even though it offers a fair
   point of comparison, a more thorough evaluation is likely to
   uninformative as the other benchmarks are highly likely to timeout
@@ -1342,8 +1349,8 @@ Our implementation of the analysis used in the evaluation is roughly
   and times out after 30 minutes.]
 
 Vardoulakis and Shivers evaluate their CFA2
-analyzer~\cite{dvanhorn:Vardoulakis2011CFA2} against a variant of 0CFA
-defined in their framework.  [NEED TIMING FOR 0CFA ON CHURCH.]  The
+analyzer~\cite{dvanhorn:Vardoulakis2011CFA2} against a variant of 0-CFA
+defined in their framework.  [NEED TIMING FOR 0-CFA ON CHURCH.]  The
 Church example is the largest benchmark Vardoulakis and Shivers
 consider.  More work would be required to scale the analyzer to the
 set of features required by our benchmarks.
