@@ -14,9 +14,9 @@
 (define (entry name fn conv n)
   (match (average (fn n))
     [#f (cond [(vector-ref (numbers-timeout? n) 0)
-               "t"]
+               "\\text{{\\small $t$}}"]
               [(vector-ref (numbers-exhaust? n) 0)
-               "m"]
+               "\\text{{\\small $m$}}"]
               [else (error 'bench-overview "No numbers, timeout or oom!: ~a" name)])]
     [n (number->string (conv n))]))
 
