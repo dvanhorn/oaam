@@ -474,9 +474,9 @@ when multiple values reside in a store location.
 
 It is important to recognize from this definition that \emph{any}
 allocation strategy is an abstract
-interpretation~\cite{MIGHTANDMANOLIOS}.  In particular, concrete
-interpretation is a kind of abstract interpretation.  So is an
-interpretation that allocates a single cell into which all bindings
+interpretation~\cite{dvanhorn:Might2009Posteriori}.  In particular,
+concrete interpretation is a kind of abstract interpretation.  So is
+an interpretation that allocates a single cell into which all bindings
 and continuations are stored.  On the one hand is an abstract
 interpretation that is non-computable and gives only the ground truth
 of a programs behavior; on the other is an abstract interpretation
@@ -1360,18 +1360,19 @@ Our implementation of the analysis used in the evaluation is roughly
   and times out after 30 minutes.]
 
 Vardoulakis and Shivers evaluate their CFA2
-analyzer~\cite{dvanhorn:Vardoulakis2011CFA2} against a variant of 0-CFA
-defined in their framework.  [NEED TIMING FOR 0-CFA ON CHURCH.]  The
-Church example is the largest benchmark Vardoulakis and Shivers
-consider.  More work would be required to scale the analyzer to the
-set of features required by our benchmarks.
+analyzer~\cite{dvanhorn:Vardoulakis2011CFA2} against a variant of
+0-CFA defined in their framework and the example we draw on is the
+largest benchmark Vardoulakis and Shivers consider.  More work would
+be required to scale the analyzer to the set of features required by
+our benchmarks.
 
 [Should probably talk about mCFA too.]
 
 The only analyzers we were able to find that proved capable of
 analyzing the full suite of benchmarks considered here were the Soft
-Typing system of Wright [CITE] and, in many ways its successor, the
-Polymorphic splitting system of Wright and
+Typing system of Wright and
+Cartwright~\cite{dvanhorn:Wright1997Practical} and, in many ways its
+successor, the Polymorphic splitting system of Wright and
 Jagannathan~\cite{dvanhorn:wright-jagannathan-toplas98}.\footnote{This
   is not a coincidence; these papers set a high standard for
   evaluation, which we consciously aimed to approach.  Many of our
