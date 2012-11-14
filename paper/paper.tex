@@ -45,17 +45,17 @@
 \maketitle
 
 \begin{abstract}
-Abstracting abstract machines has recently been proposed as a
+Abstracting abstract machines has been proposed as a
 lightweight approach to designing sound and computable program
-analyses.  The approach involves deriving abstract interpreters from
+analyses.  The approach derives abstract interpreters from
 existing machine semantics and has been applied to a variety of
 languages with features widely considered difficult to analyze.
-Although analyzers are straightforward to build under this approach,
-the result is prohibitively inefficient.
+Although sound analyzers are straightforward to build under this approach,
+they are also prohibitively inefficient.
 
-This article contributes a step by step process for going from a
-\naive analyzer derived under the abstracting abstract machine
-approach, to an efficient program analyzer.  The end result of the
+This article contributes a step-by-step process for going from a
+\naive{} analyzer derived under the abstracting abstract machine
+approach to an efficient program analyzer.  The end result of the
 process is a two to three order-of-magnitude improvement over the
 systematically derived analyzer, making it competitive with
 hand-optimized implementations that compute fundamentally less precise
