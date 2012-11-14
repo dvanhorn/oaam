@@ -1299,20 +1299,20 @@ factor of 475 to 4,382.
 
 \item {\bf earley}:  Earley's parser written by Marc Feeley.
 
-\item {\bf maze}: generates a random maze and finds a path (used in
-  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98})
-  Makes use of Scheme's {\tt call-with-current-continuation}
-  operation.
+\item {\bf maze}: generates a random maze using Scheme's {\tt
+  call/cc} operation and finds a path solving
+  the maze (used in
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 
 \item {\bf church}: tests distributivity of multiplication over
-  addition for a few Church numerals (introduced by
+  addition for Church numerals (introduced by
   \cite{dvanhorn:Vardoulakis2011CFA2}).
 
 \item {\bf lattice}: enumerates the maps between two lattices (used in
-  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98})
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 
 \item {\bf boyer}: a term-rewriting theorem prover (used in
-  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98})
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 
 \item {\bf mbrotZ}: generates Mandelbrot set fractal using complex
   numbers.
@@ -1321,8 +1321,7 @@ factor of 475 to 4,382.
   distinguished root and \(k\) vertices, each having out-degree at
   most 2. It makes extensive use of higher-order procedures and is
   written in a continuation-passing style (used by
-  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98})
-
+  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 \end{enumerate}
 
 Our implementation of the analysis used in the evaluation is roughly
@@ -1358,15 +1357,15 @@ Our implementation of the analysis used in the evaluation is roughly
 
 \paragraph{Comparison with other flow analysis implementations}
 
-[Computes results more like Earl, et al.'s 0-CFA, which times out on
-  the Church numeral benchmark and so even though it offers a fair
-  point of comparison, a more thorough evaluation is likely to
-  uninformative as the other benchmarks are highly likely to timeout
-  as well (and it would require significant effort to extend their
-  implementation with the features needed to analyze our benchmark
-  suite).  That implementation is evaluated against much smaller
-  benchmarks: the largest program consists of 63 \emph{subexpressions}
-  and times out after 30 minutes.]
+The analysis considered here computes results more like Earl, et al.'s
+0-CFA, which times out on the \Church{} benchmark because it does not
+widen the store as described for our baseline evaluator.  So even
+though it offers a fair point of comparison, a more thorough
+evaluation is probably uninformative as the other benchmarks are
+likely to timeout as well (and it would require significant effort to
+extend their implementation with the features needed to analyze our
+benchmark suite).  That implementation is evaluated against much
+smaller benchmarks: the largest program is 30 lines.
 
 Vardoulakis and Shivers evaluate their CFA2
 analyzer~\cite{dvanhorn:Vardoulakis2011CFA2} against a variant of
@@ -1374,8 +1373,6 @@ analyzer~\cite{dvanhorn:Vardoulakis2011CFA2} against a variant of
 largest benchmark Vardoulakis and Shivers consider.  More work would
 be required to scale the analyzer to the set of features required by
 our benchmarks.
-
-[Should probably talk about mCFA too.]
 
 The only analyzers we were able to find that proved capable of
 analyzing the full suite of benchmarks considered here were the Soft
@@ -1418,7 +1415,7 @@ of research: (1) the study of abstract
 machines~\cite{dvanhorn:landin-64} and their systematic
 construction~\cite{dvanhorn:reynolds-hosc98}, and (2) the theory of
 abstract interpretation
-\cite{dvanhorn:Cousot:1977:AI,dvanhorn:Cousot:1979:Galois}.
+\cite{dvanhorn:Cousot:1977:AI,dvanhorn:Cousot1979Systematic}.
 
 
 \paragraph{Frameworks for flow analysis of higher-order programs}
@@ -1471,14 +1468,32 @@ optimized~\cite{dvanhorn:bravenboer-smaragdakis-oopsla09}.
 Consequently, constraint-based analyses can be computed quickly.  For
 example, Jagannathan and Wright's polymorphic splitting
 implementation~\cite{dvanhorn:wright-jagannathan-toplas98} analyses
-the church numeral example of figure~\ref{fig:church} in 7
-milliseconds, about 25 times faster than the fastest implementation
-considered here.  These analyses compute very different things (as
-detailed in section~\ref{sec:accept}), so the performance comparison
-is not apples-to-apples.  We view the primary contribution of this
-work as a systematic path that eases the design, verification, and
-implementation of analyses using the abstracting abstract machine
-approach to within a factor of performant constraint-based analyses.
+the \Church{} benchmark about 25 times faster than the fastest
+implementation considered here.  These analyses compute very different
+things, so the performance comparison is not apples-to-apples.
+
+The AAM approach, and the state transition graphs it generates, encode
+temporal properties not found in classical constraint-based analyses
+for higher-order programs.
+%
+These analyses (ultimately) compute judgments on program terms and
+contexts, e.g., at expression $e$, variable $x$ may have value $v$.
+%
+The judgments do not relate the order in which expressions and context
+may be evaluated in a program, e.g., it has nothing
+to say with regard to question like, ``Do we always evaluate $e_1$
+before $e_2$?'' or ``Is it always the case that a file handle is
+opened, read and then closed in that order?''
+%
+The state transition graphs can answer these kinds of queries, but
+this does not come for free: respecting temporal order imposes an
+order in which states and terms may be evaluated \emph{during} the
+analysis.
+
+We view the primary contribution of this work as a systematic path
+that eases the design, verification, and implementation of analyses
+using the abstracting abstract machine approach to within a factor of
+performant constraint-based analyses.
 
 \section{Conclusion}
 \label{sec:conclusion}
