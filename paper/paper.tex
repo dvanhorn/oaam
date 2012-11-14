@@ -761,34 +761,41 @@ for the move.
 
 \subsection{Lazy non-determinism}
 
-A shortcoming of the AAM approach is that much of the non-determinism
-is spurious. For example, in a function application, {\tt (f x y)},
-where all variables have been joined with multiple values, each
-variable reference transitions to as many new states as there are
-values, only to be joined back together in their respective
-application positions. We would see transitions of the following
-shape:
+Tracing the execution of the analysis reveals an immediate shortcoming:
+there is a high degree of branching and merging in the exploration.
+%
+Surveying this branching has no benefit for precision.
+%
+For example, in a function application, {\tt (f x y)},
+where {\tt f}, {\tt x} and {\tt y} each have several values
+each argument evaluation induces two-way branching, only to be ultimately joined back together in their respective
+application positions. 
+%
+Transition patterns of this shape litter the state-graph:
+%
 \begin{center}
 \includegraphics[scale=0.3]{fanout.pdf}
 \end{center}
-For this reason, we {\it delay} the non-determinism
-until it is needed in {\it strict contexts} (such as the guard for an
-{\tt if} a called procedure, or a numerical primitive application). We instead get transitions of this shape:
+To avoid the spurious forking and joining, we {\it delay} the non-determinism
+until and unless it is needed in {\it strict contexts} (such as the guard for an
+{\tt if} a called procedure, or a numerical primitive application). 
+%
+Doing so collapses these forks and joins into a linear sequence of states:
 \begin{center}
 \includegraphics[scale=0.3]{lazy.pdf}
 \end{center}
 
-This does not change the concrete semantics of the language. It is an
-abstraction of the otherwise several states the original
-non-deterministic semantics steps to. We say the abstraction is
-\emph{lazy} because it delays dereferencing an address until its
-contents are \emph{needed} as values in the semantics. It does not
-change the execution order that leads to the values that are stored in
+In case it's unclear, this shift does not change the concrete semantics of the
+language to be lazy.  Rather, it abstracts over transitions that the original
+non-deterministic semantics steps through. 
+%
+We say the abstraction is \emph{lazy} because it delays dereferencing an
+address until its contents are \emph{needed} as values in the semantics. It
+does not change the execution order that leads to the values that are stored in
 the address.
 
 We introduce a new kind of value, $\saddr{\maddr}$, that represents a
-delayed lookup of $\maddr$. This acts to quotient the state space by
-the values at the delayed address. The following rules highlight the
+delayed lookup of $\maddr$.  The following rules highlight the
 changes to the semantics:
 
 \renewcommand{\ext}{\mathit{ext}}
@@ -809,7 +816,9 @@ changes to the semantics:
               \maddr &= \mvar\mcntr'
 \end{align*}
 
-\paragraph{Lose precision; simplify implementation}
+We have two choices for how to implement lazy non-determinism.
+
+\paragraph{Option 1: Lose precision; simplify implementation}
 This semantics introduces a subtle precision difference over the
 baseline. Consider a configuration where a reference to a variable and
 a binding of a variable will happen in one step. With laziness, the
@@ -820,7 +829,7 @@ will fan out to all the bindings of the variable before the new
 binding happens and thus might have an observable precision
 difference.
 
-\paragraph{Regain precision; complicate implementation}
+\paragraph{Option 2: Regain precision; complicate implementation}
 The administrative nature of laziness means that we could remove the
 loss in precision by duplicating the reduction relation to specialize
 variable lookup. This works since in the semantics of ISWIM with
