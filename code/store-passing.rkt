@@ -1,7 +1,7 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          "fix.rkt" "handle-limits.rkt"
-         "graph.rkt" (for-syntax racket/stxparam))
+         "graph.rkt" racket/stxparam)
 (provide bind-join-whole bind-join*-whole
          (for-syntax bind-rest) ;; common helper
          wide-step hash-getter

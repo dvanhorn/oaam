@@ -1,5 +1,5 @@
 #lang racket
-(require "notation.rkt" "graph.rkt" (for-syntax racket/stxparam))
+(require "notation.rkt" "graph.rkt" racket/stxparam)
 (provide mk-fix fix appl)
 
 ;; appl : (∀ (X) ((X -> (Setof X)) -> ((Setof X) -> (Setof X))))

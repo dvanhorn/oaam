@@ -2,7 +2,7 @@
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          "store-passing.rkt" "context.rkt" "fix.rkt"
          "handle-limits.rkt"
-         "graph.rkt" (for-syntax racket/stxparam))
+         "graph.rkt" racket/stxparam)
 (provide bind-join-∆s bind-join*-∆s mk-∆-fix^ mk-timestamp-∆-fix^ with-σ-∆s)
 
 ;; Utility function for combining multiple σ-∆s
@@ -96,7 +96,7 @@
                                  ([c* (in-set cs*)]
                                   #:when (or change?
                                              (not (= σ-count (hash-ref accum c* -1)))))
-                               #,(if (syntax-parameter-value #'generate-graph?) #'((add-edge! graph c c*)) #'())
+                               #,@(if (syntax-parameter-value #'generate-graph?) #'((add-edge! graph c c*)) #'())
                                (values (hash-set accum* c* σ-count) (∪1 front* c*))))
                            (step/join accum* todo* front* ∆**)]))]))))
      ;; filter the final results
