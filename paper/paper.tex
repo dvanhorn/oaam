@@ -74,12 +74,25 @@ results.
 
 The \emph{abstracting abstract machines} (AAM)
 approach~\cite{dvanhorn:VanHorn2011Abstracting,dvanhorn:VanHorn2012Systematic}
-to deriving program analyses provides a straightforward way of
-transforming a programming language semantics in the form of an
-abstract machine, into a family of abstract interpreters parameterized
-over policies for regulating the analytic precision of the control,
-environment, store, and base value domains.  By taking a
-machine-oriented view of computation, it becomes possible to design,
+to deriving program analyses provides a systematic way of transforming a
+programming language semantics in the form of an abstract machine into a family
+of abstract interpreters.
+%
+The approach parameterizes these families with policies for regulating analytic
+precision.
+%
+While flexible and robust, the AAM approach unfortunately yields analyzers with
+poor performance relative to hand-optimized analyzers.
+%
+Our work takes aim squarely at this ``efficiency gap,'' and narrows it in an
+equally systematic way.
+
+%
+% Specifically, these policies tune precision for control,
+% the environment, the store, and base value domains.  
+
+By taking a
+machine-oriented view of computation, AAM makes it possible to design,
 verify, and implement program analyzers for realistic language
 features typically considered difficult to model.  The approach was
 originally applied to features such as higher-order functions,
@@ -116,24 +129,6 @@ further implementation effort.
 In this article, we develop a systematic approach to deriving the
 feasible implementation of an abstract-machine-based analyzer.
 
-
-
-
-%% Using this approach has also lead to new insights in pushdown
-%% abstractions of programs capable of precisely modeling the program
-%% stack, even in the presence of control effects.
-
-
-%% \subsection{Notation and prerequisites}
-
-%% Prereqs: Semantics Engineering \cite{dvanhorn:Felleisen2009Semantics},
-%% AAM \cite{dvanhorn:VanHorn2011Abstracting}
-%% \cite{dvanhorn:VanHorn2012Systematic}.
-
-%% Notation: concrete examples of programs under analysis is given in
-%% (monochrome) Scheme notation.  Code is given in (syntax colored)
-%% Racket.
-
 \section{At a glance}
 
 \begin{figure}[t]
@@ -158,25 +153,15 @@ setting of a core functional language.  This allows us to explicate
 the optimizations with a minimal amount of inessential technical
 overhead.  In the second half, we scale this approach up to an
 analyzer for a realistic untyped, higher-order imperative language
-with a number of interesting features.
+with a number of interesting features and then measure
+improvements across a suite of benchmarks.
 
-At each step during the initial development, we evaluate the
+At each step during the initial presentation and development, we evaluate the
 implementation on a benchmark from Vardoulakis and
 Shivers~\cite{dvanhorn:Vardoulakis2011CFA2} that tests distributivity
 of multiplication over addition on Church numerals.
-%% \footnote{It is
-%%   written here using Scheme notation and makes use of the shorthands:
-%% %
-%% \begin{alltt}
-%%    (define (((f x) y) z) ...) \(\equiv\)
-%%
-%%    (define f (\(\lambda\) (x) (\(\lambda\) (y) (\(\lambda\) (z) ...))))
-%% \end{alltt}
-%%
-%% \begin{alltt}
-%%    \church{n} \(\equiv\) (\(\lambda\) (s) (\(\lambda\) (z) (s\(\subscript1\) (s\(\subscript2\) ... (s\(\subscript{n}\) z)))))
-%% \end{alltt}}
-The example, while small, is informative:
+For the step-by-step development, 
+this benchmark is particularly informative:
 \begin{enumerate}
 \item it can be written in most modern programming languages,
 %
@@ -208,46 +193,7 @@ nearly a factor of 500, dropping the analysis time to a fraction of a
 second.  Figure~\ref{fig:churchtime} shows the step-wise improvement
 of the analysis time for this example.
 
-%% \newcommand{\church}[1]{\(\ulcorner{\tt #1}\urcorner\)}
-%% \begin{figure}
-%% \hrule
-%% \vspace{2mm}
-%% \begin{alltt}
-%% (define (zero? n) ((n (\(\lambda\) (zx) #f)) #t))
-%% (define (((mult m1) m2) mf) (m2 (m1 mf)))
-%% (define ((((plus p1) p2) pf) x)
-%%   ((p1 pf) ((p2 pf) x)))
-
-%% (define (((pred n) rf) rx)
-%%   (((n (\(\lambda\) (g) (\(\lambda\) (h) (h (g rf)))))
-%%     (\(\lambda\) (ignored) rx))
-%%    (\(\lambda\) (id) id)))
-
-%% (define ((church=? e1) e2)
-%%   (if (zero? e1) (zero? e2)
-%%       (if (zero? e2) #f
-%%           ((church=? (pred e1)) (pred e2)))))
-
-%% ;; multiplication distributes over addition
-%% ((church=? ((mult \church2) ((plus \church1) \church3)))
-%%  ((plus ((mult \church2) \church1)) ((mult \church2) \church3)))
-%% \end{alltt}
-%% \caption{Church-numeral calculation}
-%% \label{fig:church}
-%% \end{figure}
-
 \begin{figure}[t]
-%% \hrule
-%% \vspace{2mm}
-%% \begin{alltt}
-%% (define (id x) x)
-%% (define (f n)
-%%   (if (<= n 1) 1 (* n (f (- n 1)))))
-%% (define (g n)
-%%   (if (<= n 1) 1 (+ (* n n) (g (- n 1)))))
-%% (print (+ ((id f) 3) ((id g) 4)))
-%% \end{alltt}
-%% \hrule
 \begin{center}
 \begin{tabular}{ccc}
 \raisebox{1ex-\height}{
@@ -331,19 +277,35 @@ Section~\ref{sec:related} relates this work to the literature and
 section~\ref{sec:conclusion} concludes.
 
 %\newpage
-\section{An abstract$^{\text 2}$ machine for ISWIM}
+\section{An analyzer for ISWIM}
 \label{sec:aam}
 
+In this section, we give a brief review of the AAM approach by
+defining a sound analytic framework for a core higher-order functional
+language: Landin's ISWIM~\cite{dvanhorn:Landin1966Next}.  In the
+subsequent sections, we will explore optimizations for the analyzer in
+this simplified setting, but scaling these techniques to realistic
+languages is straightforward and has been done for the analyzer
+evaluated in section~\ref{sec:eval}.
 
 ISWIM is a family of programming languages parameterized by a set of
 base values and operations.  To make things concrete, we consider a
 member of the ISWIM family with integers, booleans, and a few
 operations.
+%
+Figure~\ref{fig:syntax} defines the (abstract) syntax of ISWIM.  It
+includes variables, literals (either integers, booleans, or
+operations), $\lambda$-expressions for defining procedures, procedure
+applications, and conditionals.  Expressions carry a label, $\mlab$,
+which is drawn from an unspecified set and denotes the source location
+of the expression; labels are used to disambiguate distinct, but
+syntactically identical pieces of syntax.  We omit the label
+annotation in contexts where it is irrelevant.
 
 \begin{figure}
 \[
 \begin{array}{l@{\qquad}rcl}
-\text{Expressions} & \mathit{e} &=& \svar[^\mlab]\mvar\\
+\text{Expressions} & \mexp &=& \svar[^\mlab]\mvar\\
 &&|& \slit[^\mlab]\mlit\\
 &&|& \slam[^\mlab]\mvar\mexp\\
 &&|& \sapp[^\mlab]\mexp\mexp \\
@@ -359,28 +321,50 @@ operations.
 \label{fig:syntax}
 \end{figure}
 
-Figure~\ref{fig:syntax} defines the (abstract) syntax of ISWIM.
-Figure~\ref{fig:aam} defines the semantics of ISWIM as a machine
-model.  Evaluation is defined as the set of states reachable by the
+\begin{figure}
+\[
+\begin{array}{l@{\qquad}rcl}
+\text{Values} & \mval   &=& \clos{\mvar,\mexp,\menv}\ |\ \mlit\ |\ \mkont\\
+\text{States} & \mstate &=& \ev{\mexp,\menv,\msto,\mkont}\\
+                       &&|& \co{\mkont,\mval,\msto}\\
+                       &&|& \ap{\mval,\mval,\msto,\mkont}\\
+\text{Continuations} & \mkont &=& \kmt\\
+&&|& \kfn{\mval,\maddr}\\
+&&|& \kar{\mexp,\menv,\maddr}\\
+&&|& \kif{\mexp,\mexp,\menv,\maddr}\\
+\text{Environments} &\menv&\in& \mathit{Var} \rightharpoonup \mathit{Addr}\\
+\text{Stores} &\msto&\in& \mathit{Addr} \rightharpoonup \mathcal{P}(\mathit{Value})
+\end{array}
+\]
+\caption{Abstract machine components}
+\label{fig:domains}
+\end{figure}
+
+
+The semantics are defined in terms of a machine model.  The machine
+compoents are defined in figure~\ref{fig:domains} and
+figure~\ref{fig:aam} defines the transition relation.  The evaluation
+of a program is defined as the set of states reachable by the
 reflexive, transitive closure of the machine transition relation.  The
 machine is a very slight variation on a standard abstract machine for
-ISWIM in ``eval, continue, apply''
-form~\cite{dvanhorn:Danvy:DSc}.  It can be
-systematically derived from a definitional interpreter through a
-continuation-passing style transformation and defunctionalization, or
-from a structural operational semantics using the refocusing
+ISWIM in ``eval, continue, apply'' form~\cite{dvanhorn:Danvy:DSc}.  It
+can be systematically derived from a definitional interpreter through
+a continuation-passing style transformation and defunctionalization,
+or from a structural operational semantics using the refocusing
 construction of Danvy and
 Nielsen~\cite{dvanhorn:Danvy-Nielsen:RS-04-26}.
 
 Compared with the standard machine semantics, this definition is
-different in the following ways:
+different in the following ways, which make it abstractable as a
+program analyzer:
 \begin{itemize}
-\item the store maps addresses to \emph{sets} of values,
-\item continuations are heap-allocated,
+\item the store maps addresses to \emph{sets} of values, not
+  single values,
+\item continuations are heap-allocated, not stack-allocated,
 \item there are ``contour values'' (written $\mcntr$) and syntax
   labels ($\mlab$) threaded through the computation, and
 \item the machine is implicitly parameterized by the functions
-  $\mathit{push}$, $\mathit{bind}$, $\interpdelta$ and $\sqcup$.
+  $\mathit{push}$, $\mathit{bind}$, and $\interpdelta$.
 \end{itemize}
 
 \begin{figure}
@@ -449,13 +433,13 @@ different in the following ways:
 \end{figure}
 
 
-\paragraph{Concrete interpretation} can be characterized by setting the implicit
-parameters of the relation given in Figure~\ref{fig:aam} as follows:
+\paragraph{Concrete interpretation} To characterize concrete interpretration, set the implicit
+parameters of the relation given in figure~\ref{fig:aam} as follows:
 \begin{align*}
 \mathit{push}_\mlab^\mcntr(\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
 \mbox{ where }\maddr \notin\msto
 \\
-\mathit{bind}(\menv,\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\msto\sqcup[\maddr\mapsto\{\mval\}]
+\mathit{bind}_\mlab^\mcntr(\menv,\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\msto\sqcup[\maddr\mapsto\{\mval\}]
 \mbox{ where }\maddr \notin\msto
 \end{align*}
 The resulting relation is non-deterministic in its choice of
@@ -464,9 +448,18 @@ allocating a continuation or variable binding.  If we consider machine
 states equivalent up to consistent renaming, this relation defines
 a deterministic machine.  (The relation is really a function.)
 
+The interpretation of primitive operations is defined by setting
+$\interpdelta$ as follows:
+\begin{align*}
+\mnum+1 &\in \interpdelta(\saddone,\mnum) &
+\mnum-1 &\in \interpdelta(\ssubone,\mnum)\\
+\strue &\in \interpdelta(\szerohuh,\szero) &
+\sfalse &\in \interpdelta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
+\end{align*}
 
-\paragraph{Abstract interpretation} can be characterized by setting the implicit
-parameters just as above, but dropping the $\maddr \not\in \msto$
+
+\paragraph{Abstract interpretation} To characterize abstract interpretation, set the implicit
+parameters just as above, but drop the $\maddr \not\in \msto$
 condition.  This family of interpreters is also non-deterministic in
 choices of addresses, but it is free to choose addresses that are
 already in use.  Consequently, the machines may be non-deterministic
@@ -482,17 +475,11 @@ interpretation that is non-computable and gives only the ground truth
 of a programs behavior; on the other is an abstract interpretation
 that is easy to compute but gives little information.  Useful program
 analyses lay somewhere in between and can be characterized by their
-choice of address representation and allocation strategy.
+choice of address representation and allocation strategy.  Uniform
+\(k\)-CFA~\cite{dvanhorn:nielson-nielson-popl97} is one such analysis.
 
-%% We now have a framework for describing program analysis for the ISWIM
-%% family of languages, whereby approximation of both control and
-%% environment structure is regulated by the heap and allocation
-%% policies.
-
-Uniform \(k\)-CFA is one such analysis.
-
-\paragraph{Uniform \(k\)-CFA} can be characterized by the following allocation
-strategy:
+\paragraph{Uniform \(k\)-CFA} To characterize uniform \(k\)-CFA, set the allocation
+strategy as follows, for a fixed constant \(k\):
 
 \begin{align*}
 \mathit{push}_\mlab^\mcntr(\msto,\mkont) &=
@@ -507,68 +494,19 @@ strategy:
               \lfloor \mcntr \rfloor_0 &= \mtcntr \\
               \lfloor \mlab\mcntr \rfloor_{k+1} &= \mlab\lfloor \mcntr\rfloor_k
 \end{align*}
-$\sqcup$ on stores is a point-wise lifting of $\sqcup$: $\msto \sqcup \msto' = \lambda \maddr. \msto(\maddr) \sqcup \msto'(\maddr)$.
-For the duration of this paper, since our example abstract value space
-has no interesting ordering, $\sqcup$ can be read as $\cup$.
-\paragraph{Primitives}
+where $\sqcup$ on stores is a point-wise lifting of $\sqcup$: $\msto
+\sqcup \msto' = \lambda \maddr. \msto(\maddr) \sqcup \msto'(\maddr)$.
+The \(\rfloor\cdot\lfloor_k\) notation denotes the truncation of a list
+of symbols to the leftmost \(k\) symbols.
 
-\begin{align*}
-\mnum+1 &\in \interpdelta(\saddone,\mnum) &
-\mnum-1 &\in \interpdelta(\ssubone,\mnum)\\
-\strue &\in \interpdelta(\szerohuh,\szero) &
-\sfalse &\in \interpdelta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
-\end{align*}
+All that remains is the interpretation of primitives.  For abstract
+intepretation, we set $\interpdelta$ to the function that returns
+$\sNum$ on all inputs---a symbolic value we interpret as denote the
+set of all integers.
 
-\begin{align*}
-\sNum &\in \hat\interpdelta(\saddone,\mnum) &
-\sNum &\in \hat\interpdelta(\ssubone,\mnum)\\
-\strue &\in \hat\interpdelta(\szerohuh,\sNum) &
-\sfalse &\in \hat\interpdelta(\szerohuh,\sNum)\\
-\strue &\in \hat\interpdelta(\szerohuh,\szero) &
-\sfalse &\in \hat\interpdelta(\szerohuh,\mnum)\text{ if }\mnum\neq \szero\\
-\end{align*}
-
-%% \begin{figure}
-%% \begin{alltt}
-%%   ;; State \(\to\) \(\Set(\)State\()\)
-%%   (define (step \(\mstate\))
-%%     (match \(\mstate\)
-%%       [(ev \(\mexp\) \(\rho\) \(\msto\) \(\mkont\))
-%%        (match \(\mexp\)
-%%          [(var\(\superscript\mlab\) \(\mvar\))
-%%           (for/set ((\(\mval\) (lookup \(\rho\) \(\msto\) \(\mvar\))))
-%%             (co \(\msto\) \(\mkont\) \(\mval\)))]
-%%          [(lit\(\superscript\mlab\) \(\mlit\)) (set (co \(\msto\) \(\mkont\) \(\mlit\)))]
-%%          [(lam\(\superscript\mlab\) \(\mvar\) \(\mexp\)) (set (co \(\msto\) \(\mkont\) (clos \(\mvar\) \(\mexp\) \(\rho\))))]
-%%          [(app\(\superscript\mlab\) \(\mexp\subscript0\) \(\mexp\subscript1\))
-%%           (define-values (\(\msto'\) \(\maddr\)) (push \(\mstate\)))
-%%           (set (ev \(\mexp\subscript0\) \(\rho\) \(\msto'\) (ar \(\mexp\subscript1\) \(\rho\) \(\maddr\))))]
-%%          [(ife\(\superscript\mlab\) \(\mexp\subscript0\) \(\mexp\subscript1\) \(\mexp\subscript2\))
-%%           (define-values (\(\msto'\) \(\maddr\)) (push \(\mstate\)))
-%%           (set (ev \(\mexp\subscript0\) \(\rho\) \(\msto'\) (ifk \(\mexp\subscript1\) \(\mexp\subscript2\) \(\rho\) \(\maddr\))))])]
-%%       [(co \(\msto\) \(\mkont\) \(\mval\))
-%%        (match \(\mkont\)
-%%          ['mt (set (ans \(\msto\) \(\mval\)))]
-%%          [(ar\(\superscript\mlab\) \(\mexp\) \(\rho\)) (set (ev \(\mexp\) \(\rho\) \(\msto\) (fn \(\mval\) l)))]
-%%          [(fn\(\superscript\mlab\) \(\mval'\))
-%%           (for/set ((\(\mkont\) (get-cont \(\msto\) l)))
-%%             (ap \(\msto\) \(\mval'\) \(\mval\) \(\mkont\)))]
-%%          [(fi\(\superscript\mlab\) c a \(\rho\))
-%%           (for/set ((k (get-cont \(\msto\) l)))
-%%             (ev (if v c \(\maddr\)) \(\rho\) \(\msto\) \(\mkont\)))])]
-%%       [(ap \(\msto\) fun \(\maddr\) \(\mkont\))
-%%        (match fun
-%%          [(clos l \(\mvar\) \(\mexp\) \(\rho\))
-%%           (define-values (\(\rho'\) \(\msto'\)) (bind \(\mstate\)))
-%%           (set (ev \(\msto'\) \(\mexp\) \(\rho'\) \(\mkont\)))]
-%%          [(op \(\mop\))
-%%           (for*/set ((\(\mkont\) (get-cont \(\msto\) l))
-%%                      (\(\mval\) (\(\interpdelta\) \(\mop\) \(\mval\))))
-%%             (co \(\msto\) \(\mkont\) \(\mval\)))]
-%%          [_ (set)]))]))
-%% \end{alltt}
-%% \caption{Implementation of machine transition relation.}
-%% \end{figure}
+At this point, we have abstracted the original machine to one which
+has a finite state space for any given program, and thus forms the
+basis of a sound, computable program analyzer for ISWIM.
 
 \section{Reduction semantics to baseline analyzer}
 \label{sec:baseline}
@@ -1266,8 +1204,8 @@ use the timeout limits as a lower bound on the actual time required,
 thus giving a conservative estimate of improvements.
 
 All benchmarks are calculated as an average of 5 runs, done in
-parallel, on an 11-core, 64-bit Intel Xeon machine running at 2.40GHz
-with 11Gb of memory.
+parallel, on an 12-core, 64-bit Intel Xeon machine running at 2.40GHz
+with 12Gb of memory.
 
 Many benchmarks cause the baseline analyzer to take longer than 30
 minutes or to consume more 1 gigabyte of memory, at which point the
