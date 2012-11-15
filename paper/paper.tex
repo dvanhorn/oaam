@@ -711,7 +711,7 @@ application positions.
 Transition patterns of this shape litter the state-graph:
 %
 \begin{center}
-\includegraphics[scale=0.3]{fanout.pdf}
+\includegraphics[scale=0.3]{fanout}
 \end{center}
 To avoid the spurious forking and joining, we {\it delay} the non-determinism
 until and unless it is needed in {\it strict contexts} (such as the guard for an
@@ -719,7 +719,7 @@ until and unless it is needed in {\it strict contexts} (such as the guard for an
 %
 Doing so collapses these forks and joins into a linear sequence of states:
 \begin{center}
-\includegraphics[scale=0.3]{lazy.pdf}
+\includegraphics[scale=0.3]{lazy}
 \end{center}
 
 In case it's unclear, this shift does not change the concrete semantics of the
