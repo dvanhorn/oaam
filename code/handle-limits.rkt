@@ -20,7 +20,8 @@
                      (λ (e)
                         (state-rate)
                         (case (exn:fail:resource-resource e)
-                          [(time) (dump-memory-stats) (printf "Result: Timeout~%")]
+                          [(time) (printf "Result: Timeout~%")]
                           [(memory) (printf "Result: Exhausted memory~%")]))]
                     [exn:fail? (λ (e) (printf "Barf ~a" e))])
-      body ...)))
+      body ...
+      (dump-memory-stats))))

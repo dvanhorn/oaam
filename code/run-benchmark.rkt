@@ -33,15 +33,15 @@
                       60 #;seconds-in-minutes)
                    1024 ;; Max memory: 1GiB
                    (begin0 (time ((aval) e))
-                           (void)
-                           (dump-memory-stats)
-                           (flush-output)
                            (printf "Result: Complete~%"))))))
 
 (module+ main
  (require racket/cmdline)
  (define test-file
   (command-line #:once-any
+                [("--sparsep")
+                 "Benchmark compiled imperative sparse"
+                 (aval sp-lazy-0cfa^/c)]
 #|                [("--sid")
                  "Benchmark compiled imperative store-diff"
                  (aval 0cfa^/c/∆s!)]
@@ -49,6 +49,7 @@
                  "Benchmark compiled preallocated store-diff"
                  (aval 0cfa^/c/∆s/prealloc!)]
 |#
+#|
                 [("--bl") "Benchmark baseline"
                  (aval baseline)] ;; least optimized
                 [("--sp") "Benchmark specialized fixpoint"
@@ -72,9 +73,11 @@
                 [("--pa")
                  "Benchmark compiled preallocated accumulated store-diff lazy non-determinism"
                  (aval lazy-0cfa^/c/∆s/acc/prealloc!)]
+|#
                 [("--pd")
                  "Benchmark compiled preallocated store-diff lazy non-determinism"
                  (aval lazy-0cfa^/c/∆s/prealloc!)]
+#|
                 [("--it")
                  "Benchmark compiled imperative store lazy non-determinism timestap approx"
                  (aval lazy-0cfa^/c/timestamp!)]
@@ -92,6 +95,7 @@
                 [("--kp")
                  "Benchmark best lazy-Krivine machine"
                  (aval LK-lazy-0cfa^/c/∆s/prealloc!)]
+|#
                 ;; Not benchmarked for paper
 #|
                 [("--ls2") "Benchmark specialized2 lazy non-determinism"

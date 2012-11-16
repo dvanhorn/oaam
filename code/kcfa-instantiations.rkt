@@ -48,7 +48,8 @@
                    #:ans  sp-lazy-0cfa^/c-ans
                    #:touches sp-lazy-0cfa^/c-touches
                    #:fixpoint sp-lazy-0cfa^/c-fix
-                   #:global-σ #:compiled #:wide #:sparse))))))
+                   #:global-σ #;
+                   #:compiled #:wide #:sparse))))))
 (provide sp-lazy-0cfa^/c)
 
 

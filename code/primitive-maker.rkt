@@ -193,8 +193,8 @@
              (for/fold ([stx
                          #`(let ([res (toSetOfLists acc)])
                              #,(body #'res))])
-                 ([t (in-list (reverse ts))]
-                  [v (in-list (reverse v-ids))]
+                 ([t (in-list ts)]
+                  [v (in-list v-ids)]
                   [argnum (in-range (length ts) 0 -1)])
                (define tm (type-match t σ-stx v))
                (tm #'acc
