@@ -16,7 +16,6 @@
 ;; - "change" actions are unnecessary to track.
 ;; - congruence is just a difference between "last updated" timestamps.
 
-
 (struct starting-point (state points actions) #:mutable #:prefab)
 (struct point starting-point (skips at-unions) #:mutable #:prefab)
 
@@ -162,17 +161,6 @@
     (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
       body)))
 
-(define-syntax-rule (bind-force-sparse (res σ v) body)
-  (let ([res (force σ v)]
-        [actions (begin
-                   (unless (set? target-actions)
-                          (error 'get "Bad target actions ~a" target-actions))
-                   (match v
-                     [(addr a) (∪1 target-actions a)]
-                     [_ target-actions]))])
-    (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
-      body)))
-
 ;; An aliased address also counts as a use.
 (define-syntax-rule (bind-big-alias-sparse (σ* σ alias all-to-alias) body)
   (let-values ([(actions val)
@@ -209,7 +197,7 @@
     [bind-force (make-rename-transformer #'bind-force-sparse)]
     [bind-big-alias (make-rename-transformer #'bind-big-alias-sparse)]
     [bind-alias* (make-rename-transformer #'bind-alias*-sparse)]
-    ;; not new
-    [bind-join (make-rename-transformer #'bind-join-sparse)]
-    [bind-join* (make-rename-transformer #'bind-join*-sparse)])
+    [bind-join (make-rename-transformer #'bind-join!/sparse)]
+    [bind-join* (make-rename-transformer #'bind-join*!/sparse)]
+    [getter (make-rename-transformer #'global-vector-getter)])
    body))

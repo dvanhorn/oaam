@@ -9,6 +9,7 @@
          with-σ-∆s/acc/prealloc!
          with-σ-∆s/prealloc!
          grow-vector ;; helper
+         global-vector-getter
          next-loc contour-table
          with-prealloc/timestamp-store)
 
