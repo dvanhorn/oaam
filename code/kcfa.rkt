@@ -80,7 +80,7 @@
                      [(_ e:expr) (syntax/loc syn (yield-meaning e))]))
              #'(syntax-rules () [(_ e) (yield-meaning e)])))
        (define eval ;; what does ev mean?
-         (syntax/loc stx
+         (quasisyntax/loc stx
            (match e
              [(var l x)
               (λ% (ev-σ ρ k δ)
@@ -144,25 +144,27 @@
                   (do (ev-σ) ([σ*-lcc #:join ev-σ x-addr (singleton k)])
                     (yield (ev σ*-lcc c ρ* k δ))))]
              ;; Forms for stack inspection
-             [(grt l R e)
-              (define c (compile e))
-              (λ% (ev-σ ρ k δ)
-                  (do (ev-σ) () (yield (ev ev-σ c ρ (grant k R) δ))))]
-             [(fal l)
-              (λ% (ev-σ ρ k δ)
-                  (do (ev-σ) () (yield (co ev-σ (mt mt-marks) fail))))]
-             [(frm l R e)
-              (define c (compile e))
-              (λ% (ev-σ ρ k δ)
-                  (do (ev-σ) () (yield (ev ev-σ c ρ (frame k R) δ))))]
-             [(tst l R t e)
-              (define c0 (compile t))
-              (define c1 (compile e))
-              (λ% (ev-σ ρ k δ)
-                  (do (ev-σ) ()
-                    (if (OK^ R k ev-σ)
-                        (yield (ev ev-σ c0 ρ k δ))
-                        (yield (ev ev-σ c1 ρ k δ)))))]
+             #,@(if (given CM?)
+                    #`([(grt l R e)
+                        (define c (compile e))
+                        (λ% (ev-σ ρ k δ)
+                            (do (ev-σ) () (yield (ev ev-σ c ρ (grant k R) δ))))]
+                       [(fal l)
+                        (λ% (ev-σ ρ k δ)
+                            (do (ev-σ) () (yield (co ev-σ (mt mt-marks) fail))))]
+                       [(frm l R e)
+                        (define c (compile e))
+                        (λ% (ev-σ ρ k δ)
+                            (do (ev-σ) () (yield (ev ev-σ c ρ (frame k R) δ))))]
+                       [(tst l R t e)
+                        (define c0 (compile t))
+                        (define c1 (compile e))
+                        (λ% (ev-σ ρ k δ)
+                            (do (ev-σ) ()
+                              (if (OK^ R k ev-σ)
+                                  (yield (ev ev-σ c0 ρ k δ))
+                                  (yield (ev ev-σ c1 ρ k δ)))))])
+                    #'())
              [_ (error 'eval "Bad expr ~a" e)])))
 
        (define compile-def
@@ -365,7 +367,6 @@
              (fixpoint step (inj (prepare e))))
 
            #,@compile-def
-
            (define-syntax mk-prims (mk-mk-prims #,(given global-σ?) #,σ-passing?*
                                                 #,(given σ-∆s?) #,(given compiled?)
                                                 #,(attribute K)))
