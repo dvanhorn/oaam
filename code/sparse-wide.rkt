@@ -33,7 +33,7 @@
   (begin0 (prepare-prealloc parser sexp)
           (set! current-point (starting-point 'entry (seteq) ∅))
           (set! state->point (make-hash))
-          (set! σ-history (make-hash))))
+          (set! σ-history (make-vector (vector-length global-σ)))))
 
 ;; TODO: change state constructors to intern table lookup so that we can
 ;; represent the graph structure via sharing instead of indirection through

@@ -11,6 +11,7 @@
          "imperative.rkt"
          "prealloc.rkt"
          "nonsparse.rkt"
+         "sparse-wide.rkt"
          racket/splicing)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -32,6 +33,24 @@
   (splicing-syntax-parameterize
    ([widen (make-rename-transformer #'flatten-value)])
    body))
+
+(mk-sparse^-fixpoint
+                sp-lazy-0cfa^/c-fix
+                sp-lazy-0cfa^/c-ans? sp-lazy-0cfa^/c-ans-v
+                sp-lazy-0cfa^/c-touches)
+(with-sparse^
+ (with-lazy
+  (with-0-ctx
+   (with-sparse-mutable-worklist
+    (with-abstract
+      (mk-analysis #:aval sp-lazy-0cfa^/c
+                   #:prepare (λ (sexp) (prepare-sparse-wide parse-prog sexp))
+                   #:ans  sp-lazy-0cfa^/c-ans
+                   #:touches sp-lazy-0cfa^/c-touches
+                   #:fixpoint sp-lazy-0cfa^/c-fix
+                   #:global-σ #:compiled #:wide #:sparse))))))
+(provide sp-lazy-0cfa^/c)
+
 
 #|
 ;; "sid"
@@ -66,7 +85,6 @@
                    #:fixpoint s-prealloc/∆s-fixpoint/c
                    #:global-σ #:compiled #:wide))))))
 (provide 0cfa^/c/∆s/prealloc!)
-|#
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Potpourris of evaluators
@@ -196,6 +214,9 @@
                    #:σ-∆s
                    #:global-σ #:compiled #:wide))))))
 (provide lazy-0cfa^/c/∆s/acc/prealloc!)
+
+|#
+
 ;; "pd"
 (mk-prealloc/∆s^-fixpoint prealloc/∆s-fixpoint/c prealloc/∆s-ans/c?
               prealloc/∆s-ans/c-v prealloc/∆s-touches-0/c)
@@ -211,6 +232,8 @@
                    #:fixpoint prealloc/∆s-fixpoint/c
                    #:global-σ #:compiled #:wide))))))
 (provide lazy-0cfa^/c/∆s/prealloc!)
+
+#|
 
 ;; "it"
 (mk-imperative/timestamp^-fixpoint imperative-fixpoint/c imperative-ans/c?
@@ -261,6 +284,8 @@
                    #:σ-passing #:wide #:set-monad)))))))
 (provide baseline/cm)
 
+|#
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Evaluators not in the paper
 #|
@@ -299,6 +324,7 @@
                           #:kcfa +inf.0)))))))
  (provide lazy-eval^/c)
 |#
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Instantiations not in the paper
 #|
