@@ -11,6 +11,7 @@
          grow-vector ;; helper
          global-vector-getter
          next-loc contour-table
+         get-contour-index!-0
          with-prealloc/timestamp-store)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

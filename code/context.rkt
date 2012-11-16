@@ -33,7 +33,7 @@
                       (bind-big-alias (νσ νσ rA vrest) body*))))
      ;; Concretely, rest-arg is a finite list.
      (define conc-r
-       #'(let*-values ([(ra) (cons sr sδ*)]
+       #'(let*-values ([(ra) (make-var-contour sr sδ*)]
                        [(νρ) (extend sρ r ra)])
            (do (sσ) loop ([as vrest] [last ra] [count 0])
                (match as
@@ -41,8 +41,8 @@
                   (do (sσ) ([νσ #:join sσ last snull])
                     body*)]
                  [(cons a as)
-                  (define rnextA `((,sr A . ,count) . ,sδ*))
-                  (define rnextD `((,sr D . ,count) . ,sδ*))
+                  (define rnextA (make-var-contour `(,sr A . ,count) sδ*))
+                  (define rnextD (make-var-contour `(,sr D . ,count) sδ*))
                   (do (sσ) ([νσ #:alias sσ rnextA a]
                             [νσ #:join νσ last (singleton (consv rnextA rnextD))])
                     (loop νσ as rnextD (add1 count)))]))))
@@ -51,13 +51,13 @@
            [(< K +inf.0)
             (bind-args (λ (body)
                           #`(let* ([δ* (truncate (cons l δ) #,K)]
-                                   [as (map (λ (x) (cons x δ*)) xs)]
+                                   [as (map (λ (x) (make-var-contour x δ*)) xs)]
                                    [ρ* (extend* ρ xs as)])
                               #,body))
                        #'as abs-r)]
            [else
             (bind-args (λ (body) #`(let* ([δ* (cons l δ)]
-                                          [as (map (λ (x) (cons x δ*)) xs)]
+                                          [as (map (λ (x) (make-var-contour x δ*)) xs)]
                                           [ρ* (extend* ρ xs as)])
                                      #,body))
                        #'as conc-r)])]))
@@ -67,12 +67,12 @@
     [(_ (ρ* σ* δ*) (ρ bσ l δ xs v-addrs) body)
      (define vs
        (λ (addrs)
-       (quasisyntax/loc stx
-         (bind-alias* (σ* bσ #,addrs v-addrs) body))))
+          (quasisyntax/loc stx
+            (bind-alias* (σ* bσ #,addrs v-addrs) body))))
      (if (zero? K)
          (vs #'xs)
          #`(let* ([δ* (truncate (cons l δ) #,K)]
-                  [as (map (λ (x) (cons x δ*)) xs)]
+                  [as (map (λ (x) (make-var-contour x δ*)) xs)]
                   [ρ* (extend* ρ xs as)])
              #,(vs #'as)))]))
 (define-syntax-rule (make-var-contour-0 x δ) x)

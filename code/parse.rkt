@@ -8,6 +8,7 @@
 
 (define (parse-prog sexp [fresh-label! igensym] [fresh-variable! igensym])
   (parse (cons define-ctx sexp) fresh-label! fresh-variable!))
+(trace parse-prog)
 
 (define (parse sexp [fresh-label! igensym] [fresh-variable! igensym])
   ;; in order for the renaming to work on open programs, we not only have to return

@@ -204,10 +204,7 @@
            (define check-rest
              (and rest
                   (type-match rest σ-stx #'ra)))
-           (body #'∅)
-#|
            #`(match #,v-addrs
-               #;
                [(list-rest vids ... rest-match)
                 #,(if rest
                       #`(do (σ) loop ([raddrs #,r-id]
@@ -223,17 +220,14 @@
                                                   #`(log-info "Bad input to primitive: ~a (rest arg ~a)"
                                                               'prim
                                                               #'argnum))
-                                             (λ (vs) #`(loop σ rrest (cons #,vs acc) (add1 argnum))))]))
+                                             #`(loop σ rrest acc (add1 argnum)))]))
                       #`(let ([acc '()]) #,built))]
                [vs
                 #,@(listy
                     (and (not mult-ary?)
                          #`(log-info "Primitive application arity mismatch (Expect: ~a, given ~a): ~a"
                                      #,(length ts) (length vs) 'prim)))
-                (let ([res ∅]) #,(body #'res))])
-|#
-
-))))
+                (let ([res ∅]) #,(body #'res))])))))
 
  ;; Creates a transformer that expects pσ vs (so it can use yield-both or force if it needs to)
  ;; vs will have already been forced if necessary. Any types will have to be forced for non-abstract applications.

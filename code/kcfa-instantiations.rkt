@@ -40,11 +40,11 @@
                 sp-lazy-0cfa^/c-touches)
 (with-sparse^
  (with-lazy
-  (with-0-ctx
+  (with-0-ctx/prealloc/sparse
    (with-sparse-mutable-worklist
     (with-abstract
       (mk-analysis #:aval sp-lazy-0cfa^/c
-                   #:prepare (λ (sexp) (prepare-sparse-wide parse-prog sexp))
+                   #:prepare (λ (sexp) (prepare-sparse-wide/prealloc parse-prog sexp))
                    #:ans  sp-lazy-0cfa^/c-ans
                    #:touches sp-lazy-0cfa^/c-touches
                    #:fixpoint sp-lazy-0cfa^/c-fix
