@@ -1,6 +1,10 @@
+*~
+*clean
 *aux
 *log
+*blg
 *space.pdf
 *speed.pdf
 *time.pdf
 introspective*pdf
+compiled/
