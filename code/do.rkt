@@ -24,7 +24,8 @@
                       bind-alias* bind-big-alias
                       bind-get bind-force bind-delay
                       bind bind-rest do make-var-contour
-                      target-σ? target-σ target-cs? target-cs target-actions? target-actions
+                      target-σ? target-σ target-cs? target-cs
+                      top-actions? target-actions? target-actions
                       top-σ top-σ?)
 ;; default: do nothing to the body of a do.
 (define-syntax-parameter do-body-transformer (syntax-rules () [(_ e) e]))
@@ -60,9 +61,12 @@
             (listy (and tas #'target-actions))))
 
   (define (init-target-actions body)
-    (cond [(and (not in-do?) tas)
-           #`(let ([actions (hash)])
-               (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
+    (cond [(and (not (syntax-parameter-value #'top-actions?))
+                (not in-do?) tas)
+           (define actions-id (generate-temporary #'hidden-actions))
+           #`(let ([#,actions-id (hash)])
+               (syntax-parameterize ([target-actions (make-rename-transformer #'#,actions-id)]
+                                     [top-actions? #t])
                  #,body))]
           [else body]))
 

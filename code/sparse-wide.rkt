@@ -1,12 +1,7 @@
 #lang racket
 (require "primitives.rkt" "data.rkt" "notation.rkt" racket/stxparam racket/splicing
-         "do.rkt" "context.rkt"
-         "deltas.rkt"
-         "prealloc.rkt"
-         "handle-limits.rkt"
-         (rename-in "imperative.rkt" [add-todo! i:add-todo!])
-         "env.rkt"
-         racket/trace)
+         "do.rkt" "context.rkt" "deltas.rkt" "prealloc.rkt" "handle-limits.rkt"
+         "env.rkt" (rename-in "imperative.rkt" [add-todo! i:add-todo!]))
 (provide mk-sparse^-fixpoint with-sparse^
          with-sparse-mutable-worklist
          with-0-ctx/prealloc/sparse
@@ -17,45 +12,57 @@
 
 ;; The wide story is less nuanced than the narrow one. In particular,
 ;; - ill-formed states are impossible
-;; - "change" actions are unnecessary to track.
-;; - congruence is just a difference between "last updated" timestamps.
+;; - "change" actions are unnecessary to track (all changes made to same store)
+;; - congruence is equality of address ages. (last modified, and age when last used at a state)
 
 ;; - actions start at #f to distinguish "none" from "unknown"
-(struct starting-point (state points actions) #:mutable #:prefab)
-(struct point starting-point (skips at-unions) #:mutable #:prefab)
-
-(define σ-history #f) ;; Stores the union count for each address's last update
-
-(define state->point #f) ;; map states to the graph nodes
+;; - todo? blocks skipping past a point. We cannot soundly skip a state
+;;   until it has been processed, since extra edges might be added that skipping
+;;   would have to traverse to stay sound. After a state has been stepped and is not
+;;   part of the todo set afterwards, todo? is reset to #f
+(struct point (state points actions todo? skips) #:mutable #:prefab)
+;; Stores the union count for each address's last update
+(define σ-history #f)
+;; Any store changes during this step?
+(define ∆? #f)
+;; States intern to mutable "points" that represent the annotated state graph
+(define state->point #f)
+;; Intern states.
 (define (register-state s)
-  (hash-ref! state->point s (λ _ (point s (seteq) #f (seteq) -1))))
+  (hash-ref! state->point s (λ _ (point s (seteq) #f #t (seteq)))))
 
 ;; terrible global to communicate to other functions
 ;; (parameters have the right semantics, but too slow in a hot loop)
 (define current-point #f)
 
-;; States that are added by skipping can't be skipped.
-(define must-do #f)
-(define (reset-must-do!) (set! must-do ∅))
-
 (define (join-actions oldA newA)
   (for/fold ([A oldA]) ([(addr age) (in-hash newA)])
-    (hash-set A addr age)))
+    (hash-set A addr (max age (hash-ref oldA addr 0)))))
+(define (join-actions/change oldA newA)
+  (for/fold ([A oldA] [change? #f]) ([(addr age) (in-hash newA)])
+    (define old-age (hash-ref oldA addr -1))
+    (if (> age old-age)
+        (values (hash-set A addr age) #t)
+        (values A change?))))
 
-(define (add-todo! p actions)
-  (match-define (starting-point _ ps A) current-point)
-  ;; add edge to graph
-  (set-point-at-unions! p unions)
-  (set-starting-point-points! current-point (∪1 ps p))
-  (set-starting-point-actions! current-point (if A (join-actions A actions) actions)))
+;; Add p to current-point's outgoing edges and return if the given actions
+;; changed value since last time, or if the point added is new.
+(define (add-todo p actions)
+  (define current-A (point-actions current-point))
+  (define ps (point-points current-point))
+  (define ps* (∪1 ps p))
+  (set-point-points! current-point ps*)
+  (define-values (A* change?)
+    (if current-A
+        (join-actions/change current-A actions)
+        (values actions #t)))
+  (set-point-actions! current-point A*)
+  (or change? (> (set-count ps*) (set-count ps))))
 
 (define (add-todo/skip! p)
-  (match-define (point state _ _ skips _) p)
-  ;; XXX: Is this really all that's needed? Do we also need to
-  ;; update the union count at each state on the path?
-  (set-point-at-unions! p unions)
-  (set-point-skips! current-point (∪1 skips p))
-  (set! must-do (∪1 must-do state)))
+  (set-point-skips! current-point (∪1 (point-skips current-point) p))
+  (set-point-todo?! p #t)
+  (i:add-todo! (point-state p)))
 
 (define (ensure-σ-size/sparse)
   (when (= next-loc (vector-length global-σ))
@@ -86,21 +93,35 @@
     [(_ e) #'(let ([state e]
                    [actions target-actions])
                (define p (register-state state))
-               (cond [(= unions (point-at-unions p))
-                      (void)
-                      #;
-                      (printf "Seen ~a ~a ~a~%" actions unions (starting-point-state p))]
-                     [else
-                      (add-todo! p actions)
-                      (i:add-todo! state)])
+               ;; If stepping changed the store, or if the addresses this point
+               ;; depends on changed since last interpretation, it must be
+               ;; re-processed.
+               (define change? (add-todo p actions))
+               (cond [(or change? ∆?)
+                      (set-point-todo?! p #t)
+                      (i:add-todo! state)]
+                     [else (void)])
                actions)]))
+
+(define (skip-from ps)
+  (define seen (make-hasheq)) ;; no intermediate allocation. eq? okay
+  (let loop ([todo ps])
+    (for ([p (in-set todo)]
+          #:unless (and (hash-has-key? seen p)
+                        #;
+                        (printf "Seen (skip) ~a~%" (point-state p))))
+      (hash-set! seen p #t)
+      (match-define (point state-debug pp* A todo? _) p)
+      (cond [(and (not todo?) (actions-consonant? A))
+             (loop pp*)]
+            [else (add-todo/skip! p)]))))
 
 (define (prepare-sparse-wide/prealloc parser sexp)
   (begin0 (prepare-prealloc parser sexp)
-          (set! must-do ∅)
-          (set! current-point (starting-point 'entry (seteq) ∅))
+          (set! current-point (point 'entry (seteq) #f #t (seteq)))
           (set! state->point (make-hash))
           (set! σ-history (make-vector (vector-length global-σ)))))
+
 ;; An address is consonant with a past state if its union count is smaller than
 ;; the union count of that state.
 (define (actions-consonant? A)
@@ -119,6 +140,7 @@
          (printf "No change to ~a with ~a~%" a vs)]
         [else
          (vector-set! global-σ a upd)
+         (set! ∆? #t)
          (inc-unions!)
          (vector-set! σ-history a unions)]))
 
@@ -127,24 +149,11 @@
         [vs (in-list vss)])
     (join!/sparse a vs)))
 
-(define (skip-from ps)
-  (define seen (make-hasheq)) ;; no intermediate allocation. eq? okay
-  (let loop ([todo ps])
-    (for ([p (in-set todo)]
-          #:unless (and (hash-has-key? seen p)
-                        #;
-                        (printf "Seen (skip) ~a~%" (starting-point-state p))))
-      (hash-set! seen p #t)
-      (match-define (point _ pp* A _ _) p)
-      (cond [(actions-consonant? A) (loop pp*)]
-            [else
-             #;
-             (printf "Not consonant ~a.~%Skipping to (at ~a) ~a~%" A unions (starting-point-state p))
-             (add-todo/skip! p)]))))
-
 (define ((mk-sparse-step step) c)
   (set! current-point (register-state c))
+  (set! ∆? #f)
   (match-define (point _ ps A _ _) current-point)
+  (set-point-todo?! current-point #f)
   (if (actions-consonant? A)
       (skip-from ps)
       (step c)))
@@ -154,31 +163,30 @@
     (let ()
       (set-box! (start-time) (current-milliseconds))
       (define state-count* (state-count))
+      (set-box! state-count* 0)
       fst
       (define clean-σ (restrict-to-reachable/vector touches))
       (define sparse-step (mk-sparse-step step))
       (let loop ()
-        (cond [(and (∅? todo) (∅? must-do)) ;; → null?
-               (state-rate)
-               (define vs
-                 (for*/set ([(c _) (in-hash state->point)]
-                            #:when (ans^? c))
-                   (ans^-v c)))
-               (values (format "State count: ~a" (unbox state-count*))
-                       (format "Point count: ~a" (hash-count state->point))
-                       (clean-σ global-σ vs)
-                       vs)]
-              [else
-               (define todo-old todo)
-               (define must-do-old must-do)
-               (reset-todo!)
-               (reset-must-do!)
-               (set-box! state-count* (+ (unbox state-count*)
-                                         (set-count todo-old)
-                                         (set-count must-do-old)))
-               (for ([c (in-set todo-old)]) (sparse-step c))
-               (for ([c (in-set must-do-old)]) (step c))
-               (loop)])))))
+        (cond
+         [(∅? todo)
+          (state-rate)
+          (define vs
+            (for*/set ([(c _) (in-hash state->point)]
+                       #:when (ans^? c))
+              (ans^-v c)))
+          (values (format "State count: ~a" (unbox state-count*))
+                  (format "Point count: ~a" (hash-count state->point))
+                  (clean-σ global-σ vs)
+                  vs)]
+
+         [else
+          (define todo-old todo)
+          (reset-todo!)
+          (set-box! state-count* (+ (unbox state-count*)
+                                    (set-count todo-old)))
+          (for ([c (in-set todo-old)]) (sparse-step c))
+          (loop)])))))
 
 ;; Get and force accumulate uses of addresses
 (define-syntax-rule (bind-get-sparse (res σ a) body)

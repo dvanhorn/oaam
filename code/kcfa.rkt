@@ -169,16 +169,20 @@
 
        (define compile-def
          (cond [(given compiled?)
-                (define hidden-σ (and (given σ-∆s?) (not (given global-σ?)) (generate-temporary #'hidden)))
+                (define hidden-σ (and (given σ-∆s?) (not (given global-σ?)) (generate-temporary #'hidden-σ)))
+                (define hidden-actions (and (given sparse?) (generate-temporary #'hidden-actions)))
                 (with-syntax ([(top ...) (listy hidden-σ)]
+                              [(topa ...) (listy hidden-actions)]
                               [topp (or hidden-σ #'gσ)])
                   (quasisyntax/loc stx
                     ((define-syntax-rule (... (λ% (gσ ρ k δ) body ...))
-                       (λ (top ... σ-gop ... ρ-op ... k δ-op ...)
+                       (λ (top ... topa ... σ-gop ... ρ-op ... k δ-op ...)
                           (syntax-parameterize ([yield (... (... #,yield-ev))]
                                                 [top-σ (make-rename-transformer #'topp)]
                                                 [target-σ (make-rename-transformer #'gσ)]
-                                                [top-σ? #t])
+                                                [target-actions (make-rename-transformer #'topa)] ...
+                                                [top-σ? #t]
+                                                [top-actions? #t])
                             body (... ...))))
                      (define (compile e) #,eval))))]
                [else
@@ -320,6 +324,7 @@
                          ;; gσ only optional if it's global
                          [(_ gσ e ρ k δ)
                           #'(e #,@(listy (and (given σ-∆s?) (not (given global-σ?)) #'top-σ))
+                               #,@(listy (and (given sparse?) #'target-actions))
                                σ-gop ... ρ-op ... k δ-op ...)]))
                      (define-match-expander ev: ;; inert, but introduces bindings
                        (syntax-rules () [(_ . args) (list . args)]))))

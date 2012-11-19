@@ -48,7 +48,7 @@
                    #:ans  sp-lazy-0cfa^/c-ans
                    #:touches sp-lazy-0cfa^/c-touches
                    #:fixpoint sp-lazy-0cfa^/c-fix
-                   #:global-σ #;
+                   #:global-σ
                    #:compiled #:wide #:sparse))))))
 (provide sp-lazy-0cfa^/c)
 
@@ -252,6 +252,8 @@
                    #:fixpoint imperative-fixpoint/c
                    #:global-σ #:compiled #:wide)))))))
 (provide lazy-0cfa^/c/timestamp!)
+|#
+
 ;; "pt"
 (mk-prealloc/timestamp^-fixpoint prealloc/imperative-fixpoint/c prealloc-ans/c?
                                  prealloc-ans/c-v prealloc-touches-0/c)
@@ -269,7 +271,7 @@
                    #:global-σ #:compiled #:wide)))))))
 (provide lazy-0cfa^/c/prealloc/timestamp!)
 
-
+#|
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Evaluators for CM-extended Scheme
 (mk-set-fixpoint^ fix baseline/cm-fixpoint baseline/cm-ans?)
