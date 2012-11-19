@@ -117,7 +117,7 @@
          #:x-min 0
          #:x-max 5.2
          #:y-label "" #;"Factor improvement over baseline"
-         #:out-file (format "~a-relative-time.ps" bench-name))
+         #:out-file (format "~a-relative-time.pdf" bench-name))
    
    (plot (list
           (lines rel-states-per-sec-data #:color 6 #:width 4
@@ -129,7 +129,7 @@
          #:x-label ""
          #:x-max 5.2
          #:y-label ""
-         #:out-file (format "~a-relative-speed.ps" bench-name))
+         #:out-file (format "~a-relative-speed.pdf" bench-name))
    
    (plot (list
           (lines rel-mem-data #:color 4 #:width 4
@@ -141,7 +141,7 @@
          #:x-min 0
          #:x-max 5.2
          #:y-label ""
-         #:out-file (format "~a-relative-space.ps" bench-name))))
+         #:out-file (format "~a-relative-space.pdf" bench-name))))
 
   
   

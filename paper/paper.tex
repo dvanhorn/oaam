@@ -132,9 +132,9 @@ feasible implementation of an abstract-machine-based analyzer.
 
 \begin{figure}[t]
 \begin{center}
-\includegraphics[width=3.2in]{church-relative-space.ps}
-\includegraphics[width=3.2in]{church-relative-speed.ps}
-\includegraphics[width=3.2in]{church-relative-time.ps}
+\includegraphics[width=3.2in]{church-relative-space}
+\includegraphics[width=3.2in]{church-relative-speed}
+\includegraphics[width=3.2in]{church-relative-time}
 \vspace{-1.5em}
 \end{center}
 \caption{Factor improvements over the baseline analyzer for the
@@ -217,7 +217,7 @@ of the analysis time for this example.
   nondeterminism and fan-in from joins.  Part (b) shows the result of
   performing nondeterminism lazily and thus avoids many of the diamond
   subgraphs.  Part (c) shows the result of abstract compilation that
-  removes intepretive overhead in the form of intermediate states,
+  removes interpretive overhead in the form of intermediate states,
   thus minimizing the corridor transitions.  The end result is a more
   compact abstraction of the program that can be generated faster.}
 \label{fig:state-graphs}
@@ -256,7 +256,7 @@ By generating significantly fewer states at a significantly faster
 rate, we are able to achieve large performance improvements in terms
 of both time and space.
 
-Section~\ref{sec:eval} describes the evaluation of each optimiztion
+Section~\ref{sec:eval} describes the evaluation of each optimization
 technique applied to an implementation supporting a more realistic set
 of features, including mutation, first-class control, compound data, a
 full numeric tower and many more forms of primitive data and
@@ -341,7 +341,7 @@ annotation in contexts where it is irrelevant.
 
 
 The semantics are defined in terms of a machine model.  The machine
-compoents are defined in figure~\ref{fig:domains} and
+components are defined in figure~\ref{fig:domains} and
 figure~\ref{fig:aam} defines the transition relation.  The evaluation
 of a program is defined as the set of states reachable by the
 reflexive, transitive closure of the machine transition relation.  The
@@ -432,7 +432,7 @@ program analyzer:
 \end{figure}
 
 
-\paragraph{Concrete interpretation} To characterize concrete interpretration, set the implicit
+\paragraph{Concrete interpretation} To characterize concrete interpretation, set the implicit
 parameters of the relation given in figure~\ref{fig:aam} as follows:
 \begin{align*}
 \mathit{push}_\mlab^\mcntr(\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
@@ -499,7 +499,7 @@ The \(\rfloor\cdot\lfloor_k\) notation denotes the truncation of a list
 of symbols to the leftmost \(k\) symbols.
 
 All that remains is the interpretation of primitives.  For abstract
-intepretation, we set $\interpdelta$ to the function that returns
+interpretation, we set $\interpdelta$ to the function that returns
 $\sNum$ on all inputs---a symbolic value we interpret as denoting the
 set of all integers.
 
@@ -536,7 +536,7 @@ we define the global transfer function:
  F_{\varsigma_0} : \mathcal{P}(\mathit{State}) \to \mathcal{P}(\mathit{State})
  \text.
 \end{equation*}
-Internally, this global transfer function computes the successors of all supplied states, and then includes the inital state:
+Internally, this global transfer function computes the successors of all supplied states, and then includes the initial state:
 \begin{equation*}
   F_{\varsigma_0}(S) = \{ \varsigma_0 \} \cup \{ \varsigma' \mathrel{|} \varsigma \in S \text{ and } \varsigma \machstep \varsigma' \}\text. 
 \end{equation*}
@@ -555,7 +555,7 @@ stores in the AAM framework.
 In the next subsection, we'll fix this with a widening and reach polynomial
 (albeit of a high degree) complexity.
 %
-This widening effictively lifts the store out of individual states to create
+This widening effectively lifts the store out of individual states to create
 a single, global shared store for all.
 
 
@@ -573,8 +573,8 @@ application of a widening operator during the fixed-point iteration.
 In the ISWIM language, such a widening makes 0-CFA quartic in the size of the
 program.
 %
-Thus, in one step, complexity drops from intractable exponentiality to merely
-daunting polynomiality.
+Thus, in one step, complexity drops from intractable exponentially to a merely
+daunting polynomial.
 
 Since we can cast this optimization as a widening, there is no need to change
 the transition relation itself.
@@ -711,7 +711,7 @@ application positions.
 Transition patterns of this shape litter the state-graph:
 %
 \begin{center}
-\includegraphics[scale=0.3]{fanout.pdf}
+\includegraphics[scale=0.3]{fanout}
 \end{center}
 To avoid the spurious forking and joining, we {\it delay} the non-determinism
 until and unless it is needed in {\it strict contexts} (such as the guard for an
@@ -719,7 +719,7 @@ until and unless it is needed in {\it strict contexts} (such as the guard for an
 %
 Doing so collapses these forks and joins into a linear sequence of states:
 \begin{center}
-\includegraphics[scale=0.3]{lazy.pdf}
+\includegraphics[scale=0.3]{lazy}
 \end{center}
 
 In case it's unclear, this shift does not change the concrete semantics of the
@@ -776,7 +776,7 @@ step. This is not the case for semantics that replicate the value
 component across reductions, say for popping off exception handler
 frames. Further convolution is needed to remove the administrative
 nature of laziness in these semantics. Due to the increase of
-conceptual complexity for negligable benefit, we decided against this
+conceptual complexity for negligible benefit, we decided against this
 approach.
 
 \paragraph{Our choice: option 1}
@@ -1078,10 +1078,10 @@ of the Boyer-Moore theorem-prover---drove our own considerations for
 abstractions for compound data structures.
 %
 Boyer's fluent use of literal list dooms the ``natural'' abstraction
-of lists to fail from overprecision.
+of lists to fail from over precision.
 %
 In short, if we interpret a literal list {\tt '(a b c)} as {\tt (cons 'a (cons 'b
-(cons 'c '())))}, even a monovariant allocation stategy for abstract
+(cons 'c '())))}, even a monovariant allocation strategy for abstract
 cons cells will precisely and exactly create a 3-cell list.
 
 If code contains a length-300 literal list, then its analysis yields a length-300 abstract
@@ -1117,7 +1117,7 @@ like the following:
 Upon evaluating a {\tt cons} application, we instead allocate two
 addresses $a$ and $d$, join them to the respective values in the
 store, and return the flattened {\tt (cons $a$ $d$)} value. Since
-these addresses are all distinguished at different syntactic callsites
+these addresses are all distinguished at different syntactic call sites
 in the uniform $k$-CFA allocation strategy, and quoted lists are sugar
 for a sequence of calls to {\tt cons}, this abstraction explodes the
 value space. Analyzing a function that counts the number of atoms in a
@@ -1298,17 +1298,17 @@ the store delta technique without further improvements.
 
 \begin{figure*}
 \begin{center}
-  \includegraphics[width=6.5in]{all-relative-memory.ps}
+  \includegraphics[width=6.5in]{all-relative-space}
 
   (a) Peak memory usage
 
   \vspace{1em}
-  \includegraphics[width=6.5in]{all-relative-speed.ps}
+  \includegraphics[width=6.5in]{all-relative-speed}
 
   (b) Rate of state transitions
 
   \vspace{1em}
-  \includegraphics[width=6.5in]{all-relative-time.ps}
+  \includegraphics[width=6.5in]{all-relative-time}
 
   (c) Total analysis time
 \end{center}
@@ -1317,6 +1317,11 @@ the store delta technique without further improvements.
 \label{fig:bench-all}
 \end{figure*}
 
+Source code of the implementation and benchmark suite is at:
+
+\begin{center}
+\url{https://github.com/dvanhorn/oaam}
+\end{center}
 
 \paragraph{Comparison with other flow analysis implementations}
 
@@ -1346,7 +1351,7 @@ successor, the Polymorphic splitting system of Wright and
 Jagannathan~\cite{dvanhorn:wright-jagannathan-toplas98}.\footnote{This
   is not a coincidence; these papers set a high standard for
   evaluation, which we consciously aimed to approach.}  Unfortunately, these
-analyses compute an inherently different and uncomparable form of
+analyses compute an inherently different and incomparable form of
 analysis.  Consequently, we have omitted a complete comparison with
 these implementations,.  The AAM approach provides more precision in
 terms of temporal-ordering of program states, which comes at a cost
