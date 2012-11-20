@@ -8,6 +8,9 @@
 ;; so some threads will finish far sooner than others. This has not been a problem,
 ;; and we could do better with minimal effort by randomly shuffling the worklist
 ;; before distributing it to the threads (see the main submodule below).
+
+;; NOTE: if base-num or run-num change, you must manually change [code/bench/out.sh]
+;; and [paper/proctime.rkt] to be consistent with the number range.
 (define base-num 0)
 (define run-num 5)
 (define num-threads 11)
@@ -18,8 +21,6 @@
 ;; 
 ;; See [code/bench/out.sh] for the script we used to distill the output info
 ;; that is processed by [paper/proctime.rkt]
-;; NOTE: if base-num or run-num change, you must manually change [code/bench/out.sh]
-;; to be consistent with the number range.
 (define (construct-cmd which n file)
   (define path (string->path file))
   (define-values (base filename dir?) (split-path path))

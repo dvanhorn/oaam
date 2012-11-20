@@ -6,7 +6,8 @@ WGETIANJBIB=curl -o ianj.bib "http://www.citeulike.org/bibtex/user/ianjohnson?fi
 
 default: introspective-base.pdf introspective-lazy.pdf introspective-lazyc.pdf \
 	 church-relative-space.ps church-relative-time.ps church-relative-speed.ps \
-	 bench-overview.tex
+	 all-relative-space.ps all-relative-time.ps all-relative-speed.ps \
+	 bench-overview.tex all-relative-time.ps
 	xelatex $(CURRENT)
 
 refresh: getbib
@@ -41,6 +42,16 @@ church-relative-time.ps: vardoulakis-shivers-numbers.rkt
 
 church-relative-space.ps: vardoulakis-shivers-numbers.rkt
 	racket vardoulakis-shivers-numbers.rkt
+
+all-relative-speed.ps: vis-bench.rkt
+	racket vis-bench.rkt
+
+all-relative-time.ps: vis-bench.rkt
+	racket vis-bench.rkt
+	racket vardoulakis-shivers-numbers.rkt
+
+all-relative-space.ps: vis-bench.rkt
+	racket vis-bench.rkt
 
 bench-overview.tex:
 	racket bench-overview.rkt

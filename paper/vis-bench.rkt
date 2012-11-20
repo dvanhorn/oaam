@@ -71,7 +71,7 @@
 (define exps (list 1 ;; Base / New number grows since time goes down
                    1 ;; Base / new same
                    -1)) ;; Rate goes up
-(define descs (list "time" "memory" "speed"))
+(define descs (list "time" "space" "speed"))
 (define xmins '((0 . 5.2)
                 (0 . 5.2)
                 (0 . 5.2)))

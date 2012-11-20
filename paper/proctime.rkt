@@ -7,6 +7,7 @@
 
 (module data racket/base
   (provide (all-defined-out))
+  ;; These numbers change if the base-num and run-num change in [code/drive-benchmarks.rkt]
   (define start-run 15)
   (define end-run 19)
   (define algos '("bl" "sp" "ls" "lc" "ld" "fd" "ia" "id" "pa" "pd" "it" "pt"))
