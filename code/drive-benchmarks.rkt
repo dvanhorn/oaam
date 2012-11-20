@@ -16,8 +16,10 @@
 ;; Racket VM, which we spin up with a shell command. The analysis statistics are
 ;; printed to stdout, and the memory statistics to stderr.
 ;; 
-;; See bench/out.sh for the script we used to distill the output info 
+;; See [code/bench/out.sh] for the script we used to distill the output info
 ;; that is processed by [paper/proctime.rkt]
+;; NOTE: if base-num or run-num change, you must manually change [code/bench/out.sh]
+;; to be consistent with the number range.
 (define (construct-cmd which n file)
   (define path (string->path file))
   (define-values (base filename dir?) (split-path path))
