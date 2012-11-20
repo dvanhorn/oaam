@@ -1,9 +1,23 @@
 #lang racket
 
-(define base-num 15)
-(define run-num (make-parameter 5))
+;; This module drives [run-benchmark.rkt] with several algorithms/benchmarks 
+;; to run in parallel. Since we want the output of each run of each algorithm/benchmark,
+;; we label the run numbers in the interval [base-num, base-num + run-num).
+
+;; The parallelism is determined by num-threads. There is no work-stealing,
+;; so some threads will finish far sooner than others. This has not been a problem,
+;; and we could do better with minimal effort by randomly shuffling the worklist
+;; before distributing it to the threads (see the main submodule below).
+(define base-num 0)
+(define run-num 5)
 (define num-threads 11)
 
+;; In order to get consistent benchmarking numbers, each run is in a /fresh/
+;; Racket VM, which we spin up with a shell command. The analysis statistics are
+;; printed to stdout, and the memory statistics to stderr.
+;; 
+;; See bench/out.sh for the script we used to distill the output info 
+;; that is processed by [paper/proctime.rkt]
 (define (construct-cmd which n file)
   (define path (string->path file))
   (define-values (base filename dir?) (split-path path))
@@ -11,6 +25,7 @@
   (define outmem (path-replace-suffix filename (format ".~a.mem.~a" which (+ n base-num))))
   (format "racket run-benchmark.rkt --~a ~a > bench/~a 2> bench/~a" which file outtime outmem))
 
+;; We identify benchmarks so that we can collect stats easier in [proctime.rkt] (LOC, etc.)
 (define church "../benchmarks/church.sch")
 (define mbrotZ "../benchmarks/mbrotZ.sch")
 (define earley "../benchmarks/earley.sch")
@@ -18,79 +33,48 @@
 (define graphs "../benchmarks/toplas98/graphs.sch")
 (define lattice "../benchmarks/toplas98/lattice.scm")
 (define matrix "../benchmarks/toplas98/matrix.scm")
-(define maze "../benchmarks/toplas98/maze.sch") #;call/cc
+(define maze "../benchmarks/toplas98/maze.sch")
 (define nbody "../benchmarks/toplas98/nbody.sch")
 (define nucleic "../benchmarks/toplas98/nucleic.sch")
 (define to-test
-  (list ;; church mbrotZ earley lattice graphs 
-        boyer matrix maze nbody nucleic
-   ;;"../benchmarks/toplas98/splay.scm" ;; old match
-   ;;"../benchmarks/toplas98/nucleic2.sch" ;; define-syntax
-   ;;"../benchmarks/toplas98/handle.scm" ;; old match and defmacro
-   ))
+  (list church mbrotZ earley lattice graphs boyer matrix maze nbody nucleic))
 
 (module+ data (provide church mbrotZ earley boyer graphs lattice matrix maze nbody nucleic to-test))
 
-(define baseline "bl")
-(define specialized "sp")
+;; Algorithm tags used to drive [run-benchmark.rkt]
+(define baseline "sp")
 (define lazy "ls")
 (define compiled "lc")
 (define deltas "ld")
-(define deltasfd "fd")
-(define deltasia "ia")
 (define deltasid "id")
-(define deltaspa "pa")
 (define deltaspd "pd")
+;; Not in paper since insignificant or worse performance+precision
+(define deltasfd "fd")
 (define imperative "it")
 (define preallocated "pt")
+(define deltasia "ia")
+(define deltaspa "pa")
 
 (define which-analyses
   (list
-#| deltasfd
-
-        deltas
-        imperative
-        preallocated
-        deltasia
-        deltasid
-        deltaspa
-        deltaspd
-        baseline 
-|#
-        specialized
-        lazy
-        compiled
-
-))
-
-(define known-timeout (hash baseline    (set maze graphs matrix nbody)
-                            specialized (set maze graphs matrix nbody)
-                            lazy        (set maze graphs matrix nbody)
-                            compiled    (set maze graphs matrix)                            
-                            deltas      (set boyer)
-                            ;; All complete
-                            imperative  (set)
-                            preallocated (set)))
-;; 2GB RAM
-(define known-exhaust (hash baseline (set nucleic)
-                            specialized (set nucleic boyer)
-                            lazy (set nucleic boyer)
-                            compiled (set nucleic boyer)
-                            ;; Must rerun
-                            deltas (set)
-                            ;; others complete
-                            ))
+   ;; deltasfd ;; like deltaspd, only purely functional. Unfortunately slow.
+   baseline
+   lazy
+   compiled
+   deltas
+;; imperative   ;; timestamp approximation, not in paper.
+;; preallocated ;; timestamp approximation, not in paper.
+   deltasid
+   deltaspd))
 
 (define (run which file)
-  (for* ([n (in-range (run-num))]
-         [timeout (in-value (hash-ref known-timeout which (set)))]
-         [exhaust (in-value (hash-ref known-timeout which (set)))]
-#;#;
-         #:unless (or (set-member? timeout file)
-                      (set-member? exhaust file)))
+  (for ([n (in-range run-num)])
     (printf "Running ~a (count ~a): ~a~%" which n file)
     (system (construct-cmd which n file))))
 
+;; Split work "evenly" by number of threads.
+;; The last thread gets the remainder of integer division in addition to
+;; its "even" allotment.
 (define (distribute-threads work)
   (define num (length work))
   (define even (quotient num num-threads))
@@ -102,6 +86,7 @@
            (loop rest (cons this per-thread) (add1 thread-num))])))
 
 (module+ main
+  ;; Spin up threads
   (define running-threads
     (let ([distributed (distribute-threads
                         (for*/list ([file (in-list to-test)]
@@ -110,4 +95,5 @@
       (for/list ([work-for-thread distributed])
         (thread (λ () (for ([work (in-list work-for-thread)])
                         (run (car work) (cdr work))))))))
+  ;; Join all threads
   (for ([w running-threads]) (thread-wait w)))
