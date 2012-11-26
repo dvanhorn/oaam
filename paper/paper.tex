@@ -444,8 +444,8 @@ parameters of the relation given in figure~\ref{fig:aam} as follows:
 The resulting relation is non-deterministic in its choice of
 addresses, however it must always choose a fresh address when
 allocating a continuation or variable binding.  If we consider machine
-states equivalent up to consistent renaming, this relation defines
-a deterministic machine.  (The relation is really a function.)
+states equivalent up to consistent renaming and fix an allocation
+scheme, this relation defines a deterministic machine (the relation is really a function).
 
 The interpretation of primitive operations is defined by setting
 $\interpdelta$ as follows:
@@ -495,7 +495,7 @@ strategy as follows, for a fixed constant \(k\):
 \end{align*}
 where $\sqcup$ on stores is a point-wise lifting of $\sqcup$: $\msto
 \sqcup \msto' = \lambda \maddr. \msto(\maddr) \sqcup \msto'(\maddr)$.
-The \(\rfloor\cdot\lfloor_k\) notation denotes the truncation of a list
+The \(\lfloor\cdot\rfloor_k\) notation denotes the truncation of a list
 of symbols to the leftmost \(k\) symbols.
 
 All that remains is the interpretation of primitives.  For abstract
@@ -596,7 +596,7 @@ The refactored relation, $\widehat{\machstep}$, becomes:
 %
 \begin{align*}
 (C, \msto) &\mathrel{\widehat{\machstep}} (C', \msto') \\
-\mbox{where } C' &= \{c' \mid \wn(c, \msto) \mathrel{\machstep} \wn(c, \msto^c), c \in C\} \\
+\mbox{where } C' &= \{c' \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto^c), c \in C\} \\
               \msto' &= \bigsqcup\; \{\msto^c \mid \wn(c,\msto)\mathrel{\machstep} \wn(c', \msto^c), c \in C\} \\
 \wn(\ev{\mexp, \menv, \mkont}, \msto) &= \ev{\mexp, \menv, \msto, \mkont} \\
 \wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \msto, \mkont} \\
@@ -604,7 +604,7 @@ The refactored relation, $\widehat{\machstep}$, becomes:
 \wn(\ans{\mval}, \msto) &= \ans{\msto, \mval}
 \end{align*}
 %
-In effect, the new store is computed as the least upper bound of all subsequent stores.
+In effect, the new store is computed as the least upper bound of all stores after stepping.
 
 
 \subsection{Store-allocated results}
@@ -624,36 +624,40 @@ and the tail address are both determined by the label of the
 application point, so the space becomes linear and the overall
 complexity drops to cubic.  This is a critical abstraction in
 languages with $n$-ary functions, since otherwise the continuation
-space grows super-exponentially.
+space grows super-exponentially. In our example language, we have only
+unary functions, so application forms always have two positions: the
+function and the argument. Thus for every application labeled $\mlab$,
+we introduce two new labels, $\mlab^f$ and $\mlab^a$.
 % In theory, this aggressive distinction between continuations might buy
 % additional precision, but in practice, it does not.
 
-If we specialize to 0CFA, the evaluation rules become:
-
+In $k$-CFA, the evaluation rules become:
 
 \newcommand{\ext}[3]{#1\sqcup[#2\mapsto#3]}
 %\newcommand{\ext}[3]{ext(#1,#2,#3)}
 
 \begin{align*}
 %ext(\msto, \maddr, s) &= \msto \sqcup [\maddr \mapsto s] \\
-\ev{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &\machstep
-\ev{\mexpi{0},\menv,\ext{\msto}{\mlab}{\{\mkont\}},\kar{\mexpi{1},\mlab}}
+\ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &\machstep
+\ev[^\mcntr]{\mexpi{0},\menv,\ext{\msto}{\mlab}{\{\mkont\}},\kar{\mexpi{1},\menv,\mlab,\mcntr}}
 \\
-\co{\kar{\mexp,\menv,\mlab},\mval,\msto} & \machstep
-\ev{\mexp,\menv,\ext{\msto}{\mlab^f}{\{\mval\}},\kfn{\mlab^f,\mlab}}
+\co{\kar{\mexp,\menv,\mlab,\mcntr},\mval,\msto} & \machstep
+\ev[^\mcntr]{\mexp,\menv,\ext{\msto}{\mlab^f\mcntr}{\{\mval\}},\kfn{\mlab^f,\mlab,\mcntr}}
 \\
-\co{\kfn{\mlab^f,\mlab},\mval,\msto} & \machstep
-\ap[_\mlab]{\mvalx{u},\mlab^a,\mkont,\ext{\msto}{\mlab^a}{\{\mval\}}}
+\co{\kfn{\mlab^f,\mlab,\mcntr},\mval,\msto} & \machstep
+\ap[^\mcntr_\mlab]{\mvalx{u},\mlab^a,\mkont,\ext{\msto}{\mlab^a\mcntr}{\{\mval\}}}
 \\
-\text{ where } &\mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddr^f)
+\text{ where } &\mkont \in \msto(\mlab\mcntr), \mvalx{u} \in \msto(\mlab^f\mcntr)
 \\
-\ap[_\mlab]{\clos{\mvar,\mexp,\menv},\mlab^a, \msto,\mkont} & \machstep
-\ev{\mexp,\menv[\mvar\mapsto\mvar],\ext{\msto}{\mvar}{\msto(\mlab^a)},\mkont}
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mlab^a, \msto,\mkont} & \machstep
+\ev[^{\mcntr'}]{\mexp,\menv[\mvar\mapsto\mvar\mcntr'],\ext{\msto}{\mvar\mcntr'}{\msto(\mlab^a\mcntr)},\mkont}
 \\
-\ap[_\mlab]{\mop,\mlab^a,\msto,\mkont} & \machstep
+\text{ where }& \mcntr' = \lfloor\mlab\mcntr\rfloor_k
+\\
+\ap[^\mcntr_\mlab]{\mop,\mlab^a,\msto,\mkont} & \machstep
 \co{\mkont,\mval',\msto}
 \\
-\text{ where }& \mval'\in \{\interpdelta(\mop,\mval) \mid \mval \in \msto(\mlab^a)\}
+\text{ where }& \mval'\in \{\interpdelta(\mop,\mval) \mid \mval \in \msto(\mlab^a\mcntr)\}
 \end{align*}
 
 % This extra store-allocation is effectively naming all intermediate
@@ -722,9 +726,9 @@ Doing so collapses these forks and joins into a linear sequence of states:
 \includegraphics[scale=0.3]{lazy}
 \end{center}
 
-In case it's unclear, this shift does not change the concrete semantics of the
-language to be lazy.  Rather, it abstracts over transitions that the original
-non-deterministic semantics steps through. 
+This shift does not change the concrete semantics of the language to
+be lazy.  Rather, it abstracts over transitions that the original
+non-deterministic semantics steps through.
 %
 We say the abstraction is \emph{lazy} because it delays dereferencing an
 address until its contents are \emph{needed} as values in the semantics. It
@@ -1145,12 +1149,11 @@ primitives are interpreted on every combination of values that flow to
 them, and unions lead to more primitive interpretations.
 
 Quotation is special because it cannot introduce function values,
-which is important to enhancing our technique's soundness to
-conceptual complexity ratio. If we join two values of different type
-together, we don't get ``anything,'' which has complex meaning in
-higher-order languages (Shivers' escape semantics) and is overly
-approximate. We instead get ``any quotable value,'' which has much
-simpler semantics.
+which is important for a simple semantics. If we join two values of
+different type together, we don't get ``anything,'' which has complex
+meaning in higher-order languages (Shivers' escape semantics) and is
+overly approximate. We instead get ``any quotable value,'' which has
+much simpler semantics.
 
 There are a few steps to consider:
 \begin{itemize}
@@ -1185,6 +1188,8 @@ There are a few steps to consider:
 \label{fig:qlist}
 \end{figure}
 
+This abstraction was so critical to timely convergence that all of our evaluation uses it.
+
 \section{Evaluation}
 \label{sec:eval}
 
@@ -1192,7 +1197,7 @@ We have implemented, optimized, and evaluated an analysis framework
 supporting higher-order functions, state, first-class control,
 compound data, and a large number of primitive kinds of data and
 operations such as floating point, complex, and exact rational
-arithmetic.  The analysis is evaluated against a suite of benchmarks
+arithmetic.  The analysis is evaluated against a suite of Scheme benchmarks
 drawn from the literature.
 %
 For each benchmark, we collect analysis times, peak memory usage, and
@@ -1210,7 +1215,7 @@ with 12Gb of memory.
 Many benchmarks cause the baseline analyzer to take longer than 30
 minutes or to consume more 1 gigabyte of memory, at which point the
 analysis is stopped.  This is the case for the largest benchmark
-program, which is 3,500 lines of code and takes under a minute in the
+program, {\bf nucleic}, which is 3,500 lines of code and takes under a minute in the
 most optimized analyzer.  For those benchmarks that did complete on
 the baseline, the optimized analyzer outperformed the baseline by a
 factor of two to three orders of magnitude.
@@ -1243,9 +1248,9 @@ We use the following set of benchmarks:
   \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 
 
-\item {\bf nbody}: implements the Greengard multipole algorithm for
-  computing gravitational forces on point masses distributed uniformly
-  in a cube (used in
+\item {\bf nbody}: implementation~\cite{ianjohnson:nbody87} of the
+  Greengard multipole algorithm for computing gravitational forces on
+  point masses distributed uniformly in a cube (used in
   \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 
 \item {\bf earley}: Earley's parsing algorithm, applied to a 15-symbol
@@ -1325,7 +1330,7 @@ Source code of the implementation and benchmark suite is at:
 
 \paragraph{Comparison with other flow analysis implementations}
 
-The analysis considered here computes results similar Earl, et al.'s
+The analysis considered here computes results similar to Earl, et al.'s
 0-CFA implementation~\cite{dvanhorn:Earl2012Introspective}, which
 times out on the \Church{} benchmark because it does not widen the
 store as described for our baseline evaluator.  So even though it
@@ -1411,7 +1416,7 @@ effect.
 \paragraph{Constraint-based program analysis for higher-order languages}
 
 Constraint-based program analyses
-(e.g.~\cite{dvanhorn:nielson-nielson-popl97,dvanhorn:wright-jagannathan-toplas98,dvanhorn:Meunier2006Modular})
+(e.g.~\cite{dvanhorn:nielson-nielson-popl97,dvanhorn:wright-jagannathan-toplas98,dvanhorn:Meunier2006Modular,dvanhorn:steckler-wand-toplas97})
 typically compute sets of abstract values for each program point.
 These values approximate values arising at run-time for each
 program point.  Value sets are computed as the least solution to a set
