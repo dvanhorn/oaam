@@ -137,7 +137,7 @@
                                    [#,acc (cons filtered #,acc)])
                               #,@(if on-err
                                      #`((when (∅? filtered)
-                                          #,on-err))
+                                          #,(on-err #'res)))
                                      #'())
                               #,rest))))))
 
@@ -199,7 +199,8 @@
                (define tm (type-match t σ-stx v))
                (tm #'acc
                    (and (not mult-ary?)
-                        #`(log-info "Bad input to primitive: ~a (arg ~a)" 'prim #,argnum))
+                        (λ (tmp)
+                           #`(log-info "Bad input to primitive: ~a (arg ~a): ~a" 'prim #,argnum #,tmp)))
                    stx)))
            (define check-rest
              (and rest
@@ -217,9 +218,11 @@
                               [(cons ra rrest)
                                #,(check-rest #'acc
                                              (and (not mult-ary?)
-                                                  #`(log-info "Bad input to primitive: ~a (rest arg ~a)"
-                                                              'prim
-                                                              #'argnum))
+                                                  (λ (tmp)
+                                                     #`(log-info "Bad input to primitive: ~a (rest arg ~a): ~a"
+                                                                 'prim
+                                                                 #'argnum
+                                                                 #,tmp)))
                                              #`(loop σ rrest acc (add1 argnum)))]))
                       #`(let ([acc '()]) #,built))]
                [vs
@@ -358,22 +361,28 @@
 
 (define-syntax (mk-primitive-meaning stx)
   (syntax-parse stx
-         [(_ gb?:boolean σpb?:boolean σdb?:boolean cb?:boolean 0b?:boolean
+         [(_ gb?:boolean σpb?:boolean σdb?:boolean cb?:boolean sb?:boolean 0b?:boolean
              mean:id compile:id co:id defines ... (p:prim-entry ...))
           (define global-σ? (syntax-e #'gb?))
           (define σ-passing? (syntax-e #'σpb?))
           (define σ-∆s? (syntax-e #'σdb?))
           (define compiled? (syntax-e #'cb?))
+          (define sparse? (syntax-e #'sb?))
           (define 0cfa? (syntax-e #'0b?))
           (define ((ap m) arg-stx)
             (if (procedure? m)
                 (m arg-stx)
                 (datum->syntax arg-stx (cons m arg-stx) arg-stx)))
           (define hidden-σ (and σ-∆s? (not global-σ?) (generate-temporary #'hidden)))
+          (define hidden-actions (and sparse? (generate-temporary #'hidden-A)))
           (with-syntax ([(σ-gop ...) (if σ-passing? #'(pσ) #'())]
-                        [(top ...) (listy hidden-σ)]
+                        [((top top-op) ...)
+                         (if hidden-σ `((,hidden-σ #'top-σ)) '())]
+                        [((top-actions actions-op) ...)
+                         (if hidden-actions
+                             (list (list hidden-actions #'target-actions))
+                             '())]
                         [topp (or hidden-σ #'pσ)]
-                        [(top-op ...) (if (and σ-∆s? (not global-σ?)) #'(top-σ) #'())]
                         [(δ-op ...) (if 0cfa? #'() #'(δ))])
             (define eval
               #`(case o
@@ -396,26 +405,30 @@
                                                    #,(cond [w? (m #'(pσ ℓ δ vs))]
                                                            [r? (m #'(pσ vs))]
                                                            [else (m #'(vs))])))))))])))
+            (define qs #'quasisyntax) ;; have to lift for below to parse correctly
             (quasisyntax/loc stx
               (begin
                 ;; Let primitives yield single values instead of entire states.
-                #,#'(define-syntax (with-prim-yield syn)
-                      (syntax-parse syn
-                        [(_ k body)
-                         (define yield-tr (syntax-parameter-value #'yield-meaning))
-                         (define new
-                           (λ (sx)
-                              (syntax-parse sx
-                                [(_ v)
-                                 (yield-tr (syntax/loc sx (yield (co target-σ k v))))])))
-                         #`(syntax-parameterize ([yield #,new]) body)]))
+                (define-syntax (with-prim-yield syn)
+                  (syntax-parse syn
+                    [(_ k body)
+                     (define yield-tr (syntax-parameter-value #'yield-meaning))
+                     (define new
+                       (λ (sx)
+                          (syntax-parse sx
+                            [(_ v)
+                             (yield-tr (syntax/loc sx (yield (co target-σ k v))))])))
+                     ;; Must quote the produced quasisyntax's unsyntax
+                     #,#'#`(syntax-parameterize ([yield #,new]) body)]))
                 defines ...
                 ;; λP very much like λ%
                 (define-syntax-rule (... (λP (pσ ℓ δ k v-addrs) body ...))
                   #,(if compiled?
-                        #'(λ (top ... σ-gop ... ℓ δ-op ... k v-addrs)
+                        #'(λ (top ... top-actions ... σ-gop ... ℓ δ-op ... k v-addrs)
                              (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
                                                    [target-σ (make-rename-transformer #'pσ)]
+                                                   [target-actions (make-rename-transformer #'top-actions)] ...
+                                                   [top-actions? #t]
                                                    [top-σ? #t])
                                body (... ...)))
                         #'(syntax-parameterize ([target-σ (make-rename-transformer #'pσ)])
@@ -425,5 +438,5 @@
                   #,(if compiled? eval #'o))
                 (define-syntax-rule (mean o pσ ℓ δ k v-addrs)
                   #,(if compiled?
-                        #'(o top-op ... σ-gop ... ℓ δ-op ... k v-addrs)
+                        #'(o top-op ... actions-op ... σ-gop ... ℓ δ-op ... k v-addrs)
                         eval)))))]))

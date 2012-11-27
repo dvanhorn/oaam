@@ -1,5 +1,6 @@
 #lang racket
-(require "parse.rkt" "kcfa-instantiations.rkt" "LK-instantiations.rkt"
+(require "parse.rkt" "kcfa-instantiations.rkt"
+         ;; "LK-instantiations.rkt" FIXME
          "handle-limits.rkt"
          racket/sandbox)
 (provide test aval prep)
@@ -32,8 +33,10 @@
       (with-limits (* 10 #;run-for-10-minutes
                       60 #;seconds-in-minutes)
                    1024 ;; Max memory: 1GiB
-                   (begin0 (time ((aval) e))
-                           (printf "Result: Complete~%"))))))
+                   (call-with-values
+                       (λ () (begin0 (time ((aval) e))
+                                     (printf "Result: Complete~%")))
+                     print-values)))))
 
 (module+ main
  (require racket/cmdline)
@@ -124,6 +127,12 @@
                  "Benchmark preallocated store lazy non-determinism"
                  (aval lazy-0cfa^/prealloc!)]
 |#
+                #:multi
+                [("-d") datum
+                 "Print debug message if following datum interpreted"
+                 (define d (with-input-from-string datum read))
+                 (printf "Debug msg on ~v~%" d)
+                 (debug-check (cons d (debug-check)))]
                 #:args (filename)
                 filename))
 (test (prep test-file)))

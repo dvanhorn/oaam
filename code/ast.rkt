@@ -11,15 +11,16 @@
 ;; (lcc Lab Var Exp)
 ;; (primr Lab Sym)
 ;; (datum Lab Atom)
-(struct exp (lab)             #:transparent)
+;; Forms are mutable for in-place transformations.
+(struct exp (lab tail?)       #:transparent)
 (struct var exp (name)        #:transparent)
-(struct lrc exp (xs es e)     #:transparent)
-(struct lam exp (xs exp)      #:transparent)
-(struct rlm exp (xs rest exp) #:transparent)
-(struct app exp (rator rand)  #:transparent)
-(struct ife exp (t c a)       #:transparent)
-(struct st! exp (x e)         #:transparent)
-(struct lcc exp (x e)         #:transparent)
+(struct lrc exp (xs es e)     #:transparent #:mutable)
+(struct lam exp (xs exp)      #:transparent #:mutable)
+(struct rlm exp (xs rest exp) #:transparent #:mutable)
+(struct app exp (rator rand)  #:transparent #:mutable)
+(struct ife exp (t c a)       #:transparent #:mutable)
+(struct st! exp (x e)         #:transparent #:mutable)
+(struct lcc exp (x e)         #:transparent #:mutable)
 ;; Stack inspection forms
 (struct grt exp (r e)         #:transparent) ;; Grant
 (struct fal exp ()            #:transparent) ;; Fail
@@ -45,27 +46,27 @@
               [bound (set)])
     (define (loop e) (loop* e bound))
     (match e
-      [(var _ name) (if (name . ∈ . bound) ∅ (set name))]
-      [(lrc _ xs es e)
+      [(var _ _ name) (if (name . ∈ . bound) ∅ (set name))]
+      [(lrc _ _ xs es e)
        (define bound* (∪/l bound xs))
        (for/union #:initial (loop* e bound*)
                   ([e (in-list es)])
          (loop* e bound*))]
-      [(lam _ vars body) (loop* body (∪/l bound vars))]
-      [(rlm _ vars rest body) (loop* body (∪1 (∪/l bound vars) rest))]
-      [(app _ rator rands) (for/union #:initial (loop rator)
+      [(lam _ _ vars body) (loop* body (∪/l bound vars))]
+      [(rlm _ _ vars rest body) (loop* body (∪1 (∪/l bound vars) rest))]
+      [(app _ _ rator rands) (for/union #:initial (loop rator)
                                       ([rand (in-list rands)])
                              (loop rand))]
-      [(ife _ t c a) (∪ (loop t) (loop c) (loop a))]
-      [(st! _ x e)
+      [(ife _ _ t c a) (∪ (loop t) (loop c) (loop a))]
+      [(st! _ _ x e)
        (define efs (loop e))
        (if (x . ∈ . bound) efs (∪1 efs x))]
-      [(lcc _ x e) (loop* e (∪1 bound x))]
-      [(primr _ _) ∅]
-      [(datum _ _) ∅]
+      [(lcc _ _ x e) (loop* e (∪1 bound x))]
+      [(primr _ _ _) ∅]
+      [(datum _ _ _) ∅]
       ;; Continuation mark forms
-      [(grt _ _ e) (loop e)]
-      [(frm _ _ e) (loop e)]
-      [(fal _) ∅]
-      [(tst _ _ t e) (∪ (loop t) (loop e))]
+      [(grt _ _ _ e) (loop e)]
+      [(frm _ _ _ e) (loop e)]
+      [(fal _ _) ∅]
+      [(tst _ _ _ t e) (∪ (loop t) (loop e))]
       [_ (error 'free "Bad expr ~a" e)])))

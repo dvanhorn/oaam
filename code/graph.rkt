@@ -1,13 +1,35 @@
 #lang racket
-(require racket/stxparam)
-(provide graph-file dump-dot add-edge! generate-graph?)
+(require racket/stxparam (for-syntax racket/stxparam))
+(provide graph-file dump-dot add-edge! new-graph generate-graph?
+         node-of node-of/data
+         (struct-out node)
+         (for-syntax when-graph if-graph))
 ;; for destination for *.dot files
 (define graph-file (make-parameter #f))
 
 (define-syntax-parameter generate-graph? #f)
+(begin-for-syntax
+ (define-syntax-rule (when-graph body ...)
+   (if (syntax-parameter-value #'generate-graph?)
+       #`(#,(let () body ...))
+       #'()))
+ (define-syntax-rule (if-graph then else)
+   (if (syntax-parameter-value #'generate-graph?)
+       then
+       else)))
+
+(struct node (state [succ #:mutable] [data #:mutable]) #:prefab)
+
+(define (new-graph) (make-hash))
+(define (node-of g state)
+  (hash-ref! g state (λ () (node state (seteq) #f))))
+(define-syntax-rule (node-of/data g state data)
+  (hash-ref! g state (λ () (node state (seteq) data))))
 
 (define (add-edge! g from to)
-  (hash-set! g from (set-add (hash-ref g from (set)) to)))
+  (define from-n (node-of g from))
+  (define to-n (node-of g to))
+  (set-node-succ! g from-n (set-add (node-succ from-n) to-n)))
 
 ;; The given graph will be from states to sets of states.
 ;; Rename states with symbols for node names.
@@ -15,8 +37,10 @@
   (define names (make-hash))
   (define (name-of s) (hash-ref! names s (λ _ (gensym 'n))))
   (begin0
-   (for/hash ([(from tos) (in-hash graph)])
-     (values (name-of from) (for/set ([to (in-set tos)]) (name-of to))))
+   (for/hash ([(from n) (in-hash graph)])
+     (values (name-of n)
+             (for/set ([to (in-set (node-succ n))])
+               (name-of to))))
    (for ([n (hash-values names)]) (printf "  ~a [label = \"\"];~%" n))))
 
 (define (dump-dot graph)

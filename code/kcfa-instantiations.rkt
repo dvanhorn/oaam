@@ -13,7 +13,7 @@
          "nonsparse.rkt"
          "sparse-wide.rkt"
          racket/splicing)
-
+(provide debug-check)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Concrete semantics
 
@@ -48,173 +48,172 @@
                    #:ans  sp-lazy-0cfa^/c-ans
                    #:touches sp-lazy-0cfa^/c-touches
                    #:fixpoint sp-lazy-0cfa^/c-fix
-                   #:global-σ
-                   #:compiled #:wide #:sparse))))))
+                   #:global-σ #:compiled #:wide #:sparse))))))
 (provide sp-lazy-0cfa^/c)
 
 
 #|
-;; "sid"
-(mk-imperative/∆s^-fixpoint
-                s-imperative/∆s-fixpoint/c s-imperative/∆s-ans/c?
-                s-imperative/∆s-ans/c-v s-imperative/∆s-touches-0/c)
-(with-nonsparse
- (with-strict
-  (with-0-ctx
-   (with-σ-∆s!
-    (with-abstract
-      (mk-analysis #:aval 0cfa^/c/∆s!
-                   #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
-                   #:ans s-imperative/∆s-ans/c
-                   #:touches s-imperative/∆s-touches-0/c
-                   #:fixpoint s-imperative/∆s-fixpoint/c
-                   #:global-σ #:compiled #:wide))))))
-(provide 0cfa^/c/∆s!)
-
-;; "spd"
-(mk-prealloc/∆s^-fixpoint s-prealloc/∆s-fixpoint/c s-prealloc/∆s-ans/c?
-              s-prealloc/∆s-ans/c-v s-prealloc/∆s-touches-0/c)
-(with-nonsparse
- (with-strict
-  (with-0-ctx/prealloc
-   (with-σ-∆s/prealloc!
-    (with-abstract
-      (mk-analysis #:aval 0cfa^/c/∆s/prealloc!
-                   #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
-                   #:ans s-prealloc/∆s-ans/c
-                   #:touches s-prealloc/∆s-touches-0/c
-                   #:fixpoint s-prealloc/∆s-fixpoint/c
-                   #:global-σ #:compiled #:wide))))))
-(provide 0cfa^/c/∆s/prealloc!)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Potpourris of evaluators
-;; "bl"
-(mk-set-fixpoint^ fix baseline-fixpoint baseline-ans?)
-(with-nonsparse
- (with-strict
-  (with-0-ctx
-   (with-whole-σ
-    (with-σ-passing-set-monad
+ ;; "sid"
+ (mk-imperative/∆s^-fixpoint
+                 s-imperative/∆s-fixpoint/c s-imperative/∆s-ans/c?
+                 s-imperative/∆s-ans/c-v s-imperative/∆s-touches-0/c)
+ (with-nonsparse
+  (with-strict
+   (with-0-ctx
+    (with-σ-∆s!
      (with-abstract
-      (mk-analysis #:aval baseline #:ans baseline-ans
-                   #:fixpoint baseline-fixpoint
-                   #:σ-passing #:wide #:set-monad)))))))
-(provide baseline)
-;; "sp"
-(mk-special-set-fixpoint^ fix 0cfa-set-fixpoint^ 0cfa-ans^?)
-(with-nonsparse
- (with-strict
-  (with-0-ctx
-   (with-whole-σ
-    (with-σ-passing-set-monad
+       (mk-analysis #:aval 0cfa^/c/∆s!
+                    #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
+                    #:ans s-imperative/∆s-ans/c
+                    #:touches s-imperative/∆s-touches-0/c
+                    #:fixpoint s-imperative/∆s-fixpoint/c
+                    #:global-σ #:compiled #:wide))))))
+ (provide 0cfa^/c/∆s!)
+ 
+ ;; "spd"
+ (mk-prealloc/∆s^-fixpoint s-prealloc/∆s-fixpoint/c s-prealloc/∆s-ans/c?
+               s-prealloc/∆s-ans/c-v s-prealloc/∆s-touches-0/c)
+ (with-nonsparse
+  (with-strict
+   (with-0-ctx/prealloc
+    (with-σ-∆s/prealloc!
      (with-abstract
-      (mk-analysis #:aval 0cfa^ #:ans 0cfa-ans^
-                   #:fixpoint 0cfa-set-fixpoint^
-                   #:σ-passing #:wide #:set-monad)))))))
-(provide 0cfa^)
-;; "ls"
-(mk-special-set-fixpoint^ fix lazy-0cfa-set-fixpoint^ lazy-0cfa-ans^?)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx
-   (with-whole-σ
-    (with-σ-passing-set-monad
+       (mk-analysis #:aval 0cfa^/c/∆s/prealloc!
+                    #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
+                    #:ans s-prealloc/∆s-ans/c
+                    #:touches s-prealloc/∆s-touches-0/c
+                    #:fixpoint s-prealloc/∆s-fixpoint/c
+                    #:global-σ #:compiled #:wide))))))
+ (provide 0cfa^/c/∆s/prealloc!)
+ 
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;; Potpourris of evaluators
+ ;; "bl"
+ (mk-set-fixpoint^ fix baseline-fixpoint baseline-ans?)
+ (with-nonsparse
+  (with-strict
+   (with-0-ctx
+    (with-whole-σ
+     (with-σ-passing-set-monad
+      (with-abstract
+       (mk-analysis #:aval baseline #:ans baseline-ans
+                    #:fixpoint baseline-fixpoint
+                    #:σ-passing #:wide #:set-monad)))))))
+ (provide baseline)
+ ;; "sp"
+ (mk-special-set-fixpoint^ fix 0cfa-set-fixpoint^ 0cfa-ans^?)
+ (with-nonsparse
+  (with-strict
+   (with-0-ctx
+    (with-whole-σ
+     (with-σ-passing-set-monad
+      (with-abstract
+       (mk-analysis #:aval 0cfa^ #:ans 0cfa-ans^
+                    #:fixpoint 0cfa-set-fixpoint^
+                    #:σ-passing #:wide #:set-monad)))))))
+ (provide 0cfa^)
+ ;; "ls"
+ (mk-special-set-fixpoint^ fix lazy-0cfa-set-fixpoint^ lazy-0cfa-ans^?)
+ (with-nonsparse
+  (with-lazy
+   (with-0-ctx
+    (with-whole-σ
+     (with-σ-passing-set-monad
+      (with-abstract
+       (mk-analysis #:aval lazy-0cfa^ #:ans lazy-0cfa-ans^
+                    #:fixpoint lazy-0cfa-set-fixpoint^
+                    #:σ-passing #:wide #:set-monad)))))))
+ (provide lazy-0cfa^)
+ ;; "lc"
+ (mk-special-set-fixpoint^ fix 0cfa-set-fixpoint^/c 0cfa-ans^/c?)
+ (with-nonsparse
+  (with-lazy
+   (with-0-ctx
+    (with-whole-σ
+     (with-σ-passing-set-monad
+      (with-abstract
+       (mk-analysis #:aval lazy-0cfa^/c #:ans 0cfa-ans^/c
+                    #:fixpoint 0cfa-set-fixpoint^/c
+                    #:σ-passing
+                    #:compiled #:wide #:set-monad)))))))
+  (provide lazy-0cfa^/c)
+ ;; "ld"
+ (mk-∆-fix^ lazy-0cfa∆^-fixpoint 0cfa∆-ans^?)
+ (with-nonsparse
+  (with-lazy
+   (with-0-ctx
+    (with-σ-∆s
+             (with-σ-passing-set-monad
+              (with-abstract
+               (mk-analysis #:aval lazy-0cfa^/c/∆s #:ans 0cfa∆-ans^
+                            #:fixpoint lazy-0cfa∆^-fixpoint
+                            #:wide #:σ-∆s #:set-monad
+                            #:compiled)))))))
+ (provide lazy-0cfa^/c/∆s) 
+ 
+ ;; "fd"
+ (mk-timestamp-∆-fix^ lazy-0cfa∆^-fixpoint/t lazy-0cfa∆/t-ans^?)
+ (with-nonsparse
+  (with-lazy
+   (with-0-ctx
+    (with-σ-∆s
+             (with-σ-passing-set-monad
+              (with-abstract
+               (mk-analysis #:aval lazy-0cfa^/c/∆s/t #:ans lazy-0cfa∆/t-ans^
+                            #:fixpoint lazy-0cfa∆^-fixpoint/t
+                            #:wide #:σ-∆s #:set-monad
+                            #:compiled)))))))
+ (provide lazy-0cfa^/c/∆s/t)
+ 
+ ;; "ia"
+ (mk-imperative/∆s/acc^-fixpoint
+                 imperative/∆s/acc-fixpoint/c imperative/∆s/acc-ans/c?
+                 imperative/∆s/acc-ans/c-v imperative/∆s/acc-touches-0/c)
+ (with-nonsparse
+  (with-lazy
+   (with-0-ctx
+    (with-σ-∆s/acc!
      (with-abstract
-      (mk-analysis #:aval lazy-0cfa^ #:ans lazy-0cfa-ans^
-                   #:fixpoint lazy-0cfa-set-fixpoint^
-                   #:σ-passing #:wide #:set-monad)))))))
-(provide lazy-0cfa^)
-;; "lc"
-(mk-special-set-fixpoint^ fix 0cfa-set-fixpoint^/c 0cfa-ans^/c?)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx
-   (with-whole-σ
-    (with-σ-passing-set-monad
+       (mk-analysis #:aval lazy-0cfa^/c/∆s/acc!
+                    #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
+                    #:ans imperative/∆s/acc-ans/c
+                    #:touches imperative/∆s/acc-touches-0/c
+                    #:fixpoint imperative/∆s/acc-fixpoint/c
+                    #:σ-∆s
+                    #:global-σ #:compiled #:wide))))))
+ (provide lazy-0cfa^/c/∆s/acc!)
+ ;; "id"
+ (mk-imperative/∆s^-fixpoint
+                 imperative/∆s-fixpoint/c imperative/∆s-ans/c?
+                 imperative/∆s-ans/c-v imperative/∆s-touches-0/c)
+ (with-nonsparse
+  (with-lazy
+   (with-0-ctx
+    (with-σ-∆s!
      (with-abstract
-      (mk-analysis #:aval lazy-0cfa^/c #:ans 0cfa-ans^/c
-                   #:fixpoint 0cfa-set-fixpoint^/c
-                   #:σ-passing
-                   #:compiled #:wide #:set-monad)))))))
- (provide lazy-0cfa^/c)
-;; "ld"
-(mk-∆-fix^ lazy-0cfa∆^-fixpoint 0cfa∆-ans^?)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx
-   (with-σ-∆s
-            (with-σ-passing-set-monad
-             (with-abstract
-              (mk-analysis #:aval lazy-0cfa^/c/∆s #:ans 0cfa∆-ans^
-                           #:fixpoint lazy-0cfa∆^-fixpoint
-                           #:wide #:σ-∆s #:set-monad
-                           #:compiled)))))))
-(provide lazy-0cfa^/c/∆s)
-
-;; "fd"
-(mk-timestamp-∆-fix^ lazy-0cfa∆^-fixpoint/t lazy-0cfa∆/t-ans^?)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx
-   (with-σ-∆s
-            (with-σ-passing-set-monad
-             (with-abstract
-              (mk-analysis #:aval lazy-0cfa^/c/∆s/t #:ans lazy-0cfa∆/t-ans^
-                           #:fixpoint lazy-0cfa∆^-fixpoint/t
-                           #:wide #:σ-∆s #:set-monad
-                           #:compiled)))))))
-(provide lazy-0cfa^/c/∆s/t)
-
-;; "ia"
-(mk-imperative/∆s/acc^-fixpoint
-                imperative/∆s/acc-fixpoint/c imperative/∆s/acc-ans/c?
-                imperative/∆s/acc-ans/c-v imperative/∆s/acc-touches-0/c)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx
-   (with-σ-∆s/acc!
-    (with-abstract
-      (mk-analysis #:aval lazy-0cfa^/c/∆s/acc!
-                   #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
-                   #:ans imperative/∆s/acc-ans/c
-                   #:touches imperative/∆s/acc-touches-0/c
-                   #:fixpoint imperative/∆s/acc-fixpoint/c
-                   #:σ-∆s
-                   #:global-σ #:compiled #:wide))))))
-(provide lazy-0cfa^/c/∆s/acc!)
-;; "id"
-(mk-imperative/∆s^-fixpoint
-                imperative/∆s-fixpoint/c imperative/∆s-ans/c?
-                imperative/∆s-ans/c-v imperative/∆s-touches-0/c)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx
-   (with-σ-∆s!
-    (with-abstract
-      (mk-analysis #:aval lazy-0cfa^/c/∆s!
-                   #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
-                   #:ans imperative/∆s-ans/c
-                   #:touches imperative/∆s-touches-0/c
-                   #:fixpoint imperative/∆s-fixpoint/c
-                   #:global-σ #:compiled #:wide))))))
-(provide lazy-0cfa^/c/∆s!)
-;; "pa"
-(mk-prealloc/∆s/acc^-fixpoint prealloc/∆s/acc-fixpoint/c prealloc/∆s/acc-ans/c? 
-              prealloc/∆s/acc-ans/c-v prealloc/∆s/acc-touches-0/c)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx/prealloc
-   (with-σ-∆s/acc/prealloc!
-    (with-abstract
-      (mk-analysis #:aval lazy-0cfa^/c/∆s/acc/prealloc!
-                   #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
-                   #:ans prealloc/∆s/acc-ans/c
-                   #:touches prealloc/∆s/acc-touches-0/c
-                   #:fixpoint prealloc/∆s/acc-fixpoint/c
-                   #:σ-∆s
-                   #:global-σ #:compiled #:wide))))))
-(provide lazy-0cfa^/c/∆s/acc/prealloc!)
+       (mk-analysis #:aval lazy-0cfa^/c/∆s!
+                    #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
+                    #:ans imperative/∆s-ans/c
+                    #:touches imperative/∆s-touches-0/c
+                    #:fixpoint imperative/∆s-fixpoint/c
+                    #:global-σ #:compiled #:wide))))))
+ (provide lazy-0cfa^/c/∆s!)
+ ;; "pa"
+ (mk-prealloc/∆s/acc^-fixpoint prealloc/∆s/acc-fixpoint/c prealloc/∆s/acc-ans/c? 
+               prealloc/∆s/acc-ans/c-v prealloc/∆s/acc-touches-0/c)
+ (with-nonsparse
+  (with-lazy
+   (with-0-ctx/prealloc
+    (with-σ-∆s/acc/prealloc!
+     (with-abstract
+       (mk-analysis #:aval lazy-0cfa^/c/∆s/acc/prealloc!
+                    #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
+                    #:ans prealloc/∆s/acc-ans/c
+                    #:touches prealloc/∆s/acc-touches-0/c
+                    #:fixpoint prealloc/∆s/acc-fixpoint/c
+                    #:σ-∆s
+                    #:global-σ #:compiled #:wide))))))
+ (provide lazy-0cfa^/c/∆s/acc/prealloc!)
 
 |#
 
@@ -272,20 +271,20 @@
 (provide lazy-0cfa^/c/prealloc/timestamp!)
 
 #|
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Evaluators for CM-extended Scheme
-(mk-set-fixpoint^ fix baseline/cm-fixpoint baseline/cm-ans?)
-(with-nonsparse
- (with-strict
-  (with-0-ctx
-   (with-whole-σ
-    (with-σ-passing-set-monad
-     (with-abstract
-      (mk-analysis #:aval baseline/cm #:ans baseline/cm-ans
-                   #:fixpoint baseline/cm-fixpoint
-                   #:CM (set 'A 'S)
-                   #:σ-passing #:wide #:set-monad)))))))
-(provide baseline/cm)
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;; Evaluators for CM-extended Scheme
+ (mk-set-fixpoint^ fix baseline/cm-fixpoint baseline/cm-ans?)
+ (with-nonsparse
+   (with-strict
+   (with-0-ctx
+    (with-whole-σ
+     (with-σ-passing-set-monad
+      (with-abstract
+       (mk-analysis #:aval baseline/cm #:ans baseline/cm-ans
+                    #:fixpoint baseline/cm-fixpoint
+                    #:CM (set 'A 'S)
+                    #:σ-passing #:wide #:set-monad)))))))
+ (provide baseline/cm)
 
 |#
 

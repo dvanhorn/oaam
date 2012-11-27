@@ -1,7 +1,7 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          (only-in "store-passing.rkt" bind-rest) "data.rkt" "deltas.rkt" "add-lib.rkt"
-         "handle-limits.rkt")
+         "handle-limits.rkt" "graph.rkt")
 (provide reset-globals! reset-todo! add-todo! inc-unions! set-global-σ!
          saw-change!
          reset-saw-change?!
@@ -14,7 +14,8 @@
          mk-add-∆/s
          mk-add-∆/s!
          prepare-imperative
-         unions todo seen global-σ
+         unions todo seen global-σ graph reset-graph!
+         current-state set-current-state!
          with-mutable-store
          with-mutable-worklist
          with-σ-∆s/acc!
@@ -25,6 +26,10 @@
 (define todo #f)
 (define seen #f)
 (define global-σ #f)
+(define current-state #f) ;; for graphs
+(define graph #f)
+(define (set-current-state! v) (set! current-state v))
+(define (reset-graph!) (set! graph (new-graph)))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Timestamp approximation
 (define unions #f)
@@ -32,9 +37,10 @@
 
 (define-for-syntax (yield! stx)
   (syntax-case stx ()
-    [(_ e) #'(let ([c e])
+    [(_ e) #`(let ([c e])
                (unless (= unions (hash-ref seen c -1))
                  (hash-set! seen c unions)
+                 #,@(when-graph #'(add-edge! graph current-state c))
                  (add-todo! c)))])) ;; ∪1 → cons
 
 (define (join-h! a vs)
@@ -53,7 +59,7 @@
 (define-syntax-rule (bind-join*-h! (σ* jh*σ as vss) body)
   (begin (join*-h! as vss) body))
 
-(define-syntax-rule (mk-mk-imperative/timestamp^-fixpoint mk-name cleaner)
+(define-simple-macro* (mk-mk-imperative/timestamp^-fixpoint mk-name cleaner)
   (define-syntax-rule (mk-name name ans^? ans^-v touches)
     (define-syntax-rule (name step fst)
       (let ()
@@ -78,6 +84,7 @@
                  (reset-todo!) ;; → '()
                  (set-box! state-count* (+ (unbox state-count*) (set-count todo-old)))
                  (for ([c (in-set todo-old)])
+                   #,@(when-graph #'(set-current-state! c))
                    (step c)) ;; → in-list
                  (loop)]))))))
 (mk-mk-imperative/timestamp^-fixpoint
@@ -96,13 +103,16 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Accumulated deltas
-(define-for-syntax yield/∆s/acc!
-  (syntax-rules () [(_ e) (let ([c e])
-                            (when (or saw-change?
-                                      (not (= unions (hash-ref seen c -1))))
-                              (hash-set! seen c unions)
-                              (add-todo! c))
-                            target-σ)]))
+(define-for-syntax (yield/∆s/acc! stx)
+  (syntax-case stx ()
+    [(_ e)
+     #`(let ([c e])
+         (when (or saw-change?
+                   (not (= unions (hash-ref seen c -1))))
+           (hash-set! seen c unions)
+           #,@(when-graph #'(add-edge! graph current-state c))
+           (add-todo! c))
+         target-σ)]))
 (define-syntax-rule (mk-add-∆/s add-∆ add-∆s bind-join bind-join* get-σ)
   (begin
     (define (add-∆ acc a vs)
@@ -137,7 +147,7 @@
 (define-syntax-rule (mk-mk-imperative/∆s/acc^-fixpoint mk-name cleaner joiner set-σ! get-σ)
   (define-syntax-rule (mk-name name ans^? ans^-v touches)
     (define-syntax-rule (name step fst)
-      (let ()        
+      (let ()
       (set-box! (start-time) (current-milliseconds))
       ;; fst contains all the ∆s from the first step(s)
       (for ([a×vs (in-list fst)]) (joiner (car a×vs) (cdr a×vs)))
@@ -200,20 +210,26 @@
     (define-simple-macro* (bind-join* (∆s* ∆s as vss) body)
       (begin (add-∆s! as vss) body))))
 (mk-add-∆/s! add-∆! add-∆s! bind-join-∆s! bind-join*-∆s! hash-ref)
+
+(define-for-syntax (yield/∆s! stx)
+  (syntax-case stx ()
+    [(_ e)
+     #`(let ([c e])
+         (when (or saw-change?
+                   (not (= unions (hash-ref seen c -1))))
+           (hash-set! seen c unions)
+           #,@(when-graph #'(add-edge! graph current-state c))
+           (add-todo! c)))]))
+
 (define-syntax-rule (with-σ-∆s! body)
   (splicing-syntax-parameterize
-   ([yield-meaning (syntax-rules () [(_ e)
-                                     (let ([c e])
-                                       (when (or saw-change?
-                                                 (not (= unions (hash-ref seen c -1))))
-                                         (hash-set! seen c unions)
-                                         (add-todo! c)))])]
+   ([yield-meaning yield/∆s!]
     [bind-join (make-rename-transformer #'bind-join-∆s!)]
     [bind-join* (make-rename-transformer #'bind-join*-∆s!)]
     [getter (make-rename-transformer #'global-hash-getter)])
    body))
 
-(define-syntax-rule (mk-mk-imperative/∆s^-fixpoint mk-name cleaner joiner set-σ! get-σ)
+(define-simple-macro* (mk-mk-imperative/∆s^-fixpoint mk-name cleaner joiner set-σ! get-σ)
   (define-syntax-rule (mk-name name ans^? ans^-v touches)
     (define-syntax-rule (name step fst)
        (let ()
@@ -241,7 +257,7 @@
                (reset-todo!)
                (set-box! state-count* (+ (unbox state-count*) (set-count todo-old)))
                ;; REMARK: there are a couple ways that we can populate the "seen"
-               ;; hash. 
+               ;; hash.
                ;; 1) determine at every yield if the store changes
                ;;    actually grow the store, and populate accordingly.
                ;; 2) Associate changes with "todo" and after a step has occurred
@@ -252,6 +268,7 @@
                ;; We choose the first option since it's the cheapest.
                (for ([c (in-set todo-old)])
                  (reset-saw-change?!)
+                 #,@(when-graph #'(set-current-state! c))
                  (step c))
                ;; Integrate all the store diffs accumulated over the last
                ;; frontier steps.
@@ -272,6 +289,8 @@
 ;; Common functionality
 (define (reset-globals! σ)
   (set! unions 0)
+  (reset-graph!)
+  (set! current-state (node 'entry (seteq) #f))
   (set! saw-change? #f)
   (set! todo ∅)
   (set! seen (make-hash))

@@ -69,13 +69,13 @@
      (set-box! (start-time) (current-milliseconds))
      (define state-count* (state-count))
      (set-box! state-count* 0)
+     #,@(when-graph #'(define graph (new-graph)))
      (define-values (∆ cs) fst)
-     #,@(if (syntax-parameter-value #'generate-graph?) #'((define graph (make-hash))) #'())
      (define-values (last-σ final-cs)
        (let loop ([accum (hash)] [front cs] [σ (update ∆ (hash))] [σ-count 0])
          (cond [(∅? front)
                 (state-rate)
-                #,@(if (syntax-parameter-value #'generate-graph?) #'((dump-dot graph)) #'())
+                #,@(when-graph #'(dump-dot graph))
                 (values σ (for/set ([(c _) (in-hash accum)]) c))]
                [else
                 ;; If a state is revisited with a different store, that counts as
@@ -95,7 +95,7 @@
                              ([c* (in-set cs*)]
                               #:when (or change?
                                          (not (= σ-count (hash-ref accum c* -1)))))
-                           #,@(if (syntax-parameter-value #'generate-graph?) #'((add-edge! graph c c*)) #'())
+                           #,@(when-graph #'(add-edge! graph c c*))
                            (values (hash-set accum* c* σ-count) (∪1 front* c*))))
                        (step/join accum* todo* front* ∆**)]))])))
      ;; filter the final results

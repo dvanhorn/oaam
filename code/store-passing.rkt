@@ -16,9 +16,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Widen set-monad fixpoint
 (define-simple-macro* (wide-step-specialized step)
-  (λ (state-count #,@(if (syntax-parameter-value #'generate-graph?)
-                         #'(graph)
-                         #'()))
+  (λ (state-count #,@(when-graph #'graph))
      (λ (state)
         (match state
           [(cons wsσ cs)
@@ -27,11 +25,11 @@
                (define-values (σ** cs*) (step (cons wsσ c)))
                ;; Add new states to accumulator and construct graph
                (define cs**
-                 #,(if (syntax-parameter-value #'generate-graph?)
-                       #'(for/set #:initial cs ([c* (in-set cs*)])
-                                  (add-edge! graph c c*)
-                                  c*)
-                       #'(∪ cs cs*)))
+                 #,(if-graph
+                    #'(for/set #:initial cs ([c* (in-set cs*)])
+                               (add-edge! graph c c*)
+                               c*)
+                    #'(∪ cs cs*)))
                (values (join-store σ* σ**) cs**)))
            ;; Stuck states are the same as input. Remove stuck states from the count
            ;; XXX: Remove for performant version. This is just for statistics.
@@ -59,15 +57,11 @@
  (define-syntax-rule (name step fst)
    (let ()
      (define-values (f^σ cs) fst)
-     #,@(if (syntax-parameter-value #'generate-graph?)
-            #'((define graph (make-hash)))
-            #'())
+     #,@(when-graph #'(define graph (new-graph)))
      (define state-count* (state-count))
      (set-box! state-count* 0)
      (define step^ ((wide-step-specialized step) state-count*
-                    #,@(if (syntax-parameter-value #'generate-graph?)
-                           #'(graph)
-                           #'())))
+                    #,@(when-graph #'graph)))
      (set-box! (start-time) (current-milliseconds))
      (define ss (fix step^ (set (cons f^σ cs))))
      (state-rate)
@@ -75,7 +69,7 @@
        (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
          (match s
            [(cons fsσ cs)
-            #,@(if (syntax-parameter-value #'generate-graph?) #'((dump-dot graph)) #'())
+            #,@(when-graph #'(dump-dot graph))
             (values (join-store last-σ fsσ) (∪ final-cs cs))]
            [_ (error 'name "bad output ~a~%" s)])))
      ;; filter the final results

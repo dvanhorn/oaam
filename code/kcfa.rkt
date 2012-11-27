@@ -10,8 +10,9 @@
          racket/stxparam racket/splicing
          racket/trace)
 (provide yield-meaning #;<-reprovide
-         mk-analysis)
-
+         mk-analysis
+         debug-check)
+(define debug-check (make-parameter '()))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Machine maker
 
@@ -21,9 +22,26 @@
          (~optional (~seq #:fixpoint fixpoint:expr)
                     #:defaults ([fixpoint #'fix]))
          (~once (~seq #:aval aval:id)) ;; name the evaluator to use/provide
-         (~optional (~seq #:ans ans:id)  ;; name the answer struct to use/provide
-                    #:defaults ([ans (generate-temporary #'ans)]))
-         (~optional (~seq #:touches touches:id)) ;; Touch relation specialized for clos
+         ;; Name representations' structs
+         (~optional (~seq #:ans ans:id) #:defaults ([ans (generate-temporary #'ans)]))
+         (~optional (~seq #:dr dr:id) #:defaults ([dr (generate-temporary #'dr)]))
+         (~optional (~seq #:ar ar:id) #:defaults ([ar (generate-temporary #'ar)]))
+         (~optional (~seq #:ap ap:id) #:defaults ([ap (generate-temporary #'ap)]))
+         (~optional (~seq #:co co:id) #:defaults ([co (generate-temporary #'co)]))
+         ;; Continuation frames
+         (~optional (~seq #:mt mt:id) #:defaults ([mt (generate-temporary #'mt)]))
+         (~optional (~seq #:sk! sk!:id) #:defaults ([sk! (generate-temporary #'sk!)]))
+         (~optional (~seq #:ifk ifk:id) #:defaults ([ifk (generate-temporary #'ifk)]))
+         (~optional (~seq #:lrk lrk:id) #:defaults ([lrk (generate-temporary #'lrk)]))
+         (~optional (~seq #:ls ls:id) #:defaults ([ls (generate-temporary #'ls)]))
+         (~optional (~seq #:clos clos:id) #:defaults ([clos (generate-temporary #'clos)]))
+         (~optional (~seq #:rlos rlos:id) #:defaults ([rlos (generate-temporary #'rlos)]))
+         ;; Integrated analysis information stored in each state
+         (~optional (~seq #:extra (extra:id ...)) #:defaults ([(extra 1) '()]))
+         ;; Sometimes things get widened.
+         (~optional (~seq #:extra-represented (sub-extra:id ...)) #:defaults ([(sub-extra 1) '()]))
+         ;; Touch relation specialized for clos
+         (~optional (~seq #:touches touches:id))
          ;; Analysis strategies flags (requires the right parameters too)
          (~optional (~and #:compiled compiled?))
          (~optional (~and #:σ-∆s σ-∆s?))
@@ -60,6 +78,22 @@
      (with-syntax ([((ρ-op ...) (δ-op ...) (l-op ...))
                     (if (zero? (attribute K)) #'(() () ()) #'((ρ) (δ) (l)))]
                    [ev: (format-id #'ev "~a:" #'ev)]
+                   [co: (format-id #'co "~a:" #'co)]
+                   [ap: (format-id #'ap "~a:" #'ap)]
+                   [ls? (format-id #'ls "~a?" #'ls)]
+                   [lrk? (format-id #'lrk "~a?" #'lrk)]
+                   [ifk? (format-id #'ifk "~a?" #'ifk)]
+                   [sk!? (format-id #'sk! "~a?" #'sk!)]
+                   [mt? (format-id #'mt "~a?" #'mt)]
+                   [clos? (format-id #'clos "~a?" #'clos)]
+                   [rlos? (format-id #'rlos "~a?" #'rlos)]
+                   [ls: (format-id #'ls "~a:" #'ls)]
+                   [lrk: (format-id #'lrk "~a:" #'lrk)]
+                   [ifk: (format-id #'ifk "~a:" #'ifk)]
+                   [sk!: (format-id #'sk! "~a:" #'sk!)]
+                   [mt: (format-id #'mt "~a:" #'mt)]
+                   [clos: (format-id #'ev "~a:" #'clos)]
+                   [rlos: (format-id #'ev "~a:" #'rlos)]
                    [ev #'ev]
                    ;; represent rσ explicitly in all states?
                    [(σ-op ...) (if (given wide?) #'() #'(rσ))]
@@ -70,7 +104,7 @@
                    [(expander-flags ...)
                     (cond [(and (given wide?) (not (given global-σ?)))
                            #'(#:expander #:with-first-cons)]
-                          [else #'()])]
+                          [else #'()])]                   
                    [inj-σ (if (given σ-∆s?) #''() #'(hash))])
        (define yield-ev
          (if (attribute compiled?)
@@ -82,7 +116,7 @@
        (define eval ;; what does ev mean?
          (quasisyntax/loc stx
            (match e
-             [(var l x)
+             [(var l _ x)
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([v #:in-delay ev-σ (lookup-env ρ x)])
                     (yield (co ev-σ k v)))
@@ -91,19 +125,25 @@
                   #;
                   (do (ev-σ) ()
                     (yield (dr ev-σ k (lookup-env ρ x)))))]
-             [(datum l d) (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k d))))]
-             [(primr l which)
+             [(datum l _ d)
+              (λ% (ev-σ ρ k δ)
+                  #;
+                  (when (memv d (debug-check))
+                    (printf "Reached ~a~%" d)
+                    (flush-output))
+                  (do (ev-σ) () (yield (co ev-σ k d))))]
+             [(primr l _ which)
               (define p (primop (compile-primop which)))
               (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k p))))]
-             [(lam l x e*)
+             [(lam l _ x e*)
               (define c (compile e*))
               (define fv (free e))
               (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k (clos x c ρ fv)))))]
-             [(rlm l x r e*)
+             [(rlm l _ x r e*)
               (define c (compile e*))
               (define fv (free e))
               (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k (rlos x r c ρ fv)))))]
-             [(lrc l xs es b)
+             [(lrc l _ xs es b)
               (define c (compile (first es)))
               (define cs (map compile (rest es)))
               (define cb (compile b))
@@ -116,28 +156,28 @@
                   (do (ev-σ) ([(σ0 a) #:push ev-σ l δ k]
                               [σ*-lrc #:join* σ0 as ss])
                     (yield (ev σ*-lrc c ρ* (lrk (marks-of k) x xs* cs cb ρ* a δ) δ))))]
-             [(app l e es)
+             [(app l _ e es)
               (define c (compile e))
               (define cs (map compile es))
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([(σ*-app a) #:push ev-σ l δ k])
                     (yield (ev σ*-app c ρ (ls (marks-of k) l 0 cs '() ρ a δ) δ))))]
-             [(ife l e0 e1 e2)
+             [(ife l _ e0 e1 e2)
               (define c0 (compile e0))
               (define c1 (compile e1))
               (define c2 (compile e2))
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([(σ*-ife a) #:push ev-σ l δ k])
                     (yield (ev σ*-ife c0 ρ (ifk (marks-of k) c1 c2 ρ a δ) δ))))]
-             [(st! l x e)
-              (define c (compile e))
+             [(st! l _ x e*)
+              (define c (compile e*))
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([(σ*-st! a) #:push ev-σ l δ k])
                     (yield (ev σ*-st! c ρ (sk! (marks-of k) (lookup-env ρ x) a) δ))))]
              ;; let/cc is easier to add than call/cc since we make yield
              ;; always make co states for primitives.
-             [(lcc l x e)
-              (define c (compile e))
+             [(lcc l _ x e*)
+              (define c (compile e*))
               (λ% (ev-σ ρ k δ)
                   (define x-addr (make-var-contour x δ))
                   (define/ρ ρ* (extend ρ x x-addr))
@@ -145,20 +185,20 @@
                     (yield (ev σ*-lcc c ρ* k δ))))]
              ;; Forms for stack inspection
              #,@(if (given CM?)
-                    #`([(grt l R e)
-                        (define c (compile e))
+                    #`([(grt l _ R e*)
+                        (define c (compile e*))
                         (λ% (ev-σ ρ k δ)
                             (do (ev-σ) () (yield (ev ev-σ c ρ (grant k R) δ))))]
-                       [(fal l)
+                       [(fal l _)
                         (λ% (ev-σ ρ k δ)
                             (do (ev-σ) () (yield (co ev-σ (mt mt-marks) fail))))]
-                       [(frm l R e)
+                       [(frm l _ R e)
                         (define c (compile e))
                         (λ% (ev-σ ρ k δ)
                             (do (ev-σ) () (yield (ev ev-σ c ρ (frame k R) δ))))]
-                       [(tst l R t e)
+                       [(tst l _ R t e*)
                         (define c0 (compile t))
-                        (define c1 (compile e))
+                        (define c1 (compile e*))
                         (λ% (ev-σ ρ k δ)
                             (do (ev-σ) ()
                               (if (OK^ R k ev-σ)
@@ -194,15 +234,17 @@
 
        (quasitemplate/loc stx
          (begin ;; specialize representation given that 0cfa needs less
-           (mk-op-struct co (rσ k v) (σ-op ... k v) expander-flags ...)
+           (mk-op-struct state (rσ extra ...) (σ-op ... sub-extra ...)
+                         #:fields-as-parameters (sub-extra ...))
+           (mk-op-struct co state (k v) expander-flags ...)
            ;; Variable dereference causes problems with strict/compiled
            ;; instantiations because store changes are delayed a step.
            ;; We fix this by making variable dereference a new kind of state.
-           (mk-op-struct dr (rσ k a) (σ-op ... k a) expander-flags ...)
-           (mk-op-struct ans (rσ cm v) (σ-op ... cm-op ... v) expander-flags ...
+           (mk-op-struct dr state (k a) expander-flags ...)
+           (mk-op-struct ans state (cm v) (cm-op ... v) expander-flags ...
                          #:expander-id ans:)
-           (mk-op-struct ap (rσ l fn-addr v-addrs k δ)
-                         (σ-op ... l fn-addr v-addrs k δ-op ...)
+           (mk-op-struct ap state (l fn-addr v-addrs k δ)
+                         (l fn-addr v-addrs k δ-op ...)
                          expander-flags ...)
            ;; Continuation frames
            (mk-op-struct mt (cm) (cm-op ...))
@@ -329,7 +371,7 @@
                      (define-match-expander ev: ;; inert, but introduces bindings
                        (syntax-rules () [(_ . args) (list . args)]))))
                   (quasisyntax/loc stx
-                    ((mk-op-struct ev (rσ e ρ k δ) (σ-op ... e ρ-op ... k δ-op ...)
+                    ((mk-op-struct ev state (e ρ k δ) (e ρ-op ... k δ-op ...)
                                    expander-flags ...))))
 
             (define-syntax-rule (define/ρ ρ body)
@@ -374,6 +416,7 @@
            #,@compile-def
            (define-syntax mk-prims (mk-mk-prims #,(given global-σ?) #,σ-passing?*
                                                 #,(given σ-∆s?) #,(given compiled?)
+                                                #,(given sparse?)
                                                 #,(attribute K)))
            (mk-prims prim-meaning compile-primop co clos? rlos?)
            ;; [Rel State State]
@@ -384,7 +427,7 @@
                [(dr: dr-σ k a)
                 (generator
                  (do (dr-σ) ([v #:in-delay dr-σ a]) (yield (co dr-σ k v))))]
-               [(co: co-σ k v)
+               [(co: co-σ extra ... k v)
                 (match k
                   [(mt: cm) (generator (do (co-σ) ([v #:in-force co-σ v])
                                      (yield (ans co-σ cm v))))]
@@ -428,7 +471,7 @@
                   [_ (error 'step "Bad continuation ~a" k)])]
 
                ;; v is not a value here. It is an address.
-               [(ap: ap-σ l fn-addr arg-addrs k δ)
+               [(ap: ap-σ extra ... l fn-addr arg-addrs k δ)
                 (generator
                  (do (ap-σ) ([f #:in-get ap-σ fn-addr])
                    (match f
@@ -468,7 +511,7 @@
                       (yield (ap ap-σ l fn-addr arg-addrs k δ))])))]
 
                ;; this code is dead when running compiled code.
-               [(ev: ev-σ e ρ k δ)
+               [(ev: ev-σ extra ... e ρ k δ)
                 #,(if (given compiled?)
                       #'(generator (do (ev-σ) () (yield (ev ev-σ e ρ k δ))))
                       eval)]

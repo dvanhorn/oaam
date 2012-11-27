@@ -68,7 +68,10 @@
      (define vs
        (λ (addrs)
           (quasisyntax/loc stx
-            (bind-alias* (σ* bσ #,addrs v-addrs) body))))
+            (bind-alias* (σ* bσ #,addrs v-addrs)
+                         body
+                         #;
+                         (begin (printf "Alias ~a to ~a~%" #,addrs v-addrs) body)))))
      (if (zero? K)
          (vs #'xs)
          #`(let* ([δ* (truncate (cons l δ) #,K)]

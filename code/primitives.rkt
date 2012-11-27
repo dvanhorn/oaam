@@ -3,6 +3,7 @@
 (require "data.rkt" "notation.rkt" "do.rkt"
          "primitive-maker.rkt"
          (for-syntax syntax/parse) ;; for core syntax-classes
+         racket/stxparam
          racket/unsafe/ops
          racket/flonum)
 (provide primitive? changes-store? reads-store? primitive? prim-constants
@@ -52,10 +53,20 @@
   (with-syntax ([clos? clos?]
                 [rlos? rlos?])
     #`((define-syntax-rule (yield-delay ydσ v)
-         (do (ydσ) ([v* #:in-delay ydσ v]) (yield v*)))
+         (do (ydσ) ([v* #:in-delay ydσ v])
+#|           
+           #,@(listy (and (syntax-parameter-value #'target-actions?)
+                          #'(printf "Yield delay ~a with actions ~a~%" v* target-actions)))
+|#
+           (yield v*)))
        (define-simple-macro* (errorv vs)
          (begin (log-info "Error reachable ~a" vs)
                 (continue)))
+
+       (define-simple-macro* (printfv prσ vs)
+         (begin (log-debug "Printing: ~a"
+                           (for/append ([va (in-list vs)]) (set->list (force prσ va))))
+                (yield (void))))
 
        (define/basic (quotientv z0 z1)
          (cond [(or (number^? z0) (number^? z1))
@@ -245,7 +256,7 @@
            [(? qcons^?) (yield qdata^)]
            [(? cons^?) (yield ●)]))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+       ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ;; Prims that write the store
        (define/write (vectorv-set! !σ l δ vec i val)
          (match vec
@@ -718,6 +729,7 @@
                               (any op -> !))]
      [newline #t #f newlinev ((-> !)
                               (op -> !))]
+     [printf #t #f printfv (#:rest any -> !)] ;; for debugging
      [eof-object? #:predicate eof]
      ;; time should be with time-apply, but that means supporting apply...
      [time #f #f timev (any -> any)]
@@ -732,12 +744,12 @@
 
 (mk-static-prims primitive? changes-store? reads-store?)
 
-(define-for-syntax ((mk-mk-prims global-σ? σ-passing? σ-∆s? compiled? K) stx)
+(define-for-syntax ((mk-mk-prims global-σ? σ-passing? σ-∆s? compiled? sparse? K) stx)
   (syntax-parse stx
     [(_ mean:id compile:id co:id clos?:id rlos?:id)
      (quasisyntax/loc stx
        (mk-primitive-meaning
-        #,global-σ? #,σ-passing? #,σ-∆s? #,compiled? #,(= K 0)
+        #,global-σ? #,σ-passing? #,σ-∆s? #,compiled? #,sparse? #,(= K 0)
         mean compile co #,@(prim-defines #'clos? #'rlos? (= K +inf.0)) 
         #,prim-table))]))
 

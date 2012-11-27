@@ -1,6 +1,7 @@
 #lang racket
 (require "primitives.rkt" "data.rkt" "notation.rkt" racket/stxparam racket/splicing
          "do.rkt" "context.rkt" "deltas.rkt" "prealloc.rkt" "handle-limits.rkt"
+         "graph.rkt"
          "env.rkt" (rename-in "imperative.rkt" [add-todo! i:add-todo!]))
 (provide mk-sparse^-fixpoint with-sparse^
          with-sparse-mutable-worklist
@@ -20,20 +21,16 @@
 ;;   until it has been processed, since extra edges might be added that skipping
 ;;   would have to traverse to stay sound. After a state has been stepped and is not
 ;;   part of the todo set afterwards, todo? is reset to #f
-(struct point (state points actions todo? skips) #:mutable #:prefab)
+(struct point (actions todo? skips) #:mutable #:prefab)
 ;; Stores the union count for each address's last update
 (define σ-history #f)
 ;; Any store changes during this step?
 (define ∆? #f)
-;; States intern to mutable "points" that represent the annotated state graph
-(define state->point #f)
 ;; Intern states.
 (define (register-state s)
-  (hash-ref! state->point s (λ _ (point s (seteq) #f #t (seteq)))))
+  (node-of/data graph s (point #f #t (seteq))))
 
-;; terrible global to communicate to other functions
-;; (parameters have the right semantics, but too slow in a hot loop)
-(define current-point #f)
+(define-syntax-rule (empty-actions-sparse^) (hasheq))
 
 (define (join-actions oldA newA)
   (for/fold ([A oldA]) ([(addr age) (in-hash newA)])
@@ -45,24 +42,29 @@
         (values (hash-set A addr age) #t)
         (values A change?))))
 
-;; Add p to current-point's outgoing edges and return if the given actions
+;; Add p to current-state's outgoing edges and return if the given actions
 ;; changed value since last time, or if the point added is new.
 (define (add-todo p actions)
-  (define current-A (point-actions current-point))
-  (define ps (point-points current-point))
+  (define data (node-data current-state))
+  (define current-A (point-actions data))
+  (define ps (node-succ current-state))
   (define ps* (∪1 ps p))
-  (set-point-points! current-point ps*)
+  (set-node-succ! current-state ps*)
   (define-values (A* change?)
     (if current-A
         (join-actions/change current-A actions)
         (values actions #t)))
-  (set-point-actions! current-point A*)
+  (set-point-actions! (node-data current-state) A*)
   (or change? (> (set-count ps*) (set-count ps))))
 
 (define (add-todo/skip! p)
-  (set-point-skips! current-point (∪1 (point-skips current-point) p))
-  (set-point-todo?! p #t)
-  (i:add-todo! (point-state p)))
+  (define data (node-data current-state))
+  (set-point-skips! data (∪1 (point-skips data) p))
+  (set-point-todo?! data #t)
+  (define state (node-state p))
+  (unless (state . ∈ . todo)
+    (set-skips (add1 skips))
+    (i:add-todo! state)))
 
 (define (ensure-σ-size/sparse)
   (when (= next-loc (vector-length global-σ))
@@ -98,28 +100,38 @@
                ;; re-processed.
                (define change? (add-todo p actions))
                (cond [(or change? ∆?)
-                      (set-point-todo?! p #t)
+                      #;
+                      (printf "Saw change~%")
+                      (set-point-todo?! (node-data p) #t)
                       (i:add-todo! state)]
                      [else (void)])
                actions)]))
 
 (define (skip-from ps)
   (define seen (make-hasheq)) ;; no intermediate allocation. eq? okay
+  (hash-set! seen current-state #t)
+#;
+  (printf "Skipping from ~a~%"
+          (for/set ([p (in-set ps)]) (node-state p)))
   (let loop ([todo ps])
     (for ([p (in-set todo)]
           #:unless (and (hash-has-key? seen p)
                         #;
                         (printf "Seen (skip) ~a~%" (point-state p))))
       (hash-set! seen p #t)
-      (match-define (point state-debug pp* A todo? _) p)
+      (match-define (node state-debug pp* (point A todo? _)) p)
       (cond [(and (not todo?) (actions-consonant? A))
              (loop pp*)]
-            [else (add-todo/skip! p)]))))
+            [else
+             #;(printf "To (todo? ~a) ~a~%" todo? (node-state p))
+             #;
+             (set-skips (add1 skips))
+             (add-todo/skip! p)]))))
 
 (define (prepare-sparse-wide/prealloc parser sexp)
   (begin0 (prepare-prealloc parser sexp)
-          (set! current-point (point 'entry (seteq) #f #t (seteq)))
-          (set! state->point (make-hash))
+          (reset-graph!) ;; creates current-state as a node
+          (set-node-data! current-state (point #f #t (seteq)))
           (set! σ-history (make-vector (vector-length global-σ)))))
 
 ;; An address is consonant with a past state if its union count is smaller than
@@ -141,22 +153,26 @@
         [else
          (vector-set! global-σ a upd)
          (set! ∆? #t)
-         (inc-unions!)
-         (vector-set! σ-history a unions)]))
+         (vector-set! σ-history a (add1 (vector-ref σ-history a)))]))
 
 (define (join*!/sparse as vss)
   (for ([a (in-list as)]
         [vs (in-list vss)])
     (join!/sparse a vs)))
 
+(define steps 0) (define (set-steps v) (set! steps v))
+(define skips 0) (define (set-skips v) (set! skips v))
 (define ((mk-sparse-step step) c)
-  (set! current-point (register-state c))
+  (set-current-state! (register-state c))
   (set! ∆? #f)
-  (match-define (point _ ps A _ _) current-point)
-  (set-point-todo?! current-point #f)
-  (if (actions-consonant? A)
-      (skip-from ps)
-      (step c)))
+  (match-define (node state ps (and (point A _ _) p)) current-state)
+  (define consonant? (actions-consonant? A))
+#;
+  (printf "Consonant? ~a ~a~%" state consonant?)
+  (cond [consonant? (skip-from ps)]
+        [else #;
+         (set-steps (add1 steps)) (step c)])
+  (set-point-todo?! p #f))
 
 (define-syntax-rule (mk-sparse^-fixpoint name ans^? ans^-v touches)
   (define-syntax-rule (name step fst)
@@ -167,16 +183,17 @@
       fst
       (define clean-σ (restrict-to-reachable/vector touches))
       (define sparse-step (mk-sparse-step step))
+      (define last-count 0)
       (let loop ()
         (cond
          [(∅? todo)
           (state-rate)
           (define vs
-            (for*/set ([(c _) (in-hash state->point)]
+            (for*/set ([(c _) (in-hash graph)]
                        #:when (ans^? c))
               (ans^-v c)))
           (values (format "State count: ~a" (unbox state-count*))
-                  (format "Point count: ~a" (hash-count state->point))
+                  (format "Point count: ~a" (hash-count graph))
                   (clean-σ global-σ vs)
                   vs)]
 
@@ -185,13 +202,19 @@
           (reset-todo!)
           (set-box! state-count* (+ (unbox state-count*)
                                     (set-count todo-old)))
+          #;
+          (when (> (- (unbox state-count*) last-count) 1000)
+            (printf "States: ~a, Steps: ~a, Skips: ~a~%" (unbox state-count*) steps skips)
+            (set-skips 0)
+            (set-steps 0)
+            (set! last-count (unbox state-count*)))
           (for ([c (in-set todo-old)]) (sparse-step c))
           (loop)])))))
 
 ;; Get and force accumulate uses of addresses
 (define-syntax-rule (bind-get-sparse (res σ a) body)
   (let ([res (getter σ a)]
-        [actions (hash-set target-actions a unions)])
+        [actions (hash-set target-actions a (vector-ref σ-history a))])
     (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
       body)))
 
@@ -200,7 +223,7 @@
   (let-values ([(actions val)
                 (for/fold ([actions target-actions]
                            [val nothing]) ([to-alias (in-list all-to-alias)])
-                  (values (hash-set actions to-alias unions)
+                  (values (hash-set actions to-alias (vector-ref σ-history to-alias))
                           (⊓ val (getter σ to-alias))))])
     (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
       (bind-join (σ* σ alias val) body))))
@@ -210,7 +233,7 @@
                 (for/fold ([actions target-actions] [raliases '()] [vals '()])
                     ([alias (in-list aliases)]
                      [to-alias (in-list all-to-alias)])
-                  (values (hash-set actions to-alias unions)
+                  (values (hash-set actions to-alias (vector-ref σ-history to-alias))
                           ;; XXX: icky intermediate lists.
                           (cons alias raliases)
                           (cons (getter σ to-alias) vals)))])
@@ -241,5 +264,6 @@
     [bind-alias* (make-rename-transformer #'bind-alias*-sparse)]
     [bind-join (make-rename-transformer #'bind-join!/sparse)]
     [bind-join* (make-rename-transformer #'bind-join*!/sparse)]
-    [getter (make-rename-transformer #'global-vector-getter)])
+    [getter (make-rename-transformer #'global-vector-getter)]
+    [empty-actions (make-rename-transformer #'empty-actions-sparse^)])
    body))

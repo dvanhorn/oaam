@@ -139,20 +139,24 @@
     [_ (error 'cond-tf "Bad input ~a" inp)]))
 
 (define (define-ctx-tf inp)
-  (define (parse-defns ds)
-    (match ds
-      ['() '()]
-      [`((define (,f . ,xs) . ,b) . ,ds)
-       (parse-defns `((define ,f (lambda ,xs . ,b)) . ,ds))]
-      [`((define ,f ,e) . ,ds)
-       (cons (list f e)
-             (parse-defns ds))]))
+  (define (parse-defns ds [ensure-last-expr? #f])
+    (let loop ([ds ds])
+      (match ds
+        ['() '()]
+        [`((define (,f . ,xs) . ,b) . ,ds)
+         (loop `((define ,f (lambda ,xs . ,b)) . ,ds))]
+        [`((define ,f ,e) . ,ds)
+         (when (and ensure-last-expr? (null? ds))
+           (error 'define-ctx "expected at least one expression after defines"))
+         (cons (list f e) (loop ds))]
+        [`((begin ,des ..1) . ,ds) (append (loop des) (loop ds))]
+        [`(,e . ,ds) ;; Interspersed exprs are bound to dummy variables
+         (cons (list (igensym) e) (loop ds))])))
   (match inp
     [(list e) e]
-    [(list (and ds `(define ,_ . ,_)) ... es ...)
-     (when (null? es)
-       (error 'define-ctx "expected at least one expression after defines ~a" inp))
-     `(,letrec$ ,(parse-defns ds) (,begin$ ,@es))]))
+    [(list ds ... e)
+     (define-values (last-ds last-e) (split-at-right (parse-defns (list e) #t) 1))
+     `(,letrec$ ,(append (parse-defns ds #f) last-ds) ,(second (first last-e)))]))
 
 (define (do-tf inp)
   (let loop ([e (cdr inp)])
