@@ -29,13 +29,14 @@ each optimization.
 Paper
 -----
 
-The paper _Optimizing Abstract Abstract Machines_ is available in PDF
-form from [arXiv](http://arxiv.org/abs/1211.3722)
+The paper _Optimizing Abstract Abstract Machines_ is available as a
+PDF from [arXiv.org](http://arxiv.org/abs/1211.3722).
 
 Building
 --------
 
-Requires Racket version 5.2 or higher (maybe the nightly)
+Requires [Racket](http://www.racket-lang.org/) version 5.2 or higher
+(maybe the nightly)
 
 ### Running benchmarks
 
