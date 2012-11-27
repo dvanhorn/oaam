@@ -1,6 +1,10 @@
 Optimizing Abstract Abstract Machines
 =====================================
 
+Authors: [J. Ian Johnson](http://www.ccs.neu.edu/home/ianj/),
+[Matthew Might](http://matt.might.net/), 
+[David Van Horn](http://www.ccs.neu.edu/home/dvanhorn/)
+
 Overview
 --------
 
@@ -21,6 +25,12 @@ summarizing the results of an empirical evalution; an implementation
 of a framework of analyses that can be instantiated to each step of
 the optimizations; and a benchmark suite and harness that evaluates
 each optimization.
+
+Paper
+-----
+
+The paper _Optimizing Abstract Abstract Machines_ is available in PDF
+form from [arXiv](http://arxiv.org/abs/1211.3722)
 
 Building
 --------
