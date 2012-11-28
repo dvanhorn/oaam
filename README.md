@@ -45,9 +45,14 @@ the algorithms/abstractions, run
 
     raco make code/run-benchmark.rkt
 
+(This may take several minutes due to the substantial compile-time
+computation involved.)
+
 To run benchmarks,
 
     racket code/drive-benchmarks.rkt
+
+(This may take several hours.)
 
 Instructions for modification (times to run, how many threads, etc)
 are inline.
