@@ -2,7 +2,9 @@
 (require (for-syntax syntax/parse racket/syntax)
          racket/stxparam "notation.rkt" "data.rkt"
          racket/generator)
-(provide continue bind-alias (for-syntax mk-do listy))
+(provide continue bind-alias bind-join-local bind-get-kont bind-push
+         in-scope-of-extras
+         (for-syntax mk-do listy))
 
 ;; Helper for building targets
 (define-for-syntax (listy x) (if x (list x) '()))
@@ -30,10 +32,21 @@
 ;; default: do nothing to the body of a do.
 (define-syntax-parameter do-body-transformer (syntax-rules () [(_ e) e]))
 (provide do-body-transformer)
-
-(define-syntax-rule (bind-push (σ* a* bpσ l δ k) body)
-  (let ([a* (make-var-contour l δ)])
-    (bind-join (σ* bpσ a* (singleton k)) body)))
+;; for tandem analysis. default: bind nothing
+(define-syntax-parameter bind-extra
+  (syntax-rules () [(_ ids body ...) (let () body ...)]))
+(define-syntax-parameter bind-extra-initial
+  (syntax-rules () [(_ body ...) (let () body ...)]))
+(provide bind-extra bind-extra-initial)
+;; regular vs pushdown. Default: regular
+(define-syntax-parameter bind-push
+  (syntax-rules ()
+    [(_ (σ* a* bpσ l δ k) body)
+     (let ([a* (make-var-contour l δ)])
+       (bind-join (σ* bpσ a* (singleton k)) body))]))
+(define-syntax-parameter bind-get-kont (make-rename-transformer #'bind-get))
+(define-syntax-parameter bind-join-local (make-rename-transformer #'bind-join))
+(define-syntax-parameter in-scope-of-extras (syntax-rules () [(_ ids body ...) (begin body ...)]))
 
 (define-syntax-rule (bind-alias (σ* σ alias to-alias) body)
   (bind-get (res σ to-alias) (bind-join (σ* σ alias res) body)))
@@ -109,6 +122,7 @@
              #:attr clause
              (λ (rest) #`(bindf (σ* jσ a vs) #,rest)))
     (pattern [res:id (~or (~and #:get (~bind [bindf #'bind-get]))
+                          (~and #:get-kont (~bind [bindf #'bind-get-kont]))
                           (~and #:force (~bind [bindf #'bind-force]))
                           (~and #:delay (~bind [bindf #'bind-delay]))) jσ:expr a:expr]
              #:with new-σ #'jσ ;; XXX: not new
@@ -126,12 +140,15 @@
              #:attr clause
              (λ (rest) #`(bind-push (σ* a* bpσ l δ k) #,rest)))
     ;; a couple shorthands
-    (pattern [σ*:id #:join-forcing jσ:expr a:expr v:expr]
+    (pattern [σ*:id (~or (~and #:join-forcing (~bind [bindf #'bind-join]))
+                         (~and #:join-local-forcing (~bind [bindf #'bind-join-local])))
+                    jσ:expr a:expr v:expr]
              #:with new-σ #'σ*
              #:attr clause
              (λ (rest) #`(do (jσ) ([fs #:force jσ v])
-                           (bind-join (σ* jσ a fs) #,rest))))
+                           (bindf (σ* jσ a fs) #,rest))))
     (pattern [res:id (~or (~and #:in-get (~bind [bindf #'bind-get]))
+                          (~and #:in-kont (~bind [bindf #'bind-get-kont]))
                           (~and #:in-force (~bind [bindf #'bind-force]))
                           (~and #:in-delay (~bind [bindf #'bind-delay]))) jσ:expr a:expr]
              #:with new-σ #'jσ ;; XXX: not new

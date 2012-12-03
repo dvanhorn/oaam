@@ -1,7 +1,7 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          "fix.rkt" "handle-limits.rkt"
-         "graph.rkt" racket/stxparam)
+         "graph.rkt")
 (provide bind-join-whole bind-join*-whole
          (for-syntax bind-rest) ;; common helper
          wide-step hash-getter
@@ -187,13 +187,13 @@
 
 (define-syntax-rule (with-σ-passing-set-monad body)
   (splicing-syntax-parameterize
-   ([yield-meaning (syntax-rules () [(_ e) (values target-σ (∪1 target-cs e))])]
+   ([yield (syntax-rules () [(_ e) (values target-σ (∪1 target-cs e))])]
     [do-body-transformer do-body-transform-σ/cs])
    body))
 
 (define-syntax-rule (with-narrow-set-monad body)
   (splicing-syntax-parameterize
-   ([yield-meaning (syntax-rules () [(_ e) (∪1 target-cs e)])]
+   ([yield (syntax-rules () [(_ e) (∪1 target-cs e)])]
     [do-body-transformer do-body-transform-cs])
    body))
 

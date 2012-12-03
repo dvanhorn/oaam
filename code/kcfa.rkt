@@ -9,9 +9,7 @@
                      syntax/parse/experimental/template)
          racket/stxparam racket/splicing
          racket/trace)
-(provide yield-meaning #;<-reprovide
-         mk-analysis
-         debug-check)
+(provide mk-analysis debug-check)
 (define debug-check (make-parameter '()))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Machine maker
@@ -28,6 +26,7 @@
          (~optional (~seq #:ar ar:id) #:defaults ([ar (generate-temporary #'ar)]))
          (~optional (~seq #:ap ap:id) #:defaults ([ap (generate-temporary #'ap)]))
          (~optional (~seq #:co co:id) #:defaults ([co (generate-temporary #'co)]))
+         (~optional (~seq #:ev ev:id) #:defaults ([ev (generate-temporary #'ev)]))
          ;; Continuation frames
          (~optional (~seq #:mt mt:id) #:defaults ([mt (generate-temporary #'mt)]))
          (~optional (~seq #:sk! sk!:id) #:defaults ([sk! (generate-temporary #'sk!)]))
@@ -37,9 +36,9 @@
          (~optional (~seq #:clos clos:id) #:defaults ([clos (generate-temporary #'clos)]))
          (~optional (~seq #:rlos rlos:id) #:defaults ([rlos (generate-temporary #'rlos)]))
          ;; Integrated analysis information stored in each state
-         (~optional (~seq #:extra (extra:id ...)) #:defaults ([(extra 1) '()]))
-         ;; Sometimes things get widened.
-         (~optional (~seq #:extra-represented (sub-extra:id ...)) #:defaults ([(sub-extra 1) '()]))
+         (~optional (~seq #:extra (extra:id ...) (~bind [(extra-ids 1) (generate-temporaries #'(extra ...))]))
+                    #:defaults ([(extra 1) '()]
+                                [(extra-ids 1) '()]))
          ;; Touch relation specialized for clos
          (~optional (~seq #:touches touches:id))
          ;; Analysis strategies flags (requires the right parameters too)
@@ -94,7 +93,6 @@
                    [mt: (format-id #'mt "~a:" #'mt)]
                    [clos: (format-id #'ev "~a:" #'clos)]
                    [rlos: (format-id #'ev "~a:" #'rlos)]
-                   [ev #'ev]
                    ;; represent rσ explicitly in all states?
                    [(σ-op ...) (if (given wide?) #'() #'(rσ))]
                    ;; explicitly pass σ/∆ to compiled forms?
@@ -107,12 +105,13 @@
                           [else #'()])]                   
                    [inj-σ (if (given σ-∆s?) #''() #'(hash))])
        (define yield-ev
-         (if (attribute compiled?)
-             #'(λ (syn)
-                   (syntax-parse syn #:literals (ev)
-                     [(_ (ev . args)) (syntax/loc syn (ev . args))]
-                     [(_ e:expr) (syntax/loc syn (yield-meaning e))]))
-             #'(syntax-rules () [(_ e) (yield-meaning e)])))
+         #`(let ([yield-tr (syntax-parameter-value #'yield)])
+             #,(if (attribute compiled?)
+                   #'(λ (syn)
+                        (syntax-parse syn #:literals (ev)
+                          [(_ (ev . args)) (syntax/loc syn (ev . args))]
+                          [(_ e:expr) (yield-tr #'(yield e))]))
+                   #'yield-tr)))
        (define eval ;; what does ev mean?
          (quasisyntax/loc stx
            (match e
@@ -216,26 +215,26 @@
                               [topp (or hidden-σ #'gσ)])
                   (quasisyntax/loc stx
                     ((define-syntax-rule (... (λ% (gσ ρ k δ) body ...))
-                       (λ (top ... topa ... σ-gop ... ρ-op ... k δ-op ...)
-                          (syntax-parameterize ([yield (... (... #,yield-ev))]
-                                                [top-σ (make-rename-transformer #'topp)]
+                       (λ (top ... topa ... extra-ids ... σ-gop ... ρ-op ... k δ-op ...)
+                          (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
                                                 [target-σ (make-rename-transformer #'gσ)]
                                                 [target-actions (make-rename-transformer #'topa)] ...
                                                 [top-σ? #t]
                                                 [top-actions? #t])
-                            body (... ...))))
+                            (bind-extra (#f extra-ids ...)
+                              body (... ...)))))
                      (define (compile e) #,eval))))]
                [else
                 ;; brittle, since other identifiers must be the same in ev:
                 (syntax/loc stx
-                  ((... (define-syntax-rule (λ% (ev-σ ρ k δ) body ...)
+                  ((... (define-syntax-rule (λ% (ev-σ ρ k δ) body ...)                          
                           (generator body ...)))
                    (define compile values)))]))
 
        (quasitemplate/loc stx
          (begin ;; specialize representation given that 0cfa needs less
-           (mk-op-struct state (rσ extra ...) (σ-op ... sub-extra ...)
-                         #:fields-as-parameters (sub-extra ...))
+           (mk-op-struct state (rσ extra ...) (σ-op ... extra ...)
+                         #:fields-as-parameters (extra ...))
            (mk-op-struct co state (k v) expander-flags ...)
            ;; Variable dereference causes problems with strict/compiled
            ;; instantiations because store changes are delayed a step.
@@ -347,179 +346,190 @@
                   #'())
            (splicing-syntax-parameterize ([target-σ? (and #,σ-threading? 'threading)]
                                           [target-cs? #,c-passing?]
-                                          [target-actions? #,(given sparse?)])
-           (define-syntax do-macro
-             (mk-do #,(given σ-∆s?)
-                    #,c-passing?
-                    #,(given global-σ?)
-                    #,(given generators?)))
-           (mk-flatten-value flatten-value-fn clos: rlos: kont?)
-           (splicing-syntax-parameterize ([do (make-rename-transformer #'do-macro)]
-                                          [flatten-value (make-rename-transformer #'flatten-value-fn)])
+                                          [target-actions? #,(given sparse?)]
+                                          [yield (... #,yield-ev)])
+            (in-scope-of-extras (extra ...)
+             (define-syntax do-macro
+               (mk-do #,(given σ-∆s?)
+                      #,c-passing?
+                      #,(given global-σ?)
+                      #,(given generators?)))
+             (mk-flatten-value flatten-value-fn clos: rlos: kont?)
+             (splicing-syntax-parameterize ([do (make-rename-transformer #'do-macro)]
+                                            [flatten-value (make-rename-transformer #'flatten-value-fn)])
+                                           
+               ;; ev is special since it can mean "apply the compiled version" or
+               ;; make an actual ev state to later interpret.
+               #,@(if (given compiled?)
+                      (quasisyntax/loc stx
+                        ((define-syntax (ev syn)
+                           (syntax-case syn ()
+                             ;; gσ only optional if it's global
+                             [(_ gσ e ρ k δ)
+                              #'(e #,@(listy (and (given σ-∆s?) (not (given global-σ?)) #'top-σ))
+                                   #,@(listy (and (given sparse?) #'target-actions))
+                                   extra ...
+                                   σ-gop ... ρ-op ... k δ-op ...)]))
+                         (define-match-expander ev: ;; inert, but introduces bindings
+                           (syntax-rules () [(_ . args) (list . args)]))))
+                      (quasisyntax/loc stx
+                        ((mk-op-struct ev state (e ρ k δ) (e ρ-op ... k δ-op ...)
+                                       expander-flags ...))))
 
-           ;; ev is special since it can mean "apply the compiled version" or
-           ;; make an actual ev state to later interpret.
-           #,@(if (given compiled?)
-                  (quasisyntax/loc stx
-                    ((define-syntax (ev syn)
-                       (syntax-case syn ()
-                         ;; gσ only optional if it's global
-                         [(_ gσ e ρ k δ)
-                          #'(e #,@(listy (and (given σ-∆s?) (not (given global-σ?)) #'top-σ))
-                               #,@(listy (and (given sparse?) #'target-actions))
-                               σ-gop ... ρ-op ... k δ-op ...)]))
-                     (define-match-expander ev: ;; inert, but introduces bindings
-                       (syntax-rules () [(_ . args) (list . args)]))))
-                  (quasisyntax/loc stx
-                    ((mk-op-struct ev state (e ρ k δ) (e ρ-op ... k δ-op ...)
-                                   expander-flags ...))))
+               (define-syntax-rule (define/ρ ρ body)
+                 #,(if (zero? (attribute K))
+                       #'(void)
+                       #'(define ρ body)))
 
-            (define-syntax-rule (define/ρ ρ body)
-             #,(if (zero? (attribute K))
-                   #'(void)
-                   #'(define ρ body)))
+               ;; No environments in 0cfa
+               (define-syntax-rule (lookup-env ρ x)
+                 #,(cond [(zero? (attribute K)) #'x]
+                         [else #'(hash-ref ρ x (λ () (error 'lookup "Unbound var ~a" x)))]))
+               (...
+                (define-syntax (generator syn)
+                  (syntax-parse syn
+                    [(_ body:expr ...)
+                     (syntax/loc syn
+                       #,(cond [(given generators?)
+                                (quasisyntax/loc stx
+                                  (... (real-generator () body ...)))]
+                               [else
+                                (quasisyntax/loc stx
+                                  (... (begin body ...)))]))])))
 
-           ;; No environments in 0cfa
-           (define-syntax-rule (lookup-env ρ x)
-             #,(cond [(zero? (attribute K)) #'x]
-                     [else #'(hash-ref ρ x (λ () (error 'lookup "Unbound var ~a" x)))]))
-           (...
-            (define-syntax (generator syn)
-              (syntax-parse syn
-                [(_ body:expr ...)
-                 (syntax/loc syn
-                   (syntax-parameterize ([yield (... #,yield-ev)])
-                     #,(cond [(given generators?)
-                              (quasisyntax/loc stx
-                                (... (real-generator () body ...)))]
-                             [else
-                              (quasisyntax/loc stx
-                                (... (begin body ...)))])))])))
+               (define (inj e)
+                 (define σ₀ (hash))
+                 (generator
+                   (bind-extra-initial
+                     (do (σ₀) () (yield (ev σ₀ (compile e) (hash) (mt mt-marks) '()))))))
 
-           (define (inj e)
-             (define σ₀ (hash))
-             (generator
-              (do (σ₀) () (yield (ev σ₀ (compile e) (hash) (mt mt-marks) '())))))
+               (define (aval e #:prepare [prepare (?? prep-fn
+                                                      (λ (e)
+                                                         ;; Don't join literals when parsing for
+                                                         ;; concrete evaluation.
+                                                         (parameterize ([cons-limit
+                                                                         #,(if (eq? (attribute K) +inf.0)
+                                                                               #'+inf.0
+                                                                               #'(cons-limit))])
+                                                           (define-values (e* r) (parse-prog e gensym gensym))
+                                                           (add-lib e* r gensym gensym))))])
+                 (fixpoint step (inj (prepare e))))
 
-           (define (aval e #:prepare [prepare (?? prep-fn
-                                                  (λ (e)
-                                                     ;; Don't join literals when parsing for
-                                                     ;; concrete evaluation.
-                                                     (parameterize ([cons-limit
-                                                                     #,(if (eq? (attribute K) +inf.0)
-                                                                           #'+inf.0
-                                                                           #'(cons-limit))])
-                                                       (define-values (e* r) (parse-prog e gensym gensym))
-                                                       (add-lib e* r gensym gensym))))])
-             (fixpoint step (inj (prepare e))))
-
-           #,@compile-def
-           (define-syntax mk-prims (mk-mk-prims #,(given global-σ?) #,σ-passing?*
-                                                #,(given σ-∆s?) #,(given compiled?)
-                                                #,(given sparse?)
-                                                #,(attribute K)))
-           (mk-prims prim-meaning compile-primop co clos? rlos?)
-           ;; [Rel State State]
-           (define (step state)
-             (match state
-               ;; Only for compiled/strict
-               #;
-               [(dr: dr-σ k a)
-                (generator
-                 (do (dr-σ) ([v #:in-delay dr-σ a]) (yield (co dr-σ k v))))]
-               [(co: co-σ extra ... k v)
-                (match k
-                  [(mt: cm) (generator (do (co-σ) ([v #:in-force co-σ v])
-                                     (yield (ans co-σ cm v))))]
-
-                  ;; We need this intermediate step so that σ-∆s work.
-                  ;; The above join is not merged into the store until
-                  ;; after the step, and the address is needed by the call.
-                  [(ls: cm l n '() v-addrs ρ a δ)
-                   (define v-addr (make-var-contour (cons l n) δ))
-                   (define args (reverse (cons v-addr v-addrs)))
+               #,@compile-def
+               (define-syntax mk-prims (mk-mk-prims #,(given global-σ?) #,σ-passing?*
+                                                    #,(given σ-∆s?) #,(given compiled?)
+                                                    #,(given sparse?)
+                                                    #,(attribute K)))
+               (mk-prims prim-meaning compile-primop co clos? rlos? extra ...)
+               ;; [Rel State State]
+               (define (step state)
+                 (match state
+                   ;; Only for compiled/strict
+                   #;
+                   [(dr: dr-σ k a)
                    (generator
-                    (do (co-σ) ([σ*-ls #:join-forcing co-σ v-addr v]
-                                [k #:in-get σ*-ls a])
-                      (yield (ap σ*-ls l (first args) (rest args) k δ))))]
+                   (do (dr-σ) ([v #:in-delay dr-σ a]) (yield (co dr-σ k v))))]
+                   [(co: co-σ extra-ids ... k v)
+                    (bind-extra (state extra-ids ...)
+                      (match k
+                        [(mt: cm)
+                         (generator (do (co-σ) ([v #:in-force co-σ v])
+                                      (yield (ans co-σ cm v))))]
 
-                  [(ls: cm l n (list-rest e es) v-addrs ρ a δ)
-                   (define v-addr (make-var-contour (cons l n) δ))
-                   (generator
-                    (do (co-σ) ([σ*-lsn #:join-forcing co-σ v-addr v])
-                      (yield (ev σ*-lsn e ρ
-                                 (ls cm l (add1 n) es (cons v-addr v-addrs) ρ a δ) δ))))]
-                  [(ifk: cm t e ρ a δ)
-                   (generator
-                    (do (co-σ) ([k* #:in-get co-σ a]
-                                [v #:in-force co-σ v])
-                      (yield (ev co-σ (if v t e) ρ k* δ))))]
-                  [(lrk: cm x '() '() e ρ a δ)
-                   (generator
-                    (do (co-σ) ([σ*-lrk #:join-forcing co-σ (lookup-env ρ x) v]
-                                [k* #:in-get σ*-lrk a])
-                      (yield (ev σ*-lrk e ρ k* δ))))]
-                  [(lrk: cm x (cons y xs) (cons e es) b ρ a δ)
-                   (generator
-                    (do (co-σ) ([σ*-lrkn #:join-forcing co-σ (lookup-env ρ x) v])
-                      (yield (ev σ*-lrkn e ρ (lrk cm y xs es b ρ a δ) δ))))]
-                  [(sk!: cm l a)
-                   (generator
-                    (do (co-σ) ([σ*-sk! #:join-forcing co-σ l v]
-                                [k* #:in-get σ*-sk! a])
-                      (yield (co σ*-sk! k* (void)))))]
-                  [_ (error 'step "Bad continuation ~a" k)])]
+                        ;; We need this intermediate step so that σ-∆s work.
+                        ;; The above join is not merged into the store until
+                        ;; after the step, and the address is needed by the call.
+                        [(ls: cm l n '() v-addrs ρ a δ)
+                         (define v-addr (make-var-contour (cons l n) δ))
+                         (define args (reverse (cons v-addr v-addrs)))
+                         (generator
+                          (do (co-σ) ([σ*-ls #:join-local-forcing co-σ v-addr v]
+                                      [k #:in-kont σ*-ls a])
+                            (yield (ap σ*-ls l (first args) (rest args) k δ))))]
 
-               ;; v is not a value here. It is an address.
-               [(ap: ap-σ extra ... l fn-addr arg-addrs k δ)
-                (generator
-                 (do (ap-σ) ([f #:in-get ap-σ fn-addr])
-                   (match f
-                     [(clos: xs e ρ _)
-                      (cond [(= (length xs) (length arg-addrs))
-                             (do (ap-σ)
-                                 ([(ρ* σ*-clos δ*) #:bind ρ ap-σ l δ xs arg-addrs])
-                               (yield (ev σ*-clos e ρ* k δ*)))]
-                            ;; Yield the same state to signal "stuckness".
-                            [else
-                             (log-info "Arity error on ~a at ~a" f l)
-                             (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-                     [(rlos: xs r e ρ _)
-                      (cond [(<= (length xs) (length arg-addrs))
-                             (do (ap-σ)
-                                 ([(ρ* σ*-clos δ*) #:bind-rest ρ ap-σ l δ xs r arg-addrs])
-                               (yield (ev σ*-clos e ρ* k δ*)))]
-                            ;; Yield the same state to signal "stuckness".
-                            [else
-                             (log-info "Arity error on ~a at ~a" f l)
-                             (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-                     [(primop o) (prim-meaning o ap-σ l δ k arg-addrs)]
-                     [(? kont? k)
-                      ;; continuations only get one argument.
-                      (cond [(and (pair? arg-addrs) (null? (cdr arg-addrs)))
-                             (do (ap-σ) ([v #:in-delay ap-σ (car arg-addrs)])
-                               (yield (co ap-σ k v)))]
-                            [else
-                             (log-info "Called continuation with wrong number of arguments (~a): ~a at ~a"
-                                       (length arg-addrs) k l)
-                             (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-                     [(== ●) (=> fail)
-                      (log-debug "implement ●-call")
-                      (fail)]
-                     [_
-                      (log-info "Called non-function ~a" f)
-                      (yield (ap ap-σ l fn-addr arg-addrs k δ))])))]
+                        [(ls: cm l n (list-rest e es) v-addrs ρ a δ)
+                         (define v-addr (make-var-contour (cons l n) δ))
+                         (generator
+                          (do (co-σ) ([σ*-lsn #:join-local-forcing co-σ v-addr v])
+                            (yield (ev σ*-lsn e ρ
+                                       (ls cm l (add1 n) es (cons v-addr v-addrs) ρ a δ) δ))))]
+                        [(ifk: cm t e ρ a δ)
+                         (generator
+                          (do (co-σ) ([k* #:in-kont co-σ a]
+                                      [v #:in-force co-σ v])
+                            (yield (ev co-σ (if v t e) ρ k* δ))))]
+                        [(lrk: cm x '() '() e ρ a δ)
+                         (generator
+                          (do (co-σ) ([σ*-lrk #:join-local-forcing co-σ (lookup-env ρ x) v]
+                                      [k* #:in-kont σ*-lrk a])
+                            (yield (ev σ*-lrk e ρ k* δ))))]
+                        [(lrk: cm x (cons y xs) (cons e es) b ρ a δ)
+                         (generator
+                          (do (co-σ) ([σ*-lrkn #:join-local-forcing co-σ (lookup-env ρ x) v])
+                            (yield (ev σ*-lrkn e ρ (lrk cm y xs es b ρ a δ) δ))))]
+                        [(sk!: cm l a)
+                         (generator
+                          (do (co-σ) ([σ*-sk! #:join-forcing co-σ l v]
+                                      [k* #:in-kont σ*-sk! a])
+                            (yield (co σ*-sk! k* (void)))))]
+                        [_ (error 'step "Bad continuation ~a" k)]))]
 
-               ;; this code is dead when running compiled code.
-               [(ev: ev-σ extra ... e ρ k δ)
-                #,(if (given compiled?)
-                      #'(generator (do (ev-σ) () (yield (ev ev-σ e ρ k δ))))
-                      eval)]
+                   ;; v is not a value here. It is an address.
+                   [(ap: ap-σ extra-ids ... l fn-addr arg-addrs k δ)
+                    (bind-extra (state extra-ids ...)
+                      (generator
+                       (do (ap-σ) ([f #:in-get ap-σ fn-addr])
+                         (match f
+                           [(clos: xs e ρ _)
+                            (cond [(= (length xs) (length arg-addrs))
+                                   (do (ap-σ)
+                                       ([(ρ* σ*-clos δ*) #:bind ρ ap-σ l δ xs arg-addrs])
+                                     (yield (ev σ*-clos e ρ* k δ*)))]
+                                  ;; Yield the same state to signal "stuckness".
+                                  [else
+                                   (log-info "Arity error on ~a at ~a" f l)
+                                   (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
+                           [(rlos: xs r e ρ _)
+                            (cond [(<= (length xs) (length arg-addrs))
+                                   (do (ap-σ)
+                                       ([(ρ* σ*-clos δ*) #:bind-rest ρ ap-σ l δ xs r arg-addrs])
+                                     (yield (ev σ*-clos e ρ* k δ*)))]
+                                  ;; Yield the same state to signal "stuckness".
+                                  [else
+                                   (log-info "Arity error on ~a at ~a" f l)
+                                   (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
+                           [(primop o) (prim-meaning o ap-σ l δ k arg-addrs)]
+                           [(? kont? k)
+                            ;; continuations only get one argument.
+                            (cond [(and (pair? arg-addrs) (null? (cdr arg-addrs)))
+                                   (do (ap-σ) ([v #:in-delay ap-σ (car arg-addrs)])
+                                     (yield (co ap-σ k v)))]
+                                  [else
+                                   (log-info "Called continuation with wrong number of arguments (~a): ~a at ~a"
+                                             (length arg-addrs) k l)
+                                   (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
+                           [(== ●) (=> fail)
+                            (log-debug "implement ●-call")
+                            (fail)]
+                           [_
+                            (log-info "Called non-function ~a" f)
+                            (yield (ap ap-σ l fn-addr arg-addrs k δ))]))))]
 
-               [(ans: ans-σ cm v) (generator (do (ans-σ) () (yield (ans ans-σ cm v))))]
-               [_ (error 'step "Bad state ~a" state)]))
+                   ;; this code is dead when running compiled code.
+                   ;; ev states shouldn't need to step "extra" components.
+                   [(ev: ev-σ extra-ids ... e ρ k δ)
+                    (bind-extra (state extra-ids ...)
+                      #,(if (given compiled?)
+                            #'(generator (do (ev-σ) () (yield (ev ev-σ e ρ k δ))))
+                            eval))]
 
-#;
-           (trace step)
+                   [(ans: ans-σ extra-ids ... cm v)
+                    (bind-extra (state extra-ids ...)
+                      (generator (do (ans-σ) () (yield (ans ans-σ cm v)))))]
 
-           )))))]))
+                   [_ (error 'step "Bad state ~a" state)]))
+
+
+                 (trace step)
+
+               ))))))]))

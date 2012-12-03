@@ -2,6 +2,7 @@
 (require "primitives.rkt" "data.rkt" "notation.rkt" racket/stxparam racket/splicing
          "do.rkt" "context.rkt" "deltas.rkt" "prealloc.rkt" "handle-limits.rkt"
          "graph.rkt"
+         (for-template "primitives.rkt")
          "env.rkt" (rename-in "imperative.rkt" [add-todo! i:add-todo!]))
 (provide mk-sparse^-fixpoint with-sparse^
          with-sparse-mutable-worklist
@@ -92,20 +93,21 @@
 ;; NOTE TO SELF: Store deltas might be able to speed up congruence calculations.
 (define-for-syntax (yield-global-sparse stx)
   (syntax-case stx ()
-    [(_ e) #'(let ([state e]
-                   [actions target-actions])
-               (define p (register-state state))
-               ;; If stepping changed the store, or if the addresses this point
-               ;; depends on changed since last interpretation, it must be
-               ;; re-processed.
-               (define change? (add-todo p actions))
-               (cond [(or change? ∆?)
-                      #;
-                      (printf "Saw change~%")
-                      (set-point-todo?! (node-data p) #t)
-                      (i:add-todo! state)]
-                     [else (void)])
-               actions)]))
+    [(_ e)
+     #'(let ([state e]
+             [actions target-actions])
+         (define p (register-state state))
+         ;; If stepping changed the store, or if the addresses this point
+         ;; depends on changed since last interpretation, it must be
+         ;; re-processed.
+         (define change? (add-todo p actions))
+         (cond [(or change? ∆?)
+                #;
+                (printf "Saw change~%")
+                (set-point-todo?! (node-data p) #t)
+                (i:add-todo! state)]
+               [else (void)])
+         actions)]))
 
 (define (skip-from ps)
   (define seen (make-hasheq)) ;; no intermediate allocation. eq? okay
@@ -245,8 +247,11 @@
 
 (define-syntax-rule (with-sparse-mutable-worklist body)
   (splicing-syntax-parameterize
-   ([yield-meaning yield-global-sparse]
+   ([yield yield-global-sparse]
     [do-body-transformer do-body-transform-actions])
+   #;
+   (begin-for-syntax (printf "Yield in ctx ~a~%" (syntax->datum ((syntax-parameter-value #'yield)
+                                                                 #'(yield blmoeau)))))
    body))
 
 (define-syntax-rule (with-0-ctx/prealloc/sparse body)

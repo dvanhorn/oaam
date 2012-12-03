@@ -66,6 +66,7 @@
         (set-box! (start-time) (current-milliseconds))
         fst
         (define state-count* (state-count))
+        (define last 0)
         (set-box! state-count* 0)
         (define clean-σ (cleaner touches))
         (let loop ()
@@ -82,7 +83,11 @@
                 [else
                  (define todo-old todo)
                  (reset-todo!) ;; → '()
-                 (set-box! state-count* (+ (unbox state-count*) (set-count todo-old)))
+                 (define count (+ (unbox state-count*) (set-count todo-old)))
+                 (set-box! state-count* count)
+                 (when (>= (- count last) 1000)
+                   (printf "States: ~a~%" count)
+                   (set! last count))
                  (for ([c (in-set todo-old)])
                    #,@(when-graph #'(set-current-state! c))
                    (step c)) ;; → in-list
@@ -92,7 +97,7 @@
 
 (define-syntax-rule (with-mutable-worklist body)
   (splicing-syntax-parameterize
-   ([yield-meaning yield!])
+   ([yield yield!])
    body))
 (define-syntax-rule (with-mutable-store body)
   (splicing-syntax-parameterize
@@ -140,7 +145,7 @@
   (splicing-syntax-parameterize
    ([bind-join (make-rename-transformer #'bind-join-∆s/change)]
     [bind-join* (make-rename-transformer #'bind-join*-∆s/change)]
-    [yield-meaning yield/∆s/acc!]
+    [yield yield/∆s/acc!]
     [getter (make-rename-transformer #'global-hash-getter)])
             body))
 
@@ -223,7 +228,7 @@
 
 (define-syntax-rule (with-σ-∆s! body)
   (splicing-syntax-parameterize
-   ([yield-meaning yield/∆s!]
+   ([yield yield/∆s!]
     [bind-join (make-rename-transformer #'bind-join-∆s!)]
     [bind-join* (make-rename-transformer #'bind-join*-∆s!)]
     [getter (make-rename-transformer #'global-hash-getter)])

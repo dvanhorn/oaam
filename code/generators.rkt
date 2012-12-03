@@ -81,10 +81,10 @@
 
 (define-syntax-rule (with-σ-passing-generators body)
   (splicing-syntax-parameterize
-   ([yield-meaning (syntax-rules () [(_ e) (begin (real-yield e) target-σ)])])
+   ([yield (syntax-rules () [(_ e) (begin (real-yield e) target-σ)])])
    body))
 
 (define-syntax-rule (with-global-σ-generators body)
   (splicing-syntax-parameterize
-   ([yield-meaning (syntax-rules () [(_ e) (real-yield e)])])
+   ([yield (syntax-rules () [(_ e) (real-yield e)])])
    body))

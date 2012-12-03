@@ -102,8 +102,8 @@
       [else (error "Unknown base value" v)])))
 
 ;; Everything is all heterogeneous
-(define nothing ∅)
-(define singleton set)
+(define-syntax nothing (make-rename-transformer #'∅))
+(define-syntax singleton (make-rename-transformer #'set))
 (define ⊓ set-union)
 (define ⊓1 set-add)
 

@@ -5,7 +5,8 @@
                      syntax/id-table
                      racket/match
                      syntax/struct
-                     racket/trace))
+                     racket/trace)
+         racket/stxparam)
 (provide mk-op-struct)
 
 ;; Map struct names to (container, given fields, actual subfields, represented subfields)
@@ -19,7 +20,10 @@
 
 (define-for-syntax (get-op id)
   (free-id-table-ref optional id
-                     (λ () (raise-syntax-error #f "Unregistered struct" id))))
+                     (λ ()
+                        (printf "Bad optional~%")
+                        (free-id-table-for-each optional (λ (id v) (printf "~a ↦ ~a~%" id v)))
+                        (raise-syntax-error #f "Unregistered struct" id))))
 (define-for-syntax (safe-cdr lst) (if (pair? lst) (cdr lst) null))
 (begin-for-syntax (trace safe-cdr))
 
@@ -46,17 +50,21 @@
                 (~or
                  (~and #:with-first-cons
                        (~bind [expander
-                               #`(syntax-rules ()
-                                   [(_ fσ
-                                       #,@(safe-cdr (syntax->list #'(parent-fields ...)))
-                                       fields ...)
-                                    (list-rest fσ parent-subfields ...
-                                               (container subfields ...))])]))
+                               #`(λ (stx)
+                                    (syntax-case stx ()
+                                      [(_ fσ
+                                          #,@(safe-cdr (syntax->list #'(parent-fields ...)))
+                                          fields ...)
+                                       #'(list-rest fσ parent-subfields ...
+                                                    (container subfields ...))]
+                                      [_ (raise-syntax-error #f "Bad cons matcher" stx)]))]))
                      expander:expr)) ;; want a different match expander?
                     #:defaults ([expander
-                                 #'(syntax-rules ()
-                                     [(_ parent-fields ... fields ...)
-                                      (container parent-subfields ... subfields ...)])]))
+                                 #'(λ (stx)
+                                      (syntax-case stx ()
+                                        [(_ parent-fields ... fields ...)
+                                         #'(container parent-subfields ... subfields ...)]
+                                        [_ (raise-syntax-error #f "Bad default matcher" stx)]))]))
          (~optional (~seq #:expander-id name-ex:id)
                     #:defaults ([name-ex (format-id #'name "~a:" #'name)]))
          ;; Extras in states really should be hidden from the main semantics.
@@ -101,15 +109,26 @@
                              (get-op #'super)))
      (define rfields (reverse rev-rep-fields))
      ;; Note fields for later use (only allows single parent depth for now)
-     (free-id-table-set! optional #'name (list #'container #'(fields ...) #'(subfields ...) rfields))
+     (free-id-table-set! optional #'name (list #'container
+                                               #'(fields ...)
+                                               #'(subfields ...)
+                                               rfields
+                                               #'(param-fields ...)))
      (with-syntax ([((good real-good) ...) good-sels]
                    [(bad ...) bad-sels]
+                   [(debug-params ...)
+                    (append (syntax->list
+                             (if super-info
+                                 (car (cddddr super-info))
+                                 #'()))
+                            (syntax->list #'(param-fields ...)))]
                    [(rfields ...) rfields])
      #`(begin (struct container super-op ... (subfields ...) #:prefab)
               (define-syntax-parameter param-fields #f) ...
               (define-syntax (name syn)
                 (syntax-parse syn
-                  [(_ parent-rfields ... rfields ...) #'(container parent-subfields ... subfields ...)]
+                  [(_ parent-rfields ... rfields ...)
+                   #'(container parent-subfields ... subfields ...)]
                   [n:id (raise-syntax-error #f "Not first class" syn)]))
               (define #,name? #,real-name?)
               (define good real-good) ...
