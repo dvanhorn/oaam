@@ -15,7 +15,7 @@
     [(_  names ...)
      (with-syntax ([(names$ ...) (map (λ (i) (format-id i "~a$" i)) (syntax->list #'(names ...)))])
        #'(begin (define names$ (cons special 'names)) ...))]))
-(mk-specials begin car cdr cons let letrec lambda if eq? or quote void not vector
+(mk-specials begin car cdr cons let core-let letrec lambda if eq? or quote void not vector
              qlist^ qimproper^ qvector^ qhash^)
 
 (define (igensym [start 'g]) (string->symbol (symbol->string (gensym start))))
@@ -75,10 +75,9 @@
 (define (let-tf inp)
   (match inp
     [`(let () . ,b) `(,define-ctx . ,b)]
-    [`(let ([,xs ,es] ...) . ,b)
-     `((,lambda$ ,xs . ,b) . ,es)]
+    [`(let ,(and `([,xs ,es] ...) clauses) . ,b) `(,core-let$ ,clauses . ,b)]
     [`(let ,(? symbol? loop) ([,xs ,es] ...) . ,b)
-     `(,letrec$ ([,loop (,lambda$ ,xs . ,b)])
+     `(,letrec$ ([,loop (,lambda$ ,xs . ,b)]) ;; not primitive
          (,loop . ,es))]
     [_ (error 'let-tf "Bad input ~a" inp)]))
 

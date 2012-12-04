@@ -216,7 +216,7 @@
                                                   (λ (tmp)
                                                      #`(log-info "Bad input to primitive: ~a (rest arg ~a): ~a"
                                                                  'prim
-                                                                 #'argnum
+                                                                 argnum
                                                                  #,tmp)))
                                              #`(loop σ rrest acc (add1 argnum)))]))
                       #`(let ([acc '()]) #,built))]

@@ -142,12 +142,10 @@
               (define c (compile e*))
               (define fv (free e))
               (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k (rlos x r c ρ fv)))))]
-             [(lrc l _ xs es b)
-              (define c (compile (first es)))
-              (define cs (map compile (rest es)))
+             [(lrc l _ (and xs (cons x xs*)) (cons e es) b)
+              (define c (compile e))
+              (define cs (map compile es))
               (define cb (compile b))
-              (define x (first xs))
-              (define xs* (rest xs))
               (define ss (map (λ _ nothing) xs))
               (λ% (ev-σ ρ k δ)
                   (define as (map (λ (x) (make-var-contour x δ)) xs))
@@ -155,6 +153,13 @@
                   (do (ev-σ) ([(σ0 a) #:push ev-σ l δ k]
                               [σ*-lrc #:join* σ0 as ss])
                     (yield (ev σ*-lrc c ρ* (lrk (marks-of k) x xs* cs cb ρ* a δ) δ))))]
+             [(lte l _ (cons x xs) (cons e es) b)
+              (define c (compile e))
+              (define cs (map compile es))
+              (define cb (compile b))
+              (λ% (ev-σ ρ k δ)
+                  (do (ev-σ) ([(σ*-app a) #:push ev-σ l δ k])
+                    (yield (ev σ*-app c ρ (ltk (marks-of k) x xs cs '() '() cb ρ a δ) δ))))]
              [(app l _ e es)
               (define c (compile e))
               (define cs (map compile es))
@@ -245,17 +250,20 @@
            (mk-op-struct ap state (l fn-addr v-addrs k δ)
                          (l fn-addr v-addrs k δ-op ...)
                          expander-flags ...)
+           (mk-op-struct lt state (e ρ xs as k δ) (e ρ-op ... xs as k δ-op ...) expander-flags ...)
            ;; Continuation frames
            (mk-op-struct mt (cm) (cm-op ...))
            (mk-op-struct sk! (cm x k) (cm-op ... x k))
            (mk-op-struct ifk (cm t e ρ k δ) (cm-op ... t e ρ-op ... k δ-op ...))
            (mk-op-struct lrk (cm x xs es e ρ k δ) (cm-op ... x xs es e ρ-op ... k δ-op ...))
            (mk-op-struct ls (cm l n es vs ρ k δ) (cm-op ... l n es vs ρ-op ... k δ-op ...))
+           (mk-op-struct ltk (cm x xs es x-done v-addrs e ρ k δ)
+                         (cm-op ... x xs es x-done v-addrs e ρ-op ... k δ-op ...))
            ;; Values
            (struct primop (which) #:prefab)
            (mk-op-struct clos (x e ρ free) (x e ρ-op ... free) #:expander-id clos:)
            (mk-op-struct rlos (x r e ρ free) (x r e ρ-op ... free) #:expander-id rlos:)
-           (define (kont? v) (or (ls? v) (lrk? v) (ifk? v) (sk!? v) (mt? v)))
+           (define (kont? v) (or (ls? v) (lrk? v) (ltk? v) (ifk? v) (sk!? v) (mt? v)))
            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
            ;; Handling of continuation marks
            (define (marks-of k)
@@ -265,6 +273,7 @@
                             (sk!: cm _ _)
                             (ifk: cm _ _ _ _ _)
                             (lrk: cm _ _ _ _ _ _ _)
+                            (ltk: cm _ _ _ _ _ _ _ _ _)
                             (ls: cm _ _ _ _ _ _ _)) cm])
                    #'#f))
            (define (tail-of k)
@@ -274,6 +283,7 @@
                        [(sk!: cm l k) k]
                        [(ifk: cm t e ρ k δ) k]
                        [(lrk: cm x xs es e ρ k δ) k]
+                       [(ltk: cm x xs es xd va e ρ k δ) k]
                        [(ls: cm l n es vs ρ k δ) k])
                    #'#f))
            (define mt-marks
@@ -298,6 +308,8 @@
                         (ifk (set-mark cm R) t e ρ k δ)]
                        [(lrk: cm x xs es e ρ k δ)
                         (lrk (set-mark cm R) x xs es e ρ k δ)]
+                       [(ltk: cm x xs es xd va e ρ k δ)
+                        (ltk (set-mark cm R) x xs es xd va e ρ k δ)]
                        [(ls: cm l n es vs ρ k δ)
                         (ls (set-mark cm R) l n es vs ρ k δ)])
                    #'#f))
@@ -312,9 +324,12 @@
                         (ifk (frame-mark cm R) t e ρ k δ)]
                        [(lrk: cm x xs es e ρ k δ)
                         (lrk (frame-mark cm R) x xs es e ρ k δ)]
+                       [(ltk: cm x xs es xd va e ρ k δ)
+                        (ltk (frame-mark cm R) x xs es xd va e ρ k δ)]
                        [(ls: cm l n es vs ρ k δ)
                         (ls (frame-mark cm R) l n es vs ρ k δ)])
                    #'#f))
+           
            ;; XXX: does not work with actions
            (define-syntax-rule (OK^ R k σ)
              (let ([seen (make-hasheq)])
@@ -453,6 +468,26 @@
                           (do (co-σ) ([σ*-lsn #:join-local-forcing co-σ v-addr v])
                             (yield (ev σ*-lsn e ρ
                                        (ls cm l (add1 n) es (cons v-addr v-addrs) ρ a δ) δ))))]
+
+                        ;; Let is much like application, but some analyses treat let specially
+                        [(ltk: cm x '() '() x-done v-addrs e ρ a δ)
+                         (define x-done* (cons x x-done))
+                         (define x-addrs (for/list ([x (in-list x-done*)])
+                                           (make-var-contour x δ)))
+                         (define/ρ ρ* (extend* ρ x-done* x-addrs))
+                         (define v-addr (make-var-contour (cons x 'tmp) δ))
+                         (generator
+                          (do (co-σ) ([σ*-ltk #:join-local-forcing co-σ v-addr v]
+                                      [k* #:in-kont σ*-ltk a])
+                            (yield (lt σ*-ltk e ρ* x-done* (cons v-addr v-addrs) k* δ))))]
+                        [(ltk: cm x (cons y xs) (cons e es) x-done v-addrs b ρ a δ)
+                         (define v-addr (make-var-contour (cons y 'tmp) δ))
+                         (generator
+                          (do (co-σ) ([σ*-ltkn #:join-local-forcing co-σ v-addr v])
+                            (yield (ev σ*-ltkn e ρ
+                                       (ltk cm y xs es (cons x x-done) (cons v-addr v-addrs) b ρ a δ) δ))))]
+
+
                         [(ifk: cm t e ρ a δ)
                          (generator
                           (do (co-σ) ([k* #:in-kont co-σ a]
@@ -473,6 +508,12 @@
                                       [k* #:in-kont σ*-sk! a])
                             (yield (co σ*-sk! k* (void)))))]
                         [_ (error 'step "Bad continuation ~a" k)]))]
+
+                   [(lt: lt-σ extra-ids ... e ρ x-addrs v-addrs k δ)
+                    (bind-extra (state extra-ids ...)
+                      (generator
+                       (do (lt-σ) ([lt-σ* #:alias* lt-σ x-addrs v-addrs])
+                         (yield (ev lt-σ* e ρ k δ)))))]
 
                    ;; v is not a value here. It is an address.
                    [(ap: ap-σ extra-ids ... l fn-addr arg-addrs k δ)

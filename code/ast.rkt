@@ -14,7 +14,8 @@
 ;; Forms are mutable for in-place transformations.
 (struct exp (lab tail?)       #:transparent)
 (struct var exp (name)        #:transparent)
-(struct lrc exp (xs es e)     #:transparent #:mutable)
+(struct lrc exp (xs es e)     #:transparent #:mutable) ;; letrec
+(struct lte exp (xs es e)     #:transparent #:mutable) ;; let
 (struct lam exp (xs exp)      #:transparent #:mutable)
 (struct rlm exp (xs rest exp) #:transparent #:mutable)
 (struct app exp (rator rand)  #:transparent #:mutable)
@@ -52,6 +53,11 @@
        (for/union #:initial (loop* e bound*)
                   ([e (in-list es)])
          (loop* e bound*))]
+      [(lte _ _ xs es e)
+       (define bound* (∪/l bound xs))
+       (for/union #:initial (loop* e bound*)
+                  ([e (in-list es)])
+         (loop* e bound))]
       [(lam _ _ vars body) (loop* body (∪/l bound vars))]
       [(rlm _ _ vars rest body) (loop* body (∪1 (∪/l bound vars) rest))]
       [(app _ _ rator rands) (for/union #:initial (loop rator)

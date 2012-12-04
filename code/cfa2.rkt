@@ -3,6 +3,7 @@
          "prealloc.rkt" "imperative.rkt" "fix.rkt" "handle-limits.rkt"
          "data.rkt" "ast.rkt"
          "graph.rkt"
+         racket/unsafe/ops
          (for-template "op-struct.rkt" racket/base racket/stxparam)
          (for-syntax racket/syntax))
 (provide with-cfa2^ prepare-cfa2^)
@@ -15,12 +16,71 @@
 ;; would end up in.
 
 (struct entry (fn #;ρ ξ) #:prefab)
-(define L #f) ;; Map[entry, Set[Pair[KontSection, Frame]]] (non-tail-call continuations)
+(define L #f) ;; Map[entry, Set[Pair[KontSection, Frame]]]
 (define M #f) ;; Map[entry, Set[Value]]
 (define Ξ? #f)
 (define (push! entry pair) (hash-set! L entry (∪1 (hash-ref L entry ∅) pair)))
 (define (add-memo! entry v) (hash-set! M entry (∪1 (hash-ref M entry ∅) v)))
 (define (add-memos! entry vs) (hash-set! M entry (∪ (hash-ref M entry ∅) vs)))
+
+;; Global σ
+(define (do-co-yield ξ #;σ k v do)
+  (cond
+   [(entry? k)
+    (add-memo! k v)
+    ;; XXX: Is this fresh seen hash adding more states than necessary?
+    (define seen (make-hasheq))
+    (let memo-tail ([konts (hash-ref L k)])
+      (for ([kont (in-set konts)]
+            #:unless (hash-has-key? seen kont))
+        (hash-set! seen kont #t)
+        (match kont
+          [(cons κ ξ*) (do ξ* κ v)]
+          [κ (add-memo! κ v)
+             (memo-tail (hash-ref L κ))])))]
+   [else (do ξ k v)]))
+
+(define (call-prep fn-call-ξ ok ent do)                                 
+  ;; new entry points to old continuation and stack frame.
+  (define prev (if (entry? ok)
+                   ok
+                   (cons ok fn-call-ξ)))
+  (push! ent prev)
+  (define memos (hash-ref M ent ∅))
+  (unless (∅? memos)
+    (define seen (make-hasheq))
+    (let forward ([konts (set prev)])
+      (for ([kont (in-set konts)]
+            ;; Could have cycles in call graph.
+            #:unless (hash-has-key? seen kont))
+        (hash-set! seen kont #t)
+        (match kont
+          ;; Install continuation and the previous stack frame.
+          [(cons κ ξ*) (for ([v (in-set memos)]) (do ξ* κ v))]
+          ;; Tail call: memoize and continue down the call chain.
+          [κ (add-memos! κ memos) ;; transitive summaries.
+             (forward (hash-ref L κ))])))))
+
+(define (bind-Ξ ξ a vs)
+  (cond [(hash-ref Ξ? a #f)
+         (values (hash-set ξ a vs) nothing)]
+        [else (values ξ vs)]))
+
+(define (alt-reverse l)
+  (let recur ([l l] [acc '()])
+    (if (pair? l)
+        (recur (unsafe-cdr l) (cons (unsafe-car l) acc))
+        acc)))
+
+(define (bind-Ξ* ξ as vss)
+  (define-values (ξ* rvss)
+    (for/fold ([ξ* ξ] [rvss '()]) 
+        ([a (in-list as)]
+         [vs (in-list vss)])
+      (cond [(hash-ref Ξ? a #f)
+             (values (hash-set ξ* a vs) (cons nothing rvss))]
+            [else (values ξ* (cons vs rvss))])))
+  (values ξ* (alt-reverse rvss)))
 
 (define (prepare-cfa2^ parser sexp)
   (set! L (make-hash))
@@ -35,28 +95,31 @@
 
 (define (classify-bindings! e)
   (let loop ([e e] [ξ (seteq)])
+    (define (add-fresh xs)
+      (for/fold ([ξ ξ]) ([x (in-list xs)])
+        (hash-set! Ξ? x #t)
+        (∪1 ξ x)))
     (match e
       [(var _ _ name) (unless (name . ∈ . ξ)
                         (hash-set! Ξ? name #f))]
       [(lrc _ _ xs es e)
-       (define ξ* (∪/l ξ xs))
-       (for ([x (in-list xs)]) (hash-set! Ξ? x #t))
+       (define ξ* (add-fresh xs))
        (for ([e (in-list es)]) (loop e ξ*))
        (loop e ξ*)]
       [(lam _ _ vars body)
        (for ([x (in-list vars)]) (hash-set! Ξ? x #t))
        (loop body (list->seteq vars))]
       [(rlm _ _ vars rest body)
-       (for ([x (in-list (cons rest vars))]) (hash-set! Ξ? x #t))
+       (hash-set! Ξ? rest #f) ;; self-references.
+       (for ([x (in-list vars)]) (hash-set! Ξ? x #t))
        (loop body (∪1 (∪/l ξ vars) rest))]
       [(app _ _ rator rands)
        (for ([rand (in-list rands)]) (loop rand ξ))
-       (match rator
-         ;; specialize let
-         [(lam _ _ vars body)
-          (for ([x (in-list vars)]) (hash-set! Ξ? x #t))
-          (loop body (∪/l ξ vars))]
-         [_ (loop rator ξ)])]
+       (loop rator ξ)]
+      [(lte _ _ xs es e)
+       (define ξ* (add-fresh xs))
+       (for ([e (in-list es)]) (loop e ξ))
+       (loop e ξ*)]
       [(ife _ _ g t e)
        (loop g ξ)
        (loop t ξ)
@@ -82,19 +145,18 @@
         (λ (stx) #`(#,target . #,(cdr (syntax-e stx)))))
       f))
 
-(define-for-syntax ((mk-cfa2 ev co ap mt) stx)
+(define-for-syntax ((mk-cfa2 ev co ap) stx)
   (syntax-case stx ()
     [(_ (ξ) body ...)
      (with-syntax ([co co]
                    [ev ev]
-                   [mt? (format-id mt "~a?" mt)]
                    [ap? (format-id ap "~a?" ap)])
        (define getter-tr (syntax-parameter-value #'getter))
        (define bind-join-tr (syntax-parameter-value #'bind-join))
        (define bind-join*-tr (syntax-parameter-value #'bind-join*))
        (define bind-tr (syntax-parameter-value #'bind))
-       (define bind-rest-tr (syntax-parameter-value #'bind-rest))
-       #`(splicing-let ()
+       (define bind-rest-tr (syntax-parameter-value #'bind-rest))       
+       #`(splicing-let ()           
            (define-for-syntax (cfa2-yield fnξ)
              (with-syntax ([fn-call-ξ fnξ])
                ;; When constructing a continue state, we might need to pop
@@ -104,59 +166,25 @@
                  (λ (stx)
                     (syntax-case stx (co ev)
                       [(_ (co σ k v))
-                       #,#'#`(let ([k* k]
-                                   [v* v])
-                               (cond
-                                [(entry? k*)
-                                 (add-memo! k* v*)
-                                 (define seen (make-hasheq))
-                                 (let memo-tail ([konts (hash-ref L k*)])
-                                   (for ([kont (in-set konts)]
-                                         #:unless (hash-has-key? seen kont))
-                                     (hash-set! seen kont #t)
-                                     (match-define (cons κ ξ*) kont)
-                                     (cond
-                                      [(entry? κ)
-                                       (add-memo! κ v*)
-                                       (memo-tail (hash-ref L κ))]
-                                      [else
-                                       (syntax-parameterize ([ξ (make-rename-transformer #'ξ*)])
-                                         #,(yield-tr #'(yield (co σ κ v*))))])))]
-                                [else
-                                 #,(yield-tr #'(yield (co σ k* v*)))]))]
+                       #,#'#`(let* ([k* k]
+                                    [v* v]
+                                    [do (λ (ξ** k** v**)
+                                           (syntax-parameterize ([ξ (make-rename-transformer #'ξ**)])
+                                             #,(yield-tr #'(yield (co σ k** v**)))))])
+                               (do-co-yield ξ k* v* do))]
                       ;; If this is the product of a function call,
                       ;; push the continuation + stack frame for the entry.
                       [(_ (ev σ e ρ k δ))
                        #,#'#`(let* ([ok k]
-                                    [k* (if fn-call-ξ
-                                            ;; ξ bound to new stack frame.
-                                            (entry e ξ)
-                                            ok)])
-                               (when fn-call-ξ
-                                 (define pair (cons ok fn-call-ξ))                                 
-                                 ;; new entry points to old continuation and stack frame.
-                                 (push! k* pair)
-                                 (define memos (hash-ref M k* ∅))
-                                 (unless (∅? memos)
-                                   (define seen (make-hasheq))
-                                   (let forward ([konts (set pair)])
-                                     (for ([kont (in-set konts)]
-                                           ;; Could have cycles in call graph.
-                                           #:unless (hash-has-key? seen kont))
-                                       (hash-set! seen kont #t)
-                                       (match-define (cons κ ξ*) kont)
-                                       (cond
-                                        ;; Tail call: memoize and continue down the call chain.
-                                        [(entry? κ)
-                                         (add-memos! κ memos) ;; transitive summaries.
-                                         (forward (hash-ref L κ))]
-                                        ;; Install continuation and the previous stack frame.
-                                        [else
-                                         (syntax-parameterize ([ξ (make-rename-transformer #'ξ*)])
-                                           (for ([v (in-set memos)])
-                                             #,(yield-tr #'(yield (co σ κ v)))))])))))
-                               ;; Continue to the function/other ev state.
-                               #,(yield-tr #'(yield (ev σ e ρ k* δ))))]
+                                    [do-co (λ (ξ* k* v*)
+                                              (syntax-parameterize ([ξ (make-rename-transformer #'ξ*)])
+                                                #,(yield-tr #'(yield (co σ k* v*)))))]
+                                    [do-ev (λ (k*) #,(yield-tr #'(yield (ev σ e ρ k* δ))))])
+                               (cond [fn-call-ξ
+                                      (define k* (entry e ξ))
+                                      (call-prep fn-call-ξ ok k* do-co)
+                                      (do-ev k*)]
+                                     [else (do-ev ok)]))]
                       [(_ e) (yield-tr #'(yield e))])))))
 
            (define-syntax-rule (bind-extra-initial-cfa2 body* (... ...))
@@ -173,27 +201,20 @@
                  body* (... ...))))
 
            (define-simple-macro* (bind-join-cfa2 (σ* σ a vs) body*)
-             (let-values ([(ξ* vs*)
-                           (cond [(hash-ref Ξ? a #f)
-                                  (values (hash-set ξ a vs) nothing)]
-                                 [else (values ξ vs)])])
+             (let*-values ([(-a) a]
+                           [(-vs) vs]
+                           [(ξ* vs*) (bind-Ξ ξ -a -vs)])
                (syntax-parameterize ([ξ (make-rename-transformer #'ξ*)])
                  #,((apply-transformer bind-join-tr)
-                    #'(bind-join (σ* σ a vs*) body*)))))
+                    #'(bind-join (σ* σ -a vs*) body*)))))
 
            (define-simple-macro* (bind-join*-cfa2 (σ* σ as vss) body*)
-             (let*-values ([(vss*) vss]
-                           [(ξ* rvss*)
-                            (for/fold ([ξ* ξ] [rvss* '()]) 
-                                ([a (in-list as)]
-                                 [vs (in-list vss*)])
-                              (cond [(hash-ref Ξ? a #f)
-                                     (values (hash-set ξ* a vs) (cons nothing rvss*))]
-                                    [else (values ξ* (cons vs rvss*))]))]
-                           [(vss*) (reverse rvss*)])
+             (let*-values ([(-as) as]
+                           [(-vss) vss]
+                           [(ξ* vss*) (bind-Ξ* ξ -as -vss)])
                (syntax-parameterize ([ξ (make-rename-transformer #'ξ*)])
                  #,((apply-transformer bind-join*-tr)
-                    #'(bind-join* (σ* σ as vss*) body*)))))
+                    #'(bind-join* (σ* σ -as vss*) body*)))))
 
            (define-syntax-rule (bind-get-kont-cfa2 (res σ k) body*)
              ;; Use let-syntax so that for's singleton optimization kicks in.
@@ -204,8 +225,14 @@
 
            (define-simple-macro* (mk-getter name ξ*)
              (define-syntax-rule (name σ a)
-               (or (hash-ref ξ* a #f)
-                   #,((apply-transformer getter-tr) #'(getter σ a)))))
+               (or (hash-ref ξ* a #f) #,((apply-transformer getter-tr) #'(getter σ a)))
+               #;
+               (let ([s (hash-ref ξ* a #f)])
+                 (cond [s (when (∅? s) (error 'name "bad stack ~a" a))
+                          s]
+                       [else (define res #,((apply-transformer getter-tr) #'(getter σ a)))
+                             (when (∅? res) (error 'name "bad store ~a" a))
+                             res]))))
            (mk-getter getter-cfa2 ξ)
 
            ;; Make a new stack frame before entering a new function
@@ -258,11 +285,10 @@
   (splicing-let-syntax ([mk-analysis
                          (syntax-rules ()
                            [(_ . args)
-                            (splicing-syntax-parameterize ([in-scope-of-extras (mk-cfa2 #'ev #'co #'ap #'mt)])
+                            (splicing-syntax-parameterize ([in-scope-of-extras (mk-cfa2 #'ev #'co #'ap)])
                               (mk-analysis #:extra (ξ)
                                            #:ev ev
                                            #:co co
                                            #:ap ap
-                                           #:mt mt
                                            . args))])])
                        body))
