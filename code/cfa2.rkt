@@ -27,7 +27,12 @@
 (define (do-co-yield ξ #;σ k v do)
   (cond
    [(entry? k)
-    (add-memo! k v)
+    (define v* (match v ;; don't let stack addresses escape. Resolve them at return.
+                 [(addr a) (if (hash-ref Ξ? a #f)
+                               (value-set (hash-ref ξ a))
+                               v)]
+                 [_ v]))
+    (add-memo! k v*)
     ;; XXX: Is this fresh seen hash adding more states than necessary?
     (define seen (make-hasheq))
     (let memo-tail ([konts (hash-ref L k)])
@@ -35,8 +40,8 @@
             #:unless (hash-has-key? seen kont))
         (hash-set! seen kont #t)
         (match kont
-          [(cons κ ξ*) (do ξ* κ v)]
-          [κ (add-memo! κ v)
+          [(cons κ ξ*) (do ξ* κ v*)]
+          [κ (add-memo! κ v*)
              (memo-tail (hash-ref L κ))])))]
    [else (do ξ k v)]))
 

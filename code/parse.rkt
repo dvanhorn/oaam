@@ -52,11 +52,11 @@
            (rlm (fresh-label!) tail? '() x-id (parse-seq s #t (hash-set ρ x x-id)))]
           ;; Specialize let-like lambda
           [`((,(or 'lambda `(,(== special) . lambda)) () . ,body))
-           (parse-seq body #t)]
+           (parse-seq body tail?)]
           [(or `((,(or 'lambda `(,(== special) . lambda)) (,xs ...) . ,body) . ,es)
                `(core-let ([,xs ,es] ...) . ,body))
            (define-values (xs-id ρ*) (fresh-xs xs))
-           (lte (fresh-label!) tail? xs-id (map (parse_ #f) es) (parse-seq body #t ρ*))]
+           (lte (fresh-label!) tail? xs-id (map (parse_ #f) es) (parse-seq body tail? ρ*))]
           [`(if ,e0 ,e1 ,e2)
            (ife (fresh-label!) tail? (parse e0 #f) (parse e1 tail?) (parse e2 tail?))]
           [`(if ,g ,t)

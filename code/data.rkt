@@ -26,6 +26,7 @@
          (struct-out vectorv)
          (struct-out vectorv-immutable)
          (struct-out addr)
+         (struct-out value-set)
          atomic?
          nothing singleton
          ≡ ⊑? big⊓ ⊓ ⊓1)
@@ -149,6 +150,7 @@
 (struct vectorv (length addrs) #:prefab)
 (struct vectorv-immutable (length addrs) #:prefab)
 (struct addr (a) #:prefab)
+(struct value-set (a) #:prefab)
 
 ;; For the lazy Krivine machine, a lazy cons (lazy in both arguments)
 (struct lconsv (car cdr) #:prefab)

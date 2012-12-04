@@ -112,6 +112,7 @@
                           [(_ (ev . args)) (syntax/loc syn (ev . args))]
                           [(_ e:expr) (yield-tr #'(yield e))]))
                    #'yield-tr)))
+       
        (define eval ;; what does ev mean?
          (quasisyntax/loc stx
            (match e
@@ -462,7 +463,7 @@
                                       [k #:in-kont σ*-ls a])
                             (yield (ap σ*-ls l (first args) (rest args) k δ))))]
 
-                        [(ls: cm l n (list-rest e es) v-addrs ρ a δ)
+                        [(ls: cm l n (cons e es) v-addrs ρ a δ)
                          (define v-addr (make-var-contour (cons l n) δ))
                          (generator
                           (do (co-σ) ([σ*-lsn #:join-local-forcing co-σ v-addr v])
@@ -479,14 +480,13 @@
                          (generator
                           (do (co-σ) ([σ*-ltk #:join-local-forcing co-σ v-addr v]
                                       [k* #:in-kont σ*-ltk a])
-                            (yield (lt σ*-ltk e ρ* x-done* (cons v-addr v-addrs) k* δ))))]
+                            (yield (lt σ*-ltk e ρ* x-addrs (cons v-addr v-addrs) k* δ))))]
                         [(ltk: cm x (cons y xs) (cons e es) x-done v-addrs b ρ a δ)
                          (define v-addr (make-var-contour (cons y 'tmp) δ))
                          (generator
                           (do (co-σ) ([σ*-ltkn #:join-local-forcing co-σ v-addr v])
                             (yield (ev σ*-ltkn e ρ
                                        (ltk cm y xs es (cons x x-done) (cons v-addr v-addrs) b ρ a δ) δ))))]
-
 
                         [(ifk: cm t e ρ a δ)
                          (generator

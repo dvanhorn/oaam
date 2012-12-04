@@ -10,6 +10,7 @@
 (define-syntax-rule (bind-force-lazy (res σ v) body)
   (match v
     [(addr a) (bind-get (res σ a) body)]
+    [(value-set vs) (let ([res vs]) body)]
     [other (let ([res (singleton other)]) body)]))
 
 (define-syntax-rule (bind-force-strict (res σ v) body)
