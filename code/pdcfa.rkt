@@ -47,49 +47,48 @@
                  (λ (stx)
                     (syntax-case stx (co ev)
                       [(_ (co σ k v))
-                       #,#'#`(cond
-                              [(entry? k)
-                               (log-debug "Return ~a ~a" k v)
-                               (add-memo! k v)
-                               (define seen (make-hasheq))
-                               (let memo-tail ([konts (hash-ref L k)])
-                                 (for ([kont (in-set konts)]
-                                       #:unless (hash-has-key? seen kont))
-                                   (hash-set! seen kont #t)
-                                   (cond
-                                    [(entry? kont)
-                                     (add-memo! kont v)
-                                     (memo-tail (hash-ref L kont))]
-                                    [else #,(yield-tr #'(yield (co σ kont v)))])))]
-                              [else
-                               (log-debug "Normal co yield ~a ~a" k v)
-                               #,(yield-tr #'(yield (co σ k v)))])]
-                      ;; If this is the product of a function call,
-                      ;; push the continuation + stack frame for the entry.
-                      [(_ (ev σ e ρ k δ))
-                       #,#'#`(let* ([k* (if fn-call?
-                                            (entry e)
-                                            k)])
-                               (when fn-call?
-                                 (define memos (hash-ref M k* ∅))
+                       #,#'#`(let ([k* k]
+                                   [v* v*])
+                               (cond
+                                [(entry? k*)
+                                 (add-memo! k* v*)
                                  (define seen (make-hasheq))
-                                 (push! k* k)
-                                 (let forward ([konts (set k)])
+                                 (let memo-tail ([konts (hash-ref L k*)])
                                    (for ([kont (in-set konts)]
                                          #:unless (hash-has-key? seen kont))
                                      (hash-set! seen kont #t)
                                      (cond
                                       [(entry? kont)
-                                       (add-memos! kont memos) ;; transitive summaries.
-                                       (forward (hash-ref L kont))]
-                                      [else
-                                       (for ([v (in-set memos)])
-                                         #,(yield-tr #'(yield (co σ kont v))))]))))
+                                       (add-memo! kont v*)
+                                       (memo-tail (hash-ref L kont))]
+                                      [else #,(yield-tr #'(yield (co σ kont v*)))])))]
+                                [else
+                                 #,(yield-tr #'(yield (co σ k* v*)))]))]
+                      ;; If this is the product of a function call,
+                      ;; push the continuation + stack frame for the entry.
+                      [(_ (ev σ e ρ k δ))
+                       #,#'#`(let* ([ok k]
+                                    [k* (if fn-call?
+                                            (entry e)
+                                            ok)])
+                               (when fn-call?
+                                 (push! k* ok)
+                                 (define memos (hash-ref M k* ∅))
+                                 (unless (∅? memos)
+                                   (define seen (make-hasheq))
+                                   (let forward ([konts (set ok)])
+                                     (for ([kont (in-set konts)]
+                                           #:unless (hash-has-key? seen kont))
+                                       (hash-set! seen kont #t)
+                                       (cond
+                                        [(entry? kont)
+                                         (add-memos! kont memos) ;; transitive summaries.
+                                         (forward (hash-ref L kont))]
+                                        [else
+                                         (for ([v (in-set memos)])
+                                           #,(yield-tr #'(yield (co σ kont v))))])))))
                                #,(yield-tr #'(yield (ev σ e ρ k* δ))))]
-                      [(_ e)
-                       #,#'#`(begin
-                               (log-debug "Regular yield ~a" e)
-                               #,(yield-tr #'(yield e)))])))))
+                      [(_ e) (yield-tr #'(yield e))])))))
 
            (define-syntax-rule (bind-extra-initial-pdcfa body* (... ...))
              (let ([fn-call? #f])

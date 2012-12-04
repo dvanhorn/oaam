@@ -348,7 +348,7 @@
                                           [target-cs? #,c-passing?]
                                           [target-actions? #,(given sparse?)]
                                           [yield (... #,yield-ev)])
-            (in-scope-of-extras (extra ...)
+            (in-scope-of-extras (extra ...) 
              (define-syntax do-macro
                (mk-do #,(given σ-∆s?)
                       #,c-passing?
@@ -460,12 +460,12 @@
                             (yield (ev co-σ (if v t e) ρ k* δ))))]
                         [(lrk: cm x '() '() e ρ a δ)
                          (generator
-                          (do (co-σ) ([σ*-lrk #:join-local-forcing co-σ (lookup-env ρ x) v]
+                          (do (co-σ) ([σ*-lrk #:join-forcing co-σ (lookup-env ρ x) v]
                                       [k* #:in-kont σ*-lrk a])
                             (yield (ev σ*-lrk e ρ k* δ))))]
                         [(lrk: cm x (cons y xs) (cons e es) b ρ a δ)
                          (generator
-                          (do (co-σ) ([σ*-lrkn #:join-local-forcing co-σ (lookup-env ρ x) v])
+                          (do (co-σ) ([σ*-lrkn #:join-forcing co-σ (lookup-env ρ x) v])
                             (yield (ev σ*-lrkn e ρ (lrk cm y xs es b ρ a δ) δ))))]
                         [(sk!: cm l a)
                          (generator
@@ -529,7 +529,7 @@
 
                    [_ (error 'step "Bad state ~a" state)]))
 
-
+#;
                  (trace step)
 
                ))))))]))

@@ -10,7 +10,7 @@
          (for-syntax mk-mk-prims)
          define/read define/basic define/write yield-both
          ;; reprovide
-         snull yield yield-meaning force getter widen delay)
+         snull yield getter widen)
 
 (define-simple-macro* (define/read (name:id rσ:id v:id ...) body ...+)
   ;; XXX: not capture-avoiding, so we have to be careful in our definitions
@@ -53,19 +53,13 @@
   (with-syntax ([clos? clos?]
                 [rlos? rlos?])
     #`((define-syntax-rule (yield-delay ydσ v)
-         (do (ydσ) ([v* #:in-delay ydσ v])
-#|           
-           #,@(listy (and (syntax-parameter-value #'target-actions?)
-                          #'(printf "Yield delay ~a with actions ~a~%" v* target-actions)))
-|#
-           (yield v*)))
+         (do (ydσ) ([v* #:in-delay ydσ v]) (yield v*)))
        (define-simple-macro* (errorv vs)
          (begin (log-info "Error reachable ~a" vs)
                 (continue)))
 
        (define-simple-macro* (printfv prσ vs)
-         (begin (log-debug "Printing: ~a"
-                           (for/append ([va (in-list vs)]) (set->list (force prσ va))))
+         (begin (log-debug "Printing: ~a" vs)
                 (yield (void))))
 
        (define/basic (quotientv z0 z1)
@@ -746,11 +740,11 @@
 
 (define-for-syntax ((mk-mk-prims global-σ? σ-passing? σ-∆s? compiled? sparse? K) stx)
   (syntax-parse stx
-    [(_ mean:id compile:id co:id clos?:id rlos?:id)
+    [(_ mean:id compile:id co:id clos?:id rlos?:id extra ...)
      (quasisyntax/loc stx
        (mk-primitive-meaning
         #,global-σ? #,σ-passing? #,σ-∆s? #,compiled? #,sparse? #,(= K 0)
-        mean compile co #,@(prim-defines #'clos? #'rlos? (= K +inf.0)) 
+        mean compile co (extra ...) #,@(prim-defines #'clos? #'rlos? (= K +inf.0)) 
         #,prim-table))]))
 
 (define prim-constants

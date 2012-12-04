@@ -4,20 +4,15 @@
          (for-syntax syntax/parse racket/syntax
                      racket/match racket/list racket/base)
          racket/stxparam)
-(provide getter force widen delay yield yield-meaning snull
+(provide getter widen yield snull fn-prim?
          mk-primitive-meaning mk-static-primitive-functions)
 
+(define-syntax-parameter fn-prim? #f)
 (define-syntax-parameter getter #f)
-(define-syntax-parameter force #f)
 (define-syntax-parameter widen #f)
-(define-syntax-parameter delay #f)
-(define-syntax-parameter yield
+(define-syntax-parameter yield 
   (λ (stx)
-     (raise-syntax-error #f "Must be within the context of a generator" stx)))
-;; Yield is an overloaded term that will do some manipulation to its
-;; input. Yield-meaning is the intended meaning of yield.
-(define-syntax-parameter yield-meaning
-  (λ (stx) (raise-syntax-error #f "Must parameterize for mk-analysis" stx)))
+     (raise-syntax-error #f "Unset" stx)))
 
 (define snull (singleton '()))
 
@@ -362,7 +357,9 @@
 (define-syntax (mk-primitive-meaning stx)
   (syntax-parse stx
          [(_ gb?:boolean σpb?:boolean σdb?:boolean cb?:boolean sb?:boolean 0b?:boolean
-             mean:id compile:id co:id defines ... (p:prim-entry ...))
+             mean:id compile:id co:id
+             (extra ...)
+             defines ... (p:prim-entry ...))
           (define global-σ? (syntax-e #'gb?))
           (define σ-passing? (syntax-e #'σpb?))
           (define σ-∆s? (syntax-e #'σdb?))
@@ -376,6 +373,7 @@
           (define hidden-σ (and σ-∆s? (not global-σ?) (generate-temporary #'hidden)))
           (define hidden-actions (and sparse? (generate-temporary #'hidden-A)))
           (with-syntax ([(σ-gop ...) (if σ-passing? #'(pσ) #'())]
+                        [(extra-ids ...) (generate-temporaries #'(extra ...))]
                         [((top top-op) ...)
                          (if hidden-σ `((,hidden-σ #'top-σ)) '())]
                         [((top-actions actions-op) ...)
@@ -412,25 +410,28 @@
                 (define-syntax (with-prim-yield syn)
                   (syntax-parse syn
                     [(_ k body)
-                     (define yield-tr (syntax-parameter-value #'yield-meaning))
+                     (define yield-tr (syntax-parameter-value #'yield))
                      (define new
                        (λ (sx)
                           (syntax-parse sx
                             [(_ v)
                              (yield-tr (syntax/loc sx (yield (co target-σ k v))))])))
                      ;; Must quote the produced quasisyntax's unsyntax
-                     #,#'#`(syntax-parameterize ([yield #,new]) body)]))
+                     #,#'#`(syntax-parameterize ([yield #,new]
+                                                 [fn-prim? #t])
+                             body)]))
                 defines ...
                 ;; λP very much like λ%
                 (define-syntax-rule (... (λP (pσ ℓ δ k v-addrs) body ...))
                   #,(if compiled?
-                        #'(λ (top ... top-actions ... σ-gop ... ℓ δ-op ... k v-addrs)
+                        #'(λ (top ... top-actions ... extra-ids ... σ-gop ... ℓ δ-op ... k v-addrs)
                              (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
                                                    [target-σ (make-rename-transformer #'pσ)]
                                                    [target-actions (make-rename-transformer #'top-actions)] ...
                                                    [top-actions? #t]
                                                    [top-σ? #t])
-                               body (... ...)))
+                               (bind-extra (#f extra-ids ...)
+                                 body (... ...))))
                         #'(syntax-parameterize ([target-σ (make-rename-transformer #'pσ)])
                             body (... ...))))
                 ;; Identity if not compiled.
@@ -438,5 +439,5 @@
                   #,(if compiled? eval #'o))
                 (define-syntax-rule (mean o pσ ℓ δ k v-addrs)
                   #,(if compiled?
-                        #'(o top-op ... actions-op ... σ-gop ... ℓ δ-op ... k v-addrs)
+                        #'(o top-op ... actions-op ... extra ... σ-gop ... ℓ δ-op ... k v-addrs)
                         eval)))))]))
