@@ -35,13 +35,21 @@
 (define unions #f)
 (define (inc-unions!) (set! unions (add1 unions)))
 
+(define (do-yield c)
+  (unless (= unions (hash-ref seen c -1))
+    (hash-set! seen c unions)
+    (add-todo! c)))
+(define (do-yield-graph c)
+  (unless (= unions (hash-ref seen c -1))
+    (hash-set! seen c unions)
+    (add-todo! c)
+    (add-edge! graph current-state c)))
+
 (define-for-syntax (yield! stx)
   (syntax-case stx ()
-    [(_ e) #`(let ([c e])
-               (unless (= unions (hash-ref seen c -1))
-                 (hash-set! seen c unions)
-                 #,@(when-graph #'(add-edge! graph current-state c))
-                 (add-todo! c)))])) ;; ∪1 → cons
+    [(_ e) (if (syntax-parameter-value #'generate-graph?)
+               #`(do-yield-graph e)
+               #`(do-yield e))])) ;; ∪1 → cons
 
 (define (join-h! a vs)
   (define prev (hash-ref global-σ a ∅))
@@ -78,6 +86,7 @@
                      (ans^-v c)))
                  (values (format "State count: ~a" (unbox state-count*))
                          (format "Point count: ~a" (hash-count seen))
+                         #;global-σ
                          (clean-σ global-σ vs)
                          vs)]
                 [else
@@ -108,16 +117,27 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Accumulated deltas
+(define (do-yield/∆s/acc! c)
+  (when (or saw-change?
+            (not (= unions (hash-ref seen c -1))))
+    (hash-set! seen c unions)
+    (add-todo! c)))
+
+(define (do-yield/∆s/acc!-graph c)
+  (when (or saw-change?
+            (not (= unions (hash-ref seen c -1))))
+    (hash-set! seen c unions)
+    (add-edge! graph current-state c)
+    (add-todo! c)))
+
 (define-for-syntax (yield/∆s/acc! stx)
   (syntax-case stx ()
-    [(_ e)
-     #`(let ([c e])
-         (when (or saw-change?
-                   (not (= unions (hash-ref seen c -1))))
-           (hash-set! seen c unions)
-           #,@(when-graph #'(add-edge! graph current-state c))
-           (add-todo! c))
-         target-σ)]))
+    [(_ e) (if (syntax-parameter-value #'generate-graph?)
+               #`(begin (do-yield/∆s/acc!-graph e)
+                        target-σ)
+               #`(begin (do-yield/∆s/acc! e)
+                        target-σ))]))
+
 (define-syntax-rule (mk-add-∆/s add-∆ add-∆s bind-join bind-join* get-σ)
   (begin
     (define (add-∆ acc a vs)
@@ -216,15 +236,24 @@
       (begin (add-∆s! as vss) body))))
 (mk-add-∆/s! add-∆! add-∆s! bind-join-∆s! bind-join*-∆s! hash-ref)
 
+(define (yield/∆s! c)
+  (when (or saw-change?
+            (not (= unions (hash-ref seen c -1))))
+    (hash-set! seen c unions)
+    (add-todo! c)))
+
+(define (yield/∆s!-graph c)
+  (when (or saw-change?
+            (not (= unions (hash-ref seen c -1))))
+    (hash-set! seen c unions)
+    (add-edge! graph current-state c)
+    (add-todo! c)))
+
 (define-for-syntax (yield/∆s! stx)
   (syntax-case stx ()
-    [(_ e)
-     #`(let ([c e])
-         (when (or saw-change?
-                   (not (= unions (hash-ref seen c -1))))
-           (hash-set! seen c unions)
-           #,@(when-graph #'(add-edge! graph current-state c))
-           (add-todo! c)))]))
+    [(_ e) (if (syntax-parameter-value #'generate-graph?)
+               #'(yield/∆s!-graph e)
+               #'(yield/∆s! e))]))
 
 (define-syntax-rule (with-σ-∆s! body)
   (splicing-syntax-parameterize
