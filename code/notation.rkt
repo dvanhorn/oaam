@@ -3,7 +3,13 @@
 (require (for-syntax syntax/parse))
 (provide for/append for/union for*/union for/set for*/set
          define-simple-macro* hash-reverse
+         add1/debug
          ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
+
+(define (add1/debug n from)
+  (unless (number? n)
+    (error 'add1 "Bad input from ~a" from))
+  (add1 n))
 
 ;; define-simple-macro does not have an implicit quasisyntax.
 (define-syntax (define-simple-macro* stx)

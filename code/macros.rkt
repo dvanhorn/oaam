@@ -1,9 +1,9 @@
 #lang racket
 
-(require (for-syntax racket/syntax) "data.rkt")
+(require (for-syntax racket/syntax) "data.rkt" "notation.rkt")
 (provide macro-env define-ctx-tf
          igensym
-         void$ quote$
+         void$ quote$ internal-apply$
          special kwote define-ctx)
 
 (define-nonce special)
@@ -16,6 +16,7 @@
      (with-syntax ([(names$ ...) (map (λ (i) (format-id i "~a$" i)) (syntax->list #'(names ...)))])
        #'(begin (define names$ (cons special 'names)) ...))]))
 (mk-specials begin car cdr cons let core-let letrec lambda if eq? or quote void not vector
+             internal-apply
              qlist^ qimproper^ qvector^ qhash^)
 
 (define (igensym [start 'g]) (string->symbol (symbol->string (gensym start))))
@@ -25,7 +26,7 @@
 (define (quote-tf inp)
   (define limit (cons-limit))
   (define (improper-length l)
-    (cond [(pair? l) (add1 (improper-length (cdr l)))]
+    (cond [(pair? l) (add1/debug (improper-length (cdr l)) 'improper)]
           [else 0]))
   (define (split-improper l)
     (let loop ([l l] [front '()])
@@ -148,6 +149,8 @@
          (when (and ensure-last-expr? (null? ds))
            (error 'define-ctx "expected at least one expression after defines"))
          (cons (list f e) (loop ds))]
+        [`((define . ,blah) . ,ds)
+         (error 'define-ctx-tf "Bad define form ~a" (car ds))]
         [`((begin ,des ..1) . ,ds) (append (loop des) (loop ds))]
         [`(,e . ,ds) ;; Interspersed exprs are bound to dummy variables
          (cons (list (igensym) e) (loop ds))])))

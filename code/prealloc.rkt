@@ -19,17 +19,17 @@
 (define next-loc #f)
 (define contour-table #f)
 
-(define (inc-next-loc!) (set! next-loc (add1 next-loc)))
+(define (inc-next-loc!) (set! next-loc (add1/debug next-loc 'inc-next-loc!)))
 
-(define (grow-vector σ old-size)
-  (for/vector #:length (* 2 old-size) #:fill ∅ ;; ∅ → '()
+(define (grow-vector fill σ old-size)
+  (for/vector #:length (* 2 old-size) #:fill fill ;; ∅ → '()
                  ([v (in-vector σ)]
                   [i (in-naturals)]
                   #:when (< i old-size))
     v))
 (define (ensure-σ-size)
   (when (= next-loc (vector-length global-σ))
-    (set-global-σ! (grow-vector global-σ next-loc))))
+    (set-global-σ! (grow-vector nothing global-σ next-loc))))
 
 (define-syntax-rule (get-contour-index!-0 c)
   (or (hash-ref contour-table c #f)
@@ -63,6 +63,7 @@
   (splicing-syntax-parameterize
    ([bind (make-rename-transformer #'bind-0)]
     [bind-rest (make-rename-transformer #'bind-rest-0)]
+    [bind-rest-apply (make-rename-transformer #'bind-rest-apply-0)]
     [make-var-contour (make-rename-transformer #'make-var-contour-0-prealloc)])
    body))
 

@@ -64,11 +64,6 @@
      (with-syntax ([co co]
                    [ev ev]
                    [ap? (format-id ap "~a?" ap)])
-       (define getter-tr (syntax-parameter-value #'getter))
-       (define bind-join-tr (syntax-parameter-value #'bind-join))
-       (define bind-join*-tr (syntax-parameter-value #'bind-join*))
-       (define bind-tr (syntax-parameter-value #'bind))
-       (define bind-rest-tr (syntax-parameter-value #'bind-rest))
        #`(splicing-let ()
            (define-for-syntax (pdcfa-yield fnc?)
              (with-syntax ([fn-call? fnc?])

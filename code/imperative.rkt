@@ -1,6 +1,6 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
-         (only-in "store-passing.rkt" bind-rest) "data.rkt" "deltas.rkt" "add-lib.rkt"
+         (only-in "store-passing.rkt" bind-help) "data.rkt" "deltas.rkt" "add-lib.rkt"
          "handle-limits.rkt" "graph.rkt")
 (provide reset-globals! reset-todo! add-todo! inc-unions! set-global-σ!
          saw-change!
@@ -84,9 +84,14 @@
                    (for*/set ([(c at-unions) (in-hash seen)]
                               #:when (ans^? c))
                      (ans^-v c)))
+               (pretty-print
+                (for/list ([v (in-vector global-σ)]
+                           [i (in-naturals)])
+                  (cons i v)))
                  (values (format "State count: ~a" (unbox state-count*))
                          (format "Point count: ~a" (hash-count seen))
-                         #;global-σ
+                         global-σ
+                         #;
                          (clean-σ global-σ vs)
                          vs)]
                 [else
@@ -156,9 +161,9 @@
            (error 'add-∆s "Expected same length lists. Finished at ~a ~a"
                   as vss)])))
     (define-simple-macro* (bind-join* (∆s* ∆s as vss) body)
-      (let ([∆s* (add-∆s ∆s as vss)]) #,(bind-rest #'∆s* #'body)))
+      (let ([∆s* (add-∆s ∆s as vss)]) #,(bind-help #'∆s* #'body)))
     (define-simple-macro* (bind-join (∆s* ∆s a vs) body)
-      (let ([∆s* (add-∆ ∆s a vs)]) #,(bind-rest #'∆s* #'body)))))
+      (let ([∆s* (add-∆ ∆s a vs)]) #,(bind-help #'∆s* #'body)))))
 (mk-add-∆/s add-∆ add-∆s bind-join-∆s/change bind-join*-∆s/change hash-ref)
 
 (define-syntax-rule (with-σ-∆s/acc! body)

@@ -91,8 +91,8 @@
                    [ifk: (format-id #'ifk "~a:" #'ifk)]
                    [sk!: (format-id #'sk! "~a:" #'sk!)]
                    [mt: (format-id #'mt "~a:" #'mt)]
-                   [clos: (format-id #'ev "~a:" #'clos)]
-                   [rlos: (format-id #'ev "~a:" #'rlos)]
+                   [clos: (format-id #'clos "~a:" #'clos)]
+                   [rlos: (format-id #'rlos "~a:" #'rlos)]
                    ;; represent rσ explicitly in all states?
                    [(σ-op ...) (if (given wide?) #'() #'(rσ))]
                    ;; explicitly pass σ/∆ to compiled forms?
@@ -102,7 +102,7 @@
                    [(expander-flags ...)
                     (cond [(and (given wide?) (not (given global-σ?)))
                            #'(#:expander #:with-first-cons)]
-                          [else #'()])]                   
+                          [else #'()])]
                    [inj-σ (if (given σ-∆s?) #''() #'(hash))])
        (define yield-ev
          #`(let ([yield-tr (syntax-parameter-value #'yield)])
@@ -112,7 +112,7 @@
                           [(_ (ev . args)) (syntax/loc syn (ev . args))]
                           [(_ e:expr) (yield-tr #'(yield e))]))
                    #'yield-tr)))
-       
+
        (define eval ;; what does ev mean?
          (quasisyntax/loc stx
            (match e
@@ -127,7 +127,7 @@
                     (yield (dr ev-σ k (lookup-env ρ x)))))]
              [(datum l _ d)
               (λ% (ev-σ ρ k δ)
-                  #;
+
                   (when (memv d (debug-check))
                     (printf "Reached ~a~%" d)
                     (flush-output))
@@ -214,7 +214,8 @@
 
        (define compile-def
          (cond [(given compiled?)
-                (define hidden-σ (and (given σ-∆s?) (not (given global-σ?)) (generate-temporary #'hidden-σ)))
+                (define hide-σ? (and (given σ-∆s?) (not (given global-σ?))))
+                (define hidden-σ (and hide-σ? (generate-temporary #'hidden-σ)))
                 (define hidden-actions (and (given sparse?) (generate-temporary #'hidden-actions)))
                 (with-syntax ([(top ...) (listy hidden-σ)]
                               [(topa ...) (listy hidden-actions)]
@@ -225,15 +226,15 @@
                           (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
                                                 [target-σ (make-rename-transformer #'gσ)]
                                                 [target-actions (make-rename-transformer #'topa)] ...
-                                                [top-σ? #t]
-                                                [top-actions? #t])
+                                                [top-σ? #,hide-σ?]
+                                                [top-actions? #,(given sparse?)])
                             (bind-extra (#f extra-ids ...)
                               body (... ...)))))
                      (define (compile e) #,eval))))]
                [else
                 ;; brittle, since other identifiers must be the same in ev:
                 (syntax/loc stx
-                  ((... (define-syntax-rule (λ% (ev-σ ρ k δ) body ...)                          
+                  ((... (define-syntax-rule (λ% (ev-σ ρ k δ) body ...)
                           (generator body ...)))
                    (define compile values)))]))
 
@@ -330,7 +331,7 @@
                        [(ls: cm l n es vs ρ k δ)
                         (ls (frame-mark cm R) l n es vs ρ k δ)])
                    #'#f))
-           
+
            ;; XXX: does not work with actions
            (define-syntax-rule (OK^ R k σ)
              (let ([seen (make-hasheq)])
@@ -339,7 +340,7 @@
                                #:when (eq? status 'deny))
                         (permission . ∈ . R))))
                (let loop ([R R] [k k])
-                 (define m (marks-of k))                    
+                 (define m (marks-of k))
                  (hash-set! seen k #t)
                  (or (∅? R)
                      (and (overlap? R m)
@@ -364,16 +365,19 @@
                                           [target-cs? #,c-passing?]
                                           [target-actions? #,(given sparse?)]
                                           [yield (... #,yield-ev)])
-            (in-scope-of-extras (extra ...) 
+            (in-scope-of-extras (extra ...)
              (define-syntax do-macro
                (mk-do #,(given σ-∆s?)
-                      #,c-passing?
                       #,(given global-σ?)
                       #,(given generators?)))
+             (define-syntax lift-do-macro (mk-lift-do #'(extra ...)))
+             (define-syntax do-app-macro (mk-do-app #'(extra ...)))
              (mk-flatten-value flatten-value-fn clos: rlos: kont?)
              (splicing-syntax-parameterize ([do (make-rename-transformer #'do-macro)]
+                                            [lift-do (make-rename-transformer #'lift-do-macro)]
+                                            [do-app (make-rename-transformer #'do-app-macro)]
                                             [flatten-value (make-rename-transformer #'flatten-value-fn)])
-                                           
+
                ;; ev is special since it can mean "apply the compiled version" or
                ;; make an actual ev state to later interpret.
                #,@(if (given compiled?)
@@ -436,7 +440,7 @@
                                                     #,(given σ-∆s?) #,(given compiled?)
                                                     #,(given sparse?)
                                                     #,(attribute K)))
-               (mk-prims prim-meaning compile-primop co clos? rlos? extra ...)
+               (mk-prims prim-meaning compile-primop ev co clos rlos kont? extra ...)
                ;; [Rel State State]
                (define (step state)
                  (match state
@@ -468,13 +472,13 @@
                          (generator
                           (do (co-σ) ([σ*-lsn #:join-local-forcing co-σ v-addr v])
                             (yield (ev σ*-lsn e ρ
-                                       (ls cm l (add1 n) es (cons v-addr v-addrs) ρ a δ) δ))))]
+                                       (ls cm l (add1/debug n 'kcfa-ls) es (cons v-addr v-addrs) ρ a δ) δ))))]
 
                         ;; Let is much like application, but some analyses treat let specially
                         [(ltk: cm x '() '() x-done v-addrs e ρ a δ)
                          (define x-done* (cons x x-done))
-                         (define x-addrs (for/list ([x (in-list x-done*)])
-                                           (make-var-contour x δ)))
+                         (define x-addrs (for/list ([xd (in-list x-done*)])
+                                           (make-var-contour xd δ)))
                          (define/ρ ρ* (extend* ρ x-done* x-addrs))
                          (define v-addr (make-var-contour (cons x 'tmp) δ))
                          (generator
@@ -482,7 +486,7 @@
                                       [k* #:in-kont σ*-ltk a])
                             (yield (lt σ*-ltk e ρ* x-addrs (cons v-addr v-addrs) k* δ))))]
                         [(ltk: cm x (cons y xs) (cons e es) x-done v-addrs b ρ a δ)
-                         (define v-addr (make-var-contour (cons y 'tmp) δ))
+                         (define v-addr (make-var-contour (cons x 'tmp) δ))
                          (generator
                           (do (co-σ) ([σ*-ltkn #:join-local-forcing co-σ v-addr v])
                             (yield (ev σ*-ltkn e ρ
@@ -520,7 +524,7 @@
                     (bind-extra (state extra-ids ...)
                       (generator
                        (do (ap-σ) ([f #:in-get ap-σ fn-addr])
-                         (match f
+                         (match-function f
                            [(clos: xs e ρ _)
                             (cond [(= (length xs) (length arg-addrs))
                                    (do (ap-σ)

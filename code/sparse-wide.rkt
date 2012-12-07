@@ -64,13 +64,13 @@
   (set-point-todo?! data #t)
   (define state (node-state p))
   (unless (state . ∈ . todo)
-    (set-skips (add1 skips))
+    (set-skips (add1/debug skips 'add-todo/skip!))
     (i:add-todo! state)))
 
 (define (ensure-σ-size/sparse)
   (when (= next-loc (vector-length global-σ))
-    (set-global-σ! (grow-vector global-σ next-loc))
-    (set! σ-history (grow-vector σ-history next-loc))))
+    (set-global-σ! (grow-vector nothing global-σ next-loc))
+    (set! σ-history (grow-vector 0 σ-history next-loc))))
 
 (define-syntax-rule (get-contour-index!-0 c)
   (hash-ref! contour-table c
@@ -131,10 +131,12 @@
              (add-todo/skip! p)]))))
 
 (define (prepare-sparse-wide/prealloc parser sexp)
-  (begin0 (prepare-prealloc parser sexp)
-          (reset-graph!) ;; creates current-state as a node
-          (set-node-data! current-state (point #f #t (seteq)))
-          (set! σ-history (make-vector (vector-length global-σ)))))
+  (define e (prepare-prealloc parser sexp))
+  (reset-graph!) ;; creates current-state as a node
+  (set-node-data! current-state (point #f #t (seteq)))
+  (set! σ-history (make-vector (vector-length global-σ)))
+  (pretty-print e) (newline)
+  e)
 
 ;; An address is consonant with a past state if its union count is smaller than
 ;; the union count of that state.
@@ -155,7 +157,7 @@
         [else
          (vector-set! global-σ a upd)
          (set! ∆? #t)
-         (vector-set! σ-history a (add1 (vector-ref σ-history a)))]))
+         (vector-set! σ-history a (add1/debug (vector-ref σ-history a) 'join!/sparse))]))
 
 (define (join*!/sparse as vss)
   (for ([a (in-list as)]
@@ -242,8 +244,14 @@
     (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
       (bind-join* (σ* σ rev-aliases rev-vals) body))))
 
-(define-for-syntax do-body-transform-actions
-  (syntax-rules () [(_ e) (let ([actions e]) (join-actions target-actions actions))]))
+(define-for-syntax (do-body-transform-actions stx)
+  (syntax-case stx ()
+    [(_ e)
+     (with-do-binds extra
+       #'(let ([last-actions target-actions])
+           (do-comp #:bind (σ extra ...) e
+                    (values (join-actions last-actions target-actions)
+                            extra ...))))]))
 
 (define-syntax-rule (with-sparse-mutable-worklist body)
   (splicing-syntax-parameterize
@@ -258,6 +266,7 @@
   (splicing-syntax-parameterize
    ([bind (make-rename-transformer #'bind-0)]
     [bind-rest (make-rename-transformer #'bind-rest-0)]
+    [bind-rest-apply (make-rename-transformer #'bind-rest-apply-0)]
     [make-var-contour (make-rename-transformer #'make-var-contour-0-prealloc/sparse)])
    body))
 

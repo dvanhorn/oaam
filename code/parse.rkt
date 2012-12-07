@@ -1,7 +1,7 @@
 #lang racket
-(provide parse parse-prog unparse)
 (require "ast.rkt" "primitives.rkt" "data.rkt" "macros.rkt"
          racket/trace)
+(provide parse parse-prog unparse internal-apply$)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser
@@ -56,6 +56,8 @@
           [(or `((,(or 'lambda `(,(== special) . lambda)) (,xs ...) . ,body) . ,es)
                `(core-let ([,xs ,es] ...) . ,body))
            (define-values (xs-id ρ*) (fresh-xs xs))
+           (unless (list? es)
+             (error 'parse "Bad let ~a" sexp))
            (lte (fresh-label!) tail? xs-id (map (parse_ #f) es) (parse-seq body tail? ρ*))]
           [`(if ,e0 ,e1 ,e2)
            (ife (fresh-label!) tail? (parse e0 #f) (parse e1 tail?) (parse e2 tail?))]
@@ -87,6 +89,8 @@
              [#f (fail)]
              [tf (parse (tf sexp) tail?)])]
           [`(,e . ,es)
+           (unless (list? es)
+             (error 'parse "Bad application ~a" sexp))
            (app (fresh-label!) tail? (parse e #f) (map (parse_ #f) es))]))
 
       (match sexp

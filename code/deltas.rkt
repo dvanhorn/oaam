@@ -17,9 +17,9 @@
               ls0 ls1)])))
 
 (define-simple-macro* (bind-join-∆s (∆s* ∆s a vs) body)
-  (let ([∆s* (cons (cons a vs) ∆s)]) #,(bind-rest #'∆s* #'body)))
+  (let ([∆s* (cons (cons a vs) ∆s)]) #,(bind-help #'∆s* #'body)))
 (define-simple-macro* (bind-join*-∆s (∆s* ∆s as vss) body)
-  (let ([∆s* (map2-append cons ∆s as vss)]) #,(bind-rest #'∆s* #'body)))
+  (let ([∆s* (map2-append cons ∆s as vss)]) #,(bind-help #'∆s* #'body)))
 
 (define-syntax-rule (top-hash-getter thgσ a)
   (hash-ref top-σ a (λ () (error 'top-hash-getter "Unbound address ~a in store ~a" a top-σ))))

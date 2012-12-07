@@ -2,13 +2,13 @@
 
 (require "data.rkt" "notation.rkt" "do.rkt"
          "primitive-maker.rkt"
-         (for-syntax syntax/parse) ;; for core syntax-classes
+         (for-syntax racket/syntax syntax/parse) ;; for core syntax-classes
          racket/stxparam
          racket/unsafe/ops
          racket/flonum)
 (provide primitive? changes-store? reads-store? primitive? prim-constants
          (for-syntax mk-mk-prims)
-         define/read define/basic define/write yield-both
+         define/read define/basic define/write yield-both alt-reverse
          ;; reprovide
          snull yield getter widen)
 
@@ -49,17 +49,30 @@
 (define-simple-macro* (yield-both bσ)
   (do (bσ) ([b (in-list '(#t #f))]) (yield b)))
 
-(define-for-syntax (prim-defines clos? rlos? concrete?)
-  (with-syntax ([clos? clos?]
-                [rlos? rlos?])
+(define-for-syntax (prim-defines clos rlos kont? concrete? ev co)
+  (with-syntax ([clos? (format-id clos "~a?" clos)]
+                [rlos? (format-id rlos "~a?" rlos)]
+                [clos: (format-id clos "~a:" clos)]
+                [rlos: (format-id rlos "~a:" rlos)]
+                [ev ev]
+                [co co]
+                [kont? kont?])
     #`((define-syntax-rule (yield-delay ydσ v)
          (do (ydσ) ([v* #:in-delay ydσ v]) (yield v*)))
        (define-simple-macro* (errorv vs)
-         (begin (log-info "Error reachable ~a" vs)
+         (begin (log-info "Error reachable ~a" (for/list ([v (in-list vs)])
+                                                 (match v
+                                                   [(addr a) (getter prσ a)]
+                                                   [(value-set s) s]
+                                                   [_ v])))
                 (continue)))
 
        (define-simple-macro* (printfv prσ vs)
-         (begin (log-debug "Printing: ~a" vs)
+         (begin (log-debug "Printing: ~a" (for/list ([v (in-list vs)])
+                                            (match v
+                                              [(addr a) (getter prσ a)]
+                                              [(value-set s) s]
+                                              [_ v])))
                 (yield (void))))
 
        (define/basic (quotientv z0 z1)
@@ -152,7 +165,7 @@
                                             (zero? (vector-length v1)))))]
              [(_ (== vec0)) (yield (or (eq? v0 vec0)
                                        (and (vector? v0)
-                                            (zero? (vector-length v0)))))]            
+                                            (zero? (vector-length v0)))))]
              [((? vector?) _) (=> fail) (if (zero? (vector-length v0))
                                             (yield (or (eq? v1 vec0) (equal? v0 v1)))
                                             (fail))]
@@ -270,7 +283,7 @@
            [(== vec0)
             (log-info "Cannot set any cells in a 0-length vector")
             (continue)]
-           [_ 
+           [_
             (log-info "vectorv-set! used on immutable vector")
             (continue)]))
 
@@ -369,7 +382,7 @@
          (cond [(null? vs) (yield vec0)]
                [else
                 (define V-addr (make-var-contour `(V . ,l) δ))
-                (do (vσ) loop ([v vs]) 
+                (do (vσ) loop ([v vs])
                     (match v
                       ['() (yield (vectorv-immutable^ number^ V-addr))]
                       [(cons v vrest)
@@ -411,7 +424,7 @@
                    [(cons v vrest)
                     (do (lastσ) ([fs #:force lastσ v])
                       (loop lastσ vrest (big⊓ fs J)))])))))
-       
+
        (define/write (set-car!v a!σ l δ p v)
          (match p
            [(consv A _)
@@ -515,16 +528,136 @@
                      [else (newline op)
                            (yield (void))])])]))
        ;; FIXME: remove for time-apply
-       (define/basic (timev any) (yield any)))))
+       (define/basic (timev any) (yield any))
+
+       (define (mk-expect n)
+         (cond [(exact-nonnegative-integer? n) (values (λ (n) (<= n 0)) sub1 values)]
+               [else (values null? (λ (x) (if (pair? x) (cdr x) '())) length)]))
+       
+       (define (log-too-many expect given)
+         (log-info "'apply'd function given too many arguments (expected ~a): (>= ~a)"
+                   expect given))
+
+       (define (log-too-few expect given)
+         (log-info "'apply'd function given too few arguments (expected ~a): ~a"
+                   expect given))
+
+       (define-simple-macro* (pull-arguments pσ num rest? l δ vs)
+         (let*-values ([(-vs) vs]
+                       [(-num) num]
+                       [(no-expect? sub-expect len-expect) (mk-expect -num)])
+           (do (iapσ) loop ([args -vs] [raddrs '()] [i 0] [n -num]) #:values 1
+               (match args
+                 ['() (do-values (alt-reverse raddrs))]
+                 [(list arg)
+                  ;; The last argument should contain a list of extra arguments to pull on.
+                  ;; If n > 0 we must ensure there are enough values in the list to get.
+                  ;; If arg contains a list longer than n and rest? = #f then log error.
+                  (cond [(no-expect? n)
+                         (define addr (make-var-contour `(apply ,i . ,l) δ))
+                         (do (iapσ) ([bσ #:join-forcing iapσ addr arg])
+                           (do-values (alt-reverse (cons addr raddrs))))]
+                        [else
+                         (define-values (addrs raddrs*)
+                           (let aloop ([i i] [n n] [addrs '()] [raddrs raddrs])
+                             (define addr (make-var-contour `(apply ,i . ,l) δ))
+                             (if (no-expect? n)
+                                 (if rest?
+                                     (values (alt-reverse (cons addr addrs)) (cons addr raddrs))
+                                     (values (alt-reverse addrs) raddrs))
+                                 (aloop (add1 i) (sub-expect n) (cons addr addrs) (cons addr raddrs)))))
+                         (define result (box #f))
+                         (do-comp #:bind (nσ)
+                                  (do (iapσ) ([varg #:in-force iapσ arg])
+                                    ;; Make temporary addresses for apply at this application point
+                                    ;; and put all pullable arguments into their locations.
+                                    (do (iapσ) iloop ([last varg] [-addrs addrs] [i i] [n n])
+                                        (match* (last -addrs)
+                                          [((consv A D) (cons addr -addrs))
+                                           (cond
+                                            [(no-expect? n) ;; too many in rest-arg list?
+                                             (cond
+                                              [rest? ;; nope, just include this in the final list.
+                                               (unless (null? -addrs)
+                                                 (error 'apply "Too many addresses generated ~a" addrs))
+                                               (do (iapσ) ([aprσ #:join iapσ addr (singleton last)])
+                                                 (set-box! result #t)
+                                                 (continue))]
+                                              [else ;; yes, too many
+                                               (log-too-many (len-expect -num) (add1 i))
+                                               (continue)])]
+                                            [else
+                                             (printf "More ~a to ~a~%" addr A)
+                                             ;; Still expect more, so pull another out.
+                                             (do (iapσ) ([apjσ #:alias iapσ addr A]
+                                                         [next #:in-get apjσ D])
+                                               (iloop apjσ next -addrs (add1 i) (sub-expect n)))])]
+                                          [('() _)
+                                           (cond
+                                            [(no-expect? n)
+                                             (set-box! result #t)
+                                             (if rest?
+                                                 ;; Actually nothing. Make the tail an empty list.
+                                                 (do (iapσ) ([apnσ #:join iapσ (car -addrs) snull])
+                                                   (continue))
+                                                 ;; No tail since not for rest-args.
+                                                 (continue))]
+                                            [else
+                                             ;; Can't pull anything out of empty!
+                                             (log-too-few (len-expect -num) (add1 i))
+                                             (continue)])])))
+                                  (do-values (and (unbox result)
+                                                  (alt-reverse raddrs*))))])]
+                 ;; Explicitly given arguments
+                 [(cons arg args)
+                  (define addr (make-var-contour `(apply ,i . ,l) δ))
+                  (cond [(and (no-expect? n) (not rest?)) ;; might we have too many arguments?
+                         (log-info "'apply'd function given too many arguments (>= ~a) (expected ~a)"
+                                   i (len-expect -num))
+                         (do-values #f)]
+                        [else
+                         (do (iapσ) ([bσ #:join-forcing iapσ addr arg])
+                           (loop bσ args (cons addr raddrs) (add1 i) (sub-expect n)))])]))))
+
+       (define-simple-macro* (internal-applyv iapσ l δ k vs)
+         (let* ([-vs vs]
+                [f (unsafe-car -vs)]
+                [args (unsafe-cdr -vs)])
+           (match-function f
+             [(clos: xs e ρ _)
+              (do-comp #:bind (nσ apply-addrs)
+                       (pull-arguments iapσ xs #f l δ args) ;; FIXME: #:bind should have a new σ!
+                       (if apply-addrs
+                           (do (nσ) ([(ρ* σ*-apcl δ*) #:bind ρ nσ l δ xs apply-addrs])
+                             (original-yield (ev σ*-apcl e ρ* k δ)))
+                           (continue)))]
+             [(rlos: xs r e ρ _)
+              (do-comp #:bind (nσ apply-addrs)
+                       (pull-arguments iapσ xs #t l δ args) ;; FIXME: #:bind should have a new σ!
+                       (if apply-addrs
+                           (do (nσ) ([(ρ* σ*-apcl δ*) #:bind-rest-apply ρ nσ l δ xs r apply-addrs])
+                             (original-yield (ev σ*-apcl e ρ* k δ)))
+                           (continue)))]
+             [(primop o) (error 'internal-apply "TODO: apply primitives ~a" o)]
+             [(? kont?)
+              (do-comp #:bind (nσ apply-addrs)
+                       (pull-arguments iapσ 1 #f l δ args)
+                       (match apply-addrs
+                         [(list a)
+                          (do (nσ) ([v #:in-delay nσ a])
+                            (original-yield (co nσ f v)))]
+                         [_ (continue)]))
+              (error 'internal-apply "TODO: apply continuations ~a" k)]))))))
 
 (define-for-syntax prim-table
-  #'(;; Numbers
+  #'([apply #:!! internal-applyv (fn #:rest any -> any)]
+     ;; Numbers
      [add1 #:simple (n -> n) #:widen]
      [sub1 #:simple (n -> n) #:widen]
      [+    #:simple (#:rest n -> n) #:widen]
      [-    #:simple (n #:rest n -> n) #:widen]
      [*    #:simple (#:rest n -> n) #:widen]
-     [/ #f #f /v (n #:rest n -> n)]
+     [/ #:no /v (n #:rest n -> n)]
      [=    #:simple (n #:rest n -> b)]
      [<    #:simple (r #:rest r -> b)]
      [>    #:simple (r #:rest r -> b)]
@@ -534,9 +667,9 @@
      [bitwise-not #:simple (z -> z)]
      [bitwise-ior #:simple (#:rest z -> z)]
      [bitwise-xor #:simple (#:rest z -> z)]
-     [quotient #f #f quotientv (z z -> z)]
-     [remainder #f #f remainderv (z z -> z)]
-     [modulo #f #f modulov (z z -> z)]
+     [quotient #:no quotientv (z z -> z)]
+     [remainder #:no remainderv (z z -> z)]
+     [modulo #:no modulov (z z -> z)]
      [numerator #:simple (q -> z)]
      [denominator #:simple (q -> z)]
      [make-rectangular #:simple (r r -> n)]
@@ -563,10 +696,10 @@
      [cos #:simple (n -> n) #:widen]
      [asin #:simple (n -> n) #:widen]
      [acos #:simple (n -> n) #:widen]
-     [log #f #f logv (n -> n)]
+     [log #:no logv (n -> n)]
      [fl+ #:simple (fl fl -> fl) #:widen]
      [fl* #:simple (fl fl -> fl) #:widen]
-     [fl/ #f #f /v (fl fl -> fl)]
+     [fl/ #:no /v (fl fl -> fl)]
      [fl- #:simple (fl fl -> fl) #:widen]
      [fl= #:simple (fl fl -> b)]
      [fl< #:simple (fl fl -> b)]
@@ -587,7 +720,7 @@
      [flacos #:simple (fl -> fl) #:widen]
      [flasin #:simple (fl -> fl) #:widen]
      [flatan #:simple (fl -> fl) #:widen]
-     [fllog #f #f logv (fl -> fl)]
+     [fllog #:no logv (fl -> fl)]
      [flexp #:simple (fl -> fl) #:widen]
      [flsqrt #:simple (fl -> fl) #:widen]
      [flexpt #:simple (fl fl -> fl) #:widen]
@@ -631,20 +764,20 @@
      [exact-nonnegative-integer? #:simple (any -> b)]
      [exact-positive-integer? #:simple (any -> b)]
      ;; Generic Comparisons
-     [equal? #t #f equalv? (any any -> b)]
-     [eqv? #t #f equalv? (any any -> b)]
-     [eq? #t #f equalv? (any any -> b)]
+     [equal? #:ro equalv? (any any -> b)]
+     [eqv? #:ro equalv? (any any -> b)]
+     [eq? #:ro equalv? (any any -> b)]
      ;; Vectors
-     [vector #f #t prim-vectorv (#:rest any -> v)]
-     [vector-immutable #f #t prim-vectorv-immutable (#:rest any -> v)]
-     [qvector^ #f #t make-vector^ (#:rest any -> v)]
-     [make-vector #f #t make-vectorv ((z -> v)
+     [vector #:rw prim-vectorv (#:rest any -> v)]
+     [vector-immutable #:rw prim-vectorv-immutable (#:rest any -> v)]
+     [qvector^ #:rw make-vector^ (#:rest any -> v)]
+     [make-vector #:rw make-vectorv ((z -> v)
                                       (z any -> v))]
-     [vector-ref #t #f vectorv-ref (v z -> any)]
-     [vector-set! #f #t vectorv-set! (v z any -> !)]
-     [vector-length #f #f vectorv-length (v -> z)]
-     [vector->list #f #t vectorv->list (v -> lst)]
-     [list->vector #f #t list->vectorv (lst -> v)]
+     [vector-ref #:ro vectorv-ref (v z -> any)]
+     [vector-set! #:rw vectorv-set! (v z any -> !)]
+     [vector-length #:no vectorv-length (v -> z)]
+     [vector->list #:rw vectorv->list (v -> lst)]
+     [list->vector #:rw list->vectorv (lst -> v)]
      [vector? #:predicate v]
      ;; Strings
      [string? #:predicate s]
@@ -686,48 +819,48 @@
      [symbol? #:predicate y]
      [symbol->string #:simple (y -> s)]
      ;; Procedures
-     [procedure? #f #f procedure?v (any -> b)]
+     [procedure? #:no procedure?v (any -> b)]
      ;; Imperative stuff
      [void? #:predicate !]
      [void #:simple (-> !)]
-     [error #f #f errorv (#:rest any -> any)]
+     [error #:no errorv (#:rest any -> any)]
      ;; Booleans
      [not #:predicate false]
      [boolean? #:predicate b]
      ;; Pairs/lists
-     [cons #f #t make-consv (any any -> p)]
-     [qlist^ #f #t make-list^ (#:rest any -> lst)]
-     [qimproper^ #f #t make-improper^ (any #:rest any -> lst)]
+     [cons #:rw make-consv (any any -> p)]
+     [qlist^ #:rw make-list^ (#:rest any -> lst)]
+     [qimproper^ #:rw make-improper^ (any #:rest any -> lst)]
      [pair? #:predicate p]
      [null? #:predicate null]
-     [set-car! #f #t set-car!v (p any -> !)]
-     [set-cdr! #f #t set-cdr!v (p any -> !)]
-     [car    #t #f carv    (p -> any)]
-     [cdr    #t #f cdrv    (p -> any)]
+     [set-car! #:rw set-car!v (p any -> !)]
+     [set-cdr! #:rw set-cdr!v (p any -> !)]
+     [car    #:ro carv    (p -> any)]
+     [cdr    #:ro cdrv    (p -> any)]
      ;; Ports
      [input-port? #:predicate ip]
      [output-port? #:predicate op]
-     [open-input-file #f #t open-input-filev (s -> ip)]
-     [open-output-file #f #t open-output-filev (s -> op)]
-     [close-input-port #f #t close-input-portv (ip -> !)]
-     [close-output-port #f #t close-output-portv (op -> !)]
-     [port-closed? #t #f port-closed?v (prt -> b)]
+     [open-input-file #:rw open-input-filev (s -> ip)]
+     [open-output-file #:rw open-output-filev (s -> op)]
+     [close-input-port #:rw close-input-portv (ip -> !)]
+     [close-output-port #:rw close-output-portv (op -> !)]
+     [port-closed? #:ro port-closed?v (prt -> b)]
 #;#;
-     [current-input-port #f #f current-input-portv (-> ip)]
-     [current-output-port #f #f current-input-portv (-> op)]
-     [read #t #f readv ((-> lst) ;; XXX: impoverished read
+     [current-input-port #:no current-input-portv (-> ip)]
+     [current-output-port #:no current-input-portv (-> op)]
+     [read #:ro readv ((-> lst) ;; XXX: impoverished read
                         (ip -> lst))]
-     [write #t #f writev ((any -> !)
+     [write #:ro writev ((any -> !)
                           (any op -> !))]
-     [display #t #f displayv ((any -> !)
+     [display #:ro displayv ((any -> !)
                               (any op -> !))]
-     [newline #t #f newlinev ((-> !)
+     [newline #:ro newlinev ((-> !)
                               (op -> !))]
-     [printf #t #f printfv (#:rest any -> !)] ;; for debugging
+     [printf #:ro printfv (#:rest any -> !)] ;; for debugging
      [eof-object? #:predicate eof]
      ;; time should be with time-apply, but that means supporting apply...
-     [time #f #f timev (any -> any)]
-     [immutable?    #f #f immutablev?      (any -> b)]))
+     [time #:no timev (any -> any)]
+     [immutable?    #:no immutablev?      (any -> b)]))
 
 (define-syntax (mk-static-prims stx)
   (syntax-parse stx
@@ -740,12 +873,15 @@
 
 (define-for-syntax ((mk-mk-prims global-σ? σ-passing? σ-∆s? compiled? sparse? K) stx)
   (syntax-parse stx
-    [(_ mean:id compile:id co:id clos?:id rlos?:id extra ...)
-     (quasisyntax/loc stx
-       (mk-primitive-meaning
-        #,global-σ? #,σ-passing? #,σ-∆s? #,compiled? #,sparse? #,(= K 0)
-        mean compile co (extra ...) #,@(prim-defines #'clos? #'rlos? (= K +inf.0)) 
-        #,prim-table))]))
+    [(_ mean:id compile:id ev:id co:id clos:id rlos:id kont?:id extra ...)
+     (with-syntax ([clos? (format-id #'clos "~a?" #'clos)]
+                   [rlos? (format-id #'rlos "~a?" #'rlos)])
+       (quasisyntax/loc stx
+         (mk-primitive-meaning
+          #,global-σ? #,σ-passing? #,σ-∆s? #,compiled? #,sparse? #,(= K 0)
+          mean compile co clos? rlos? kont? (extra ...)
+          #,@(prim-defines #'clos #'rlos #'kont? (= K +inf.0) #'ev #'co)
+          #,prim-table)))]))
 
 (define prim-constants
   (hasheq 'eof eof

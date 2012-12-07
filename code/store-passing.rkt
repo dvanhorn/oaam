@@ -3,7 +3,7 @@
          "fix.rkt" "handle-limits.rkt"
          "graph.rkt")
 (provide bind-join-whole bind-join*-whole
-         (for-syntax bind-rest) ;; common helper
+         (for-syntax bind-help) ;; common helper
          wide-step hash-getter
          mk-set-fixpoint^
          mk-special-set-fixpoint^
@@ -174,13 +174,13 @@
 (define-for-syntax do-body-transform-cs
   (syntax-rules () [(_ e) (let ([cs e]) (∪ target-cs cs))]))
 
-(define-for-syntax (bind-rest inner-σ body)
+(define-for-syntax (bind-help inner-σ body)
   #`(syntax-parameterize ([target-σ (make-rename-transformer #'#,inner-σ)])
       #,body))
 (define-simple-macro* (bind-join-whole (σjoin sσ a vs) body)
-  (let ([σjoin (join sσ a vs)]) #,(bind-rest #'σjoin #'body)))
+  (let ([σjoin (join sσ a vs)]) #,(bind-help #'σjoin #'body)))
 (define-simple-macro* (bind-join*-whole (σjoin* sσ as vss) body)
-  (let ([σjoin* (join* sσ as vss)]) #,(bind-rest #'σjoin* #'body)))
+  (let ([σjoin* (join* sσ as vss)]) #,(bind-help #'σjoin* #'body)))
 
 (define (hash-getter hgσ a)
   (hash-ref hgσ a (λ () (error 'getter "Unbound address ~a in store ~a" a hgσ))))

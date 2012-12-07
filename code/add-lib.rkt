@@ -155,42 +155,35 @@
                                  (begin
                                    (vector-set! v i (car a))
                                    (loop (add1 i) (cdr a)))))))))
-     (map . ;; just map1 for now
-          (lambda (f l)
-            (if (null? l)
-                '()
-                (cons (f (car l))
-                      (map f (cdr l))))))
-     #;
-     (define map
-     (lambda (f a . args)
-     (letrec ((map1 (lambda (f l)
-     (if (null? l)
-     '()
-     (cons (f (car l))
-     (map1 f (cdr l))))))
-     (map2 (lambda (f l1 l2)
-     (cond ((null? l1)
-     '())
-     ((null? l2)
-     (error 'map "lists differ in length"))
-     (else
-     (cons (f (car l1) (car l2))
-     (map2 f (cdr l1) (cdr l2)))))))
-     (map* (lambda (f l*)
-     (if (null? (car l*))
-     '()
-     (cons (let ((l (map1 car l*)))
-     (if (null? l)
-     (f)
-     ((,special internal-apply) f l)))
-     (map* f (map1 cdr l*)))))))
-     (cond ((null? args)
-     (map1 f a))
-     ((null? (cdr args))
-     (map2 f a (car args)))
-     (else
-     (map* f (cons a args)))))))
+     (map .
+          (lambda (f a . args)
+            (letrec ((map1 (lambda (f l)
+                             (if (null? l)
+                                 '()
+                                 (cons (f (car l))
+                                       (map1 f (cdr l))))))
+                     (map2 (lambda (f l1 l2)
+                             (cond ((null? l1)
+                                    '())
+                                   ((null? l2)
+                                    (error 'map "lists differ in length"))
+                                   (else
+                                    (cons (f (car l1) (car l2))
+                                          (map2 f (cdr l1) (cdr l2)))))))
+                     (map* (lambda (f l*)
+                             (if (null? (car l*))
+                                 '()
+                                 (cons (let ((l (map1 car l*)))
+                                         (if (null? l)
+                                             (f)
+                                             (apply f l)))
+                                       (map* f (map1 cdr l*)))))))
+              (cond ((null? args)
+                     (map1 f a))
+                    ((null? (cdr args))
+                     (map2 f a (car args)))
+                    (else
+                     (map* f (cons a args)))))))
 
      (for-each .
        (lambda (f a . args)
@@ -214,15 +207,13 @@
                                         (f (car l1) (car l2))
                                         (for-each2 f (cdr l1) (cdr l2))))))
                     (for-each* (lambda (f l*)
-                                 (error "Well crap")
-                                 #;
                                  (if (null? (car l*))
                                      (void)
                                      (begin
                                        (let ((l (map car l*)))
                                          (if (null? l)
                                              (f)
-                                             ((,special internal-apply) f l)))
+                                             (apply f l)))
                                        (for-each* f (map cdr l*)))))))
              (cond ((null? args)
                     (for-each1 f a))
@@ -255,7 +246,7 @@
                                         ; no way to switch current output in R4RS Scheme
          (error 'with-output-to-file "not supported")
          (f)))
-
+     #;
      (apply .
        (lambda (f arg0 . args)
          (define list-copy
@@ -275,9 +266,7 @@
                  (else (let ((n (list-copy m)))
                          (if (null? n)
                              (error 'apply "can't happen")
-                             (error 'apply "TODO well crap")
-                             #;
-                             ((,special internal-apply) f n))))))))
+                             (,internal-apply$ f n))))))))
        (make-promise .
                      (lambda (thunk)
                        (let ([first #t]

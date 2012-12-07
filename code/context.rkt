@@ -3,10 +3,11 @@
          (for-syntax syntax/parse) "data.rkt")
 (provide bind-0 bind-1 bind-∞
          bind-rest-0 bind-rest-1 bind-rest-∞
+         bind-rest-apply-0 bind-rest-apply-1 bind-rest-apply-∞
          with-0-ctx with-1-ctx with-∞-ctx
          make-var-contour-0 make-var-contour-k)
 
-(define-for-syntax ((mk-bind-rest K) stx)
+(define-for-syntax ((mk-bind-rest K apply?) stx)
   (syntax-parse stx
     [(_ (ρ* σ* δ*) (ρ iσ l δ xs r v-addrs) body)
      (define (bind-args wrap as r-meaning)
@@ -84,10 +85,12 @@
 (define-syntax bind-0 (mk-bind 0))
 (define-syntax bind-1 (mk-bind 1))
 (define-syntax bind-∞ (mk-bind +inf.0))
-(define-syntax bind-rest-0 (mk-bind-rest 0))
-(define-syntax bind-rest-1 (mk-bind-rest 1))
-(define-syntax bind-rest-∞ (mk-bind-rest +inf.0))
-
+(define-syntax bind-rest-0 (mk-bind-rest 0 #f))
+(define-syntax bind-rest-1 (mk-bind-rest 1 #f))
+(define-syntax bind-rest-∞ (mk-bind-rest +inf.0 #f))
+(define-syntax bind-rest-apply-0 (mk-bind-rest 0 #t))
+(define-syntax bind-rest-apply-1 (mk-bind-rest 1 #t))
+(define-syntax bind-rest-apply-∞ (mk-bind-rest +inf.0 #t))
 (define ε '())
 (define (truncate δ k)
   (cond [(zero? k) '()]
@@ -99,6 +102,7 @@
   (splicing-syntax-parameterize
    ([bind (make-rename-transformer #'bind-0)]
     [bind-rest (make-rename-transformer #'bind-rest-0)]
+    [bind-rest-apply (make-rename-transformer #'bind-rest-apply-0)]
     [make-var-contour (make-rename-transformer #'make-var-contour-0)])
    body))
 
@@ -106,6 +110,7 @@
   (splicing-syntax-parameterize
    ([bind (make-rename-transformer #'bind-1)]
     [bind-rest (make-rename-transformer #'bind-rest-1)]
+    [bind-rest-apply (make-rename-transformer #'bind-rest-apply-1)]
     [make-var-contour (make-rename-transformer #'make-var-contour-k)])
    body))
 
@@ -113,5 +118,6 @@
   (splicing-syntax-parameterize
    ([bind (make-rename-transformer #'bind-∞)]
     [bind-rest (make-rename-transformer #'bind-rest-∞)]
+    [bind-rest-apply (make-rename-transformer #'bind-rest-apply-∞)]
     [make-var-contour (make-rename-transformer #'make-var-contour-k)])
    body))
