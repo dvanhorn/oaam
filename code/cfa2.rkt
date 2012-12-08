@@ -188,6 +188,7 @@
        (define bind-join*-tr (syntax-parameter-value #'bind-join*))
        (define bind-tr (syntax-parameter-value #'bind))
        (define bind-rest-tr (syntax-parameter-value #'bind-rest))
+       (define bind-rest-apply-tr (syntax-parameter-value #'bind-rest-apply))
        #`(splicing-let ()
            (define-for-syntax (cfa2-yield fnξ fnl)
              (with-syntax ([fn-call-ξ fnξ]
@@ -277,19 +278,26 @@
            (mk-getter getter-cfa2 ξ)
 
            ;; Make a new stack frame before entering a new function
-           (define-simple-macro* (mk-bind-rest name binder)
-             (define-simple-macro* (name (ρ* σ* δ*) (ρ iσ l δ xs r v-addrs) body*)
+           (define-simple-macro* (bind-rest-cfa2 (ρ* σ* δ*) (ρ iσ l δ xs r v-addrs) body*)
              (let ([oldξ ξ]
                    [newξ (hash)])
                (mk-getter bind-rest-getter oldξ)
                (syntax-parameterize ([ξ (make-rename-transformer #'newξ)]
                                      [getter (make-rename-transformer #'bind-rest-getter)])
                  #,((apply-transformer bind-rest-tr)
-                    #'(binder (ρ* σ* δ*) (ρ iσ i δ xs r v-addrs)
+                    #'(bind-rest (ρ* σ* δ*) (ρ iσ i δ xs r v-addrs)
                         (syntax-parameterize ([getter (make-rename-transformer #'getter-cfa2)])
-                          body*)))))))
-           (mk-bind-rest bind-rest-cfa2 bind-rest)
-           (mk-bind-rest bind-rest-apply-cfa2 bind-rest-apply)
+                          body*))))))
+           (define-simple-macro* (bind-rest-apply-cfa2 (ρ* σ* δ*) (ρ iσ l δ xs r v-addrs) body*)
+             (let ([oldξ ξ]
+                   [newξ (hash)])
+               (mk-getter bind-rest-getter oldξ)
+               (syntax-parameterize ([ξ (make-rename-transformer #'newξ)]
+                                     [getter (make-rename-transformer #'bind-rest-getter)])
+                 #,((apply-transformer bind-rest-apply-tr)
+                    #'(bind-rest-apply (ρ* σ* δ*) (ρ iσ i δ xs r v-addrs)
+                        (syntax-parameterize ([getter (make-rename-transformer #'getter-cfa2)])
+                          body*))))))
            ;; Likewise
            (define-simple-macro* (bind-cfa2 (ρ* σ* δ*) (ρ bσ l δ xs v-addrs) body*)
              (let ([oldξ ξ]

@@ -133,7 +133,7 @@
                     (flush-output))
                   (do (ev-σ) () (yield (co ev-σ k d))))]
              [(primr l _ which)
-              (define p (primop (compile-primop which)))
+              (define p (primop (compile-primop which) (hash-ref prim-arities which)))
               (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k p))))]
              [(lam l _ x e*)
               (define c (compile e*))
@@ -262,7 +262,6 @@
            (mk-op-struct ltk (cm x xs es x-done v-addrs e ρ k δ)
                          (cm-op ... x xs es x-done v-addrs e ρ-op ... k δ-op ...))
            ;; Values
-           (struct primop (which) #:prefab)
            (mk-op-struct clos (x e ρ free) (x e ρ-op ... free) #:expander-id clos:)
            (mk-op-struct rlos (x r e ρ free) (x r e ρ-op ... free) #:expander-id rlos:)
            (define (kont? v) (or (ls? v) (lrk? v) (ltk? v) (ifk? v) (sk!? v) (mt? v)))
@@ -361,7 +360,7 @@
            #,@(if (given touches)
                   #`((mk-touches touches clos: rlos: list #,(zero? (attribute K))))
                   #'())
-           (splicing-syntax-parameterize ([target-σ? (and #,σ-threading? 'threading)]
+           (splicing-syntax-parameterize ([target-σ? #,σ-threading?]
                                           [target-cs? #,c-passing?]
                                           [target-actions? #,(given sparse?)]
                                           [yield (... #,yield-ev)])
@@ -369,11 +368,16 @@
              (define-syntax do-macro
                (mk-do #,(given σ-∆s?)
                       #,(given global-σ?)
-                      #,(given generators?)))
+                      #,(given generators?)
+                      #'(extra ...)))
+             (define-syntax do-comp-macro (mk-do-comp #'(extra ...)))
+             (define-syntax do-values-macro (mk-do-values #'(extra ...)))
              (define-syntax lift-do-macro (mk-lift-do #'(extra ...)))
              (define-syntax do-app-macro (mk-do-app #'(extra ...)))
              (mk-flatten-value flatten-value-fn clos: rlos: kont?)
              (splicing-syntax-parameterize ([do (make-rename-transformer #'do-macro)]
+                                            [do-comp (make-rename-transformer #'do-comp-macro)]
+                                            [do-values (make-rename-transformer #'do-values-macro)]
                                             [lift-do (make-rename-transformer #'lift-do-macro)]
                                             [do-app (make-rename-transformer #'do-app-macro)]
                                             [flatten-value (make-rename-transformer #'flatten-value-fn)])
@@ -435,12 +439,15 @@
                                                            (add-lib e* r gensym gensym))))])
                  (fixpoint step (inj (prepare e))))
 
-               #,@compile-def
+               (splicing-syntax-parameterize ([prim-meaning (make-rename-transformer #'prim-meaning-def)])
                (define-syntax mk-prims (mk-mk-prims #,(given global-σ?) #,σ-passing?*
                                                     #,(given σ-∆s?) #,(given compiled?)
                                                     #,(given sparse?)
                                                     #,(attribute K)))
-               (mk-prims prim-meaning compile-primop ev co clos rlos kont? extra ...)
+               (mk-prims prim-meaning-def compile-primop ev co clos rlos kont? extra ...)
+
+               #,@compile-def
+
                ;; [Rel State State]
                (define (step state)
                  (match state
@@ -543,7 +550,7 @@
                                   [else
                                    (log-info "Arity error on ~a at ~a" f l)
                                    (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-                           [(primop o) (prim-meaning o ap-σ l δ k arg-addrs)]
+                           [(primop o _) (do-app prim-meaning o l δ-op ... k arg-addrs)]
                            [(? kont? k)
                             ;; continuations only get one argument.
                             (cond [(and (pair? arg-addrs) (null? (cdr arg-addrs)))
@@ -572,9 +579,9 @@
                     (bind-extra (state extra-ids ...)
                       (generator (do (ans-σ) () (yield (ans ans-σ cm v)))))]
 
-                   [_ (error 'step "Bad state ~a" state)]))
+                   [_ (error 'step "Bad state ~a" state)])))
 
-#;
+
                  (trace step)
 
                ))))))]))

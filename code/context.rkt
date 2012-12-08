@@ -19,28 +19,56 @@
             (define-values (vfirst vrest)
               (let loop ([xs* xs] [axs '()] [vs v-addrs])
                 (match* (xs* vs)
-                  [('() vs) (values (reverse axs) vs)]
+                  [('() vs) (values (alt-reverse axs) vs)]
                   [((cons x xrest) (cons a arest))
                    (loop xrest (cons a axs) arest)])))
             (add-r (σ* ρ* iσ ρ r δ* vrest)
                    (bind-alias* (σ* σ* #,as vfirst) body))))))
      ;; Abstractly, rest-arg is an infinite list.
      (define abs-r
-       #`(let* ([ra sr]
-                [rA (make-var-contour `(A . ,sr) sδ*)]
-                [rvs (if (null? vrest) snull (⊓1 snull (consv rA ra)))]
-                #,@(if (zero? K) #'() #'([νρ (extend sρ r rA)])))
-           (bind-join (νσ sσ ra rvs)
-                      (bind-big-alias (νσ νσ rA vrest) body*))))
-     ;; Concretely, rest-arg is a finite list.
+       (with-syntax ([(vrest-op ...) (if apply? #'(vrest) #'())])
+         #`(let* ([ra sr]
+                  [rA (make-var-contour `(A . ,sr) sδ*)]
+                  #,@(if (zero? K) #'() #'([νρ (extend sρ r rA)])))
+             #,(if apply?
+                   #'(do-comp #:bind (outσ vrest* rvs)
+                              (do (sσ) loop ([vrest vrest] [vrest* '()])
+                                  (match vrest
+                                    [(list tail)
+                                     (bind-get (res sσ tail)
+                                       (if (null? vrest*)
+                                           (do-values vrest* res)
+                                           ;; XXX: Exposes that stored values are sets!
+                                           (do (sσ) iloop ([vals res]
+                                                           [vrest* vrest*]
+                                                           [rvs (singleton (consv rA ra))])
+                                               (cond [(∅? vals)
+                                                      (do-values vrest* rvs)]
+                                                     [else
+                                                      (match (set-first vals)
+                                                        ['() (do-values vrest* (⊓1 rvs '()))]
+                                                        [(consv A D)
+                                                         (bind-get (rest sσ D)
+                                                           (iloop sσ (set-rest res) (cons A vrest*) (⊓ rest rvs)))]
+                                                        [_ (iloop sσ (set-rest res) vrest* rvs)])]))))]
+                                    [(cons jA -vrest)
+                                     (loop sσ -vrest (cons jA vrest*))]))
+                              (bind-join (iσ outσ ra rvs)
+                                         (bind-big-alias (νσ iσ rA vrest*) body*)))
+                   #'(let ([rvs (if (null? vrest) snull (⊓1 snull (consv rA ra)))])
+                       (bind-join (νσ sσ ra rvs)
+                         (bind-big-alias (νσ νσ rA vrest) body*)))))))
+     ;; Concretely, rest-arg is a finite list. FIXME: apply?
      (define conc-r
-       #'(let*-values ([(ra) (make-var-contour sr sδ*)]
+       #`(let*-values ([(ra) (make-var-contour sr sδ*)]
                        [(νρ) (extend sρ r ra)])
            (do (sσ) loop ([as vrest] [last ra] [count 0])
                (match as
-                 ['()
-                  (do (sσ) ([νσ #:join sσ last snull])
-                    body*)]
+                 #,(if apply?
+                       #'[(list last) (error 'TODO)]
+                       #'['()
+                          (do (sσ) ([νσ #:join sσ last snull])
+                            body*)])
                  [(cons a as)
                   (define rnextA (make-var-contour `(,sr A . ,count) sδ*))
                   (define rnextD (make-var-contour `(,sr D . ,count) sδ*))

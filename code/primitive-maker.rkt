@@ -2,7 +2,8 @@
 
 (require "data.rkt" "notation.rkt" "do.rkt"
          (for-syntax syntax/parse racket/syntax
-                     racket/match racket/list racket/base)
+                     racket/match racket/list racket/base
+                     syntax/parse/experimental/template)         
          racket/unsafe/ops
          racket/stxparam)
 (provide getter widen yield snull fn-prim? alt-reverse
@@ -296,21 +297,27 @@
             #:attr abs-out (mk-abs-out (attribute type))))
 
  (define-syntax-class (flat predfn) #:literals (->)
-   #:attributes (checker-fn mk-simple (ts 1))
+   #:attributes (checker-fn mk-simple (ts 1) arity)
    (pattern (ts:basic ... (~optional (~seq #:rest r:basic)) -> t:basic)
             #:attr checker-fn (mk-checker predfn (attribute ts.type) (attribute r.type))
             #:attr mk-simple (mk-mk-simple (attribute ts.is-abs?)
                                            (attribute ts.type)
                                            (attribute r.is-abs?)
                                            (attribute t.abs-out)
-                                           (attribute t.is-abs?))))
+                                           (attribute t.is-abs?))
+            #:with arity (let ([mandatory (length (attribute ts.type))])
+                           (if (attribute r)
+                               #`(arity-at-least #,mandatory)
+                               #`#,mandatory))))
 
  (define-syntax-class (type predfn)
-   #:attributes (checker-fn mk-simple)
+   #:attributes (checker-fn mk-simple arity)
    (pattern (~var f (flat predfn))
             #:attr checker-fn (attribute f.checker-fn)
-            #:attr mk-simple (attribute f.mk-simple))
+            #:attr mk-simple (attribute f.mk-simple)
+            #:with arity #'f.arity)
    (pattern ((~var fs (flat predfn)) ...)
+            #:with arity #'(list fs.arity ...)
             #:attr checker-fn
             (λ (prim _)
                (λ (σ-stx v-addrs body)
@@ -340,7 +347,7 @@
   (pattern #:!! #:attr tag 'full))
 
  (define-syntax-class (prim-entry predfn)
-   #:attributes (prim access meaning checker-fn)
+   #:attributes (prim access meaning checker-fn arity)
    (pattern [prim:id
              (~or
               (~seq #:predicate p:basic (~bind [access 'read-only]))
@@ -351,6 +358,9 @@
                (~optional (~and #:widen widen?))))]
             #:fail-when (and (attribute implementation) (attribute widen?))
             "Cannot specify that a simple implementation widens when giving an explicit implementation."
+            #:with arity (if (attribute p)
+                             #'1
+                             #'t.arity)
             #:attr checker-fn (or (let ([c (attribute t.checker-fn)])
                                     (and c
                                          (c #'prim #f)))
@@ -375,102 +385,101 @@
 
 (define-syntax (mk-static-primitive-functions stx)
   (syntax-parse stx
-    [(_ primitive?:id changes-store?:id reads-store?:id
+    [(_ primitive?:id arities:id
         ((~var p (prim-entry values)) ...))
-     (quasisyntax/loc stx
+     (quasitemplate/loc stx
        (begin (define (primitive? o)
                 (case o [(p.prim) #t] ... [else #f]))
-              (define (changes-store? o)
-                (case o [(p.prim) #,(eq? 'read/write (attribute p.access))] ...))
-              (define (reads-store? o)
-                (case o [(p.prim) #,(eq? 'read-only (attribute p.access))] ...))))]))
+              (define arities
+                (hasheq (?@ 'p.prim p.arity) ...))))]))
 
 (define-syntax (mk-primitive-meaning stx)
   (syntax-parse stx
-         [(_ gb?:boolean σpb?:boolean σdb?:boolean cb?:boolean sb?:boolean 0b?:boolean
-             mean:id compile:id co:id clos?:id rlos?:id kont?:id
-             (extra ...)
-             defines ... ((~var p (prim-entry (type->pred-stx #'clos? #'rlos? #'kont?))) ...))
-          (define global-σ? (syntax-e #'gb?))
-          (define σ-passing? (syntax-e #'σpb?))
-          (define σ-∆s? (syntax-e #'σdb?))
-          (define compiled? (syntax-e #'cb?))
-          (define sparse? (syntax-e #'sb?))
-          (define 0cfa? (syntax-e #'0b?))
-          (define ((ap m) arg-stx)
-            (if (procedure? m)
-                (m arg-stx)
-                (datum->syntax arg-stx (cons m arg-stx) arg-stx)))
-          (define hide-σ? (and σ-∆s? (not global-σ?)))
-          (define hidden-σ (and hide-σ? (generate-temporary #'hidden)))
-          (define hidden-actions (and sparse? (generate-temporary #'hidden-A)))
-          (with-syntax ([(σ-gop ...) (if σ-passing? #'(pσ) #'())]
-                        [(extra-ids ...) (generate-temporaries #'(extra ...))]
-                        [((top top-op) ...)
-                         (if hidden-σ `((,hidden-σ #'top-σ)) '())]
-                        [((top-actions actions-op) ...)
-                         (if hidden-actions
-                             (list (list hidden-actions #'target-actions))
-                             '())]
-                        [topp (or hidden-σ #'pσ)]
-                        [(δ-op ...) (if 0cfa? #'() #'(δ))])
-            (define eval
-              #`(case o
-                  #,@(for/list ([p (in-list (syntax->list #'(p.prim ...)))]
-                                [acc (in-list (attribute p.access))]
-                                [m (in-list (map ap (attribute p.meaning)))]
-                                [checker (in-list (attribute p.checker-fn))])
-                       #`[(#,p)
-                          (λP (pσ ℓ δ k v-addrs)
-                              (with-prim-yield
-                               k
-                               ;; Checkers will force what they need to and keep the rest
-                               ;; lazy. Forced values are exploded into possible
-                               ;; argument combinations
-                               (do (pσ) ()
-                                 #,(checker #'pσ #'v-addrs
-                                            (λ (checked)
-                                               #`(do (pσ) ([vs (in-set #,checked)])
-                                                   #,(cond [(eq? 'read/write acc) (m #'(pσ ℓ δ vs))]
-                                                           [(eq? 'read-only acc) (m #'(pσ vs))]
-                                                           [(eq? 'simple acc) (m #'(vs))]
-                                                           [(eq? 'full acc) (m #'(pσ ℓ δ k vs))])))))))])))
-            (define qs #'quasisyntax) ;; have to lift for below to parse correctly
-            (quasisyntax/loc stx
-              (begin
-                ;; Let primitives yield single values instead of entire states.
-                (define-syntax (with-prim-yield syn)
-                  (syntax-parse syn
-                    [(_ k body)
-                     (define yield-tr (syntax-parameter-value #'yield))
-                     (define new
-                       (λ (sx)
-                          (syntax-parse sx
-                            [(_ v)
-                             (yield-tr (syntax/loc sx (yield (co target-σ k v))))])))
-                     ;; Must quote the produced quasisyntax's unsyntax
-                     #,#'#`(syntax-parameterize ([yield #,new]
-                                                 [original-yield #,yield-tr]
-                                                 [fn-prim? #t])
-                             body)]))
-                defines ...
-                ;; λP very much like λ%
-                (define-syntax-rule (... (λP (pσ ℓ δ k v-addrs) body ...))
-                  #,(if compiled?
-                        #`(λ (top ... top-actions ... extra-ids ... σ-gop ... ℓ δ-op ... k v-addrs)
-                             (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
-                                                   [target-σ (make-rename-transformer #'pσ)]
-                                                   [target-actions (make-rename-transformer #'top-actions)] ...
-                                                   [top-actions? #,sparse?]
-                                                   [top-σ? #,hide-σ?])
-                               (bind-extra (#f extra-ids ...)
-                                 body (... ...))))
-                        #'(syntax-parameterize ([target-σ (make-rename-transformer #'pσ)])
-                            body (... ...))))
-                ;; Identity if not compiled.
-                (define-syntax-rule (compile o)
-                  #,(if compiled? eval #'o))
-                (define-syntax-rule (mean o pσ ℓ δ k v-addrs)
-                  #,(if compiled?
-                        #'(o top-op ... actions-op ... extra ... σ-gop ... ℓ δ-op ... k v-addrs)
-                        eval)))))]))
+    [(_ gb?:boolean σpb?:boolean σdb?:boolean cb?:boolean sb?:boolean 0b?:boolean
+        mean:id compile:id co:id clos?:id rlos?:id kont?:id
+        (extra ...)
+        defines ... ((~var p (prim-entry (type->pred-stx #'clos? #'rlos? #'kont?))) ...))
+     (define global-σ? (syntax-e #'gb?))
+     (define σ-passing? (syntax-e #'σpb?))
+     (define σ-∆s? (syntax-e #'σdb?))
+     (define compiled? (syntax-e #'cb?))
+     (define sparse? (syntax-e #'sb?))
+     (define 0cfa? (syntax-e #'0b?))
+     (define ((ap m) arg-stx)
+       (if (procedure? m)
+           (m arg-stx)
+           (datum->syntax arg-stx (cons m arg-stx) arg-stx)))
+     (define hide-σ? (and σ-∆s? (not global-σ?)))
+     (define hidden-σ (and hide-σ? (generate-temporary #'hidden)))
+     (define hidden-actions (and sparse? (generate-temporary #'hidden-A)))
+     (with-syntax ([(σ-gop ...) (if σ-passing? #'(pσ) #'())]
+                   [(extra-ids ...) (generate-temporaries #'(extra ...))]
+                   [((top top-op) ...)
+                    (if hidden-σ `((,hidden-σ #'top-σ)) '())]
+                   [((top-actions actions-op) ...)
+                    (if hidden-actions
+                        (list (list hidden-actions #'target-actions))
+                        '())]
+                   [topp (or hidden-σ #'pσ)]
+                   [(δ-op ...) (if 0cfa? #'() #'(δ))])
+       (define eval
+         #`(case o
+             #,@(for/list ([p (in-list (syntax->list #'(p.prim ...)))]
+                           [acc (in-list (attribute p.access))]
+                           [m (in-list (map ap (attribute p.meaning)))]
+                           [checker (in-list (attribute p.checker-fn))])
+                  #`[(#,p)
+                     (λP (pσ ℓ δ k v-addrs)
+                         (with-prim-yield
+                          k
+                          ;; Checkers will force what they need to and keep the rest
+                          ;; lazy. Forced values are exploded into possible
+                          ;; argument combinations
+                          (do (pσ) ()
+                            #,(checker #'pσ #'v-addrs
+                                       (λ (checked)
+                                          #`(do (pσ) ([vs (in-set #,checked)])
+                                              #,(cond [(eq? 'read/write acc) (m #'(pσ ℓ δ vs))]
+                                                      [(eq? 'read-only acc) (m #'(pσ vs))]
+                                                      [(eq? 'simple acc) (m #'(vs))]
+                                                      [(eq? 'full acc) (m #'(pσ ℓ δ k vs))])))))))])))
+       (define qs #'quasisyntax) ;; have to lift for below to parse correctly
+       (quasisyntax/loc stx
+         (begin
+           ;; Let primitives yield single values instead of entire states.
+           (define-syntax (with-prim-yield syn)
+             (syntax-parse syn
+               [(_ k body)
+                (define yield-tr (syntax-parameter-value #'yield))
+                (define new
+                  (λ (sx)
+                     (syntax-parse sx
+                       [(_ v)
+                        (yield-tr (syntax/loc sx (yield (co target-σ k v))))])))
+                ;; Must quote the produced quasisyntax's unsyntax
+                #,#'#`(syntax-parameterize ([yield #,new]
+                                            [original-yield #,yield-tr]
+                                            [fn-prim? #t])
+                        body)]))
+           defines ...
+           ;; λP very much like λ%
+           (define-syntax-rule (... (λP (pσ ℓ δ k v-addrs) body ...))
+             #,(if compiled?
+                   #`(λ (top ... top-actions ... extra-ids ... σ-gop ... ℓ δ-op ... k v-addrs)
+                        (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
+                                              [target-σ (make-rename-transformer #'σ-gop)] ...
+                                              [target-actions (make-rename-transformer #'top-actions)] ...
+                                              [top-actions? #,sparse?]
+                                              [top-σ? #,hide-σ?])
+                          (bind-extra (#f extra-ids ...)
+                                      body (... ...))))
+                   #'(syntax-parameterize ([target-σ (make-rename-transformer #'σ-gop)] ...)
+                       body (... ...))))
+           ;; Identity if not compiled.
+           (define-syntax-rule (compile o)
+             #,(if compiled? eval #'o))
+           (define mean
+             (lift-do (#:σ pσ o ℓ δ-op ... k v-addrs)
+                      #,(if compiled?
+                            #'(o top-op ... actions-op ... extra ... σ-gop ... ℓ δ-op ... k v-addrs)
+                            eval))))))]))
