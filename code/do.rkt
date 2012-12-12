@@ -2,7 +2,7 @@
 (require (for-syntax syntax/parse racket/syntax racket/list)
          racket/stxparam "notation.rkt" "data.rkt"
          racket/generator)
-(provide continue do-comp
+(provide continue do-comp expect-do-values
          ;; derived and default forms.
          bind-alias
          bind-join-local
@@ -14,6 +14,18 @@
 
 ;; Helper for building targets
 (define-for-syntax (listy x) (if x (list x) '()))
+#|
+There are several different classes of bindings that the framework maintains.
+* single-threaded - these bindings are always accumulated through loops.
+* allocation-threaded - these bindings are consistently available, but only
+accumulated in forms that specify #:extra. (XXX: general enough? Might need to extend the filtering)
+* available - Not accumulated, but maintained through lifting
+
+The semantics of the language depends on the heap being single-threaded.
+|#
+(define-syntax-parameter st-targets '())
+(define-syntax-parameter al-targets '())
+(define-syntax-parameter av-targets '())
 
 (define-for-syntax ((mk-do-values extras) stx)
   (syntax-parse stx
@@ -22,8 +34,7 @@
        (append (listy (and (syntax-parameter-value #'target-σ?) #'target-σ))
                (listy (and (syntax-parameter-value #'target-cs?) #'target-cs))
                (listy (and (syntax-parameter-value #'target-actions?) #'target-actions))
-               #;
-               (if (syntax-parameter-value #'extra?)
+               (if (syntax-parameter-value #'extra-ctx?)
                    (syntax->list extras)
                    '())))
      #`(values #,@tσtcs . args)]))
@@ -55,23 +66,33 @@
     (syntax-parameterize ([called-function (make-rename-transformer #'f)])
       (match f [pat rhs ...] ...))))
 
+(begin-for-syntax
+ (define-syntax with-do-binds
+   (syntax-rules ()
+     [(_ extra body ...)
+      (with-syntax ([(extra (... ...))
+                     (let ([xn (syntax-parameter-value #'do-extra-values)])
+                       (if xn
+                           (generate-temporaries (make-list xn 'ignore))
+                           '()))])
+        body ...)])))
+
 ;; default: do nothing to the body of a do.
 (define-syntax-parameter do-body-transformer
-  (λ (stx)
-     (syntax-case stx ()
-       [(_ e) #'e #;
-        (if (syntax-parameter-value #'extra?)
-                  #'e
-                  #'(do-comp #:no-extra (σ) e
-                             (syntax-parameterize ([extra? #f])
-                               (continue))))])))
+  (λ (stx) (syntax-case stx () [(_ e) #'e #;
+                                (with-do-binds extra
+                                        #'(do-comp #:bind (σ extra ...) e
+                                                   (do-values extra ...)))])))
 (provide do-body-transformer)
+
 ;; for tandem analysis. default: bind nothing
 (define-syntax-parameter bind-extra
   (syntax-rules () [(_ ids body ...) (let () body ...)]))
+(define-syntax-parameter bind-extra-prim
+  (syntax-rules () [(_ ids body ...) (let () body ...)]))
 (define-syntax-parameter bind-extra-initial
   (syntax-rules () [(_ body ...) (let () body ...)]))
-(provide bind-extra bind-extra-initial)
+(provide bind-extra bind-extra-initial bind-extra-prim)
 ;; regular vs pushdown. Default: regular
 (define-syntax-parameter bind-push
   (syntax-rules ()
@@ -114,8 +135,8 @@
                     (loop σ -all-to-alias (⊓ acc res)))]))
            (bind-join (σ* σi alias acc) body)))
 
-(define-syntax-parameter extra? #f)
-(provide extra?)
+(define-syntax-parameter extra-ctx? #f)
+(provide extra-ctx?)
 ;; Private
 (define-syntax-parameter in-do-ctx? #f)
 (define-syntax-rule (with-do body ...)
@@ -177,22 +198,13 @@
        (syntax/loc stx
          (lifted top-op ... σ-op ... cs-op ... act-op ... extras ... . args)))]))
 
-(begin-for-syntax
- (define-syntax with-do-binds
-   (syntax-rules ()
-     [(_ extra body ...)
-      (with-syntax ([(extra (... ...))
-                     (let ([xn (syntax-parameter-value #'do-extra-values)])
-                       (if xn
-                           (generate-temporaries (make-list xn 'ignore))
-                           '()))])
-        body ...)])))
-
 ;; Compose do forms
 (define-for-syntax ((mk-do-comp extras) stx)
   (syntax-parse stx
     [(_ e:expr) #'e]
-    [(_ (~optional (~seq #:bind (σ:id res:id ...)))
+    [(_ (~optional (~seq (~or (~and #:bind (~bind [extra? #f]))
+                              (~and #:bind/extra (~bind [extra? #t])))
+                         (σ:id res:id ...)))
         e:expr es ...)
      (define tσ (syntax-parameter-value #'target-σ?))
      (define tcs (syntax-parameter-value #'target-cs?))
@@ -205,21 +217,30 @@
                     [(bind ...) (cond
                                  [(attribute res) #'(res ...)]
                                  [else (with-do-binds extra #'(extra ...))])]
-                    [(extras ...) extras]
-                    [(extra-ids ...) (generate-temporaries #'(extras ...))])
+                    [((extras ...) (extra-ids ...))
+                     (if (attribute extra?)
+                         #`(#,extras #,(generate-temporaries extras))
+                         #'(() ()))])
        (if (or tσ tcs tas (attribute res))
-           #`(with-handlers ([exn:fail:contract:arity?
-                              (λ (exn) (raise-syntax-error #f (format "Bad extra ~a" exn) #'#,stx))])
-               (let-values ([(σ-id ... cs-id ... act-id ... extra-ids ... bind ...)
-                             (syntax-parameterize
-                                 ([do-extra-values (length (syntax->list #'(bind ...)))])
-                               e)])
-                 (syntax-parameterize ([target-σ (make-rename-transformer #'σ-id)] ...
-                                       [target-cs (make-rename-transformer #'cs-id)] ...
-                                       [target-actions (make-rename-transformer #'act-id)] ...
-                                       [extras (make-rename-transformer #'extra-ids)] ...)
-                   (do-comp es ...))))
+           #`(let-values ([(σ-id ... cs-id ... act-id ... extra-ids ... bind ...)
+                           (expect-do-values
+                            #:values #,(length (syntax->list #'(bind ...)))
+                            #,@(listy (and (attribute extra?) #'#:extra))
+                            e)])
+               (syntax-parameterize ([target-σ (make-rename-transformer #'σ-id)] ...
+                                     [target-cs (make-rename-transformer #'cs-id)] ...
+                                     [target-actions (make-rename-transformer #'act-id)] ...
+                                     [extras (make-rename-transformer #'extra-ids)] ...)
+                 (do-comp es ...)))
            #'(begin e es ...)))]))
+
+(define-simple-macro* (expect-do-values (~or (~optional (~seq #:values num:nat))
+                                             (~optional (~and #:extra (~bind [extra? #t]))
+                                                        #:defaults ([extra? #f]))) ...
+                                        body:expr ...)
+  (syntax-parameterize (#,@(listy (and (attribute num) #'[do-extra-values (syntax-e #'num)]))
+                        #,@(listy (and (attribute extra?) #'[extra-ctx? #t])))
+    body ...))
 
 (define-for-syntax ((mk-do σ-∆s? global-σ? generators? extras) stx)
   ;; Construct the values tuple given the previously bound σ and cs
@@ -228,17 +249,15 @@
   (define tcs (syntax-parameter-value #'target-cs?))
   (define tas (syntax-parameter-value #'target-actions?))
   (define top? (syntax-parameter-value #'top-σ?))
+  (define extra? (syntax-parameter-value #'extra-ctx?))
   (define gen-wrap
     (cond [(or in-do? (not generators?)) values]
           [(and global-σ? (not σ-∆s?)) (λ (stx) #`(begin #,stx 'done))]
           [else (λ (stx) #`(begin (yield #,stx) 'done))]))
-  (define add-void? (and global-σ? (not σ-∆s?) (not tas)
+  (define add-0val? (and global-σ? (not σ-∆s?) (not tas)
                          (let ([xn (syntax-parameter-value #'do-extra-values)])
-                           (if xn (zero? xn) #t))))
-  (define tσtcs
-    (append (listy (and tσ #'target-σ))
-            (listy (and tcs #'target-cs))
-            (listy (and tas #'target-actions))))
+                           (if xn (zero? xn) #t))
+                         (or (not extra?) (null? (syntax->list extras)))))
 
   (define (init-target-actions body)
     (cond [(and (not (syntax-parameter-value #'top-actions?))
@@ -349,23 +368,33 @@
      ;; build a new fold or a fold that continues adding to the
      ;; outer do's targets. σ is bound to itelf since the body may
      ;; still refer to it. cs go to a new identifier.
-     (with-syntax* ([(ttarget-σ ...) (listy (and tσ (generate-temporary #'do-σ)))]
-                    [(vtarget-σ ...) (listy (and tσ #'target-σ))]
-                    [(textras ...) (append (listy (and tcs (generate-temporary #'cs)))
-                                           (listy (and tas (generate-temporary #'actions))))]
-                    [(vextras ...) (append (listy (and tcs #'target-cs))
-                                           (listy (and tas #'target-actions)))]
-                    [(g gs ...) #'(c.guards ...)]
-                    #;
-                    [(voidc ...) (listy (and add-void? #'[dummy (void)]))])
+     (with-syntax ([(ttarget-σ ...) (listy (and tσ (generate-temporary #'do-σ)))]
+                   [(vtarget-σ ...) (listy (and tσ #'target-σ))]
+                   [(textras ...) (append (listy (and tcs (generate-temporary #'cs)))
+                                          (listy (and tas (generate-temporary #'actions))))]
+                   [(vextras ...) (append (listy (and tcs #'target-cs))
+                                          (listy (and tas #'target-actions)))]
+                   [(g gs ...) #'(c.guards ...)]
+                   [((extras ...) (extra-ids ...))
+                    (if extra?
+                        (list extras (generate-temporaries extras))
+                        #'(() ()))]
+                   [(bind ...) (with-do-binds extra #'(extra ...))])
        (init-accumulators
         #'cσ
         (gen-wrap
-         #`(for/fold ([ttarget-σ vtarget-σ] ... [textras vextras] ... #;voidc #;...) (g)
+         #`(for/fold ([ttarget-σ vtarget-σ] ... [textras vextras] ...
+                      [extra-ids extras] ...
+                      [bind #f] ...) (g)
              (syntax-parameterize ([vtarget-σ (make-rename-transformer #'ttarget-σ)] ...
-                                   [vextras (make-rename-transformer #'textras)] ...)
+                                   [vextras (make-rename-transformer #'textras)] ...
+                                   [extras (make-rename-transformer #'extra-ids)] ...)
                (let ([cσ ttarget-σ] ...)
-                 (for*/fold ([ttarget-σ ttarget-σ] ... [textras textras] ... #;voidc #;...) (gs ...)
+                 (for*/fold ([ttarget-σ ttarget-σ] ...
+                             [textras textras] ...
+                             [extra-ids extra-ids] ...
+                             [bind #f] ...)
+                     (gs ...)
                    (let ([cσ ttarget-σ] ...)
                      (with-do
                       (do-body-transformer
@@ -388,12 +417,13 @@
            #'dbσ
            (gen-wrap
             #`(do-body-transformer
-               (begin body ... #,@(listy (and add-void? #'(values)))
-                      )))))]
+               (begin body ... #,@(listy (and add-0val? #'(values))))))))]
 
     ;; when fold/fold doesn't cut it, we need a safe way to recur.
     [(_ (ℓσ:id) loop:id ([args:id arg0:expr] ...)
-        (~optional (~seq #:values num-results:nat))
+        (~optional (~seq (~or (~and #:values (~bind [add-extra? #f]))
+                              (~and #:values/extra (~bind [add-extra? #t])))
+                         num-results:nat))
         body:expr ...+)
      (define accs (append (listy (and tcs #'target-cs))
                           (listy (and tas #'target-actions))))
@@ -404,7 +434,7 @@
                                           (listy (and tas (generate-temporary #'some-actions))))]
                    [(tvalues ...) accs]
                    [(extra-ids ...) (generate-temporaries extras)]
-                   [(extras ...) extras])
+                   [(extras ...) extras])       
        ;; no gen-wrap or with-do since this is used in primitives, always nested dos.
        (init-accumulators
         #'ℓσ
@@ -415,10 +445,11 @@
             (let ([ℓσ ttarget-σ] ...)
               (syntax-parameterize ([vtarget-σ (make-rename-transformer #'ttarget-σ)] ...
                                     [tvalues (make-rename-transformer #'targets)] ...
-                                    [extras (make-rename-transformer #'extra-ids)] ...
-                                    #,@(if (attribute num-results)
-                                           #`([do-extra-values #,(syntax->datum #'num-results)])
-                                           '()))
+                                    [extras (make-rename-transformer #'extra-ids)] ...)
+                (expect-do-values #,@(append (if (attribute num-results)
+                                                 (list #'#:values #'num-results)
+                                                 '())
+                                             (listy (and (attribute add-extra?) #'#:extra)))
                 ;; make calling the loop seemless.
                 ;; Pass the accumulators if they exist.
                 (let-syntax ([loop (syntax-rules ()
@@ -427,4 +458,4 @@
                                                  tvalues ...
                                                  extras ...
                                                  argps ...)])])
-                  body ...))))))]))
+                  body ...)))))))]))

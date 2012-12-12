@@ -31,7 +31,7 @@
                   [rA (make-var-contour `(A . ,sr) sδ*)]
                   #,@(if (zero? K) #'() #'([νρ (extend sρ r rA)])))
              #,(if apply?
-                   #'(do-comp #:bind (outσ vrest* rvs)
+                   #'(do-comp #:bind/extra (outσ vrest* rvs)
                               (do (sσ) loop ([vrest vrest] [vrest* '()])
                                   (match vrest
                                     [(list tail)

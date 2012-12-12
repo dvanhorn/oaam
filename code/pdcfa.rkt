@@ -65,41 +65,32 @@
                    [ev ev]
                    [ap? (format-id ap "~a?" ap)])
        #`(splicing-let ()
-           (define-for-syntax (pdcfa-yield fnc?)
-             (with-syntax ([fn-call? fnc?])
+           (define-for-syntax pdcfa-yield
              ;; When constructing a continue state, we might need to pop
-               ;; and add a memo table entry.
-               ;; Do so when we have to.
-               (let ([yield-tr (syntax-parameter-value #'yield)])
-                 (λ (stx)
-                    (syntax-case stx (co ev)
-                      [(_ (co σ k v))
-                       #,#'#`(let ([do (λ (k* v*)
-                                          #,(yield-tr #'(yield (co σ k* v*))))])
-                               (do-co-yield k v do))]
-                      ;; If this is the product of a function call,
-                      ;; push the continuation + stack frame for the entry.
-                      [(_ (ev σ e ρ k δ))
-                       #,#'#`(let* ([ok k]
-                                    [do-co (λ (k* v*)
-                                              #,(yield-tr #'(yield (co σ k* v*))))]
-                                    [do-ev (λ (k*) #,(yield-tr #'(yield (ev σ e ρ k* δ))))])
-                               (cond [fn-call?
-                                      (define k* (entry e))
-                                      (call-prep ok k* do-co)
-                                      (do-ev k*)]
-                                     [else (do-ev ok)]))]
-                      [(_ e) (yield-tr #'(yield e))])))))
-
-           (define-syntax-rule (bind-extra-initial-pdcfa body* (... ...))
-             (let ([fn-call? #f])
-               (syntax-parameterize ([yield (pdcfa-yield #'fn-call?)])
-                 body* (... ...))))
-
-           (define-syntax-rule (bind-extra-pdcfa (state) body* (... ...))
-             (let ([fn-call? (ap? state)])
-               (syntax-parameterize ([yield (pdcfa-yield #'fn-call?)])
-                 body* (... ...))))
+             ;; and add a memo table entry.
+             ;; Do so when we have to.
+             (let ([yield-tr (syntax-parameter-value #'yield)])
+               (λ (stx)
+                  (syntax-case stx (co ev)
+                    [(_ (co σ k v))
+                     #,#'#`(let ([do (λ (k* v*)
+                                        #,(yield-tr #'(yield (co σ k* v*))))])
+                             (do-co-yield k v do))]
+                    ;; If this is the product of a function call,
+                    ;; push the continuation + stack frame for the entry.
+                    [(_ (ev σ e ρ k δ))
+                     (let ()
+                       (define do-co                        
+                         #,#'#`(λ (k* v*) #,(yield-tr #'(yield (co σ k* v*)))))
+                       (define (do-ev k-stx)
+                         (yield-tr #,#'#`(yield (ev σ e ρ #,k-stx δ*))))
+                       #,#'#`(let* ([ok k])
+                               #,(if (syntax-parameter-value #'called-function)
+                                     #`(let ([k* (entry e)])
+                                         (call-prep ok k* #,do-co)
+                                         #,(do-ev #'k*))
+                                     (do-ev #'ok))))]
+                    [(_ e) (yield-tr #'(yield e))]))))
 
            (define-syntax-rule (bind-get-kont-pdcfa (res σ k) body*)
              ;; Use let-syntax so that for's singleton optimization kicks in.
@@ -110,9 +101,8 @@
 
            (splicing-syntax-parameterize
                ([bind-get-kont (make-rename-transformer #'bind-get-kont-pdcfa)]
-                [bind-push (make-rename-transformer #'bind-push-pdcfa)]
-                [bind-extra (make-rename-transformer #'bind-extra-pdcfa)]
-                [bind-extra-initial (make-rename-transformer #'bind-extra-initial-pdcfa)])
+                [yield pdcfa-yield]
+                [bind-push (make-rename-transformer #'bind-push-pdcfa)])
              body ...)
            (void)))]))
 

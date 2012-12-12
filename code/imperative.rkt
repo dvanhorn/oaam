@@ -47,9 +47,11 @@
 
 (define-for-syntax (yield! stx)
   (syntax-case stx ()
-    [(_ e) (if (syntax-parameter-value #'generate-graph?)
-               #`(do-yield-graph e)
-               #`(do-yield e))])) ;; ∪1 → cons
+    [(_ e)
+     #`(begin #,(if (syntax-parameter-value #'generate-graph?)
+                    #`(do-yield-graph e)
+                    #`(do-yield e))
+              (continue))])) ;; ∪1 → cons
 
 (define (join-h! a vs)
   (define prev (hash-ref global-σ a ∅))

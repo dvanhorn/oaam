@@ -257,9 +257,6 @@
   (splicing-syntax-parameterize
    ([yield yield-global-sparse]
     [do-body-transformer do-body-transform-actions])
-   #;
-   (begin-for-syntax (printf "Yield in ctx ~a~%" (syntax->datum ((syntax-parameter-value #'yield)
-                                                                 #'(yield blmoeau)))))
    body))
 
 (define-syntax-rule (with-0-ctx/prealloc/sparse body)

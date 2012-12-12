@@ -14,6 +14,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Machine maker
 
+(define (arity-error f l)
+  (log-info "Arity error on ~a at ~a" f l))
+
+(define (cont-arity-error given k l)
+  (log-info "Called continuation with wrong number of arguments (~a): ~a at ~a"
+            given k l))
+
+(define (non-function-error f)
+  (log-info "Called non-function ~a" f))
+
 (define-syntax (mk-analysis stx)
   (syntax-parse stx
     [(_ (~or ;; analysis parameters
@@ -74,25 +84,19 @@
      "Cannot use a general fixpoint for step function that doesn't return sets."
      #:fail-when (and (given σ-passing?) (given global-σ?))
      "Cannot use store passing with a global store"
+     (define (:? id) (list (format-id id "~a:" id) (format-id id "~a?" id)))
      (with-syntax ([((ρ-op ...) (δ-op ...) (l-op ...))
                     (if (zero? (attribute K)) #'(() () ()) #'((ρ) (δ) (l)))]
                    [ev: (format-id #'ev "~a:" #'ev)]
                    [co: (format-id #'co "~a:" #'co)]
                    [ap: (format-id #'ap "~a:" #'ap)]
-                   [ls? (format-id #'ls "~a?" #'ls)]
-                   [lrk? (format-id #'lrk "~a?" #'lrk)]
-                   [ifk? (format-id #'ifk "~a?" #'ifk)]
-                   [sk!? (format-id #'sk! "~a?" #'sk!)]
-                   [mt? (format-id #'mt "~a?" #'mt)]
-                   [clos? (format-id #'clos "~a?" #'clos)]
-                   [rlos? (format-id #'rlos "~a?" #'rlos)]
-                   [ls: (format-id #'ls "~a:" #'ls)]
-                   [lrk: (format-id #'lrk "~a:" #'lrk)]
-                   [ifk: (format-id #'ifk "~a:" #'ifk)]
-                   [sk!: (format-id #'sk! "~a:" #'sk!)]
-                   [mt: (format-id #'mt "~a:" #'mt)]
-                   [clos: (format-id #'clos "~a:" #'clos)]
-                   [rlos: (format-id #'rlos "~a:" #'rlos)]
+                   [(ls? ls:) (:? #'ls)]
+                   [(lrk? lrk:) (:? #'lrk)]
+                   [(ifk? ifk:) (:? #'ifk)]
+                   [(sk!? sk!:) (:? #'sk!)]
+                   [(mt? mt:) (:? #'mt)]
+                   [(clos? clos:) (:? #'clos)]
+                   [(rlos? rlos:) (:? #'rlos)]
                    ;; represent rσ explicitly in all states?
                    [(σ-op ...) (if (given wide?) #'() #'(rσ))]
                    ;; explicitly pass σ/∆ to compiled forms?
@@ -438,12 +442,15 @@
                                                            (define-values (e* r) (parse-prog e gensym gensym))
                                                            (add-lib e* r gensym gensym))))])
                  (fixpoint step (inj (prepare e))))
-
+               ;; parameterize prim-meaning so we can use it in the definition of apply.
                (splicing-syntax-parameterize ([prim-meaning (make-rename-transformer #'prim-meaning-def)])
                (define-syntax mk-prims (mk-mk-prims #,(given global-σ?) #,σ-passing?*
                                                     #,(given σ-∆s?) #,(given compiled?)
                                                     #,(given sparse?)
                                                     #,(attribute K)))
+               ;; Prim-meaning is abstracted into a function, so it don't get syntactic
+               ;; context at its application point in the ap: case. For CFA2, we need to
+               ;; know the stack frame and label of the application.
                (mk-prims prim-meaning-def compile-primop ev co clos rlos kont? extra ...)
 
                #,@compile-def
@@ -539,7 +546,7 @@
                                      (yield (ev σ*-clos e ρ* k δ*)))]
                                   ;; Yield the same state to signal "stuckness".
                                   [else
-                                   (log-info "Arity error on ~a at ~a" f l)
+                                   (arity-error f l)
                                    (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
                            [(rlos: xs r e ρ _)
                             (cond [(<= (length xs) (length arg-addrs))
@@ -548,23 +555,22 @@
                                      (yield (ev σ*-clos e ρ* k δ*)))]
                                   ;; Yield the same state to signal "stuckness".
                                   [else
-                                   (log-info "Arity error on ~a at ~a" f l)
+                                   (arity-error f l)
                                    (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-                           [(primop o _) (do-app prim-meaning o l δ-op ... k arg-addrs)]
+                           [(primop o _) (do-app prim-meaning o #f l δ-op ... k arg-addrs)]
                            [(? kont? k)
                             ;; continuations only get one argument.
                             (cond [(and (pair? arg-addrs) (null? (cdr arg-addrs)))
                                    (do (ap-σ) ([v #:in-delay ap-σ (car arg-addrs)])
                                      (yield (co ap-σ k v)))]
                                   [else
-                                   (log-info "Called continuation with wrong number of arguments (~a): ~a at ~a"
-                                             (length arg-addrs) k l)
+                                   (cont-arity-error (length arg-addrs) f l)
                                    (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
                            [(== ●) (=> fail)
                             (log-debug "implement ●-call")
                             (fail)]
                            [_
-                            (log-info "Called non-function ~a" f)
+                            (non-function-error f)
                             (yield (ap ap-σ l fn-addr arg-addrs k δ))]))))]
 
                    ;; this code is dead when running compiled code.

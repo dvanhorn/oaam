@@ -2,18 +2,23 @@
 
 (require "data.rkt" "notation.rkt" "do.rkt"
          (for-syntax syntax/parse racket/syntax
-                     racket/match racket/list racket/base
-                     syntax/parse/experimental/template)         
+                     racket/match racket/list (except-in racket/base and)
+                     syntax/parse/experimental/template
+                     racket/pretty
+                     "notation.rkt")
          racket/unsafe/ops
          racket/stxparam)
-(provide getter widen yield snull fn-prim? alt-reverse
+(provide getter widen yield snull prim-extras alt-reverse
          mk-primitive-meaning mk-static-primitive-functions
+         ;; for use only by primitives.rkt
          original-yield)
 
-(define-syntax-parameter fn-prim? #f)
+;; Extra hidden parameters prim-meaning might need.
+(define-syntax-parameter prim-extras '())
+;; General lookup and flat value widening
 (define-syntax-parameter getter #f)
 (define-syntax-parameter widen #f)
-(define-syntax-parameter yield 
+(define-syntax-parameter yield
   (λ (stx)
      (raise-syntax-error #f "Unset" stx)))
 ;; Internal use only for primitives that need to produce non-co states
@@ -35,6 +40,16 @@
      (for*/set ([hd (in-set hdS)]
                 [restlist (in-set (toSetOfLists tail))])
        (cons hd restlist))]))
+
+(define (prim-bad-input prim arg val)
+  (log-info "Bad input to primitive: ~a (arg ~a): ~a" prim arg val))
+
+(define (prim-bad-rest prim arg val)
+  (log-info "Bad input to primitive: ~a (rest arg ~a): ~a" prim arg val))
+
+(define (prim-arity-error prim expected given)
+  (log-info "Primitive application arity mismatch ~a: expect: ~a, given ~a"
+            prim expected given))
 
 (define-syntax-rule (νlits set-name lits ...)
   (begin (define lits #f) ...
@@ -64,9 +79,11 @@
 (begin-for-syntax
  ;; Avoid code duplication by only generating one filter per "type"
  ;; we come across while generating definitions.
- (define type-checkers (make-hash))
+ (define type-checkers #f)
  (define-literal-set type-names (true false eof null))
- (struct type-union (abbrevs))
+ (struct type-arrow (in out) #:transparent)
+ (struct type-rest-arrow (in rest out) #:transparent)
+ (struct type-union (abbrevs) #:transparent)
  (define (flatten-type tu)
    (match
        (let loop ([tu tu])
@@ -143,22 +160,23 @@
 ;; the type.
 ;; If nothing matches, we have a stuck state, and possibly log an error.
  (define (type-match predfn t tmσ addr)
-   (λ (acc on-err rest)
-      #`(let ([addr #,addr])
-          #,(if (eq? t 'any)
-                #`(bind-delay (res #,tmσ addr)
-                              (let* ([#,acc (cons res #,acc)])
-                                #,rest))
-                #`(bind-get (gres #,tmσ addr)
-                            (let* ([filtered (for/set ([v (in-set gres)]
-                                                       #:when #,(predfn t #'v))
-                                               v)]
-                                   [#,acc (cons filtered #,acc)])
-                              #,@(if on-err
-                                     #`((when (∅? filtered)
-                                          #,(on-err #'gres)))
-                                     #'())
-                              #,rest))))))
+   (λ (acc on-err)
+      (define body
+        (cond
+         [(eq? t 'any)
+          #`(bind-delay (res #,tmσ addr)
+                        (do-values (cons res #,acc)))]
+         [else
+          #`(bind-get (gres #,tmσ addr)
+                      (let* ([filtered
+                              (for/set ([v (in-set gres)] #:when #,(predfn t #'v)) v)]
+                             [#,acc (cons filtered #,acc)])
+                        #,@(if on-err
+                               #`((when (∅? filtered)
+                                    #,(on-err #'gres)))
+                               #'())
+                        (do-values #,acc)))]))
+      #`(let ([addr #,addr]) #,body)))
 
  (define (mk-is-abs? t)
    (cond [(type-union? t)
@@ -202,52 +220,59 @@
  (define (mk-checker predfn ts rest)
    (define v-ids (generate-temporaries (make-list (length ts) #'v)))
    (define r-id (generate-temporary #'rest))
-   (λ (prim mult-ary?)
-      (λ (σ-stx v-addrs body)
-         (with-syntax ([prim prim]
-                       [(vids ...) v-ids]
-                       [rest-match (if rest r-id #''())]
-                       [σ σ-stx])
-           (define built
-             (for/fold ([stx #`(do-app bd (toSetOfLists acc))])
-                 ([t (in-list ts)]
-                  [v (in-list v-ids)]
-                  [argnum (in-range (length ts) 0 -1)])
-               (define tm (type-match predfn t σ-stx v))
-               (tm #'acc
-                   (and (not mult-ary?)
-                        (λ (tmp)
-                           #`(log-info "Bad input to primitive: ~a (arg ~a): ~a"
-                                       'prim #,argnum #,tmp)))
-                   stx)))
-           (define check-rest
-             (and rest
-                  (type-match predfn rest σ-stx #'ra)))
-           #`(let ([bd (lift-do (bdres) #,(body #'bdres))])
-               (match #,v-addrs
-                 [(list-rest vids ... rest-match)
-                  #,(if rest
-                        #`(do (σ) loop ([raddrs #,r-id]
-                                        [acc '()]
-                                        [argnum #,(length ts)])
-                              (match raddrs
-                                ['() (let ([acc (reverse acc)]) #,built)]
-                                [(cons ra rrest)
-                                 #,(check-rest #'acc
-                                               (and (not mult-ary?)
-                                                    (λ (tmp)
-                                                       #`(log-info "Bad input to primitive: ~a (rest arg ~a): ~a"
-                                                                   'prim
-                                                                   argnum
-                                                                   #,tmp)))
-                                               #`(loop σ rrest acc (add1/debug argnum 'prim-maker)))]))
-                        #`(let ([acc '()]) #,built))]
-                 [vs #,@(listy
-                         (and (not mult-ary?)
- 
-                              #`(log-info "Primitive application arity mismatch (Expect: ~a, given ~a): ~a"
-                                          #,(length ts) (length vs) 'prim)))
-                     (do-app bd ∅)]))))))
+   (λ (mult-ary?)
+      (define key (list ts rest mult-ary?))
+      (cond
+       ;; first is the name if it's there.
+       [(hash-ref type-checkers key #f) => car]
+       [else
+        (with-syntax ([(vids ...) v-ids]
+                      [rest-match (if rest r-id #''())])
+          (define built
+            (for/fold ([stx #`(do-values (toSetOfLists acc))])
+                ([t (in-list ts)]
+                 [v (in-list v-ids)]
+                 [argnum (in-range (length ts) 0 -1)])
+              (define tm (type-match predfn t #'σ v))
+              #`(do-comp #:bind (σ acc)
+                         #,(tm #'acc
+                                 (and (not mult-ary?)
+                                      (λ (tmp)
+                                         #`(prim-bad-input prim #,argnum #,tmp))))
+                         #,stx)))
+          (define check-rest
+            (and rest
+                 (type-match predfn rest #'σ #'ra)))
+          (define result
+            (cons
+             (generate-temporary #'checker-mk-checker)
+             #`(lift-do (#:σ σ prim apply? v-addrs)
+                 (expect-do-values #:values 1
+                   (match v-addrs
+                     [(list-rest vids ... rest-match)
+                      #,(if rest
+                            #`(do (σ) loop ([raddrs #,r-id]
+                                            [acc '()]
+                                            [argnum #,(length ts)])
+                                  (match raddrs
+                                    ['() (let ([acc (alt-reverse acc)]) #,built)]
+                                    [(cons ra rrest)
+                                     (do-comp #:bind (σ acc)
+                                              #,(check-rest #'acc
+                                                            (and (not mult-ary?)
+                                                                 (λ (tmp)
+                                                                    #`(prim-bad-rest
+                                                                       prim
+                                                                       argnum
+                                                                       #,tmp))))
+                                              (loop σ rrest acc (add1 argnum)))]))
+                            #`(let ([acc '()]) #,built))]
+                     [vs #,@(listy
+                             (and (not mult-ary?)
+                                  #`(prim-arity-error prim #,(length ts) (length vs))))
+                         (do-values ∅)])))))
+          (hash-set! type-checkers key result)
+          result)])))
 
  ;; Creates a transformer that expects pσ vs (so it can use yield-both or force if it needs to)
  ;; vs will have already been forced if necessary. Any types will have to be forced for non-abstract applications.
@@ -297,7 +322,7 @@
             #:attr abs-out (mk-abs-out (attribute type))))
 
  (define-syntax-class (flat predfn) #:literals (->)
-   #:attributes (checker-fn mk-simple (ts 1) arity)
+   #:attributes (checker-fn mk-simple (ts 1) arity type)
    (pattern (ts:basic ... (~optional (~seq #:rest r:basic)) -> t:basic)
             #:attr checker-fn (mk-checker predfn (attribute ts.type) (attribute r.type))
             #:attr mk-simple (mk-mk-simple (attribute ts.is-abs?)
@@ -308,7 +333,10 @@
             #:with arity (let ([mandatory (length (attribute ts.type))])
                            (if (attribute r)
                                #`(arity-at-least #,mandatory)
-                               #`#,mandatory))))
+                               #`#,mandatory))
+            #:attr type (if (attribute r)
+                            (type-rest-arrow (attribute ts.type) (attribute r.type) (attribute t.type))
+                            (type-arrow (attribute ts.type) (attribute t.type)))))
 
  (define-syntax-class (type predfn)
    #:attributes (checker-fn mk-simple arity)
@@ -319,23 +347,36 @@
    (pattern ((~var fs (flat predfn)) ...)
             #:with arity #'(list fs.arity ...)
             #:attr checker-fn
-            (λ (prim _)
-               (λ (σ-stx v-addrs body)
-                  #`(let ([bd (lift-do (tres) #,(body #'tres))])
-                      #,(for/fold
-                            ([stx ;; If nothing matches, log error
-                              #`(begin
-                                  (log-info "Primitive application arity mismatch (Expect: ~a, given ~a): ~a"
-                                            '#,(map length (attribute fs.ts)) (length #,v-addrs) 'prim)
-                                  (do-app bd ∅))])
-                            ([checker (in-list (reverse (attribute fs.checker-fn)))])
-                          (define checker* (checker prim #t #;multi-arity))
-                          (checker* σ-stx v-addrs
-                                    (λ (res)
-                                       #`(let ([r #,res])
-                                           (if (∅? r)
+            (λ (_)
+               (define key
+                 (map (match-lambda [(type-arrow in out) (list in #f)]
+                                    [(type-rest-arrow in rest out) (list in rest)])
+                      (attribute fs.type)))
+               (cond
+                [(hash-ref type-checkers key #f) => car]
+                [else
+                 (define result
+                   (cons
+                    (generate-temporary #'checker-multi)
+                    #`(lift-do (#:σ σ prim apply? v-addrs)
+                        (expect-do-values #:values 1
+                          #,(for/fold
+                                ([stx ;; If nothing matches, log error
+                                  #`(begin
+                                      (prim-arity-error prim '#,(map length (attribute fs.ts)) (length v-addrs))
+                                      (do-values ∅))])
+                                ([checker (in-list (reverse (attribute fs.checker-fn)))])
+                              (define checker* (checker #t #;multi-arity))
+                              (with-syntax ([check-name (if (identifier? checker*)
+                                                            checker*
+                                                            (car checker*))])
+                                #`(do-comp #:bind (σ res)
+                                           (do-app check-name prim apply? v-addrs)
+                                           (if (∅? res)
                                                #,stx
-                                               (do-app bd r)))))))))
+                                               (do-values res)))))))))
+                 (hash-set! type-checkers key result)
+                 result]))
             #:attr mk-simple
             (λ (widen?) (error 'mk-primitive-meaning "Simple primitives cannot have many arities."))))
 
@@ -361,11 +402,10 @@
             #:with arity (if (attribute p)
                              #'1
                              #'t.arity)
-            #:attr checker-fn (or (let ([c (attribute t.checker-fn)])
-                                    (and c
-                                         (c #'prim #f)))
+            #:attr checker-fn (or (and #:bind c (attribute t.checker-fn)
+                                       (c #f))
                                   ;; must be a predicate
-                                  ((mk-checker predfn '(any) #f) #'prim #f))
+                                  ((mk-checker predfn '(any) #f) #f))
             ;; Either a special implementation is given, or
             ;; the implementation is for a type predicate,
             ;; or it is "simple" (i.e. type-directed)
@@ -376,24 +416,36 @@
                                       [(pσ vs)
                                        #`(do (pσ) ([v #:in-force pσ (car vs)]
                                                    [res (in-list
-                                                         (let ([r #,(predfn (attribute p.type) #'v)])
-                                                           (if (eq? v ●)
-                                                               '(#t #f)
-                                                               (list r))))])
+                                                         (if (eq? v ●)
+                                                             '(#t #f)
+                                                             (list #,(predfn (attribute p.type) #'v))))])
                                            (yield res))]))
                                ((attribute t.mk-simple) #'prim (syntax? (attribute widen?)))))))
 
 (define-syntax (mk-static-primitive-functions stx)
+  (set! type-checkers (make-hash))
   (syntax-parse stx
     [(_ primitive?:id arities:id
-        ((~var p (prim-entry values)) ...))
+        ((~var p (prim-entry list)) ...))
      (quasitemplate/loc stx
        (begin (define (primitive? o)
                 (case o [(p.prim) #t] ... [else #f]))
               (define arities
                 (hasheq (?@ 'p.prim p.arity) ...))))]))
 
+(define-for-syntax (mk-checker-fns chk)
+  (define names
+    (for/list ([checker (in-list chk)])
+      (if (identifier? checker)
+          checker
+          (car checker))))
+  (define defs
+    (for/list ([(_ pair) (in-hash type-checkers)])
+      #`(define #,(car pair) #,(cdr pair))))
+  (list defs names))
+
 (define-syntax (mk-primitive-meaning stx)
+  (set! type-checkers (make-hash))
   (syntax-parse stx
     [(_ gb?:boolean σpb?:boolean σdb?:boolean cb?:boolean sb?:boolean 0b?:boolean
         mean:id compile:id co:id clos?:id rlos?:id kont?:id
@@ -420,6 +472,10 @@
                     (if hidden-actions
                         (list (list hidden-actions #'target-actions))
                         '())]
+                   [((type-filters ...)
+                     (checker-names ...)) (mk-checker-fns (attribute p.checker-fn))]
+                   [(pex-ids ...) (generate-temporaries (syntax-parameter-value #'prim-extras))]
+                   [(prim-extras ...) (syntax-parameter-value #'prim-extras)]
                    [topp (or hidden-σ #'pσ)]
                    [(δ-op ...) (if 0cfa? #'() #'(δ))])
        (define eval
@@ -427,22 +483,22 @@
              #,@(for/list ([p (in-list (syntax->list #'(p.prim ...)))]
                            [acc (in-list (attribute p.access))]
                            [m (in-list (map ap (attribute p.meaning)))]
-                           [checker (in-list (attribute p.checker-fn))])
+                           [checker (in-list (syntax->list #'(checker-names ...)))])
                   #`[(#,p)
-                     (λP (pσ ℓ δ k v-addrs)
+                     (λP (pσ apply? ℓ δ k v-addrs)
                          (with-prim-yield
                           k
                           ;; Checkers will force what they need to and keep the rest
                           ;; lazy. Forced values are exploded into possible
                           ;; argument combinations
                           (do (pσ) ()
-                            #,(checker #'pσ #'v-addrs
-                                       (λ (checked)
-                                          #`(do (pσ) ([vs (in-set #,checked)])
-                                              #,(cond [(eq? 'read/write acc) (m #'(pσ ℓ δ vs))]
-                                                      [(eq? 'read-only acc) (m #'(pσ vs))]
-                                                      [(eq? 'simple acc) (m #'(vs))]
-                                                      [(eq? 'full acc) (m #'(pσ ℓ δ k vs))])))))))])))
+                            (do-comp #:bind (nσ vss)
+                                     (do-app #,checker '#,p apply? v-addrs)
+                                     (do (nσ) ([vs (in-set vss)])
+                                       #,(cond [(eq? 'read/write acc) (m #'(nσ ℓ δ vs))]
+                                               [(eq? 'read-only acc) (m #'(nσ vs))]
+                                               [(eq? 'simple acc) (m #'(vs))]
+                                               [(eq? 'full acc) (m #'(nσ ℓ δ k vs))]))))))])))
        (define qs #'quasisyntax) ;; have to lift for below to parse correctly
        (quasisyntax/loc stx
          (begin
@@ -458,28 +514,41 @@
                         (yield-tr (syntax/loc sx (yield (co target-σ k v))))])))
                 ;; Must quote the produced quasisyntax's unsyntax
                 #,#'#`(syntax-parameterize ([yield #,new]
-                                            [original-yield #,yield-tr]
-                                            [fn-prim? #t])
+                                            [original-yield
+                                             (λ (stx)
+                                                (printf "Orig in ~a~%" (syntax->datum stx))
+                                                (define res (#,yield-tr stx))
+                                                (printf "Orig out ~a~%" (syntax->datum res))
+                                                res)])
                         body)]))
            defines ...
+           type-filters ...
            ;; λP very much like λ%
-           (define-syntax-rule (... (λP (pσ ℓ δ k v-addrs) body ...))
+           (define-syntax-rule (... (λP (pσ apply? ℓ δ k v-addrs) body ...))
              #,(if compiled?
-                   #`(λ (top ... top-actions ... extra-ids ... σ-gop ... ℓ δ-op ... k v-addrs)
+                   #`(λ (top ... top-actions ... extra-ids ... σ-gop ... pex-ids ... apply? ℓ δ-op ... k v-addrs)
                         (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
                                               [target-σ (make-rename-transformer #'σ-gop)] ...
                                               [target-actions (make-rename-transformer #'top-actions)] ...
                                               [top-actions? #,sparse?]
-                                              [top-σ? #,hide-σ?])
-                          (bind-extra (#f extra-ids ...)
-                                      body (... ...))))
+                                              [top-σ? #,hide-σ?]
+                                              [prim-extras (make-rename-transformer #'pex-ids)] ...)
+                          (bind-extra-prim (ℓ extra-ids ...)
+                            body (... ...))))
                    #'(syntax-parameterize ([target-σ (make-rename-transformer #'σ-gop)] ...)
                        body (... ...))))
            ;; Identity if not compiled.
            (define-syntax-rule (compile o)
              #,(if compiled? eval #'o))
            (define mean
-             (lift-do (#:σ pσ o ℓ δ-op ... k v-addrs)
+             (lift-do (#:σ pσ o pex-ids ... apply? ℓ δ-op ... k v-addrs)
                       #,(if compiled?
-                            #'(o top-op ... actions-op ... extra ... σ-gop ... ℓ δ-op ... k v-addrs)
+                            #'(o top-op ...
+                                 actions-op ...
+                                 extra ...
+                                 σ-gop ...
+                                 prim-extras ... ;; TODO: Grr, how to apply without exposing??
+                                 apply? ℓ
+                                 δ-op ...
+                                 k v-addrs)
                             eval))))))]))

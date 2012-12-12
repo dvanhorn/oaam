@@ -2,7 +2,7 @@
 
 (require (for-syntax syntax/parse))
 (provide for/append for/union for*/union for/set for*/set
-         define-simple-macro* hash-reverse
+         define-simple-macro* hash-reverse and
          add1/debug
          ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
 
@@ -19,6 +19,13 @@
        (define-syntax (name syn)
          (syntax-parse syn
            [(name . pattern) directives ... (quasisyntax/loc syn template)])))]))
+;; Because I want binding!!
+(define-syntax (and stx)
+  (syntax-parse stx
+    [(_) #'#t]
+    [(_ e) #'e]
+    [(_ #:bind x:id e:expr es ...+) #'(let ([x e]) (if x (and es ...) #f))]
+    [(_ e:expr es ...) #'(if e (and es ...) #f)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; for/union

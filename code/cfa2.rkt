@@ -177,6 +177,9 @@
         (λ (stx) #`(#,target . #,(cdr (syntax-e stx)))))
       f))
 
+(define-syntax-parameter fn-call-ξ #f)
+(define-syntax-parameter fn-call-label #f)
+
 (define-for-syntax ((mk-cfa2 ev co ap) stx)
   (syntax-case stx ()
     [(_ (ξ) body ...)
@@ -190,10 +193,8 @@
        (define bind-rest-tr (syntax-parameter-value #'bind-rest))
        (define bind-rest-apply-tr (syntax-parameter-value #'bind-rest-apply))
        #`(splicing-let ()
-           (define-for-syntax (cfa2-yield fnξ fnl)
-             (with-syntax ([fn-call-ξ fnξ]
-                           [fn-call-label fnl])
-               ;; When constructing a continue state, we might need to pop
+           (define-for-syntax cfa2-yield
+             ;; When constructing a continue state, we might need to pop
                ;; and add a memo table entry.
                ;; Do so when we have to.
                (let ([yield-tr (syntax-parameter-value #'yield)])
@@ -217,29 +218,41 @@
                          (define (do-ev k-stx)
                            (yield-tr #,#'#`(yield (ev σ e ρ #,k-stx δ*))))
                          #,#'#`(let* ([ok k])
-                                 #,(if (syntax-parameter-value #'called-function)
-                                       #`(let ([k* (entry ξ (singleton called-function))])
-                                           (call-prep fn-call-ξ fn-call-label ok k* #,do-co #;original-δ)
-                                           #,(do-ev #'k*))
-                                       (do-ev #'ok))))]
-                      [(_ e) (yield-tr #'(yield e))])))))
+                                 #,(cond
+                                    [(syntax-parameter-value #'called-function)
+                                     (printf "Call: ~a~%" (syntax->datum stx))
+                                     #`(let ([k* (entry ξ (singleton called-function))])
+                                         (call-prep fn-call-ξ fn-call-label ok k* #,do-co #;original-δ)
+                                         #,(do-ev #'k*))]
+                                    [else
+                                     (printf "Non-call: ~a~%" (syntax->datum stx))
+                                     (do-ev #'ok)])))]
+                      [(_ e) (yield-tr #'(yield e))]))))
 
            (define-syntax-rule (bind-extra-initial-cfa2 body* (... ...))
              (let ([ξ₀ (hash)]
-                   [fn-call-ξ #f]
-                   [fn-call-label -1])
+                   [fnξ #f]
+                   [fnlab -1])
                (syntax-parameterize ([ξ (make-rename-transformer #'ξ₀)]
-                                     [yield (cfa2-yield #'fn-call-ξ #'fn-call-label)])
+                                     [fn-call-ξ (make-rename-transformer #'fnξ)]
+                                     [fn-call-label (make-rename-transformer #'fnlab)])
                  body* (... ...))))
 
            (define-syntax-rule (bind-extra-cfa2 (state ξ*) body* (... ...))
-             (let-values ([(fn-call-ξ fn-call-label)
+             (let-values ([(fnξ fnlab)
                            (match state
                              [(ap: _ ξ* l _ _ _ _) (values ξ* l)]
                              [_ (values #f #f)])])
                (syntax-parameterize ([ξ (make-rename-transformer #'ξ*)]
-                                     [yield (cfa2-yield #'fn-call-ξ #'fn-call-label)])
+                                     [fn-call-ξ (make-rename-transformer #'fnξ)]
+                                     [fn-call-label (make-rename-transformer #'fnlab)])
                  body* (... ...))))
+
+           (define-syntax-rule (bind-extra-prim-cfa2 (state ℓ ξ*) body* (... ...))
+             (syntax-parameterize ([ξ (make-rename-transformer #'ξ*)]
+                                   [fn-call-ξ (make-rename-transformer #'ξ)]
+                                   [fn-call-label (make-rename-transformer #'ℓ)])
+               body* (... ...)))
 
            (define-simple-macro* (bind-join-cfa2 (σ* σ a vs) body*)
              (let*-values ([(-a) a]
@@ -322,6 +335,9 @@
                 [bind-push (make-rename-transformer #'bind-push-cfa2)]
                 [bind-extra (make-rename-transformer #'bind-extra-cfa2)]
                 [bind-extra-initial (make-rename-transformer #'bind-extra-initial-cfa2)]
+                [bind-extra-prim (make-rename-transformer #'bind-extra-prim-cfa2)]
+                [yield cfa2-yield]
+                [prim-extras (list #'fn-call-ξ #'fn-call-label)]
                 ;; Extra parameters over pdcfa for stack allocation.
                 [bind-join (make-rename-transformer #'bind-join-cfa2)]
                 [bind-join-local (make-rename-transformer #'bind-join-local-cfa2)]
