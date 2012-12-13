@@ -2,7 +2,8 @@
 
 (require "data.rkt" "notation.rkt" "do.rkt" "parameters.rkt"
          (for-syntax syntax/parse racket/syntax
-                     (except-in racket/match match match*) racket/list (except-in racket/base and)
+                     racket/match #;(except-in racket/match match match*)
+                     racket/list (except-in racket/base and)
                      syntax/parse/experimental/template
                      racket/pretty
                      "notation.rkt")
@@ -498,12 +499,7 @@
                         (yield-tr (syntax/loc sx (yield (co target-σ k v))))])))
                 ;; Must quote the produced quasisyntax's unsyntax
                 #,#'#`(syntax-parameterize ([yield #,new]
-                                            [original-yield
-                                             (λ (stx)
-                                                (printf "Orig in ~a~%" (syntax->datum stx))
-                                                (define res (#,yield-tr stx))
-                                                (printf "Orig out ~a~%" (syntax->datum res))
-                                                res)])
+                                            [original-yield #,yield-tr])
                         body)]))
            defines ...
            type-filters ...

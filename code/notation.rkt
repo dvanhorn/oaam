@@ -3,11 +3,12 @@
 (require (for-syntax syntax/parse))
 (provide for/append for/union for*/union for/set for*/set
          define-simple-macro* hash-reverse and
+    #;
          (rename-out [safer-match match]
                      [safer-match* match*])
          add1/debug
          ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
-
+#;#;
 (define-syntax (safer-match stx)
   (syntax-parse stx
     [(_ e others ...)

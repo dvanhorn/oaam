@@ -203,7 +203,6 @@
                                    [do (λ (ξ** k** v**)
                                           (syntax-parameterize ([ξ (make-rename-transformer #'ξ**)])
                                             #,(yield-tr #'(yield (co σ k** v**)))))])
-                              (printf "Co-yielding: ~a~%" ξ)
                               (do-co-yield ξ k* v* do))]
                      ;; If this is the product of a function call,
                      ;; push the continuation + stack frame for the entry.
@@ -218,13 +217,10 @@
                         #,#'#`(let* ([ok k])
                                 #,(cond
                                    [(syntax-parameter-value #'called-function)
-                                    (printf "Call: ~a~%" (syntax->datum stx))
                                     #`(let ([k* (entry ξ (singleton called-function))])
-                                        (printf "Entry: ~a~%" ξ)
                                         (call-prep fn-call-ξ fn-call-label ok k* #,do-co #;original-δ)
                                                    #,(do-ev #'k*))]
                                     [else
-                                     (printf "Non-call: ~a~%" (syntax->datum stx))
                                      (do-ev #'ok)])))]
                       [(_ e) (yield-tr #'(yield e))]))))
 
@@ -240,9 +236,7 @@
               (define-syntax-rule (bind-extra-cfa2 (state ξ*) body* (... ...))
                 (let-values ([(fnξ fnlab)
                               (match state
-                                [(ap: _ ξ* l _ _ _ _) 
-                                 (printf "In call! ~a~%" ξ*)
-                                 (values ξ* l)]
+                                [(ap: _ ξ* l _ _ _ _) (values ξ* l)]
                                 [_ (values #f #f)])])
                   (syntax-parameterize ([ξ (make-rename-transformer #'ξ*)]
                                         [fn-call-ξ (make-rename-transformer #'fnξ)]

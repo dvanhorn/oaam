@@ -2,6 +2,7 @@
 
 (require (for-syntax syntax/parse syntax/id-table racket/base racket/match
                      racket/dict racket/syntax racket/list)
+         racket/match
          "notation.rkt"
          racket/stxparam)
 (provide mk-syntax-parameters

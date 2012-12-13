@@ -536,8 +536,7 @@
 
        (define pull-arguments
          (tλ (#:σ iapσ num rest? l δ-op ... vs)
-           (printf "Pulling~%")
-           (expect-do-values #:values 1 #:extra #:debug
+           (expect-do-values #:values 1 #:extra
              (let*-values ([(no-expect? sub-expect len-expect) (mk-expect num)])
                (do (iapσ) loop ([args vs] [raddrs '()] [i 0] [n num])
                    (match args
@@ -547,9 +546,11 @@
                       ;; If n > 0 we must ensure there are enough values in the list to get.
                       ;; If arg contains a list longer than n and rest? = #f then log error.
                       (cond [(no-expect? n)
-                             (define addr (make-var-contour `(apply ,i . ,l) δ))
-                             (do (iapσ) ([bσ #:join-forcing iapσ addr arg])
-                               (do-values (alt-reverse (cons addr raddrs))))]
+                             (cond [rest?
+                                    (define addr (make-var-contour `(apply ,i . ,l) δ))                             
+                                    (do (iapσ) ([bσ #:join-forcing iapσ addr arg])
+                                      (do-values (alt-reverse (cons addr raddrs))))]
+                                   [else (do-values (alt-reverse raddrs))])]
                             [else
                              (define-values (addrs raddrs*)
                                (let aloop ([i i] [n n] [addrs '()] [raddrs raddrs])
@@ -565,7 +566,6 @@
                                         ;; Make temporary addresses for apply at this application point
                                         ;; and put all pullable arguments into their locations.
                                         (do (iapσ) iloop ([last varg] [-addrs addrs] [i i] [n n]) 
-                                            (printf "iloop ~a ~a ~a ~a~%" last -addrs i n)
                                             (match* (last -addrs)
                                               [((consv A D) (cons addr -addrs))
                                                (cond
@@ -641,8 +641,7 @@
                   [n (values n #f)]))
               ;; FIXME: doesn't work with rest-arg primitives
               (do-comp #:bind/extra (#:σ nσ apply-addrs)
-                       (begin0 (tapp pull-arguments #:σ iapσ num rest? l δ-op ... args)
-                               (printf "WAT~%"))
+                       (tapp pull-arguments #:σ iapσ num rest? l δ-op ... args)
                        (if apply-addrs
                            (tapp prim-meaning #:σ nσ o rest? l δ-op ... k apply-addrs)
                            (continue)))]
@@ -653,8 +652,7 @@
                          [(list a)
                           (do (nσ) ([v #:in-delay nσ a])
                             (original-yield (co nσ f v)))]
-                         [_ (continue)]))
-              (error 'internal-apply "TODO: apply continuations ~a" k)]))))))
+                         [_ (continue)]))]))))))
 
 
 (define (mk-expect n)

@@ -487,9 +487,7 @@
                    [(ap: ap-σ extra-ids ... l fn-addr arg-addrs k δ)
                     (bind-extra (state extra-ids ...)
                       (generator
-                       (printf "Getting~%")
                        (do (ap-σ) ([f #:in-get ap-σ fn-addr])
-                         (printf "Matching~%")
                          (match-function f
                            [(clos: xs e ρ _)
                             (cond [(= (length xs) (length arg-addrs))
@@ -539,7 +537,7 @@
 
                    [_ (error 'step "Bad state ~a" state)])))
 
-
+#;
                  (trace step)
 
                ))))))]))

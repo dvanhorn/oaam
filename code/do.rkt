@@ -33,8 +33,6 @@
                          (syntax-parameter-value #'al-targets)
                          '()))
              target<=?))
-     (when (syntax-parameter-value #'debug)
-       (printf "Do values ~a ~a~%" targets (syntax->datum stx)))
      #`(values #,@(map target-param targets) . args)]))
 (define-syntax-rule (continue) (do-values))
 
@@ -88,14 +86,11 @@
 
 (define-syntax-rule (bind-alias* (σ* σ aliases all-to-alias) body)
   (do-comp #:bind/extra (#:σ σ*)
-           (begin (printf "Alias*~%")
-                  (begin0
            (do (σ) loop ([-aliases aliases] [-all-to-alias all-to-alias])
                (match* (-aliases -all-to-alias)
                  [('() '()) (continue)]
                  [((cons alias -aliases) (cons to-alias -all-to-alias))
                   (bind-alias (σ* σ alias to-alias) (loop σ* -aliases -all-to-alias))]))
-           (printf "Alias* done~%")))
            body))
 
 (define-syntax-rule (bind-big-alias (σ* σ alias all-to-alias) body)
@@ -146,34 +141,22 @@
                               id)))])
               #'(syntax-parameterize ([targ (make-rename-transformer #'id)] ...)
                   a.exprs ...))]))
-       #`(with-handlers
-              ([exn:fail:contract:arity?
-                (λ (ex) (error 'do-comp "bad values outer ~a ~a"
-                               '#,(syntax->datum stx)
-                               ex))])
-             (let-values ([(acc-ids ... bind ...)
-                           (with-handlers ([exn:fail:contract:arity?
-                                            (λ (ex) (error 'do-comp "bad values in ~a ~a"
-                                                           '#,(syntax->datum stx)
-                                                           ex))])
-                             (expect-do-values
-                                 #:values #,(length (syntax->list #'(bind ...)))
-                               #,@(listy (and (attribute extra?) #'#:extra))
-                               e))])
-               #,(if (attribute wrapper)
-                     #`(let-syntax ([wrapper #,tr])
-                         e1)
-                     (tr #`(wrap e1))))))]))
+       #`(let-values ([(acc-ids ... bind ...)
+                       (expect-do-values
+                           #:values #,(length (syntax->list #'(bind ...)))
+                         #,@(listy (and (attribute extra?) #'#:extra))
+                         e)])
+           #,(if (attribute wrapper)
+                 #`(let-syntax ([wrapper #,tr])
+                     e1)
+                 (tr #`(wrap e1)))))]))
 
-(define-syntax-parameter debug #f)
 (define-simple-macro* (expect-do-values (~or (~optional (~seq #:values num:nat))
-                                             (~optional (~and #:debug debug?))
                                              (~optional (~and #:extra (~bind [extra? #t]))
                                                         #:defaults ([extra? #f]))) ...
                                         body:expr ...)
   (syntax-parameterize (#,@(listy (and (attribute num) #'[do-extra-values (syntax-e #'num)]))
-                        #,@(listy (and (attribute extra?) #'[alloc-ctx? #t]))
-                        #,@(listy (and (attribute debug?) #'[debug #t])))
+                        #,@(listy (and (attribute extra?) #'[alloc-ctx? #t])))
     body ...))
 
 (define-for-syntax ((mk-do generators?) stx)
@@ -191,9 +174,6 @@
   (define add-0val? (and (null? st*)
                          (let ([xn (syntax-parameter-value #'do-extra-values)])
                            (if xn (zero? xn) #t))))
-  (when (and (syntax-parameter-value #'debug)
-             add-0val?)
-    (error 'do "WAT? ~a" (syntax->datum stx)))
   (define-syntax-class join-clause
     #:attributes (clause new-σ)
     (pattern [σ*:id (~or (~and #:join (~bind [bindf #'bind-join]))
@@ -265,20 +245,9 @@
                    [(g gs ...) #'(c.guards ...)]                   
                    [(bind ...) (with-do-binds extra #'(extra ...))])
        (gen-wrap
-        #`(with-handlers
-              ([exn:fail:contract:arity?
-                (λ (ex) (error 'do "Bad do-for (~a ~a) (targets: ~a) ~a~%bindings: ~a~%~a"
-                               #,add-0val?
-                               #,extra?
-                               '#,(map target-param st*)
-                               '#,(syntax->datum stx)
-                               '#,(syntax->datum #'([σ-id σ-id] ...
-                                                    [acc-ids acc-ids] ...
-                                                    [bind #f] ...))
-                               ex))])
-            (for/fold ([σ-id σ-acc] ... 
-                       [acc-ids accs] ...
-                       [bind #f] ...) (g)
+        #`(for/fold ([σ-id σ-acc] ... 
+                     [acc-ids accs] ...
+                     [bind #f] ...) (g)
             (syntax-parameterize ([σ-acc (make-rename-transformer #'σ-id)] ...
                                   [accs (make-rename-transformer #'acc-ids)] ...)
               (let ([cσ σ-id] ...)
@@ -286,12 +255,9 @@
                             [acc-ids acc-ids] ...
                             [bind #f] ...)
                     (gs ...)
-                  (with-handlers ([exn:fail?
-                                   (λ (ex)
-                                      (error 'do "bad inner do-far ~a~%~a" '#,(syntax->datum stx) ex))])
-                    (let ([cσ σ-id] ...)
-                      (do-body-transformer
-                       (do (cσ) (clauses ...) body ...)))))))))))]
+                  (let ([cσ σ-id] ...)
+                    (do-body-transformer
+                     (do (cσ) (clauses ...) body ...)))))))))]
     
     ;; if we don't get a store via clauses, σ is the default.
     [(_ (jσ:id) ((~var joins (join-clauses #f)) clauses ...) body:expr ...+)
@@ -308,12 +274,10 @@
 
     [(_ (dbσ:id) () body:expr ...+)
      #`(initialize-targets
-        (with-handlers
-            ([exn:fail? (λ (ex) (error 'do "Bad null ~a~%~a" '#,(syntax->datum stx) ex))])
         (syntax-parameterize ([target-σ (make-rename-transformer #'dbσ)])
           #,(gen-wrap
              #`(do-body-transformer
-                (with-do body ... #,@(listy (and add-0val? #'(values)))))))))]
+                (with-do body ... #,@(listy (and add-0val? #'(values))))))))]
 
     ;; when fold/fold doesn't cut it, we need a safe way to recur.
     [(_ (ℓσ:id) loop:id ([args:id arg0:expr] ...)
@@ -329,12 +293,9 @@
                    [(accs ...) no-σ-stal-params]
                    [(acc-ids ...) (generate-temporaries no-σ-stal-params)])       
        #`(initialize-targets
-          (with-handlers
-              ([exn:fail:contract:arity?
-                (λ (ex) (error 'do "Bad loop ~a" '#,(syntax->datum stx)))])
-            (let real-loop ([σ-id σ-acc] ...
-                            [acc-ids accs] ...
-                            [args arg0] ...)
+          (let real-loop ([σ-id σ-acc] ...
+                          [acc-ids accs] ...
+                          [args arg0] ...)
             (let ([ℓσ σ-id] ...)
               (syntax-parameterize ([σ-acc (make-rename-transformer #'σ-id)] ...
                                     [accs (make-rename-transformer #'acc-ids)] ...)
@@ -349,4 +310,4 @@
                                           (real-loop #,@(listy (and bind-σ? #'σ*))
                                                      accs ...
                                                      argps ...)])])
-                      (with-do body ...)))))))))]))
+                      (with-do body ...))))))))]))
