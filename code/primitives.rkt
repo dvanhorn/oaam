@@ -1,6 +1,6 @@
 #lang racket
 
-(require "data.rkt" "notation.rkt" "do.rkt"
+(require "data.rkt" "notation.rkt" "do.rkt" "parameters.rkt"
          "primitive-maker.rkt"
          (for-syntax racket/syntax syntax/parse) ;; for core syntax-classes
          racket/stxparam
@@ -535,85 +535,82 @@
        (define/basic (timev any) (yield any))
 
        (define pull-arguments
-         (lift-do (#:σ iapσ num rest? l δ-op ... vs)
+         (tλ (#:σ iapσ num rest? l δ-op ... vs)
            (printf "Pulling~%")
-           (let*-values ([(no-expect? sub-expect len-expect) (mk-expect num)])
-             (do (iapσ) loop ([args vs] [raddrs '()] [i 0] [n num]) #:values/extra 1
-                 (match args
-                   ['() (do-values (alt-reverse raddrs))]
-                   [(list arg)
-                    ;; The last argument should contain a list of extra arguments to pull on.
-                    ;; If n > 0 we must ensure there are enough values in the list to get.
-                    ;; If arg contains a list longer than n and rest? = #f then log error.
-                    (cond [(no-expect? n)
-                           (define addr (make-var-contour `(apply ,i . ,l) δ))
-                           (do (iapσ) ([bσ #:join-forcing iapσ addr arg])
-                             (do-values (alt-reverse (cons addr raddrs))))]
-                          [else
-                           (define-values (addrs raddrs*)
-                             (let aloop ([i i] [n n] [addrs '()] [raddrs raddrs])
-                               (define addr (make-var-contour `(apply ,i . ,l) δ))
-                               (if (no-expect? n)
-                                   (if rest?
-                                       (values (alt-reverse (cons addr addrs)) (cons addr raddrs))
-                                       (values (alt-reverse addrs) raddrs))
-                                   (aloop (add1 i) (sub-expect n) (cons addr addrs) (cons addr raddrs)))))
-                           (define result (box #f))
-                           (do-comp #:bind/extra (nσ)
-                                    (do (iapσ) ([varg #:in-force iapσ arg])
-                                      ;; Make temporary addresses for apply at this application point
-                                      ;; and put all pullable arguments into their locations.
-                                      (do (iapσ) iloop ([last varg] [-addrs addrs] [i i] [n n]) 
-                                          (printf "iloop ~a ~a ~a ~a~%" last -addrs i n)
-                                          (match* (last -addrs)
-                                            [((consv A D) (cons addr -addrs))
-                                             (cond
-                                              [(no-expect? n) ;; too many in rest-arg list?
+           (expect-do-values #:values 1 #:extra #:debug
+             (let*-values ([(no-expect? sub-expect len-expect) (mk-expect num)])
+               (do (iapσ) loop ([args vs] [raddrs '()] [i 0] [n num])
+                   (match args
+                     ['() (do-values (alt-reverse raddrs))]
+                     [(list arg)
+                      ;; The last argument should contain a list of extra arguments to pull on.
+                      ;; If n > 0 we must ensure there are enough values in the list to get.
+                      ;; If arg contains a list longer than n and rest? = #f then log error.
+                      (cond [(no-expect? n)
+                             (define addr (make-var-contour `(apply ,i . ,l) δ))
+                             (do (iapσ) ([bσ #:join-forcing iapσ addr arg])
+                               (do-values (alt-reverse (cons addr raddrs))))]
+                            [else
+                             (define-values (addrs raddrs*)
+                               (let aloop ([i i] [n n] [addrs '()] [raddrs raddrs])
+                                 (define addr (make-var-contour `(apply ,i . ,l) δ))
+                                 (if (no-expect? n)
+                                     (if rest?
+                                         (values (alt-reverse (cons addr addrs)) (cons addr raddrs))
+                                         (values (alt-reverse addrs) raddrs))
+                                     (aloop (add1 i) (sub-expect n) (cons addr addrs) (cons addr raddrs)))))
+                             (define result (box #f))
+                             (do-comp #:bind/extra ()
+                                      (do (iapσ) ([varg #:in-force iapσ arg])
+                                        ;; Make temporary addresses for apply at this application point
+                                        ;; and put all pullable arguments into their locations.
+                                        (do (iapσ) iloop ([last varg] [-addrs addrs] [i i] [n n]) 
+                                            (printf "iloop ~a ~a ~a ~a~%" last -addrs i n)
+                                            (match* (last -addrs)
+                                              [((consv A D) (cons addr -addrs))
                                                (cond
-                                                [rest? ;; nope, just include this in the final list.
-                                                 (unless (null? -addrs)
-                                                   (error 'apply "Too many addresses generated ~a" addrs))
-                                                 (do (iapσ) ([aprσ #:join iapσ addr (singleton last)])
-                                                   (set-box! result #t)
-                                                   (continue))]
-                                                [else ;; yes, too many
-                                                 (log-too-many (len-expect num) (add1 i))
-                                                 (continue)])]
-                                              [else
-                                               ;; Still expect more, so pull another out.
-                                               (do (iapσ) ([apjσ #:alias iapσ addr A]
-                                                           [next #:in-get apjσ D])
-                                                 (iloop apjσ next -addrs (add1 i) (sub-expect n)))])]
-                                            [('() _)
-                                             (cond
-                                              [(no-expect? n)
-                                               (set-box! result #t)
-                                               (if rest?
-                                                   ;; Actually nothing. Make the tail an empty list.
-                                                   (do (iapσ) ([apnσ #:join iapσ (car -addrs) snull])
-                                                     (continue))
-                                                   ;; No tail since not for rest-args.
-                                                   (continue))]
-                                              [else
-                                               ;; Can't pull anything out of empty!
-                                               (log-too-few (len-expect num) (add1 i))
-                                               (continue)])])))
-                                    (begin0
-                                    (do-values (and (unbox result)
-                                                    (alt-reverse raddrs*)))
-                                    (printf "Trying...~%")
-                                    (printf "apply result ~a ~a~%" (unbox result)
-                                            (map (λ (a) (getter nσ a)) raddrs*))))])]
-                   ;; Explicitly given arguments
-                   [(cons arg args)
-                    (define addr (make-var-contour `(apply ,i . ,l) δ))
-                    (cond [(and (no-expect? n) (not rest?)) ;; might we have too many arguments?
-                           (log-info "'apply'd function given too many arguments (>= ~a) (expected ~a)"
-                                     i (len-expect num))
-                           (do-values #f)]
-                          [else
-                           (do (iapσ) ([bσ #:join-forcing iapσ addr arg])
-                             (loop bσ args (cons addr raddrs) (add1 i) (sub-expect n)))])])))))
+                                                [(no-expect? n) ;; too many in rest-arg list?
+                                                 (cond
+                                                  [rest? ;; nope, just include this in the final list.
+                                                   (unless (null? -addrs)
+                                                     (error 'apply "Too many addresses generated ~a" addrs))
+                                                   (do (iapσ) ([aprσ #:join iapσ addr (singleton last)])
+                                                     (set-box! result #t)
+                                                     (continue))]
+                                                  [else ;; yes, too many
+                                                   (log-too-many (len-expect num) (add1 i))
+                                                   (continue)])]
+                                                [else
+                                                 ;; Still expect more, so pull another out.
+                                                 (do (iapσ) ([apjσ #:alias iapσ addr A]
+                                                             [next #:in-get apjσ D])
+                                                   (iloop apjσ next -addrs (add1 i) (sub-expect n)))])]
+                                              [('() _)
+                                               (cond
+                                                [(no-expect? n)
+                                                 (set-box! result #t)
+                                                 (if rest?
+                                                     ;; Actually nothing. Make the tail an empty list.
+                                                     (do (iapσ) ([apnσ #:join iapσ (car -addrs) snull])
+                                                       (continue))
+                                                     ;; No tail since not for rest-args.
+                                                     (continue))]
+                                                [else
+                                                 ;; Can't pull anything out of empty!
+                                                 (log-too-few (len-expect num) (add1 i))
+                                                 (continue)])])))
+                                      (do-values (and (unbox result)
+                                                      (alt-reverse raddrs*))))])]
+                     ;; Explicitly given arguments
+                     [(cons arg args)
+                      (define addr (make-var-contour `(apply ,i . ,l) δ))
+                      (cond [(and (no-expect? n) (not rest?)) ;; might we have too many arguments?
+                             (log-info "'apply'd function given too many arguments (>= ~a) (expected ~a)"
+                                       i (len-expect num))
+                             (do-values #f)]
+                            [else
+                             (do (iapσ) ([bσ #:join-forcing iapσ addr arg])
+                               (loop bσ args (cons addr raddrs) (add1 i) (sub-expect n)))])]))))))
 
        (define-simple-macro* (internal-applyv iapσ l δ k vs)
          (let* ([-vs vs]
@@ -621,15 +618,15 @@
                 [args (unsafe-cdr -vs)])
            (match-function f
              [(clos: xs e ρ _)
-              (do-comp #:bind/extra (nσ apply-addrs)
-                       (do-app pull-arguments #;iapσ xs #f l δ-op ... args)
+              (do-comp #:bind/extra (#:σ nσ apply-addrs)
+                       (tapp pull-arguments #:σ iapσ xs #f l δ-op ... args)
                        (if apply-addrs
                            (do (nσ) ([(ρ* σ*-apcl δ*) #:bind ρ nσ l δ xs apply-addrs])
                              (original-yield (ev σ*-apcl e ρ* k δ)))
                            (continue)))]
              [(rlos: xs r e ρ _)
-              (do-comp #:bind/extra (nσ apply-addrs)
-                       (do-app pull-arguments #;iapσ xs #t l δ-op ... args)
+              (do-comp #:bind/extra (#:σ nσ apply-addrs)
+                       (tapp pull-arguments #:σ iapσ xs #t l δ-op ... args)
                        (if apply-addrs
                            (do (nσ) ([(ρ* σ*-apcl δ*) #:bind-rest-apply ρ nσ l δ xs r apply-addrs])
                              (original-yield (ev σ*-apcl e ρ* k δ)))
@@ -643,15 +640,15 @@
                    (values n #t)]
                   [n (values n #f)]))
               ;; FIXME: doesn't work with rest-arg primitives
-              (do-comp #:bind/extra (nσ apply-addrs)
-                       (begin0 (do-app pull-arguments #;iapσ num rest? l δ-op ... args)
+              (do-comp #:bind/extra (#:σ nσ apply-addrs)
+                       (begin0 (tapp pull-arguments #:σ iapσ num rest? l δ-op ... args)
                                (printf "WAT~%"))
                        (if apply-addrs
-                           (do-app prim-meaning o rest? l δ-op ... k apply-addrs)
+                           (tapp prim-meaning #:σ nσ o rest? l δ-op ... k apply-addrs)
                            (continue)))]
              [(? kont?)
-              (do-comp #:bind/extra (nσ apply-addrs)
-                       (do-app pull-arguments #;iapσ 1 #f l δ-op ... args)
+              (do-comp #:bind/extra (#:σ nσ apply-addrs)
+                       (tapp pull-arguments #:σ iapσ 1 #f l δ-op ... args)
                        (match apply-addrs
                          [(list a)
                           (do (nσ) ([v #:in-delay nσ a])
@@ -894,14 +891,14 @@
 
 (mk-static-prims primitive? prim-arities)
 
-(define-for-syntax ((mk-mk-prims global-σ? σ-passing? σ-∆s? compiled? sparse? K) stx)
+(define-for-syntax ((mk-mk-prims compiled? global-σ? K) stx)
   (syntax-parse stx
     [(_ mean:id compile:id ev:id co:id clos:id rlos:id kont?:id extra ...)
      (with-syntax ([clos? (format-id #'clos "~a?" #'clos)]
                    [rlos? (format-id #'rlos "~a?" #'rlos)])
        (quasisyntax/loc stx
          (mk-primitive-meaning
-          #,global-σ? #,σ-passing? #,σ-∆s? #,compiled? #,sparse? #,(= K 0)
+          #,compiled? #,global-σ? #,(= K 0)
           mean compile co clos? rlos? kont? (extra ...)
           #,@(prim-defines #'clos #'rlos #'kont? K #'ev #'co)
           #,prim-table)))]))

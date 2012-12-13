@@ -1,8 +1,8 @@
 #lang racket
 
-(require "data.rkt" "notation.rkt" "do.rkt"
+(require "data.rkt" "notation.rkt" "do.rkt" "parameters.rkt"
          (for-syntax syntax/parse racket/syntax
-                     racket/match racket/list (except-in racket/base and)
+                     (except-in racket/match match match*) racket/list (except-in racket/base and)
                      syntax/parse/experimental/template
                      racket/pretty
                      "notation.rkt")
@@ -234,7 +234,7 @@
                  [v (in-list v-ids)]
                  [argnum (in-range (length ts) 0 -1)])
               (define tm (type-match predfn t #'σ v))
-              #`(do-comp #:bind (σ acc)
+              #`(do-comp #:bind (#:σ σ acc)
                          #,(tm #'acc
                                  (and (not mult-ary?)
                                       (λ (tmp)
@@ -246,7 +246,7 @@
           (define result
             (cons
              (generate-temporary #'checker-mk-checker)
-             #`(lift-do (#:σ σ prim apply? v-addrs)
+             #`(tλ (#:σ σ prim apply? v-addrs)
                  (expect-do-values #:values 1
                    (match v-addrs
                      [(list-rest vids ... rest-match)
@@ -257,7 +257,7 @@
                                   (match raddrs
                                     ['() (let ([acc (alt-reverse acc)]) #,built)]
                                     [(cons ra rrest)
-                                     (do-comp #:bind (σ acc)
+                                     (do-comp #:bind (#:σ σ acc)
                                               #,(check-rest #'acc
                                                             (and (not mult-ary?)
                                                                  (λ (tmp)
@@ -358,7 +358,7 @@
                  (define result
                    (cons
                     (generate-temporary #'checker-multi)
-                    #`(lift-do (#:σ σ prim apply? v-addrs)
+                    #`(tλ (prim apply? v-addrs)
                         (expect-do-values #:values 1
                           #,(for/fold
                                 ([stx ;; If nothing matches, log error
@@ -370,8 +370,8 @@
                               (with-syntax ([check-name (if (identifier? checker*)
                                                             checker*
                                                             (car checker*))])
-                                #`(do-comp #:bind (σ res)
-                                           (do-app check-name prim apply? v-addrs)
+                                #`(do-comp #:bind (res)
+                                           (tapp check-name prim apply? v-addrs)
                                            (if (∅? res)
                                                #,stx
                                                (do-values res)))))))))
@@ -447,36 +447,20 @@
 (define-syntax (mk-primitive-meaning stx)
   (set! type-checkers (make-hash))
   (syntax-parse stx
-    [(_ gb?:boolean σpb?:boolean σdb?:boolean cb?:boolean sb?:boolean 0b?:boolean
+    [(_ cb?:boolean gσ?:boolean 0b?:boolean
         mean:id compile:id co:id clos?:id rlos?:id kont?:id
         (extra ...)
         defines ... ((~var p (prim-entry (type->pred-stx #'clos? #'rlos? #'kont?))) ...))
-     (define global-σ? (syntax-e #'gb?))
-     (define σ-passing? (syntax-e #'σpb?))
-     (define σ-∆s? (syntax-e #'σdb?))
      (define compiled? (syntax-e #'cb?))
-     (define sparse? (syntax-e #'sb?))
      (define 0cfa? (syntax-e #'0b?))
      (define ((ap m) arg-stx)
        (if (procedure? m)
            (m arg-stx)
            (datum->syntax arg-stx (cons m arg-stx) arg-stx)))
-     (define hide-σ? (and σ-∆s? (not global-σ?)))
-     (define hidden-σ (and hide-σ? (generate-temporary #'hidden)))
-     (define hidden-actions (and sparse? (generate-temporary #'hidden-A)))
-     (with-syntax ([(σ-gop ...) (if σ-passing? #'(pσ) #'())]
-                   [(extra-ids ...) (generate-temporaries #'(extra ...))]
-                   [((top top-op) ...)
-                    (if hidden-σ `((,hidden-σ #'top-σ)) '())]
-                   [((top-actions actions-op) ...)
-                    (if hidden-actions
-                        (list (list hidden-actions #'target-actions))
-                        '())]
-                   [((type-filters ...)
+     (with-syntax ([((type-filters ...)
                      (checker-names ...)) (mk-checker-fns (attribute p.checker-fn))]
-                   [(pex-ids ...) (generate-temporaries (syntax-parameter-value #'prim-extras))]
-                   [(prim-extras ...) (syntax-parameter-value #'prim-extras)]
-                   [topp (or hidden-σ #'pσ)]
+                   [(extra-ids ...) (generate-temporaries #'(extra ...))]
+                   [(σ-gop ...) (if (syntax-e #'gσ?) #'() #'(pσ))]
                    [(δ-op ...) (if 0cfa? #'() #'(δ))])
        (define eval
          #`(case o
@@ -492,8 +476,8 @@
                           ;; lazy. Forced values are exploded into possible
                           ;; argument combinations
                           (do (pσ) ()
-                            (do-comp #:bind (nσ vss)
-                                     (do-app #,checker '#,p apply? v-addrs)
+                            (do-comp #:bind (#:σ nσ vss)
+                                     (tapp #,checker '#,p apply? v-addrs)
                                      (do (nσ) ([vs (in-set vss)])
                                        #,(cond [(eq? 'read/write acc) (m #'(nσ ℓ δ vs))]
                                                [(eq? 'read-only acc) (m #'(nσ vs))]
@@ -526,29 +510,16 @@
            ;; λP very much like λ%
            (define-syntax-rule (... (λP (pσ apply? ℓ δ k v-addrs) body ...))
              #,(if compiled?
-                   #`(λ (top ... top-actions ... extra-ids ... σ-gop ... pex-ids ... apply? ℓ δ-op ... k v-addrs)
-                        (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
-                                              [target-σ (make-rename-transformer #'σ-gop)] ...
-                                              [target-actions (make-rename-transformer #'top-actions)] ...
-                                              [top-actions? #,sparse?]
-                                              [top-σ? #,hide-σ?]
-                                              [prim-extras (make-rename-transformer #'pex-ids)] ...)
-                          (bind-extra-prim (ℓ extra-ids ...)
-                            body (... ...))))
+                   #`(tλ (#:σ pσ apply? ℓ δ-op ... k v-addrs)
+                       (bind-extra-prim (ℓ extra-ids ...)
+                         body (... ...)))
                    #'(syntax-parameterize ([target-σ (make-rename-transformer #'σ-gop)] ...)
                        body (... ...))))
            ;; Identity if not compiled.
            (define-syntax-rule (compile o)
              #,(if compiled? eval #'o))
            (define mean
-             (lift-do (#:σ pσ o pex-ids ... apply? ℓ δ-op ... k v-addrs)
-                      #,(if compiled?
-                            #'(o top-op ...
-                                 actions-op ...
-                                 extra ...
-                                 σ-gop ...
-                                 prim-extras ... ;; TODO: Grr, how to apply without exposing??
-                                 apply? ℓ
-                                 δ-op ...
-                                 k v-addrs)
-                            eval))))))]))
+             (tλ (#:σ pσ o apply? ℓ δ-op ... k v-addrs)
+                 #,(if compiled?
+                       #'(tapp o #:σ pσ apply? ℓ δ-op ... k v-addrs)
+                       eval))))))]))

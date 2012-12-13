@@ -1,6 +1,7 @@
 #lang racket
 
 (require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt" "primitives.rkt" "parse.rkt"
+         "parameters.rkt"
          "notation.rkt" "op-struct.rkt" "do.rkt" "add-lib.rkt"
          (rename-in racket/generator
                     [yield real-yield]
@@ -53,61 +54,45 @@
          (~optional (~seq #:touches touches:id))
          ;; Analysis strategies flags (requires the right parameters too)
          (~optional (~and #:compiled compiled?))
-         (~optional (~and #:σ-∆s σ-∆s?))
-         (~optional (~and #:sparse sparse?))
          ;; Continuation marks incur a representation overhead.
          ;; We allow this feature to be disabled for benchmarking analysis of
          ;; languages that do not have continuation marks.
          (~optional (~seq (~and #:CM CM?) mark-set (~bind [(cm-op 1) (list #'cm)]))
                     #:defaults ([mark-set #'∅]
                                 [(cm-op 1) '()]))
-         (~optional (~or (~and #:σ-passing σ-passing?)
-                         (~and #:global-σ global-σ?)))
+         (~optional (~and #:global-σ global-σ?))
          (~optional (~and #:wide wide?))
          (~optional (~or (~and (~seq #:kcfa k-nat-or-∞)
                                (~bind [K (syntax-e #'k-nat-or-∞)]))
                          (~and #:1cfa (~bind [K 1])))
                     #:defaults ([K 0]))
          (~optional (~seq #:prepare prep-fn:expr)) ;; any preprocessing?
-         (~optional (~or (~and #:generators generators?)
-                         (~and #:set-monad set-monad?)))) ...)
+         (~optional (~and #:generators generators?))) ...)
      #:do [(define-syntax-rule (given kw) (syntax? (attribute kw)))
-           (define-syntax-rule (implies ante concl) (if ante concl #t))
-           (define σ-passing?* (or (given σ-passing?) (given σ-∆s?)))
-           (define σ-threading? (and (given wide?) σ-passing?*))
-           (define c-passing? (given set-monad?))]
+           (define-syntax-rule (implies ante concl) (if ante concl #t))]
      #:fail-unless (implies (given global-σ?) (given wide?))
      "Cannot globalize narrow stores."
-     #:fail-unless (implies (given σ-∆s?) (given wide?))
-     "Store deltas and narrow stores are antithetical."
-     #:fail-unless (or (given fixpoint) (given set-monad?))
-     "Cannot use a general fixpoint for step function that doesn't return sets."
-     #:fail-when (and (given σ-passing?) (given global-σ?))
-     "Cannot use store passing with a global store"
      (define (:? id) (list (format-id id "~a:" id) (format-id id "~a?" id)))
      (with-syntax ([((ρ-op ...) (δ-op ...) (l-op ...))
                     (if (zero? (attribute K)) #'(() () ()) #'((ρ) (δ) (l)))]
                    [ev: (format-id #'ev "~a:" #'ev)]
                    [co: (format-id #'co "~a:" #'co)]
                    [ap: (format-id #'ap "~a:" #'ap)]
-                   [(ls? ls:) (:? #'ls)]
-                   [(lrk? lrk:) (:? #'lrk)]
-                   [(ifk? ifk:) (:? #'ifk)]
-                   [(sk!? sk!:) (:? #'sk!)]
-                   [(mt? mt:) (:? #'mt)]
-                   [(clos? clos:) (:? #'clos)]
-                   [(rlos? rlos:) (:? #'rlos)]
+                   [(ls: ls?) (:? #'ls)]
+                   [(lrk: lrk?) (:? #'lrk)]
+                   [(ifk: ifk?) (:? #'ifk)]
+                   [(sk!: sk!?) (:? #'sk!)]
+                   [(mt: mt?) (:? #'mt)]
+                   [(clos: clos?) (:? #'clos)]
+                   [(rlos: rlos?) (:? #'rlos)]
                    ;; represent rσ explicitly in all states?
                    [(σ-op ...) (if (given wide?) #'() #'(rσ))]
-                   ;; explicitly pass σ/∆ to compiled forms?
-                   [(σ-gop ...) (if σ-passing?* #'(gσ) #'())]
                    ;; If rσ not part of state and not global, it is passed
                    ;; in as (cons rσ state), so expand accordingly.
                    [(expander-flags ...)
                     (cond [(and (given wide?) (not (given global-σ?)))
                            #'(#:expander #:with-first-cons)]
-                          [else #'()])]
-                   [inj-σ (if (given σ-∆s?) #''() #'(hash))])
+                          [else #'()])])
        (define yield-ev
          #`(let ([yield-tr (syntax-parameter-value #'yield)])
              #,(if (attribute compiled?)
@@ -218,23 +203,10 @@
 
        (define compile-def
          (cond [(given compiled?)
-                (define hide-σ? (and (given σ-∆s?) (not (given global-σ?))))
-                (define hidden-σ (and hide-σ? (generate-temporary #'hidden-σ)))
-                (define hidden-actions (and (given sparse?) (generate-temporary #'hidden-actions)))
-                (with-syntax ([(top ...) (listy hidden-σ)]
-                              [(topa ...) (listy hidden-actions)]
-                              [topp (or hidden-σ #'gσ)])
-                  (quasisyntax/loc stx
+                (quasisyntax/loc stx
                     ((define-syntax-rule (... (λ% (gσ ρ k δ) body ...))
-                       (λ (top ... topa ... extra-ids ... σ-gop ... ρ-op ... k δ-op ...)
-                          (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
-                                                [target-σ (make-rename-transformer #'gσ)]
-                                                [target-actions (make-rename-transformer #'topa)] ...
-                                                [top-σ? #,hide-σ?]
-                                                [top-actions? #,(given sparse?)])
-                            (bind-extra (#f extra-ids ...)
-                              body (... ...)))))
-                     (define (compile e) #,eval))))]
+                       (tλ (#:σ gσ ρ-op ... k δ-op ...) body (... ...)))
+                     (define (compile e) #,eval)))]
                [else
                 ;; brittle, since other identifiers must be the same in ev:
                 (syntax/loc stx
@@ -364,26 +336,11 @@
            #,@(if (given touches)
                   #`((mk-touches touches clos: rlos: list #,(zero? (attribute K))))
                   #'())
-           (splicing-syntax-parameterize ([target-σ? #,σ-threading?]
-                                          [target-cs? #,c-passing?]
-                                          [target-actions? #,(given sparse?)]
-                                          [yield (... #,yield-ev)])
+           (splicing-syntax-parameterize ([yield (... #,yield-ev)])
             (in-scope-of-extras (extra ...)
-             (define-syntax do-macro
-               (mk-do #,(given σ-∆s?)
-                      #,(given global-σ?)
-                      #,(given generators?)
-                      #'(extra ...)))
-             (define-syntax do-comp-macro (mk-do-comp #'(extra ...)))
-             (define-syntax do-values-macro (mk-do-values #'(extra ...)))
-             (define-syntax lift-do-macro (mk-lift-do #'(extra ...)))
-             (define-syntax do-app-macro (mk-do-app #'(extra ...)))
+             (define-syntax do-macro (mk-do #,(given generators?)))
              (mk-flatten-value flatten-value-fn clos: rlos: kont?)
              (splicing-syntax-parameterize ([do (make-rename-transformer #'do-macro)]
-                                            [do-comp (make-rename-transformer #'do-comp-macro)]
-                                            [do-values (make-rename-transformer #'do-values-macro)]
-                                            [lift-do (make-rename-transformer #'lift-do-macro)]
-                                            [do-app (make-rename-transformer #'do-app-macro)]
                                             [flatten-value (make-rename-transformer #'flatten-value-fn)])
 
                ;; ev is special since it can mean "apply the compiled version" or
@@ -392,12 +349,8 @@
                       (quasisyntax/loc stx
                         ((define-syntax (ev syn)
                            (syntax-case syn ()
-                             ;; gσ only optional if it's global
                              [(_ gσ e ρ k δ)
-                              #'(e #,@(listy (and (given σ-∆s?) (not (given global-σ?)) #'top-σ))
-                                   #,@(listy (and (given sparse?) #'target-actions))
-                                   extra ...
-                                   σ-gop ... ρ-op ... k δ-op ...)]))
+                              #'(tapp e #:σ gσ ρ-op ... k δ-op ...)]))
                          (define-match-expander ev: ;; inert, but introduces bindings
                            (syntax-rules () [(_ . args) (list . args)]))))
                       (quasisyntax/loc stx
@@ -444,10 +397,7 @@
                  (fixpoint step (inj (prepare e))))
                ;; parameterize prim-meaning so we can use it in the definition of apply.
                (splicing-syntax-parameterize ([prim-meaning (make-rename-transformer #'prim-meaning-def)])
-               (define-syntax mk-prims (mk-mk-prims #,(given global-σ?) #,σ-passing?*
-                                                    #,(given σ-∆s?) #,(given compiled?)
-                                                    #,(given sparse?)
-                                                    #,(attribute K)))
+               (define-syntax mk-prims (mk-mk-prims #,(given compiled?) #,(given global-σ?) #,(attribute K)))
                ;; Prim-meaning is abstracted into a function, so it don't get syntactic
                ;; context at its application point in the ap: case. For CFA2, we need to
                ;; know the stack frame and label of the application.
@@ -486,7 +436,7 @@
                          (generator
                           (do (co-σ) ([σ*-lsn #:join-local-forcing co-σ v-addr v])
                             (yield (ev σ*-lsn e ρ
-                                       (ls cm l (add1/debug n 'kcfa-ls) es (cons v-addr v-addrs) ρ a δ) δ))))]
+                                       (ls cm l (add1 n) es (cons v-addr v-addrs) ρ a δ) δ))))]
 
                         ;; Let is much like application, but some analyses treat let specially
                         [(ltk: cm x '() '() x-done v-addrs e ρ a δ)
@@ -537,7 +487,9 @@
                    [(ap: ap-σ extra-ids ... l fn-addr arg-addrs k δ)
                     (bind-extra (state extra-ids ...)
                       (generator
+                       (printf "Getting~%")
                        (do (ap-σ) ([f #:in-get ap-σ fn-addr])
+                         (printf "Matching~%")
                          (match-function f
                            [(clos: xs e ρ _)
                             (cond [(= (length xs) (length arg-addrs))
@@ -557,7 +509,7 @@
                                   [else
                                    (arity-error f l)
                                    (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-                           [(primop o _) (do-app prim-meaning o #f l δ-op ... k arg-addrs)]
+                           [(primop o _) (tapp prim-meaning o #f l δ-op ... k arg-addrs)]
                            [(? kont? k)
                             ;; continuations only get one argument.
                             (cond [(and (pair? arg-addrs) (null? (cdr arg-addrs)))

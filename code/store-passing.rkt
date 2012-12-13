@@ -1,16 +1,19 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
-         "fix.rkt" "handle-limits.rkt"
-         "graph.rkt")
-(provide bind-join-whole bind-join*-whole
+         "fix.rkt" "handle-limits.rkt" "parameters.rkt"
+         "graph.rkt"
+         (for-syntax syntax/parse))
+(provide bind-join-whole #;
+         bind-join*-whole
          (for-syntax bind-help) ;; common helper
          wide-step hash-getter
          mk-set-fixpoint^
          mk-special-set-fixpoint^
          mk-special2-set-fixpoint^
          mk-special3-set-fixpoint^
-         with-narrow-set-monad
-         with-σ-passing-set-monad
+         with-set-monad
+         with-wide-σ-passing
+         with-narrow-σ-passing
          with-whole-σ)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -166,40 +169,59 @@
              (format "Point count: ~a" (set-count (for/union ([p (in-set ss)]) (cdr p))))
              last-σ final-cs))))
 
-(define-for-syntax do-body-transform-σ/cs
-  (syntax-rules () [(_ e) (let-values ([(σ* cs) e])
-                            #;
-                            (log-debug "Transformed ~a ~a" cs target-cs)
-                            (values σ* (∪ target-cs cs)))]))
 (define-for-syntax do-body-transform-cs
-  (syntax-rules () [(_ e) (let ([cs e]) (∪ target-cs cs))]))
+  (syntax-parser
+    [(_ e) 
+     (with-do-binds extra
+       #'(do-comp #:wrap w #:bind (#:cs cs extra ...) e
+                  (let ([cs* (∪ target-cs cs)])
+                    (w #:cs cs* (do-values extra ...)))))]))
 
 (define-for-syntax (bind-help inner-σ body)
   #`(syntax-parameterize ([target-σ (make-rename-transformer #'#,inner-σ)])
       #,body))
 (define-simple-macro* (bind-join-whole (σjoin sσ a vs) body)
   (let ([σjoin (join sσ a vs)]) #,(bind-help #'σjoin #'body)))
+#;
 (define-simple-macro* (bind-join*-whole (σjoin* sσ as vss) body)
   (let ([σjoin* (join* sσ as vss)]) #,(bind-help #'σjoin* #'body)))
 
 (define (hash-getter hgσ a)
   (hash-ref hgσ a (λ () (error 'getter "Unbound address ~a in store ~a" a hgσ))))
 
-(define-syntax-rule (with-σ-passing-set-monad body)
+(define-syntax-parameter target-cs #f)
+(define-syntax-rule (init-cs body ...)
+  (let ([cs ∅])
+    (syntax-parameterize ([target-cs (make-rename-transformer #'cs)])
+      body ...)))
+(define-for-syntax cs-target (target #'target-cs '#:cs (make-rename-transformer #'init-cs)))
+
+(define-syntax-rule (with-set-monad body)
   (splicing-syntax-parameterize
-   ([yield (syntax-rules () [(_ e) (values target-σ (∪1 target-cs e))])]
-    [do-body-transformer do-body-transform-σ/cs])
+   ([yield (syntax-rules ()
+             [(_ e)
+              (let ([cs (∪1 target-cs e)])
+                (syntax-parameterize ([target-cs (make-rename-transformer #'cs)])
+                  (continue)))])]
+    [st-targets (cons cs-target (syntax-parameter-value #'st-targets))]
+    [do-body-transformer (let ([tr (syntax-parameter-value #'do-body-transformer)])
+                           (λ (stx) (tr #`(do-body-transform #,(do-body-transform-cs stx)))))])
    body))
 
-(define-syntax-rule (with-narrow-set-monad body)
+(define-syntax-rule (with-wide-σ-passing body)
   (splicing-syntax-parameterize
-   ([yield (syntax-rules () [(_ e) (∪1 target-cs e)])]
-    [do-body-transformer do-body-transform-cs])
-   body))
+      ([st-targets (cons σ-target (syntax-parameter-value #'st-targets))])
+    body))
+
+(define-syntax-rule (with-narrow-σ-passing body)
+  (splicing-syntax-parameterize
+      ([al-targets (cons σ-target (syntax-parameter-value #'al-targets))])
+    body))
 
 (define-syntax-rule (with-whole-σ body)
   (splicing-syntax-parameterize
    ([bind-join (make-rename-transformer #'bind-join-whole)]
+#;
     [bind-join* (make-rename-transformer #'bind-join*-whole)]
     [getter (make-rename-transformer #'hash-getter)])
    body))

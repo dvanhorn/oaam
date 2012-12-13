@@ -1,5 +1,5 @@
 #lang racket
-(require "do.rkt" "data.rkt" "primitives.rkt" racket/splicing)
+(require "do.rkt" "data.rkt" "primitives.rkt" "parameters.rkt" racket/splicing)
 (provide with-lazy with-strict)
 
 (define-syntax-rule (bind-delay-lazy (res ldσ a) body)

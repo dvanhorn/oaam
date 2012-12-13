@@ -1,9 +1,11 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
-         "store-passing.rkt" "context.rkt" "fix.rkt"
+         "store-passing.rkt" "context.rkt" "fix.rkt" "parameters.rkt"
          "handle-limits.rkt"
          "graph.rkt" racket/stxparam)
-(provide bind-join-∆s bind-join*-∆s mk-∆-fix^ mk-timestamp-∆-fix^ with-σ-∆s)
+(provide bind-join-∆s
+         #;bind-join*-∆s
+         mk-∆-fix^ mk-timestamp-∆-fix^ with-σ-∆s)
 
 ;; Utility function for combining multiple σ-∆s
 (define (map2-append f acc ls0 ls1)
@@ -18,6 +20,7 @@
 
 (define-simple-macro* (bind-join-∆s (∆s* ∆s a vs) body)
   (let ([∆s* (cons (cons a vs) ∆s)]) #,(bind-help #'∆s* #'body)))
+#;
 (define-simple-macro* (bind-join*-∆s (∆s* ∆s as vss) body)
   (let ([∆s* (map2-append cons ∆s as vss)]) #,(bind-help #'∆s* #'body)))
 
@@ -106,9 +109,30 @@
                        #:when (ans^? c))
                c)))))
 
+(define-syntax-parameter top-σ #f)
+;; We need this to initialize before target-σ, so we need
+;; a keyword that is less than #:σ. Luckily, #:top-σ is.
+(define-syntax initialize-top-σ
+  (syntax-rules () [(_ body ...)
+                    (let ([tσ target-σ])
+                      (syntax-parameterize ([top-σ (make-rename-transformer #'tσ)])
+                        body ...))]))
+(define-syntax initialize-∆s
+  (syntax-rules () [(_ body ...)
+                    (let ([∆s '()])
+                      (syntax-parameterize ([target-σ (make-rename-transformer #'∆s)])
+                        body ...))]))
+(define-for-syntax top-σ-target
+  (target #'top-σ '#:top-σ (make-rename-transformer #'initialize-top-σ)))
+(define-for-syntax ∆s-target
+  (target #'target-σ '#:σ (make-rename-transformer #'initialize-∆s)))
+
 (define-syntax-rule (with-σ-∆s body)
   (splicing-syntax-parameterize
-   ([bind-join (make-rename-transformer #'bind-join-∆s)]
-    [bind-join* (make-rename-transformer #'bind-join*-∆s)]
-    [getter (make-rename-transformer #'top-hash-getter)])
+      ([av-targets (cons top-σ-target (syntax-parameter-value #'av-targets))]
+       [st-targets (cons ∆s-target (syntax-parameter-value #'st-targets))]
+       [bind-join (make-rename-transformer #'bind-join-∆s)]
+#;
+       [bind-join* (make-rename-transformer #'bind-join*-∆s)]
+       [getter (make-rename-transformer #'top-hash-getter)])
    body))

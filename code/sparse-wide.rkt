@@ -1,7 +1,7 @@
 #lang racket
 (require "primitives.rkt" "data.rkt" "notation.rkt" racket/stxparam racket/splicing
          "do.rkt" "context.rkt" "deltas.rkt" "prealloc.rkt" "handle-limits.rkt"
-         "graph.rkt"
+         "parameters.rkt" "graph.rkt"
          (for-template "primitives.rkt")
          "env.rkt" (rename-in "imperative.rkt" [add-todo! i:add-todo!]))
 (provide mk-sparse^-fixpoint with-sparse^
@@ -31,7 +31,13 @@
 (define (register-state s)
   (node-of/data graph s (point #f #t (seteq))))
 
-(define-syntax-rule (empty-actions-sparse^) (hasheq))
+(define-syntax-parameter target-actions #f)
+(define-syntax-rule (initialize-actions body ...)
+  (let ([actions (hasheq)])
+    (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
+      body ...)))
+(define-for-syntax actions-target
+  (target #'target-actions '#:actions (make-rename-transformer #'initialize-actions)))
 
 (define (join-actions oldA newA)
   (for/fold ([A oldA]) ([(addr age) (in-hash newA)])
@@ -87,6 +93,7 @@
 ;; since the store fast-forwarding would be a no-op anyway.
 (define-syntax-rule (bind-join!/sparse (σ* j!σ a vs) body)
   (begin (join!/sparse a vs) body))
+#;
 (define-syntax-rule (bind-join*!/sparse (σ* j*!σ as vss) body)
   (begin (join*!/sparse as vss) body))
 
@@ -223,6 +230,7 @@
       body)))
 
 ;; An aliased address also counts as a use.
+#;
 (define-syntax-rule (bind-big-alias-sparse (σ* σ alias all-to-alias) body)
   (let-values ([(actions val)
                 (for/fold ([actions target-actions]
@@ -231,7 +239,7 @@
                           (⊓ val (getter σ to-alias))))])
     (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
       (bind-join (σ* σ alias val) body))))
-
+#;
 (define-syntax-rule (bind-alias*-sparse (σ* σ aliases all-to-alias) body)
   (let-values ([(actions rev-aliases rev-vals)
                 (for/fold ([actions target-actions] [raliases '()] [vals '()])
@@ -248,15 +256,15 @@
   (syntax-case stx ()
     [(_ e)
      (with-do-binds extra
-       #'(let ([last-actions target-actions])
-           (do-comp #:bind (σ extra ...) e
-                    (values (join-actions last-actions target-actions)
-                            extra ...))))]))
+       #'(do-comp #:wrap w #:bind (#:actions A extra ...) e
+                  (let ([actions (join-actions A target-actions)])
+                    (w #:actions actions (do-values extra ...)))))]))
 
 (define-syntax-rule (with-sparse-mutable-worklist body)
   (splicing-syntax-parameterize
    ([yield yield-global-sparse]
-    [do-body-transformer do-body-transform-actions])
+    [do-body-transformer (let ([tr (syntax-parameter-value #'do-body-transformer)])
+                           (λ (stx) (tr #`(do-body-transformer #,(do-body-transform-actions stx)))))])
    body))
 
 (define-syntax-rule (with-0-ctx/prealloc/sparse body)
@@ -271,10 +279,15 @@
   (splicing-syntax-parameterize
    ([bind-get (make-rename-transformer #'bind-get-sparse)]
     [bind-force (make-rename-transformer #'bind-force-sparse)]
+    [st-targets (cons actions-target (syntax-parameter-value #'st-targets))]
+#;
     [bind-big-alias (make-rename-transformer #'bind-big-alias-sparse)]
+#;
     [bind-alias* (make-rename-transformer #'bind-alias*-sparse)]
     [bind-join (make-rename-transformer #'bind-join!/sparse)]
+#;
     [bind-join* (make-rename-transformer #'bind-join*!/sparse)]
     [getter (make-rename-transformer #'global-vector-getter)]
+#;
     [empty-actions (make-rename-transformer #'empty-actions-sparse^)])
    body))

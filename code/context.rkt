@@ -1,5 +1,6 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
+         "parameters.rkt"
          (for-syntax syntax/parse) "data.rkt")
 (provide bind-0 bind-1 bind-∞
          bind-rest-0 bind-rest-1 bind-rest-∞
@@ -52,7 +53,8 @@
                                                            (iloop sσ (set-rest res) (cons A vrest*) (⊓ rest rvs)))]
                                                         [_ (iloop sσ (set-rest res) vrest* rvs)])]))))]
                                     [(cons jA -vrest)
-                                     (loop sσ -vrest (cons jA vrest*))]))
+                                     (loop sσ -vrest (cons jA vrest*))]
+                                    [_ (error 'bind-rest "Bad match ~a" vrest)]))
                               (bind-join (iσ outσ ra rvs)
                                          (bind-big-alias (νσ iσ rA vrest*) body*)))
                    #'(let ([rvs (if (null? vrest) snull (⊓1 snull (consv rA ra)))])

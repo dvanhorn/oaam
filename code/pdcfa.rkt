@@ -1,7 +1,7 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          "prealloc.rkt" "imperative.rkt" "fix.rkt" "handle-limits.rkt"
-         "data.rkt" "ast.rkt"
+         "parameters.rkt" "data.rkt" "ast.rkt"
          "graph.rkt"
          (for-template "op-struct.rkt" racket/base racket/stxparam)
          (for-syntax racket/syntax))
@@ -51,12 +51,6 @@
   (set! L (make-hash))
   (set! M (make-hash))
   (prepare-prealloc parser sexp))
-
-(define-for-syntax (apply-transformer f)
-  (if (rename-transformer? f)
-      (let ([target (rename-transformer-target f)])
-        (λ (stx) #`(#,target . #,(cdr (syntax-e stx)))))
-      f))
 
 (define-for-syntax ((mk-pdcfa ev co ap) stx)
   (syntax-case stx ()

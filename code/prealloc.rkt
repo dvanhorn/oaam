@@ -1,5 +1,6 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
+         "parameters.rkt"
          "data.rkt" "imperative.rkt" "context.rkt" "add-lib.rkt"
          "deltas.rkt")
 (provide prepare-prealloc with-0-ctx/prealloc
@@ -92,6 +93,7 @@
 (define-syntax-rule (with-prealloc/timestamp-store body)
   (splicing-syntax-parameterize
    ([bind-join (make-rename-transformer #'bind-join!)]
+#;
     [bind-join* (make-rename-transformer #'bind-join*!)]
     [getter (make-rename-transformer #'global-vector-getter)])
    body))
@@ -107,6 +109,7 @@
   (with-σ-∆s/acc!
    (splicing-syntax-parameterize
     ([bind-join (make-rename-transformer #'bind-join/∆s/acc/prealloc)]
+#;
      [bind-join* (make-rename-transformer #'bind-join*/∆s/acc/prealloc)]
      [getter (make-rename-transformer #'global-vector-getter)])
     body)))
@@ -121,6 +124,7 @@
   (with-σ-∆s!
    (splicing-syntax-parameterize
     ([bind-join (make-rename-transformer #'bind-join/∆s/prealloc)]
+#;
      [bind-join* (make-rename-transformer #'bind-join*/∆s/prealloc)]
      [getter (make-rename-transformer #'global-vector-getter)])
     body)))

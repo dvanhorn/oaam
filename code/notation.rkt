@@ -3,8 +3,22 @@
 (require (for-syntax syntax/parse))
 (provide for/append for/union for*/union for/set for*/set
          define-simple-macro* hash-reverse and
+         (rename-out [safer-match match]
+                     [safer-match* match*])
          add1/debug
          ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
+
+(define-syntax (safer-match stx)
+  (syntax-parse stx
+    [(_ e others ...)
+     #`(match e others ... [t (error 'match "Bad match ~a ~a" t '#,stx)])]))
+(define-syntax (safer-match* stx)
+  (syntax-parse stx
+    [(_ e [(pats ...) rhs ...] ...)
+     (with-syntax ([(t ...) (generate-temporaries (car (syntax->list #'((pats ...) ...))))])
+       #`(match* e
+           [(pats ...) rhs ...] ...
+           [(t ...) (error 'match "Bad match ~a ~a" (list t ...) '#,stx)]))]))
 
 (define (add1/debug n from)
   (unless (number? n)
