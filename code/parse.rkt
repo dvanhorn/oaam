@@ -6,7 +6,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser
 
+(define prim-fallbacks #f)
 (define (parse-prog sexp [fresh-label! igensym] [fresh-variable! igensym])
+  (set! prim-fallbacks (make-hasheq))
   (parse (cons define-ctx sexp) fresh-label! fresh-variable!))
 #;
 (trace parse-prog)
@@ -15,6 +17,10 @@
   ;; in order for the renaming to work on open programs, we not only have to return
   ;; the renamed program, but also a map from free variables to their new names.
   (define open (make-hasheq))
+  (define prims-used (make-hasheq))
+  (define (mk-primr tail? which)
+    (define b (hash-ref! prim-fallbacks which (λ () (box #f)) ))
+    (primr (fresh-label!) tail? which b))
   (define ((new-free x))
     (match (hash-ref open x #f)
       [#f (define x-id (fresh-variable! x))
@@ -94,13 +100,13 @@
            (app (fresh-label!) tail? (parse e #f) (map (parse_ #f) es))]))
 
       (match sexp
-        [`(,(== special) . ,s) (primr (fresh-label!) tail? s)]
+        [`(,(== special) . ,s) (mk-primr tail? s)]
         [`((,(== special) . ,s) . ,es)
-         (if (primitive? s)
-             (app (fresh-label!) tail?
-                  (primr (fresh-label!) #f s)
-                  (map (parse_ #f) es))
-             (parse-core (cons s es)))]
+         (cond [(primitive? s)
+                (app (fresh-label!) tail?
+                     (mk-primr #f s)
+                     (map (parse_ #f) es))]
+               [else (parse-core (cons s es))])]
         [`(,e . ,es)
          (cond [(hash-has-key? ρ e)
                 (app (fresh-label!) tail?
@@ -110,19 +116,19 @@
         [(? symbol? s)
          (define (mkvar) (var (fresh-label!) tail? (rename s)))
          (cond [(hash-has-key? ρ s) (mkvar)]
-               [(primitive? s) (primr (fresh-label!) tail? s)]
+               [(primitive? s) (mk-primr tail? s)]
                [(hash-ref prim-constants s #f) =>
                 (λ (d) (datum (fresh-label!) tail? d))]
                [else (mkvar)])] ;; will error
         [(? atomic? d) (datum (fresh-label!) tail? d)]
         [(? vector? d) (parse `(,quote$ ,d) tail?)] ;; ick
         [err (error 'parse "Unknown form ~a" err)])))
-  (values expr open))
+  (values expr open prim-fallbacks))
 #;
 (trace parse)
 (define (unparse e)
   (match e
-    [(or (var _ _ x) (datum _ _ x) (primr _ _ x)) x]
+    [(or (var _ _ x) (datum _ _ x) (primr _ _ x _)) x]
     [(app _ _ e es) (map unparse (cons e es))]
     [(lam _ _ xs body) `(λ ,xs ,(unparse body))]
     [(ife _ _ g t e) `(if ,(unparse g) ,(unparse t) ,(unparse e))]

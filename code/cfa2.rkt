@@ -158,7 +158,8 @@
        (loop e ξ)]
       [(lcc _ _ x e)
        (loop e (∪1 ξ x))]
-      [(or (primr _ _ _)
+      [(pfl _ _ _ e) (loop e ξ)]
+      [(or (primr _ _ _ _)
            (datum _ _ _)
            (fal _ _)) (void)]
       [(or (grt _ _ _ e) (frm _ _ _ e))
@@ -205,7 +206,7 @@
                                           (syntax-parameterize ([ξ (make-rename-transformer #'ξ**)])
                                             #,(yield-tr #'(yield (co σ k** v**)))))])
                               (do-co-yield ξ k* v* do)
-                              (continue))]
+                              (values))]
                      ;; If this is the product of a function call,
                      ;; push the continuation + stack frame for the entry.
                      [(_ (ev σ e ρ k δ*))
@@ -216,19 +217,19 @@
                                      #,(yield-tr #'(yield (co σ k* v*))))))
                         (define (do-ev k-stx)
                           (yield-tr #,#'#`(yield (ev σ e ρ #,k-stx δ*))))
-                        #,#'#`(let* ([ok k])
-                                #,(cond
-                                   [(syntax-parameter-value #'called-function)
-                                    #`(let ([k* (entry ξ (singleton called-function))])
-                                        (call-prep fn-call-ξ fn-call-label ok k* #,do-co #;original-δ)
-                                        #,(do-ev #'k*))]
-                                    [else
-                                     (do-ev #'ok)])))]
+                        #,#'#`(let* ([ok k]
+                                     [k*
+                                      (if called-function
+                                          (let ([k* (entry ξ (singleton called-function))])
+                                            (call-prep fn-call-ξ fn-call-label ok k* #,do-co #;original-δ)
+                                            k*)
+                                          ok)])
+                                #,(do-ev #'k*)))]
                       [(_ e) (yield-tr #'(yield e))]))))
 
               (define-syntax-rule (bind-extra-initial-cfa2 . body*)
                 (let ([ξ₀ (hash)]
-                      [fnξ #f]
+                      [fnξ (hash)]
                       [fnlab -1])
                   (syntax-parameterize ([ξ (make-rename-transformer #'ξ₀)]
                                         [fn-call-ξ (make-rename-transformer #'fnξ)]
@@ -247,7 +248,7 @@
 
               (define-syntax-rule (bind-extra-prim-cfa2 (state ℓ ξ*) . body*)
                 (syntax-parameterize ([ξ (make-rename-transformer #'ξ*)]
-                                      [fn-call-ξ (make-rename-transformer #'ξ)]
+                                      [fn-call-ξ (make-rename-transformer #'ξ*)]
                                       [fn-call-label (make-rename-transformer #'ℓ)])
                   . body*))
 

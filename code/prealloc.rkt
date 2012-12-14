@@ -47,8 +47,8 @@
   (define nlabels 0)
   (define (fresh-label!) (begin0 nlabels (set! nlabels (add1 nlabels))))
   (define (fresh-variable! x) (begin0 nlabels (set! nlabels (add1 nlabels))))
-  (define-values (e renaming) (parser sexp fresh-label! fresh-variable!))
-  (define e* (add-lib e renaming fresh-label! fresh-variable!))
+  (define-values (e renaming ps) (parser sexp fresh-label! fresh-variable!))
+  (define e* (add-lib e renaming ps fresh-label! fresh-variable!))
   ;; Start with a constant factor larger store since we are likely to
   ;; allocate some composite data. This way we don't incur a reallocation
   ;; right up front.

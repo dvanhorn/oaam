@@ -54,7 +54,7 @@
 ;; - eof
 ;; - '()
 ;; - (void)
-;; - (primop Sym procedure-arity?)
+;; - (primop Sym Val procedure-arity?)
 ;; - (consv Addr Addr)
 ;; - (vectorv Number (listof Addr))
 ;; - (clos List[Var] Exp Env) ;; or without Env. Constructed by mk-analysis.
@@ -157,12 +157,12 @@
 ;; - Input-Port
 ;; - Output-Port
 ;; - (addr Addr)  ;; for delayed lookup.
-;; - (primop Sym procedure-arity?)
+;; - (primop Sym Val procedure-arity?)
 ;; - (consv Addr Addr)
 ;; - (vectorv Number (listof Addr))
 ;; - (immutable-vector Val ...)
 ;; - (clos List[Var] Exp Env) ;; or without Env. Constructed by mk-analysis.
-(struct primop (which arity) #:prefab)
+(struct primop (which apply-fallback arity) #:prefab)
 (struct consv (car cdr) #:prefab)
 (struct vectorv (length addrs) #:prefab)
 (struct vectorv-immutable (length addrs) #:prefab)

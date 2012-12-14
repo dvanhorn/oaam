@@ -15,9 +15,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Machine maker
 
-(define (arity-error f l exp giv vals)
-  (log-info "Arity error on ~a at ~a. Expected ~a args, given ~a: ~a" f l exp giv vals))
-
 (define (cont-arity-error given k l)
   (log-info "Called continuation with wrong number of arguments (~a): ~a at ~a"
             given k l))
@@ -116,14 +113,20 @@
                     (yield (dr ev-σ k (lookup-env ρ x)))))]
              [(datum l _ d)
               (λ% (ev-σ ρ k δ)
-
                   (when (memv d (debug-check))
                     (printf "Reached ~a~%" d)
                     (flush-output))
                   (do (ev-σ) () (yield (co ev-σ k d))))]
-             [(primr l _ which)
-              (define p (primop (compile-primop which) (hash-ref prim-arities which)))
+             [(primr l _ which fallback)
+              (define p (primop (compile-primop which)
+                                fallback
+                                (hash-ref prim-arities which)))
               (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k p))))]
+             [(pfl l _ fallback e)
+              (define c (compile e))
+              (λ% (ev-σ ρ k δ)
+                  (do (ev-σ) ([(σ*-pfl a) #:push ev-σ l δ k])
+                    (yield (ev σ*-pfl c ρ (pfk (marks-of k) fallback a) δ))))]
              [(lam l _ x e*)
               (define c (compile e*))
               (define fv (free e))
@@ -141,8 +144,8 @@
                   (define as (map (λ (x) (make-var-contour x δ)) xs))
                   (define/ρ ρ* (extend* ρ xs as))
                   (do (ev-σ) ([(σ0 a) #:push ev-σ l δ k]
-                               [σ*-lrc #:join* σ0 as ss])
-                     (yield (ev σ*-lrc c ρ* (lrk (marks-of k) x xs* cs cb ρ* a δ) δ))))]
+                              [σ*-lrc #:join* σ0 as ss])
+                    (yield (ev σ*-lrc c ρ* (lrk (marks-of k) x xs* cs cb ρ* a δ) δ))))]
              [(lte l _ (cons x xs) (cons e es) b)
               (define c (compile e))
               (define cs (map compile es))
@@ -237,10 +240,11 @@
            (mk-op-struct ls (cm l n es vs ρ k δ) (cm-op ... l n es vs ρ-op ... k δ-op ...))
            (mk-op-struct ltk (cm x xs es x-done v-addrs e ρ k δ)
                          (cm-op ... x xs es x-done v-addrs e ρ-op ... k δ-op ...))
+           (mk-op-struct pfk (cm fallback k) (cm-op ... fallback k))
            ;; Values
            (mk-op-struct clos (x e ρ free) (x e ρ-op ... free) #:expander-id clos:)
            (mk-op-struct rlos (x r e ρ free) (x r e ρ-op ... free) #:expander-id rlos:)
-           (define (kont? v) (or (ls? v) (lrk? v) (ltk? v) (ifk? v) (sk!? v) (mt? v)))
+           (define (kont? v) (or (ls? v) (lrk? v) (ltk? v) (ifk? v) (sk!? v) (mt? v) (pfk? v)))
            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
            ;; Handling of continuation marks
            (define (marks-of k)
@@ -251,7 +255,8 @@
                             (ifk: cm _ _ _ _ _)
                             (lrk: cm _ _ _ _ _ _ _)
                             (ltk: cm _ _ _ _ _ _ _ _ _)
-                            (ls: cm _ _ _ _ _ _ _)) cm])
+                            (ls: cm _ _ _ _ _ _ _)
+                            (pfk: cm _ _)) cm])
                    #'#f))
            (define (tail-of k)
              #,(if (given CM?)
@@ -261,7 +266,8 @@
                        [(ifk: cm t e ρ k δ) k]
                        [(lrk: cm x xs es e ρ k δ) k]
                        [(ltk: cm x xs es xd va e ρ k δ) k]
-                       [(ls: cm l n es vs ρ k δ) k])
+                       [(ls: cm l n es vs ρ k δ) k]
+                       [(pfk: cm f k) k])
                    #'#f))
            (define mt-marks
              (for/hash ([permission (in-set mark-set)])
@@ -288,7 +294,9 @@
                        [(ltk: cm x xs es xd va e ρ k δ)
                         (ltk (set-mark cm R) x xs es xd va e ρ k δ)]
                        [(ls: cm l n es vs ρ k δ)
-                        (ls (set-mark cm R) l n es vs ρ k δ)])
+                        (ls (set-mark cm R) l n es vs ρ k δ)]
+                       [(pfk: cm f k)
+                        (pfk: (set-mark cm R) f k)])
                    #'#f))
            (define (frame k R)
              #,(if (given CM?)
@@ -304,7 +312,9 @@
                        [(ltk: cm x xs es xd va e ρ k δ)
                         (ltk (frame-mark cm R) x xs es xd va e ρ k δ)]
                        [(ls: cm l n es vs ρ k δ)
-                        (ls (frame-mark cm R) l n es vs ρ k δ)])
+                        (ls (frame-mark cm R) l n es vs ρ k δ)]
+                       [(pfk: cm f k)
+                        (pfk (frame-mark cm R) f k)])
                    #'#f))
 
            ;; XXX: does not work with actions
@@ -392,8 +402,9 @@
                                                                          #,(if (eq? (attribute K) +inf.0)
                                                                                #'+inf.0
                                                                                #'(cons-limit))])
-                                                           (define-values (e* r) (parse-prog e gensym gensym))
-                                                           (add-lib e* r gensym gensym))))])
+                                                           (define-values (e* r ps)
+                                                             (parse-prog e gensym gensym))
+                                                           (add-lib e* r ps gensym gensym))))])
                  (fixpoint step (inj (prepare e))))
                ;; parameterize prim-meaning so we can use it in the definition of apply.
                (splicing-syntax-parameterize ([prim-meaning (make-rename-transformer #'prim-meaning-def)])
@@ -401,7 +412,7 @@
                ;; Prim-meaning is abstracted into a function, so it don't get syntactic
                ;; context at its application point in the ap: case. For CFA2, we need to
                ;; know the stack frame and label of the application.
-               (mk-prims prim-meaning-def compile-primop ev co clos rlos kont? extra ...)
+               (mk-prims prim-meaning-def compile-primop ev co ap clos rlos kont? extra ...)
 
                #,@compile-def
 
@@ -475,6 +486,12 @@
                           (do (co-σ) ([σ*-sk! #:join-forcing co-σ l v]
                                       [k* #:in-kont σ*-sk! a])
                             (yield (co σ*-sk! k* (void)))))]
+
+                        [(pfk: cm fallback a)
+                         (generator
+                          (set-box! fallback v) ;; haxxx
+                          (do (co-σ) ([k* #:in-kont co-σ a])
+                            (yield (co co-σ k* v))))]
                         [_ (error 'step "Bad continuation ~a" k)]))]
 
                    [(lt: lt-σ extra-ids ... e ρ x-addrs v-addrs k δ)
@@ -511,7 +528,8 @@
                                   [else
                                    (arity-error f l (arity-at-least xn) an (map (λ (a) (getter ap-σ a)) arg-addrs))
                                    (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-                           [(primop o _) (tapp prim-meaning o #f l δ-op ... k arg-addrs)]
+                           [(primop o fallback _)
+                            (tapp prim-meaning o (unbox fallback) #f l δ-op ... k arg-addrs)]
                            [(? kont? k)
                             ;; continuations only get one argument.
                             (cond [(and (pair? arg-addrs) (null? (cdr arg-addrs)))
@@ -541,7 +559,7 @@
 
                    [_ (error 'step "Bad state ~a" state)])))
 
-
+#;
                  (trace step)
 
                ))))))]))

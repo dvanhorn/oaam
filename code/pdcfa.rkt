@@ -69,7 +69,8 @@
                     [(_ (co σ k v))
                      #,#'#`(let ([do (λ (k* v*)
                                         #,(yield-tr #'(yield (co σ k* v*))))])
-                             (do-co-yield k v do))]
+                             (do-co-yield k v do)
+                             (values))]
                     ;; If this is the product of a function call,
                     ;; push the continuation + stack frame for the entry.
                     [(_ (ev σ e ρ k δ))
@@ -78,12 +79,14 @@
                          #,#'#`(λ (k* v*) #,(yield-tr #'(yield (co σ k* v*)))))
                        (define (do-ev k-stx)
                          (yield-tr #,#'#`(yield (ev σ e ρ #,k-stx δ*))))
-                       #,#'#`(let* ([ok k])
-                               #,(if (syntax-parameter-value #'called-function)
-                                     #`(let ([k* (entry e)])
-                                         (call-prep ok k* #,do-co)
-                                         #,(do-ev #'k*))
-                                     (do-ev #'ok))))]
+                       #,#'#`(let* ([ok k]
+                                    [k*
+                                     (if called-function
+                                         (let ([k* (entry e)])
+                                           (call-prep ok k* #,do-co)
+                                           k*)
+                                         ok)])
+                               #,(do-ev #'k*)))]
                     [(_ e) (yield-tr #'(yield e))]))))
 
            (define-syntax-rule (bind-get-kont-pdcfa (res σ k) body*)

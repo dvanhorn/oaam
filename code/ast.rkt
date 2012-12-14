@@ -22,13 +22,14 @@
 (struct ife exp (t c a)       #:transparent #:mutable)
 (struct st! exp (x e)         #:transparent #:mutable)
 (struct lcc exp (x e)         #:transparent #:mutable)
+(struct pfl exp (fallback e)  #:transparent) ;; Primitive apply fallback value
 ;; Stack inspection forms
 (struct grt exp (r e)         #:transparent) ;; Grant
 (struct fal exp ()            #:transparent) ;; Fail
 (struct frm exp (r e)         #:transparent) ;; Frame
 (struct tst exp (r t e)       #:transparent) ;; Test
 
-(struct primr exp (which)    #:transparent)
+(struct primr exp (which fallback) #:transparent)
 ;; (dst Lab Sym List[Pair[Sym Boolean]] Exp)
 ;; Define struct form that should die after we go to real Racket.
 (struct dst exp (name fields e) #:transparent)
@@ -68,8 +69,9 @@
        (define efs (loop e))
        (if (x . ∈ . bound) efs (∪1 efs x))]
       [(lcc _ _ x e) (loop* e (∪1 bound x))]
-      [(primr _ _ _) ∅]
+      [(primr _ _ _ _) ∅]
       [(datum _ _ _) ∅]
+      [(pfl _ _ _ e) (loop e)]
       ;; Continuation mark forms
       [(grt _ _ _ e) (loop e)]
       [(frm _ _ _ e) (loop e)]

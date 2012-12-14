@@ -12,30 +12,7 @@
 
 (define r4rs-prims
   (make-hasheq
-   `((/ . (lambda (n . ms)
-            (if (null? ms)
-                (binary-/ 1 n)
-                (let loop ([acc n] [ms ms])
-                  (if (pair? ms)
-                      (loop (binary-/ acc (car ms)) (cdr ms))
-                      acc)))))
-     (+ . (lambda ns (let loop ([acc 0] [ns ns])
-                       (if (pair? ns)
-                           (loop (binary-+ acc (car ns)) (cdr ns))
-                           acc))))
-     (* . (lambda ns (let loop ([acc 1] [ns ns])
-                       (if (pair? ns)
-                           (loop (binary-* acc (car ns)) (cdr ns))
-                           acc))))
-     (vector . (lambda ns
-                 (define v (make-vector (length ns)))
-                 (let loop ([ns ns] [i 0])
-                   (if (pair? ns)
-                       (begin (vector-set! v i (car ns))
-                              (loop (cdr ns) (add1 i)))
-                       (void)))
-                 v))
-     (caar . (lambda (x) (car (car x))))
+   `((caar . (lambda (x) (car (car x))))
      (cadr . (lambda (x) (car (cdr x))))
      (cdar . (lambda (x) (cdr (car x))))
      (cddr . (lambda (x) (cdr (cdr x))))
@@ -63,6 +40,13 @@
      (cddadr . (lambda (x) (cdr (cdr (car (cdr x))))))
      (cdddar . (lambda (x) (cdr (cdr (cdr (car x))))))
      (cddddr . (lambda (x) (cdr (cdr (cdr (cdr x))))))
+     (make-vector (lambda (n . op)
+                    (if (null? op)
+                        (internal-make-vector n 0)
+                        (if (null? (cdr op))
+                            (internal-make-vector n (car op))
+                            (error 'make-vector "Too many arguments")))))
+     
      (list . (lambda a a))
      (list? . (λ (x) (or (eq? x '())
                          (and (pair? x)
@@ -210,41 +194,41 @@
                      (map* f (cons a args)))))))
 
      (for-each .
-       (lambda (f a . args)
-         (letrec ((map (lambda (f l)
-                         (if (null? l)
-                             '()
-                             (cons (f (car l))
-                                   (map f (cdr l)))))))
-           (letrec ((for-each1 (lambda (f l)
+               (lambda (f a . args)
+                 (letrec ((map (lambda (f l)
                                  (if (null? l)
-                                     (void)
-                                     (begin
-                                       (f (car l))
-                                       (for-each1 f (cdr l))))))
-                    (for-each2 (lambda (f l1 l2)
-                                 (cond ((null? l1)
-                                        (void))
-                                       ((null? l2)
-                                        (error 'for-each "lists differ in length"))
-                                       (else
-                                        (f (car l1) (car l2))
-                                        (for-each2 f (cdr l1) (cdr l2))))))
-                    (for-each* (lambda (f l*)
-                                 (if (null? (car l*))
-                                     (void)
-                                     (begin
-                                       (let ((l (map car l*)))
+                                     '()
+                                     (cons (f (car l))
+                                           (map f (cdr l)))))))
+                   (letrec ((for-each1 (lambda (f l)
                                          (if (null? l)
-                                             (f)
-                                             (apply f l)))
-                                       (for-each* f (map cdr l*)))))))
-             (cond ((null? args)
-                    (for-each1 f a))
-                   ((null? (cdr args))
-                    (for-each2 f a (car args)))
-                   (else
-                    (for-each* f (cons a args))))))))
+                                             (void)
+                                             (begin
+                                               (f (car l))
+                                               (for-each1 f (cdr l))))))
+                            (for-each2 (lambda (f l1 l2)
+                                         (cond ((null? l1)
+                                                (void))
+                                               ((null? l2)
+                                                (error 'for-each "lists differ in length"))
+                                               (else
+                                                (f (car l1) (car l2))
+                                                (for-each2 f (cdr l1) (cdr l2))))))
+                            (for-each* (lambda (f l*)
+                                         (if (null? (car l*))
+                                             (void)
+                                             (begin
+                                               (let ((l (map car l*)))
+                                                 (if (null? l)
+                                                     (f)
+                                                     (apply f l)))
+                                               (for-each* f (map cdr l*)))))))
+                     (cond ((null? args)
+                            (for-each1 f a))
+                           ((null? (cdr args))
+                            (for-each2 f a (car args)))
+                           (else
+                            (for-each* f (cons a args))))))))
      (call-with-current-continuation .
                                      (lambda (f)
                                        (let/cc x (f x))))
@@ -270,65 +254,54 @@
                                         ; no way to switch current output in R4RS Scheme
          (error 'with-output-to-file "not supported")
          (f)))     
-     (apply .
-       (lambda (f arg0 . args)
-         (cond [(null? args)
-                (cond [(null? arg0) (f)]
-                      [(null? (cdr arg0)) (f (car m))]
-                      [(null? (cdr (cdr arg0))) (f (car m) (car (cdr m)))]
-                      [else (,internal-apply$ f arg0)])]
-               [else (,internal-apply$ f (cons arg0 args))])))
-       (make-promise .
-                     (lambda (thunk)
-                       (let ([first #t]
-                             [val #f])
-                         (lambda ()
-                           (cond [(eq? first 'forcing) (error 'force "recursive force")]
-                                 [first (set! first 'forcing)
-                                        (set! val (thunk))
-                                        (set! first #f)
-                                        val]
-                                 [else val])))))
-       (force . (lambda (promise) (promise)))
-       (make-list .
-                  (lambda (n val)
-                    (let loop ((n n))
-                      (if (< n 1)
-                          '()
-                          (cons val (loop (- n 1)))))))
-       #;
-       (define andmap
-         (lambda (f list0 . lists)
-           (if (null? list0)
-               (and)
-               (let loop ((lists (cons list0 lists)))
-                 (if (null? (cdr (car lists)))
-                     (apply f (map car lists))
-                     (and (apply f (map car lists))
-                          (loop (map cdr lists))))))))
-       #;
-       (define ormap
-         (lambda (f list0 . lists)
-           (if (null? list0)
-               (or)
-               (let loop ((lists (cons list0 lists)))
-                 (if (null? (cdr (car lists)))
-                     (apply f (map car lists))
-                     (or (apply f (map car lists))
-                         (loop (map cdr lists))))))))
-       (call/cc .
-                (lambda (f)
-                  (let/cc x (f x))))
-       (dynamic-wind .
-           (lambda (in doit out)
-             (let* ([a (in)]
-                    [b (doit)]
-                    [c (out)])
-               b)))
-       (sort .
-             (lambda (compare in)
-               in))
-       (hash-ref . (λ (h k . rest)
+     
+     (make-promise .
+                   (lambda (thunk)
+                     (let ([first #t]
+                           [val #f])
+                       (lambda ()
+                         (cond [(eq? first 'forcing) (error 'force "recursive force")]
+                               [first (set! first 'forcing)
+                                      (set! val (thunk))
+                                      (set! first #f)
+                                      val]
+                               [else val])))))
+     (force . (lambda (promise) (promise)))
+     (make-list .
+                (lambda (n val)
+                  (let loop ((n n))
+                    (if (< n 1)
+                        '()
+                        (cons val (loop (- n 1)))))))
+
+     (andmap .
+             (lambda (f list0 . lists)
+               (if (null? list0)
+                   (and)
+                   (let loop ((lists (cons list0 lists)))
+                     (if (null? (cdr (car lists)))
+                         (apply f (map car lists))
+                         (and (apply f (map car lists))
+                              (loop (map cdr lists))))))))
+
+     (ormap .
+            (lambda (f list0 . lists)
+              (if (null? list0)
+                  (or)
+                  (let loop ((lists (cons list0 lists)))
+                    (if (null? (cdr (car lists)))
+                        (apply f (map car lists))
+                        (or (apply f (map car lists))
+                            (loop (map cdr lists))))))))
+     (call/cc . (lambda (f) (let/cc x (f x))))
+     (dynamic-wind .
+         (lambda (in doit out)
+           (let* ([a (in)]
+                  [b (doit)]
+                  [c (out)])
+             b)))
+     (sort . (lambda (compare in) in))
+     (hash-ref . (λ (h k . rest)
                     (if (null? rest)
                         (core-hash-ref h k)
                         (if (hash-has-key? h k)
@@ -337,7 +310,7 @@
                               (if (procedure? fail)
                                   (fail)
                                   fail))))))
-       (hash-ref! . (λ (h k . rest)
+     (hash-ref! . (λ (h k . rest)
                      (if (immutable? h)
                          (error "Shouldn'ta done that, Bill")
                          (if (null? rest)
@@ -350,9 +323,107 @@
                                                 fail)])
                                      (hash-set! h k v)
                                      v)))))))
-       )))
+     )))
 
-(define (add-lib expr renaming fresh-label! fresh-variable!)
+;; Rest-arg primitives that will be fallbacks when called by
+;; 'apply'
+(define fallbacks
+  (let ([comp (λ (op)
+                 `(lambda (n m . ms)
+                    (and (,op n m)
+                         (let loop ([last m] [ms ms])
+                           (if (pair? ms)
+                               (let ([m* (car ms)])
+                                 (and (,op last m*) (loop m* (cdr ms))))
+                               #t)))))]
+        [foldl (λ (op init)
+                  `(let loop ([acc ,init] [ms ms])
+                     (if (pair? ms)
+                         (loop (,op acc (car ms)) (cdr ms))
+                         acc)))])
+  (make-hasheq
+   `((/ . (lambda (n . ms)
+            (if (null? ms)
+                (binary-/ 1 n)
+                ,(foldl '/ 'n))))
+     (+ . (lambda ms ,(foldl 'binary-+ 0)))
+     (* . (lambda ms ,(foldl 'binary-* 1)))
+     (- . (lambda (n . ms)
+            (if (null? ms)
+                (unary-- n)
+                ,(foldl 'binary-- 'n))))
+     (vector . (lambda ns
+                 (letrec ([length (λ (l acc)
+                                     (if (pair? l)
+                                         (length (cdr l) (add1 acc))
+                                         acc))])
+                   (if (pair? ns)
+                       (let ([v (internal-make-vector (length ns 0) (car ns))])
+                         (let loop ([ns (cdr ns)] [i 1])
+                           (if (pair? ns)
+                               (begin (vector-set! v i (car ns))
+                                      (loop (cdr ns) (add1 i)))
+                               v)))
+                       (internal-make-vector 0 0)))))
+     (vector-immutable . (lambda ns
+                           (letrec ([length (λ (l acc)
+                                               (if (pair? l)
+                                                   (length (cdr l) (add1 acc))
+                                                   acc))])
+                             (if (pair? ns)
+                                 (let ([v (internal-make-immutable-vector (length ns 0) (car ns))])
+                                   (let loop ([ns (cdr ns)] [i 1])
+                                     (if (pair? ns)
+                                         (begin (internal-immutable-vector-set! v i (car ns))
+                                                (loop (cdr ns) (add1 i)))
+                                         v)))
+                                 (internal-make-immutable-vector 0 0)))))
+     (apply .
+            (lambda (f arg0 . args)
+              (define (flatten l)
+                (if (null? (cdr l))
+                    (car l)
+                    (cons (car l) (flatten (cdr l)))))
+              (define m (flatten (cons arg0 args)))
+              (cond [(null? m) (f)]
+                    [(null? (cdr m)) (f (car m))]
+                    [(null? (cdr (cdr m))) (f (car m) (car (cdr m)))]
+                    [else (,internal-apply$ f m)])))
+     (= . ,(comp '=))
+     (< . ,(comp '<))
+     (> . ,(comp '>))
+     (<= . ,(comp '<=))
+     (>= . ,(comp '>=))
+     (min . (lambda (n . ms) ,(foldl 'binary-min 'n)))
+     (max . (lambda (n . ms) ,(foldl 'binary-max 'n)))
+     (gcd . (lambda ms ,(foldl 'binary-gcd 0)))
+     (lcm . (lambda ms ,(foldl 'binary-lcm 1)))
+     (bitwise-and . (lambda ms ,(foldl 'binary-bitwise-and -1)))
+     (bitwise-xor . (lambda ms ,(foldl 'binary-bitwise-xor 0)))
+     (bitwise-ior . (lambda ms ,(foldl 'binary-bitwise-ior 0)))
+     (string=? . ,(comp 'binary-string=?))
+     (string>? . ,(comp 'binary-string>?))
+     (string<? . ,(comp 'binary-string<?))
+     (string>=? . ,(comp 'binary-string>=?))
+     (string<=? . ,(comp 'binary-string<=?))
+     (string-ci=? . ,(comp 'binary-string-ci=?))
+     (string-ci>? . ,(comp 'binary-string-ci>?))
+     (string-ci<? . ,(comp 'binary-string-ci<?))
+     (string-ci>=? . ,(comp 'binary-string-ci>=?))
+     (string-ci<=? . ,(comp 'binary-string-ci<=?))
+     (string-append . (lambda ms ,(foldl 'binary-string-append '"")))
+     (char=? . ,(comp 'binary-char=?))
+     (char>? . ,(comp 'binary-char>?))
+     (char<? . ,(comp 'binary-char<?))
+     (char>=? . ,(comp 'binary-char>=?))
+     (char<=? . ,(comp 'binary-char<=?))
+     (char-ci=? . ,(comp 'binary-char-ci=?))
+     (char-ci>? . ,(comp 'binary-char-ci>?))
+     (char-ci<? . ,(comp 'binary-char-ci<?))
+     (char-ci>=? . ,(comp 'binary-char-ci>=?))
+     (char-ci<=? . ,(comp 'binary-char-ci<=?))))))
+
+(define (add-lib expr renaming prims-used fresh-label! fresh-variable!)
   (define fv-raw (free expr))
   (define rename-rev (hash-reverse renaming))
   (define ((fresh-upto var) x)
@@ -368,9 +439,19 @@
                                   (λ () (error 'add-lib "Unsupported ~a" primv))))])
       ;; in order for the primitive references to match up between expr and the
       ;; parsed meaning, we finagle the meaning of fresh-variable.
-      (define-values (d _) (parse def fresh-label! (fresh-upto primv)))
+      (define-values (d _0 _1) (parse def fresh-label! (fresh-upto primv)))
       (values v d)))
+  (define-values (fallback-names fallback-defs)
+    (for*/lists (names defs)
+        ([(name box) (in-hash prims-used)]
+         [def (in-value (hash-ref fallbacks name #f))]
+         #:when def)
+      ;; in order for the primitive references to match up between expr and the
+      ;; parsed meaning, we finagle the meaning of fresh-variable.
+      (define-values (d _0 _1) (parse def fresh-label! fresh-variable!))
+      (values (fresh-variable! (string->symbol (format "fallback-~a" name)))
+              (pfl #f #f box d))))
   (if (null? prims)
       expr
       ;; close the program
-      (lrc (fresh-label!) #t prims prim-defs expr)))
+      (lrc (fresh-label!) #t (append fallback-names prims) (append fallback-defs prim-defs) expr)))

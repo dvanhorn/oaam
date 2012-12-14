@@ -10,10 +10,10 @@
          racket/trace
          racket/unsafe/ops
          racket/stxparam)
-(provide getter widen yield snull prim-extras alt-reverse
+(provide getter widen yield snull prim-extras alt-reverse arity-error
          mk-primitive-meaning mk-static-primitive-functions
          ;; for use only by primitives.rkt
-         original-yield)
+         original-yield mk-pull-arguments)
 
 ;; Extra hidden parameters prim-meaning might need.
 (define-syntax-parameter prim-extras '())
@@ -22,7 +22,7 @@
 (define-syntax-parameter widen #f)
 ;; If 'apply'ing a list and we're in concrete mode
 ;; (actually using the built-in primitive) then we need a way to go
-;; from consv (see reify-list). #f if we can't. 
+;; from consv (see reify-list). #f if we can't.
 (define-syntax-parameter interpret-list
   (syntax-rules () [(_ σ v) (do-values #f)]))
 (define-syntax-parameter yield
@@ -48,6 +48,9 @@
                 [restlist (in-set (toSetOfLists tail))])
        (cons hd restlist))]))
 
+(define (arity-error f l exp giv vals)
+  (log-info "Arity error on ~a at ~a. Expected ~a args, given ~a: ~a" f l exp giv vals))
+
 (define (prim-bad-input prim arg val)
   (log-info "Bad input to primitive: ~a (arg ~a): ~a" prim arg val))
 
@@ -60,6 +63,21 @@
 
 (define (log-non-nil-apply-tail v)
   (log-info "Primitive applied with non-nil terminated list: ~a" v))
+
+(define (log-exn-in p ex)
+  (log-info "Primitive raised exception ~a: ~a" p ex))
+
+(define (mk-expect n)
+  (cond [(exact-nonnegative-integer? n) (values (λ (n) (<= n 0)) sub1 values)]
+        [else (values null? (λ (x) (if (pair? x) (cdr x) '())) length)]))
+
+(define (log-too-many expect given)
+  (log-info "'apply'd function given too many arguments (expected ~a): (>= ~a)"
+            expect given))
+
+(define (log-too-few expect given)
+  (log-info "'apply'd function given too few arguments (expected ~a): ~a"
+            expect given))
 
 (define-syntax-rule (νlits set-name lits ...)
   (begin (define lits #f) ...
@@ -164,9 +182,9 @@
         #`(or #,@(map flat-pred others))]
        [_ (flat-pred t)])))
 
- (define (mk-is-abs? t rest?)
+ (define (mk-is-abs? t)
    (cond [(type-union? t)
-          (define each (map (λ (t) (mk-is-abs? t rest?)) (type-union-abbrevs t)))
+          (define each (map mk-is-abs? (type-union-abbrevs t)))
           (λ (arg-stx) #`(or #,@(for/list ([f (in-list each)]) (f arg-stx))))]
          [else
           (case t
@@ -209,11 +227,11 @@
    ;; If not any, get all values and filter out only the ones that match
    ;; the type.
    ;; If nothing matches, we have a stuck state, and possibly log an error.
-   (define (type-match t apply? tmσ addr)
+   (define (type-match t tmσ addr)
      (λ (acc on-err)
         (define body
           (cond
-           [(or (eq? t 'any) apply?)
+           [(eq? t 'any)
             #`(bind-delay (res #,tmσ addr)
                           (do-values (cons res #,acc)))]
            [else
@@ -242,7 +260,7 @@
                 ([t (in-list ts)]
                  [v (in-list v-ids)]
                  [argnum (in-range (length ts) 0 -1)])
-              (define tm (type-match t #f #'σ v))
+              (define tm (type-match t #'σ v))
               #`(do-comp #:bind (#:σ σ acc)
                          #,(tm #'acc
                                (and (not mult-ary?)
@@ -251,61 +269,30 @@
                          #,stx)))
           (define check-rest
             (and rest
-                 (type-match rest #f #'σ #'ra)))
-          (define check-rest-apply
-            (and rest
-                 (type-match rest #t #'σ #'ra)))
+                 (type-match rest #'σ #'ra)))
           (define result
             (cons
              (generate-temporary #'checker-mk-checker)
-             #`(tλ (#:σ σ prim apply? v-addrs)
+             #`(tλ (#:σ σ prim v-addrs)
                  (expect-do-values #:values 1
                    (match v-addrs
                      [(list-rest vids ... rest-match)
                       #,(if rest
-                            #`(cond
-                               [apply?
-                                (do (σ) loop ([raddrs #,r-id]
-                                              [acc '()]
-                                              [argnum #,(length ts)])
-                                    (match raddrs
-                                      ;; Rest-arg binding must be checked by individual implementations
-                                      [(list ra)
-                                       (do-comp #:bind (#:σ σ acc) 
-                                                #,(check-rest-apply #'acc
-                                                                    (and (not mult-ary?)
-                                                                         (λ (tmp)
-                                                                            #`(prim-bad-rest
-                                                                               prim
-                                                                               argnum
-                                                                               #,tmp))))
-                                                (let ([acc (alt-reverse acc)]) #,built))]
-                                      [(cons ra rrest)
-                                       (do-comp #:bind (#:σ σ acc)
-                                                #,(check-rest #'acc
-                                                              (and (not mult-ary?)
-                                                                   (λ (tmp)
-                                                                      #`(prim-bad-rest
-                                                                         prim
-                                                                         argnum
-                                                                         #,tmp))))
-                                                (loop σ rrest acc (add1 argnum)))]))]
-                               [else
-                                (do (σ) loop ([raddrs #,r-id]
-                                              [acc '()]
-                                              [argnum #,(length ts)])
-                                    (match raddrs
-                                      ['() (let ([acc (alt-reverse acc)]) #,built)]
-                                      [(cons ra rrest)
-                                       (do-comp #:bind (#:σ σ acc)
-                                                #,(check-rest #'acc
-                                                              (and (not mult-ary?)
-                                                                   (λ (tmp)
-                                                                      #`(prim-bad-rest
-                                                                         prim
-                                                                         argnum
-                                                                         #,tmp))))
-                                                (loop σ rrest acc (add1 argnum)))]))])
+                            #`(do (σ) loop ([raddrs #,r-id]
+                                            [acc '()]
+                                            [argnum #,(length ts)])
+                                  (match raddrs
+                                    ['() (let ([acc (alt-reverse acc)]) #,built)]
+                                    [(cons ra rrest)
+                                     (do-comp #:bind (#:σ σ acc)
+                                              #,(check-rest #'acc
+                                                            (and (not mult-ary?)
+                                                                 (λ (tmp)
+                                                                    #`(prim-bad-rest
+                                                                       prim
+                                                                       argnum
+                                                                       #,tmp))))
+                                              (loop σ rrest acc (add1 argnum)))]))
                             #`(let ([acc '()]) #,built))]
                      [vs #,@(listy
                              (and (not mult-ary?)
@@ -364,93 +351,24 @@
      ;; mk-simple
      (λ (stx)
         (syntax-parse stx
-          [(pσ apply? vs)
-           (with-syntax
-               ([(force-clauses ...)
-                 ;; have to force the tail list to ensure it's a list.
-                 (for/list ([t (in-list (append mtypes (list 'any)))]
-                            [arg (in-list (append arglist (list #'rest)))]
-                            #:when (eq? t 'any))
-                   #`[#,arg #:in-force pσ #,arg])]
-                [ap-rest-guard
-                 (if (eq? op-rest-type 'any)
-                     #'(do-values #f)
-                     #`(do-comp
-                        #:bind (#:σ pσ res)
-                        (tapp check-last-set given)
-                        (cond
-                         [res (do-values #t)]
-                         [else
-                          (define seen (make-hasheq))
-                          (do (pσ) loop ([v last])
-                              (cond
-                               [(hash-has-key? seen v #f)
-                                (do-values #f)]
-                               [else
-                                (hash-set! seen v #t)
-                                (match v
-                                  [(consv A D)
-                                   (do-comp #:bind (res)
-                                            (do (pσ) ([ares #:get pσ A])
-                                              (tapp check-last-set ares))
-                                            (if res
-                                                (do-values #t)
-                                                (do (pσ) #:accumulate ([abs? #f])
-                                                    ([dv #:in-get pσ D])
-                                                  (do-comp #:bind (res)
-                                                           (loop pσ dv)
-                                                           (do-values (or abs? res))))))]
-                                  [_ (unless (null? v)
-                                       (log-non-nil-apply-tail v))
-                                     (do-values #f)])]))])))])
-             (quasisyntax/loc stx
-               (cond
-                [apply? ;; INVARIANT: must have a rest-arg
-                 (match vs
-                   [(list-rest args ... rest)
-                    (do (pσ) (force-clauses ...)
-                      (define-values (given last-singleton) (split-at-right rest 1))
-                      (define last (car last-singleton))
-                      (define check-last-set
-                        (tλ (#:σ pσ to-check)
-                          (expect-do-values #:values 1
-                            (do-values (for/or ([v (in-list to-check)])
-                                         #,(op-rest #'v))))))
-                      (define do-app
-                        (tλ (#:σ daσ)
-                          (do-comp #:bind (rlst)
-                                   (interpret-list daσ last)
-                                   (if rlst
-                                       #,(catch-tr
-                                          #'(yield (wrap (ap ... op args ... (append given rlst)))))
-                                       #,(return-out #'daσ)))))
-                      (cond [mand-guard
-                             (do-comp #:bind (#:σ nσ ap-abs?)
-                                      ap-rest-guard
-                                      (if ap-abs?
-                                          #,(return-out #'nσ)
-                                          (tapp do-app)))]
-                            [else (tapp do-app)]))]
-                   [_ (error 'mk-simple "Internal error (apply?) ~a" vs)])]
-                [else #,(non-apply stx #'pσ #'vs)])))]
           [(pσ vs) (non-apply stx #'pσ #'vs)]))))
 
- (define-syntax-class (basic rest?) #:literals (∪)
+ (define-syntax-class basic #:literals (∪)
    #:attributes (type is-abs? abs-out)
    (pattern name:id
             #:fail-unless (type-abbrevs? #'name) "Expected type abbreviation"
             #:attr type (unalias (syntax-e #'name))
-            #:attr is-abs? (mk-is-abs? (attribute type) rest?)
+            #:attr is-abs? (mk-is-abs? (attribute type))
             #:attr abs-out (mk-abs-out (attribute type)))
-   (pattern (∪ (~var b (basic rest?)) ...)
+   (pattern (∪ b:basic ...)
             #:attr type (flatten-type (attribute b.type))
-            #:attr is-abs? (mk-is-abs? (attribute type) rest?)
+            #:attr is-abs? (mk-is-abs? (attribute type))
             #:attr abs-out (mk-abs-out (attribute type))))
 
  (define-syntax-class (flat predfn) #:literals (->)
-   #:attributes (checker-fn mk-simple (ts 1) arity rest-arg? type)
-   (pattern ((~var ts (basic #f)) ... (~optional (~seq #:rest (~var r (basic #t))))
-             -> (~var t (basic #f)))
+   #:attributes (checker-fn mk-simple (ts 1) arity type)
+   (pattern (ts:basic ... (~optional (~seq #:rest r:basic))
+             -> t:basic)
             #:attr checker-fn (mk-checker predfn (attribute ts.type) (attribute r.type))
             #:attr mk-simple (mk-mk-simple (attribute ts.is-abs?)
                                            (attribute ts.type)
@@ -461,21 +379,18 @@
                            (if (attribute r)
                                #`(arity-at-least #,mandatory)
                                #`#,mandatory))
-            #:attr rest-arg? (not (not (attribute r)))
             #:attr type (if (attribute r)
                             (type-rest-arrow (attribute ts.type) (attribute r.type) (attribute t.type))
                             (type-arrow (attribute ts.type) (attribute t.type)))))
 
  (define-syntax-class (type predfn)
-   #:attributes (checker-fn mk-simple arity rest-arg?)
+   #:attributes (checker-fn mk-simple arity)
    (pattern (~var f (flat predfn))
             #:attr checker-fn (attribute f.checker-fn)
             #:attr mk-simple (attribute f.mk-simple)
-            #:with arity #'f.arity
-            #:attr rest-arg? (attribute f.rest-arg?))
+            #:with arity #'f.arity)
    (pattern ((~var fs (flat predfn)) ...)
             #:with arity #'(list fs.arity ...)
-            #:attr rest-arg? #f ;; FIXME: not true
             #:attr checker-fn
             (λ (_)
                (define key
@@ -488,7 +403,7 @@
                  (define result
                    (cons
                     (generate-temporary #'checker-multi)
-                    #`(tλ (prim apply? v-addrs)
+                    #`(tλ (prim v-addrs)
                         (expect-do-values #:values 1
                           #,(for/fold
                                 ([stx ;; If nothing matches, log error
@@ -502,7 +417,7 @@
                                                             (car checker*))])
                                 ;; FIXME: Unsound for apply
                                 #`(do-comp #:bind (res)
-                                           (tapp check-name prim apply? v-addrs)
+                                           (tapp check-name prim v-addrs)
                                            (if (∅? res)
                                                #,stx
                                                (do-values res)))))))))
@@ -519,10 +434,10 @@
    (pattern #:!! #:attr tag 'full))
 
  (define-syntax-class (prim-entry predfn)
-   #:attributes (prim access meaning checker-fn arity rest-arg?)
+   #:attributes (prim access meaning checker-fn arity)
    (pattern [prim:id
              (~or
-              (~seq #:predicate (~var p (basic #f)) (~bind [access 'read-only]))
+              (~seq #:predicate p:basic (~bind [access 'read-only]))
               (~seq
                (~or (~and #:simple (~bind [access 'read-only]))
                     (~seq #:simple-alternative prim-alt:id (~bind [access 'read-only]))
@@ -535,8 +450,6 @@
             #:with arity (if (attribute p)
                              #'1 ;; predicates are unary
                              #'t.arity)
-            #:attr rest-arg? (and (not (attribute p))
-                                  (attribute t.rest-arg?))
             #:attr checker-fn (or (and #:bind c (attribute t.checker-fn)
                                        (c #f))
                                   ;; must be a predicate
@@ -587,12 +500,14 @@
   (set! type-checkers (make-hash))
   (syntax-parse stx
     [(_ cb?:boolean gσ?:boolean 0b?:boolean
-        mean:id compile:id co:id clos?:id rlos?:id kont?:id
+        mean:id compile:id ev:id co:id ap:id clos?:id rlos:id kont?:id
         (extra ...)
+        (~bind [rlos? (format-id #'rlos "~a?" #'rlos)]
+               [rlos: (format-id #'rlos "~a:" #'rlos)])
         defines ... ((~var p (prim-entry (type->pred-stx #'clos? #'rlos? #'kont?))) ...))
      (define compiled? (syntax-e #'cb?))
      (define 0cfa? (syntax-e #'0b?))
-     (define ((ap m) arg-stx)
+     (define ((apm m) arg-stx)
        (if (procedure? m)
            (m arg-stx)
            (datum->syntax arg-stx (cons m arg-stx) arg-stx)))
@@ -605,29 +520,30 @@
          #`(case o
              #,@(for/list ([p (in-list (syntax->list #'(p.prim ...)))]
                            [acc (in-list (attribute p.access))]
-                           [m (in-list (map ap (attribute p.meaning)))]
-                           [checker (in-list (syntax->list #'(checker-names ...)))]
-                           [ap-arg? (in-list (attribute p.rest-arg?))])
-                  (with-syntax*
-                      ([(ap-op ...) (listy (and ap-arg? #'apply?))]
-                       [(args ...)
+                           [m (in-list (map apm (attribute p.meaning)))]
+                           [checker (in-list (syntax->list #'(checker-names ...)))])
+                  (with-syntax
+                      ([(args ...)
                         (case acc
-                          [(read/write) #'(nσ ap-op ... ℓ δ vs)]
-                          [(read-only) #'(nσ ap-op ... vs)]
-                          [(simple) #'(ap-op ... vs)]
-                          [(full) #'(nσ ap-op ... ℓ δ k vs)])])
+                          [(read/write) #'(nσ ℓ δ vs)]
+                          [(read-only) #'(nσ vs)]
+                          [(simple) #'(vs)]
+                          [(full) #'(nσ ℓ δ k vs)])])
                     #`[(#,p)
-                       (λP (pσ apply? ℓ δ k v-addrs)
+                       (λP (pσ fallv apply? ℓ δ k v-addrs)
                            (with-prim-yield
                             k
                             ;; Checkers will force what they need to and keep the rest
                             ;; lazy. Forced values are exploded into possible
                             ;; argument combinations
                             (do (pσ) ()
-                              (do-comp #:bind (#:σ nσ vss)
-                                       (tapp #,checker '#,p apply? v-addrs)
+                              (cond [(and apply? fallv)
+                                     (tapp call-rlos fallv ℓ δ-op ... k v-addrs)]
+                                    [else
+                                     (do-comp #:bind (#:σ nσ vss)
+                                       (tapp #,checker '#,p v-addrs)
                                        (do (nσ) ([vs (in-set vss)])
-                                         #,(m #'(args ...)))))))]))))
+                                         #,(m #'(args ...))))]))))]))))
        (define qs #'quasisyntax) ;; have to lift for below to parse correctly
        (quasisyntax/loc stx
          (begin
@@ -645,13 +561,25 @@
                 #,#'#`(syntax-parameterize ([yield #,new]
                                             [original-yield #,yield-tr])
                         body)]))
+           (define call-rlos
+             (tλ (#:σ σ fnv ℓ δ-op ... k v-addrs)
+               (match-function fnv
+                 [(rlos: xs r e ρ fv)
+                  (do-comp #:bind/extra (#:σ rσ apply-addrs)
+                           (tapp pull-arguments-from-addresses #:σ σ xs #t ℓ δ-op ... v-addrs)
+                           (if apply-addrs
+                               (do (rσ)
+                                   ([(ρ* σ*-aclos δ*) #:bind-rest-apply ρ rσ ℓ δ xs r apply-addrs])
+                                 (yield (ev σ*-aclos e ρ* k δ*)))
+                               (continue)))]
+                 [_ (error 'apply "Bad fallback ~a" fnv)])))
+           (mk-pull-arguments pull-arguments-from-addresses (δ-op ...) #t)
            defines ...
            type-filters ...
-           (trace checker-names ...)
            ;; λP very much like λ%
-           (define-syntax-rule (... (λP (pσ apply? ℓ δ k v-addrs) body ...))
+           (define-syntax-rule (... (λP (pσ fallv apply? ℓ δ k v-addrs) body ...))
              #,(if compiled?
-                   #`(tλ (#:σ pσ apply? ℓ δ-op ... k v-addrs)
+                   #`(tλ (#:σ pσ fallv apply? ℓ δ-op ... k v-addrs)
                        (bind-extra-prim (ℓ extra-ids ...)
                          body (... ...)))
                    #'(syntax-parameterize ([target-σ (make-rename-transformer #'σ-gop)] ...)
@@ -660,8 +588,102 @@
            (define-syntax-rule (compile o)
              #,(if compiled? eval #'o))
            (define mean
-             (tλ (#:σ pσ o apply? ℓ δ-op ... k v-addrs)
+             (tλ (#:σ pσ o fallv apply? ℓ δ-op ... k v-addrs)
                  #,(if compiled?
-                       #'(tapp o #:σ pσ apply? ℓ δ-op ... k v-addrs)
-                       eval)))
-           (trace mean))))]))
+                       #'(tapp o #:σ pσ fallv apply? ℓ δ-op ... k v-addrs)
+                       eval))))))]))
+
+(define-simple-macro* (mk-pull-arguments name:id (δ-op ...) addrs?:boolean)
+  (define name
+    (tλ (#:σ iapσ num rest? l δ-op ... vs)
+      (expect-do-values #:values 1 #:extra
+        (define-values (no-expect? sub-expect len-expect) (mk-expect num))
+        (do (iapσ) loop ([args vs] [raddrs '()] [i 0] [n num])
+            (match args
+              ['() (do-values (alt-reverse raddrs))]
+              [(list arg)
+               ;; The last argument should contain a list of extra arguments to pull on.
+               ;; If n > 0 we must ensure there are enough values in the list to get.
+               ;; If arg contains a list longer than n and rest? = #f then log error.
+               ;; If rest? = #t then the remainder of the list is in the last in the addresses.
+               (cond
+                [(no-expect? n)
+                 (cond [rest?
+                        (define addr (make-var-contour `(apply ,i . ,l) δ))
+                        (do (iapσ) (#,(if (syntax-e #'addrs?)
+                                          #'[bσ #:alias iapσ addr arg]
+                                          #'[bσ #:join-forcing iapσ addr arg]))
+                          (do-values (alt-reverse (cons addr raddrs))))]
+                       [else (do-values (alt-reverse raddrs))])]
+                [else
+                 (define-values (addrs raddrs*)
+                   (let aloop ([i i] [n n] [addrs '()] [raddrs raddrs])
+                     (define addr (make-var-contour `(apply ,i . ,l) δ))
+                     (if (no-expect? n)
+                         (if rest?
+                             (values (alt-reverse (cons addr addrs)) (cons addr raddrs))
+                             (values (alt-reverse addrs) raddrs))
+                         (aloop (add1 i) (sub-expect n) (cons addr addrs) (cons addr raddrs)))))
+                 (log-debug "Generated addrs (num: ~a, rest?: ~a) ~a ~a" num rest? addrs raddrs*)
+                 (define result (box #f))
+                 (do-comp #:bind/extra ()
+                          (do (iapσ) (#,(if (syntax-e #'addrs?)
+                                            #'[varg #:in-get iapσ arg]
+                                            #'[varg #:in-force iapσ arg]))
+                            ;; Make temporary addresses for apply at this application point
+                            ;; and put all pullable arguments into their locations.
+                            (do (iapσ) iloop ([last varg] [-addrs addrs] [i i] [n n])
+                                (match last
+                                  [(consv A D)
+                                   (match -addrs
+                                     [(cons addr -addrs)
+                                      (cond
+                                       [(no-expect? n) ;; too many in rest-arg list?
+                                        (cond
+                                         [rest? ;; nope, just include this in the final list.
+                                          (unless (null? -addrs)
+                                            (error 'apply "Too many addresses generated ~a" addrs))
+                                          (do (iapσ) ([aprσ #:join iapσ addr (singleton last)])
+                                            (set-box! result #t)
+                                            (continue))]
+                                         [else ;; yes, too many
+                                          (log-too-many (len-expect num) (add1 i))
+                                          (continue)])]
+                                       [else
+                                        ;; Still expect more, so pull another out.
+                                        (do (iapσ) ([apjσ #:alias iapσ addr A]
+                                                    [next #:in-get apjσ D])
+                                          (iloop apjσ next -addrs (add1 i) (sub-expect n)))])]
+                                     [_
+                                      (log-too-many (len-expect num) (add1 i))
+                                      (continue)])]
+                                  [v
+                                   (unless (null? v)
+                                     (log-non-nil-apply-tail v))
+                                   (cond
+                                    [(no-expect? n)
+                                     (set-box! result #t)
+                                     (if rest?
+                                         ;; Actually nothing. Make the tail an empty list.
+                                         (do (iapσ) ([apnσ #:join iapσ (car -addrs) snull])
+                                           (continue))
+                                         ;; No tail since not for rest-args.
+                                         (continue))]
+                                    [else
+                                     ;; Can't pull anything out of empty!
+                                     (log-too-few (len-expect num) i)
+                                     (continue)])])))
+                          (do-values (and (unbox result)
+                                          (alt-reverse raddrs*))))])]
+              ;; Explicitly given arguments
+              [(cons arg args)
+               (define addr (make-var-contour `(apply ,i . ,l) δ))
+               (cond [(and (no-expect? n) (not rest?)) ;; might we have too many arguments?
+                      (log-info "'apply'd function given too many arguments (>= ~a) (expected ~a)"
+                                i (len-expect num))
+                      (do-values #f)]
+                     [else
+                      (do (iapσ) (#,(if (syntax-e #'addrs?)
+                                        #'[bσ #:alias iapσ addr arg]
+                                        #'[bσ #:join-forcing iapσ addr arg]))
+                        (loop bσ args (cons addr raddrs) (add1 i) (sub-expect n)))])]))))))

@@ -343,8 +343,8 @@
 (define (add-todo! c) (set! todo (∪1 todo c)))
 
 (define (prepare-imperative parser sexp)
-  (define-values (e renaming) (parser sexp gensym gensym))
-  (define e* (add-lib e renaming gensym gensym))
+  (define-values (e renaming ps) (parser sexp gensym gensym))
+  (define e* (add-lib e renaming ps gensym gensym))
   ;; Start with a constant factor larger store since we are likely to
   ;; allocate some composite data. This way we don't incur a reallocation
   ;; right up front.
