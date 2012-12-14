@@ -8,10 +8,34 @@
 
 ;; Needed since we have a whole program analysis yet benchmarks that
 ;; expect common functions like "append"
+;; Taken mostly verbatim from Jagannathan and Wright's polycfa implementation
 
 (define r4rs-prims
   (make-hasheq
-   `((caar . (lambda (x) (car (car x))))
+   `((/ . (lambda (n . ms)
+            (if (null? ms)
+                (binary-/ 1 n)
+                (let loop ([acc n] [ms ms])
+                  (if (pair? ms)
+                      (loop (binary-/ acc (car ms)) (cdr ms))
+                      acc)))))
+     (+ . (lambda ns (let loop ([acc 0] [ns ns])
+                       (if (pair? ns)
+                           (loop (binary-+ acc (car ns)) (cdr ns))
+                           acc))))
+     (* . (lambda ns (let loop ([acc 1] [ns ns])
+                       (if (pair? ns)
+                           (loop (binary-* acc (car ns)) (cdr ns))
+                           acc))))
+     (vector . (lambda ns
+                 (define v (make-vector (length ns)))
+                 (let loop ([ns ns] [i 0])
+                   (if (pair? ns)
+                       (begin (vector-set! v i (car ns))
+                              (loop (cdr ns) (add1 i)))
+                       (void)))
+                 v))
+     (caar . (lambda (x) (car (car x))))
      (cadr . (lambda (x) (car (cdr x))))
      (cdar . (lambda (x) (cdr (car x))))
      (cddr . (lambda (x) (cdr (cdr x))))
@@ -245,28 +269,15 @@
        (lambda (s f)
                                         ; no way to switch current output in R4RS Scheme
          (error 'with-output-to-file "not supported")
-         (f)))
-     #;
+         (f)))     
      (apply .
        (lambda (f arg0 . args)
-         (define list-copy
-           (lambda (l)
-             (if (null? l)
-                 '()
-                 (cons (car l) (list-copy (cdr l))))))
-         (define flatten
-           (lambda (args)
-             (if (null? (cdr args))
-                 (car args)
-                 (cons (car args) (flatten (cdr args))))))
-         (let ((m (flatten (cons arg0 args))))
-           (cond ((null? m) (f))
-                 ((null? (cdr m)) (f (car m)))
-                 ((null? (cdr (cdr m))) (f (car m) (car (cdr m))))
-                 (else (let ((n (list-copy m)))
-                         (if (null? n)
-                             (error 'apply "can't happen")
-                             (,internal-apply$ f n))))))))
+         (cond [(null? args)
+                (cond [(null? arg0) (f)]
+                      [(null? (cdr arg0)) (f (car m))]
+                      [(null? (cdr (cdr arg0))) (f (car m) (car (cdr m)))]
+                      [else (,internal-apply$ f arg0)])]
+               [else (,internal-apply$ f (cons arg0 args))])))
        (make-promise .
                      (lambda (thunk)
                        (let ([first #t]
@@ -317,7 +328,7 @@
        (sort .
              (lambda (compare in)
                in))
-       (hash-ref (λ (h k . rest)
+       (hash-ref . (λ (h k . rest)
                     (if (null? rest)
                         (core-hash-ref h k)
                         (if (hash-has-key? h k)
@@ -326,7 +337,7 @@
                               (if (procedure? fail)
                                   (fail)
                                   fail))))))
-       (hash-ref! (λ (h k . rest)
+       (hash-ref! . (λ (h k . rest)
                      (if (immutable? h)
                          (error "Shouldn'ta done that, Bill")
                          (if (null? rest)

@@ -96,6 +96,7 @@
            (splicing-syntax-parameterize
                ([bind-get-kont (make-rename-transformer #'bind-get-kont-pdcfa)]
                 [yield pdcfa-yield]
+                [av-targets (cons called-fn-target (syntax-parameter-value #'av-targets))]
                 [bind-push (make-rename-transformer #'bind-push-pdcfa)])
              body ...)
            (void)))]))

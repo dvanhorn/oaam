@@ -1,5 +1,7 @@
 #lang racket
-(require (for-syntax syntax/parse racket/syntax racket/list racket/match racket/dict)
+(require (for-syntax syntax/parse racket/syntax racket/list racket/dict
+                     (except-in racket/match match match*)
+                     "notation.rkt")
          racket/stxparam "notation.rkt" "data.rkt" "parameters.rkt"
          racket/generator)
 (provide continue do-comp expect-do-values
@@ -33,6 +35,10 @@
                          (syntax-parameter-value #'al-targets)
                          '()))
              target<=?))
+     (unless (let ([c (syntax-parameter-value #'do-extra-values)]
+                   [num (length (syntax->list #'args))])
+               (if c (= c num) (zero? num)))
+       (raise-syntax-error #f "Too few values" stx))
      #`(values #,@(map target-param targets) . args)]))
 (define-syntax-rule (continue) (do-values))
 
@@ -81,16 +87,19 @@
                (match* (-as -vss)
                  [('() '()) (continue)]
                  [((cons a -as) (cons vs -vss))
-                  (bind-join (σ* σ a vs) (loop σ* -as -vss))]))
+                  (bind-join (σ* σ a vs) (loop σ* -as -vss))]
+                 [(_ _) (error 'bind-join* "Bad match ~a ~a" -as -vss)]))
            body))
 
 (define-syntax-rule (bind-alias* (σ* σ aliases all-to-alias) body)
   (do-comp #:bind/extra (#:σ σ*)
            (do (σ) loop ([-aliases aliases] [-all-to-alias all-to-alias])
+               (log-debug "Bind alias ~a ~a" -aliases -all-to-alias)
                (match* (-aliases -all-to-alias)
                  [('() '()) (continue)]
                  [((cons alias -aliases) (cons to-alias -all-to-alias))
-                  (bind-alias (σ* σ alias to-alias) (loop σ* -aliases -all-to-alias))]))
+                  (bind-alias (σ* σ alias to-alias) (loop σ* -aliases -all-to-alias))]
+                 [(_ _) (error 'bind-alias* "Bad match ~a ~a" -aliases -all-to-alias)]))
            body))
 
 (define-syntax-rule (bind-big-alias (σ* σ alias all-to-alias) body)
@@ -141,6 +150,7 @@
                               id)))])
               #'(syntax-parameterize ([targ (make-rename-transformer #'id)] ...)
                   a.exprs ...))]))
+       (exn-wrap stx
        #`(let-values ([(acc-ids ... bind ...)
                        (expect-do-values
                            #:values #,(length (syntax->list #'(bind ...)))
@@ -149,7 +159,7 @@
            #,(if (attribute wrapper)
                  #`(let-syntax ([wrapper #,tr])
                      e1)
-                 (tr #`(wrap e1)))))]))
+                 (tr #`(wrap e1))))))]))
 
 (define-simple-macro* (expect-do-values (~or (~optional (~seq #:values num:nat))
                                              (~optional (~and #:extra (~bind [extra? #t]))
@@ -174,13 +184,18 @@
   (define add-0val? (and (null? st*)
                          (let ([xn (syntax-parameter-value #'do-extra-values)])
                            (if xn (zero? xn) #t))))
-  (define-syntax-class join-clause
-    #:attributes (clause new-σ)
+  (define-splicing-syntax-class acc-clauses
+    #:attributes ((clauses 1))
+    (pattern (~seq #:accumulate (~and ([acc-ids:id acc-init:expr ...])
+                                      (clauses ...)))))
+  (define-syntax-class (join-clause maybe-accumulators)
+    #:attributes (clause new-σ keep-accs?)
     (pattern [σ*:id (~or (~and #:join (~bind [bindf #'bind-join]))
                          (~and #:join* (~bind [bindf #'bind-join*]))
                          (~and #:alias (~bind [bindf #'bind-alias]))
                          (~and #:alias* (~bind [bindf #'bind-alias*]))) jσ:expr a:expr vs:expr]
              #:with new-σ #'σ*
+             #:attr keep-accs? #f
              #:attr clause
              (λ (rest) #`(bindf (σ* jσ a vs) #,rest)))
     (pattern [res:id (~or (~and #:get (~bind [bindf #'bind-get]))
@@ -188,19 +203,23 @@
                           (~and #:force (~bind [bindf #'bind-force]))
                           (~and #:delay (~bind [bindf #'bind-delay]))) jσ:expr a:expr]
              #:with new-σ #'jσ ;; XXX: not new
+             #:attr keep-accs? #f
              #:attr clause (λ (rest) #`(bindf (res jσ a) #,rest)))
     (pattern [(ρ* σ* δ*) #:bind ρ bσ l δ xs vs]
              #:with new-σ #'σ*
+             #:attr keep-accs? #f
              #:attr clause
              (λ (rest) #`(bind (ρ* σ* δ*) (ρ bσ l δ xs vs) #,rest)))
     (pattern [(ρ* σ* δ*) (~or (~and #:bind-rest (~bind [bindf #'bind-rest]))
                               (~and #:bind-rest-apply (~bind [bindf #'bind-rest-apply])))
               ρ brσ l δ xs r vs]
              #:with new-σ #'σ*
+             #:attr keep-accs? #f
              #:attr clause
              (λ (rest) #`(bindf (ρ* σ* δ*) (ρ brσ l δ xs r vs) #,rest)))
     (pattern [(σ*:id a*:id) #:push bpσ l δ k]
              #:with new-σ #'σ*
+             #:attr keep-accs? #f
              #:attr clause
              (λ (rest) #`(bind-push (σ* a* bpσ l δ k) #,rest)))
     ;; a couple shorthands
@@ -208,6 +227,7 @@
                          (~and #:join-local-forcing (~bind [bindf #'bind-join-local])))
                     jσ:expr a:expr v:expr]
              #:with new-σ #'σ*
+             #:attr keep-accs? #f
              #:attr clause
              (λ (rest) #`(do (jσ) ([fs #:force jσ v])
                            (bindf (σ* jσ a fs) #,rest))))
@@ -216,14 +236,21 @@
                           (~and #:in-force (~bind [bindf #'bind-force]))
                           (~and #:in-delay (~bind [bindf #'bind-delay]))) jσ:expr a:expr]
              #:with new-σ #'jσ ;; XXX: not new
+             #:attr keep-accs? #f
              #:attr clause (λ (rest) #`(bindf (res-tmp jσ a)
-                                         (do (jσ) ([res (in-set res-tmp)])
+                                         (do (jσ)
+                                             #,@(if maybe-accumulators
+                                                    #`(#:accumulate #,maybe-accumulators)
+                                                    '())
+                                           ([res (in-set res-tmp)])
                                            #,rest)))))
 
-  (define-splicing-syntax-class (join-clauses maybe-prev-σ)
+  (define-splicing-syntax-class (join-clauses maybe-prev-σ maybe-accumulators)
     #:attributes (clauses last-σ)
-    (pattern (~seq join:join-clause
-                   (~var joins (join-clauses (attribute join.new-σ))))
+    (pattern (~seq (~var join (join-clause maybe-accumulators))
+                   (~var joins (join-clauses (attribute join.new-σ)
+                                             (and (attribute join.keep-accs?)
+                                                  maybe-accumulators))))
              #:attr clauses (cons (attribute join.clause)
                                   (attribute joins.clauses))
              #:attr last-σ (attribute joins.last-σ))
@@ -232,7 +259,8 @@
              #:fail-unless maybe-prev-σ "Expected at least one join clause"))
 
   (syntax-parse stx
-    [(_ (cσ:id) (c:comp-clauses clauses ...) body:expr ...+)
+    [(_ (cσ:id) (~optional a:acc-clauses)
+        (c:comp-clauses clauses ...) body:expr ...+)
      ;; build a new fold or a fold that continues adding to the
      ;; outer do's targets. σ is bound to itelf since the body may
      ;; still refer to it. cs go to a new identifier.
@@ -243,41 +271,53 @@
                    [(accs ...) no-σ-st*-params]
                    [(acc-ids ...) (generate-temporaries no-σ-st*-params)]
                    [(g gs ...) #'(c.guards ...)]                   
-                   [(bind ...) (with-do-binds extra #'(extra ...))])
+                   [((bind bind-init) ...)
+                    (or (attribute a.clauses)                        
+                        (let ([lst (syntax->list (with-do-binds extra #'(extra ...)))])
+                          (map (λ (v) (list v #f)) lst)))])
        (gen-wrap
+        (exn-wrap stx
         #`(for/fold ([σ-id σ-acc] ... 
                      [acc-ids accs] ...
-                     [bind #f] ...) (g)
+                     [bind bind-init] ...) (g)
             (syntax-parameterize ([σ-acc (make-rename-transformer #'σ-id)] ...
-                                  [accs (make-rename-transformer #'acc-ids)] ...)
+                                  [accs (make-rename-transformer #'acc-ids)] ...
+                                  #,@(listy (and #:bind c (attribute a.clauses)
+                                                 #`[do-extra-values #,(length c)])))
               (let ([cσ σ-id] ...)
                 (for*/fold ([σ-id σ-id] ...
                             [acc-ids acc-ids] ...
-                            [bind #f] ...)
+                            [bind bind] ...)
                     (gs ...)
                   (let ([cσ σ-id] ...)
                     (do-body-transformer
-                     (do (cσ) (clauses ...) body ...)))))))))]
+                     (do (cσ) (clauses ...) body ...))))))))))]
     
     ;; if we don't get a store via clauses, σ is the default.
-    [(_ (jσ:id) ((~var joins (join-clauses #f)) clauses ...) body:expr ...+)
+    [(_ (jσ:id) (~optional a:acc-clauses)
+        ((~var joins (join-clauses #f (attribute a.clauses))) clauses ...)
+        body:expr ...+)
      (define join-body
        #`(do (#,(attribute joins.last-σ)) (clauses ...)
            (do-body-transformer (with-do body ...))))
      (define binds
-       #`(initialize-targets
-          (syntax-parameterize ([target-σ (make-rename-transformer #'jσ)])
-            #,(for/fold ([full join-body])
-                  ([fn (in-list (reverse (attribute joins.clauses)))])
-                (fn full)))))
+       (exn-wrap
+        stx
+        #`(initialize-targets
+           (syntax-parameterize ([target-σ (make-rename-transformer #'jσ)])
+             #,(for/fold ([full join-body])
+                   ([fn (in-list (reverse (attribute joins.clauses)))])
+                 (fn full))))))
      (gen-wrap binds)]
 
     [(_ (dbσ:id) () body:expr ...+)
+     (exn-wrap stx
      #`(initialize-targets
         (syntax-parameterize ([target-σ (make-rename-transformer #'dbσ)])
           #,(gen-wrap
              #`(do-body-transformer
-                (with-do body ... #,@(listy (and add-0val? #'(values))))))))]
+                (with-do body ... ;;#,@(listy (and add-0val? #'(values)))
+                         ))))))]
 
     ;; when fold/fold doesn't cut it, we need a safe way to recur.
     [(_ (ℓσ:id) loop:id ([args:id arg0:expr] ...)
@@ -292,7 +332,8 @@
                    [(σ-acc ...) (listy (and bind-σ? #'target-σ))]
                    [(accs ...) no-σ-stal-params]
                    [(acc-ids ...) (generate-temporaries no-σ-stal-params)])       
-       #`(initialize-targets
+       (exn-wrap stx
+        #`(initialize-targets
           (let real-loop ([σ-id σ-acc] ...
                           [acc-ids accs] ...
                           [args arg0] ...)
@@ -310,4 +351,4 @@
                                           (real-loop #,@(listy (and bind-σ? #'σ*))
                                                      accs ...
                                                      argps ...)])])
-                      (with-do body ...))))))))]))
+                      (with-do body ...)))))))))]))

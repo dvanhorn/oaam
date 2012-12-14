@@ -15,7 +15,7 @@
          ● ⊥
          open@ closed@
          fail ;; for continuation marks
-         flatten-value
+         flatten-value reify-list
          (struct-out vectorv^)
          (struct-out vectorv-immutable^)
          (struct-out input-port^)
@@ -123,6 +123,23 @@
                       (if (equal? v0f V)
                           V
                           qdata^)))])))
+(define (log-bad-reification addr value)
+  (log-info "Multiple list reifications due to ~a: ~a" addr value))
+(define-syntax-rule (reify-list σ v)
+  (do (σ) loop ([-v v]) #:values 1
+    (match -v
+      [(consv A D)
+       (do (σ) ([ares #:get σ A]
+                [dres #:get σ D])
+         (define car (set-first ares)) ;; XXX: check a/dres for ∅?
+         (define cdr (set-first dres))
+         (unless (∅? (set-rest res)) (log-bad-reification A ares))
+         (unless (∅? (set-rest dres)) (log-bad-reification D dres))
+         (do-comp #:bind (rest)
+                  (loop σ cdr)
+                  (do-values (cons car rest))))]
+      [_ (unless (null? -v) (log-info "Bad list for reification ~a" -v))
+         (do-values -v)])))
 
 (define cons-limit (make-parameter 8))
 

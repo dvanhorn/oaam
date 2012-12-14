@@ -141,9 +141,9 @@
   (syntax-case stx ()
     [(_ e) (if (syntax-parameter-value #'generate-graph?)
                #`(begin (do-yield/∆s/acc!-graph e)
-                        target-σ)
+                        (continue))
                #`(begin (do-yield/∆s/acc! e)
-                        target-σ))]))
+                        (continue)))]))
 
 (define-syntax-rule (mk-add-∆/s add-∆ add-∆s bind-join bind-join* get-σ)
   (begin
@@ -258,9 +258,10 @@
 
 (define-for-syntax (yield/∆s! stx)
   (syntax-case stx ()
-    [(_ e) (if (syntax-parameter-value #'generate-graph?)
-               #'(yield/∆s!-graph e)
-               #'(yield/∆s! e))]))
+    [(_ e) #`(begin #,(if (syntax-parameter-value #'generate-graph?)
+                          #'(yield/∆s!-graph e)
+                          #'(yield/∆s! e))
+                    (continue))]))
 
 (define-syntax-rule (with-σ-∆s! body)
   (splicing-syntax-parameterize

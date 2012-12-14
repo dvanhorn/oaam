@@ -2,23 +2,25 @@
 
 (require (for-syntax syntax/parse syntax/id-table racket/base racket/match
                      racket/dict racket/syntax racket/list)
-         racket/match
+         #;racket/match (except-in racket/match match match*)
          "notation.rkt"
          racket/stxparam)
 (provide mk-syntax-parameters
-         in-scope-of-extras
-         initialize-targets         
-         match-function
-         st-targets
-         al-targets
-         av-targets
-         tλ tapp
+         in-scope-of-extras initialize-targets match-function
+         st-targets al-targets av-targets
+         tλ tapp called-function
          (for-syntax
           target target-param target-kw target-initializer ;;(struct-out target)
           get-targets get-stal get-st #;kw<=? target<=?
-          kw-in-target remove-kw-target
+          kw-in-target remove-kw-target called-fn-target
           apply-transformer σ-target
-          formals actuals comp-clauses))
+          formals actuals comp-clauses
+          exn-wrap))
+
+(define-for-syntax (exn-wrap stx syn)
+  #`(with-handlers ([exn:fail:contract:arity?
+                     (λ (ex) (error 'do "Problem in ~a~%~a" '#,stx ex))])
+      #,syn))
 
 (define-syntax-rule (mk-syntax-parameters id ...)
   (begin (define-syntax-parameter id #f) ... (provide id ...)))
@@ -29,10 +31,9 @@
                       ;; 'alloc' a-la AAM, but with less context. More k-CFA-like.
                       make-var-contour
                       ;; single-threaded parameter necessary for semantics
-                      target-σ
-                      ;; The called-function parameter is mostly for CFA2's fake-rebinding.
-                      called-function)
+                      target-σ)
 (define-syntax-parameter in-scope-of-extras (syntax-rules () [(_ ids body ...) (begin body ...)]))
+(define-syntax-parameter called-function (λ _ #'#f))
 
 (define-syntax initialize-σ (syntax-rules () [(_ e) e]))
 
@@ -49,14 +50,14 @@ There are several different classes of bindings that the framework maintains.
 * single-threaded - these bindings are always accumulated through loops.
 * allocation-threaded - these bindings are consistently available, but only
 accumulated in forms that specify #:extra. (XXX: general enough? Might need to extend the filtering)
-* available - Not accumulated, but maintained through lifting. 
+* available - Not accumulated, but maintained through lifting.
 
 The semantics of the language depends on the heap being single-threaded.
 Each accumulator is given a chance to initialize. In the bodies of lifted functions (λ% λP lift-do)
 and do. do will not initialize an accumulator in the static extent of another do.
 |#
 
-;; Targets must be syntax-parameters that also are paired with an identifier 
+;; Targets must be syntax-parameters that also are paired with an identifier
 ;; of its initializer form. Targets have associated keywords for forms to give
 ;; specific bindings. We need this especially for naming the store.
 (define-syntax-parameter st-targets '())
@@ -69,23 +70,24 @@ and do. do will not initialize an accumulator in the static extent of another do
 ;; followed by body:expr ...+
 ;; this is to "initialize" a binding in the beginning of a managed function or
 ;; do body. A do will not initialize a binding if it in the static extent of a managed function
-;; or another do form. 
+;; or another do form.
 
 ;; Wrap initializers in sorted target order.
 (begin-for-syntax
  (struct target (param kw initializer))
  (define σ-target (target #'target-σ '#:σ (make-rename-transformer #'initialize-σ)))
+ (define called-fn-target (target #'called-function '#:called-function (syntax-rules () [(_ e) e])))
  (define (kw<=? s t)
    (string<=? (keyword->string s) (keyword->string t)))
 
  (define (target<=? s t) (kw<=? (target-kw s) (target-kw t)))
- 
+
  (define (get-targets)
    (sort (append (syntax-parameter-value #'st-targets)
                  (syntax-parameter-value #'al-targets)
                  (syntax-parameter-value #'av-targets))
          target<=?))
- 
+
  (define (get-stal)
    (sort (append (syntax-parameter-value #'st-targets)
                  (syntax-parameter-value #'al-targets))
@@ -134,7 +136,7 @@ and do. do will not initialize an accumulator in the static extent of another do
  (define-splicing-syntax-class (kw-stx all pred)
    #:attributes (kw after)
    (pattern (~seq k:keyword a)
-            #:fail-unless (pred #'a)         
+            #:fail-unless (pred #'a)
             (err-pred-msg pred)
             #:do [(define bind?
                     (for/or ([t (in-list all)])
@@ -212,8 +214,7 @@ and do. do will not initialize an accumulator in the static extent of another do
                     (for/list ([t (in-list all)])
                       (or (dict-ref explicit (target-kw t) #f)
                           (target-param t)))])
-       (quasisyntax/loc stx
-         (lifted accs ... a.exprs ...)))]))
+       (exn-wrap stx (syntax/loc stx (lifted accs ... a.exprs ...))))]))
 
 (define-syntax-parameter initialized? #f)
 (define-syntax (initialize-targets stx)
@@ -223,7 +224,7 @@ and do. do will not initialize an accumulator in the static extent of another do
      (if (syntax-parameter-value #'initialized?)
          #'(let () e ...)
          (for/fold ([out #'(syntax-parameterize ([initialized? #t])
-                             e ...)]) 
+                             e ...)])
              ([t (in-list (reverse all))])
            (apply-transformer (target-initializer t)
                               #`(initialize-targets #,out))))]))

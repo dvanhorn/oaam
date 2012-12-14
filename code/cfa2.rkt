@@ -4,6 +4,7 @@
          "data.rkt" "ast.rkt" "parameters.rkt"
          "graph.rkt"
          racket/unsafe/ops
+         racket/trace
          (for-template "op-struct.rkt" racket/base racket/stxparam)
          (for-syntax racket/syntax))
 (provide with-cfa2^ prepare-cfa2^)
@@ -101,6 +102,7 @@
              (values (hash-set ξ* a vs) (cons nothing rvss))]
             [else (values ξ* (cons vs rvss))])))
   (values ξ* (alt-reverse rvss)))
+(trace bind-Ξ bind-Ξ*)
 
 (define (prepare-cfa2^ parser sexp)
   (set! L (make-hash))
@@ -176,7 +178,6 @@
 (begin-for-syntax
  (define fnξ-target (target #'fn-call-ξ '#:fnξ (syntax-rules () [(_ e) e])))
  (define fnlab-target (target #'fn-call-label '#:fnlab (syntax-rules () [(_ e) e])))
- (define called-fn-target (target #'called-function '#:called-function (syntax-rules () [(_ e) e])))
  (define ((mk-cfa2 ev co ap) stx)
    (syntax-case stx ()
      [(_ (ξ) body ...)
@@ -203,7 +204,8 @@
                                    [do (λ (ξ** k** v**)
                                           (syntax-parameterize ([ξ (make-rename-transformer #'ξ**)])
                                             #,(yield-tr #'(yield (co σ k** v**)))))])
-                              (do-co-yield ξ k* v* do))]
+                              (do-co-yield ξ k* v* do)
+                              (continue))]
                      ;; If this is the product of a function call,
                      ;; push the continuation + stack frame for the entry.
                      [(_ (ev σ e ρ k δ*))
@@ -219,21 +221,21 @@
                                    [(syntax-parameter-value #'called-function)
                                     #`(let ([k* (entry ξ (singleton called-function))])
                                         (call-prep fn-call-ξ fn-call-label ok k* #,do-co #;original-δ)
-                                                   #,(do-ev #'k*))]
+                                        #,(do-ev #'k*))]
                                     [else
                                      (do-ev #'ok)])))]
                       [(_ e) (yield-tr #'(yield e))]))))
 
-              (define-syntax-rule (bind-extra-initial-cfa2 body* (... ...))
+              (define-syntax-rule (bind-extra-initial-cfa2 . body*)
                 (let ([ξ₀ (hash)]
                       [fnξ #f]
                       [fnlab -1])
                   (syntax-parameterize ([ξ (make-rename-transformer #'ξ₀)]
                                         [fn-call-ξ (make-rename-transformer #'fnξ)]
                                         [fn-call-label (make-rename-transformer #'fnlab)])
-                    body* (... ...))))
+                    . body*)))
 
-              (define-syntax-rule (bind-extra-cfa2 (state ξ*) body* (... ...))
+              (define-syntax-rule (bind-extra-cfa2 (state ξ*) . body*)
                 (let-values ([(fnξ fnlab)
                               (match state
                                 [(ap: _ ξ* l _ _ _ _) (values ξ* l)]
@@ -241,13 +243,13 @@
                   (syntax-parameterize ([ξ (make-rename-transformer #'ξ*)]
                                         [fn-call-ξ (make-rename-transformer #'fnξ)]
                                         [fn-call-label (make-rename-transformer #'fnlab)])
-                    body* (... ...))))
+                    . body*)))
 
-              (define-syntax-rule (bind-extra-prim-cfa2 (state ℓ ξ*) body* (... ...))
+              (define-syntax-rule (bind-extra-prim-cfa2 (state ℓ ξ*) . body*)
                 (syntax-parameterize ([ξ (make-rename-transformer #'ξ*)]
                                       [fn-call-ξ (make-rename-transformer #'ξ)]
                                       [fn-call-label (make-rename-transformer #'ℓ)])
-                  body* (... ...)))
+                  . body*))
 
               (define-simple-macro* (bind-join-cfa2 (σ* σ a vs) body*)
                 (let*-values ([(-a) a]

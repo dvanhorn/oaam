@@ -15,8 +15,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Machine maker
 
-(define (arity-error f l)
-  (log-info "Arity error on ~a at ~a" f l))
+(define (arity-error f l exp giv vals)
+  (log-info "Arity error on ~a at ~a. Expected ~a args, given ~a: ~a" f l exp giv vals))
 
 (define (cont-arity-error given k l)
   (log-info "Called continuation with wrong number of arguments (~a): ~a at ~a"
@@ -141,8 +141,8 @@
                   (define as (map (λ (x) (make-var-contour x δ)) xs))
                   (define/ρ ρ* (extend* ρ xs as))
                   (do (ev-σ) ([(σ0 a) #:push ev-σ l δ k]
-                              [σ*-lrc #:join* σ0 as ss])
-                    (yield (ev σ*-lrc c ρ* (lrk (marks-of k) x xs* cs cb ρ* a δ) δ))))]
+                               [σ*-lrc #:join* σ0 as ss])
+                     (yield (ev σ*-lrc c ρ* (lrk (marks-of k) x xs* cs cb ρ* a δ) δ))))]
              [(lte l _ (cons x xs) (cons e es) b)
               (define c (compile e))
               (define cs (map compile es))
@@ -490,22 +490,26 @@
                        (do (ap-σ) ([f #:in-get ap-σ fn-addr])
                          (match-function f
                            [(clos: xs e ρ _)
-                            (cond [(= (length xs) (length arg-addrs))
+                            (define xn (length xs))
+                            (define an (length arg-addrs))
+                            (cond [(= xn an)
                                    (do (ap-σ)
                                        ([(ρ* σ*-clos δ*) #:bind ρ ap-σ l δ xs arg-addrs])
                                      (yield (ev σ*-clos e ρ* k δ*)))]
                                   ;; Yield the same state to signal "stuckness".
                                   [else
-                                   (arity-error f l)
+                                   (arity-error f l xn an (map (λ (a) (getter ap-σ a)) arg-addrs))
                                    (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
                            [(rlos: xs r e ρ _)
-                            (cond [(<= (length xs) (length arg-addrs))
+                            (define xn (length xs))
+                            (define an (length arg-addrs))
+                            (cond [(<= xn an)
                                    (do (ap-σ)
                                        ([(ρ* σ*-clos δ*) #:bind-rest ρ ap-σ l δ xs r arg-addrs])
                                      (yield (ev σ*-clos e ρ* k δ*)))]
                                   ;; Yield the same state to signal "stuckness".
                                   [else
-                                   (arity-error f l)
+                                   (arity-error f l (arity-at-least xn) an (map (λ (a) (getter ap-σ a)) arg-addrs))
                                    (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
                            [(primop o _) (tapp prim-meaning o #f l δ-op ... k arg-addrs)]
                            [(? kont? k)
@@ -537,7 +541,7 @@
 
                    [_ (error 'step "Bad state ~a" state)])))
 
-#;
+
                  (trace step)
 
                ))))))]))

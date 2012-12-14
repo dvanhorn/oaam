@@ -34,6 +34,7 @@
              #,(if apply?
                    #'(do-comp #:bind/extra (#:σ outσ vrest* rvs)
                               (do (sσ) loop ([vrest vrest] [vrest* '()])
+                                  (log-debug "Binding ~a ~a" vrest vrest*)
                                   (match vrest
                                     [(list tail)
                                      (bind-get (res sσ tail)

@@ -63,59 +63,23 @@
                 [kont? kont?])
     #`((define-syntax-rule (yield-delay ydσ v)
          (do (ydσ) ([v* #:in-delay ydσ v]) (yield v*)))
-       (define-simple-macro* (errorv vs)
-         (begin (log-info "Error reachable ~a" (for/list ([v (in-list vs)])
+       (define-simple-macro* (errorv apply? vs)
+         (begin (when apply? (error 'error "TODO: apply"))
+                (log-info "Error reachable ~a" (for/list ([v (in-list vs)])
                                                  (match v
                                                    [(addr a) (getter prσ a)]
                                                    [(value-set s) s]
                                                    [_ v])))
                 (continue)))
 
-       (define-simple-macro* (printfv prσ vs)
-         (begin (log-debug "Printing: ~a" (for/list ([v (in-list vs)])
+       (define-simple-macro* (printfv prσ apply? vs)
+         (begin (when apply? (error 'printf "TODO: apply"))
+                (log-debug "Printing: ~a" (for/list ([v (in-list vs)])
                                             (match v
                                               [(addr a) (getter prσ a)]
                                               [(value-set s) s]
                                               [_ v])))
                 (yield (void))))
-
-       (define/basic (quotientv z0 z1)
-         (cond [(or (number^? z0) (number^? z1))
-                (yield number^)]
-               [(zero? z1)
-                (log-info "Quotient undefined on 0")
-                (continue)]
-               [else (yield (widen (quotient z0 z1)))]))
-
-       (define/basic (logv c)
-         (cond [(number^? c) (yield number^)]
-               [(>= 0 c)
-                (log-info "Log undefined <= 0")
-                (continue)]
-               [else (yield (widen (log c)))]))
-
-       (define-simple-macro* (/v vs)
-         (cond [(ormap number^? vs) (yield number^)]
-               [(memv 0 vs)
-                (log-info "/ undefined on 0")
-                (continue)]
-               [else (yield (widen (apply / vs)))]))
-
-       (define/basic (modulov z0 z1)
-         (cond [(or (number^? z0) (number^? z1))
-                (yield number^)]
-               [(zero? z1)
-                (log-info "Modulo undefined on 0")
-                (continue)]
-               [else (yield (widen (quotient z0 z1)))]))
-
-       (define/basic (remainderv z0 z1)
-         (cond [(or (number^? z0) (number^? z1))
-                (yield number^)]
-               [(zero? z1)
-                (log-info "Remainder undefined on 0")
-                (continue)]
-               [else (yield (widen (remainder z0 z1)))]))
 
        (define/basic (procedure?v v) (yield (or (clos? v) (rlos? v))))
        (define/basic (vectorv-length v)
@@ -292,7 +256,8 @@
             (continue)]))
 
        (define-simple-macro* (mk-vector-constructor name abs conc)
-         (define-simple-macro* (name vσ l δ vs)
+         (define-simple-macro* (name vσ apply? l δ vs)
+           (begin (when apply? (error 'name "TODO: apply"))
            (cond [(null? vs) (yield vec0)]
                  [else
                   (match (widen (length vs))
@@ -312,7 +277,7 @@
                            [(cons v vrest)
                             (define addr (make-var-contour `(V ,i . ,l) δ))
                             (do (vσ) ([σ*-pv #:join-forcing vσ addr v])
-                              (loop σ*-pv vrest (add1 i) (cons addr addrs)))]))])])))
+                              (loop σ*-pv vrest (add1 i) (cons addr addrs)))]))])]))))
 
        (mk-vector-constructor prim-vectorv vectorv^ vectorv)
        (mk-vector-constructor prim-vectorv-immutable vectorv-immutable^ vectorv-immutable)
@@ -382,7 +347,9 @@
                                       (log-info "list->vector input non-list. Tail: ~a" val))
                                     (continue)]))]))))]))
 
-       (define-simple-macro* (make-vector^ vσ l δ vs)
+       ;; INVARIANT: internal, so never 'apply'd.
+       (define-simple-macro* (make-vector^ vσ apply? l δ vs)
+         (begin (when apply? (error 'vector^ "TODO: apply"))
          (cond [(null? vs) (yield vec0)]
                [else
                 (define V-addr (make-var-contour `(V . ,l) δ))
@@ -391,7 +358,7 @@
                       ['() (yield (vectorv-immutable^ number^ V-addr))]
                       [(cons v vrest)
                        (do (vσ) ([jσ #:join-forcing vσ V-addr v])
-                         (loop jσ vrest))]))]))
+                         (loop jσ vrest))]))])))
 
        (define/write (make-consv cσ l δ v0 v1)
          (let ([A-addr (make-var-contour `(A . ,l) δ)]
@@ -400,7 +367,9 @@
                      [σ*D #:join-forcing σ*A D-addr v1])
              (yield (consv A-addr D-addr)))))
 
-       (define-simple-macro* (make-list^ cσ l δ vs)
+       ;; INVARIANT: internal, so never 'apply'd.
+       (define-simple-macro* (make-list^ cσ apply? l δ vs)
+         (begin (when apply? (error 'list^ "TODO: apply"))
          (let ([A-addr (make-var-contour `(A . ,l) δ)]
                [D-addr (make-var-contour `(D . ,l) δ)])
            (define val (consv A-addr D-addr))
@@ -412,9 +381,11 @@
                       (yield val))]
                    [(cons v vrest)
                     (do (nilσ) ([fs #:force nilσ v])
-                      (loop nilσ vrest (big⊓ fs J)))])))))
+                      (loop nilσ vrest (big⊓ fs J)))]))))))
 
-       (define-simple-macro* (make-improper^ cσ l δ vs)
+       ;; INVARIANT: internal, so never 'apply'd.
+       (define-simple-macro* (make-improper^ cσ apply? l δ vs)
+         (begin (when apply? (error 'improper "TODO: apply"))
          (let ([A-addr (make-var-contour `(A . ,l) δ)]
                [D-addr (make-var-contour `(D . ,l) δ)])
            (define val (consv A-addr D-addr))
@@ -427,7 +398,7 @@
                       (yield val))]
                    [(cons v vrest)
                     (do (lastσ) ([fs #:force lastσ v])
-                      (loop lastσ vrest (big⊓ fs J)))])))))
+                      (loop lastσ vrest (big⊓ fs J)))]))))))
 
        (define/write (set-car!v a!σ l δ p v)
          (match p
@@ -545,6 +516,7 @@
                       ;; The last argument should contain a list of extra arguments to pull on.
                       ;; If n > 0 we must ensure there are enough values in the list to get.
                       ;; If arg contains a list longer than n and rest? = #f then log error.
+                      ;; If rest? = #t then the remainder of the list is in the last in the addresses.
                       (cond [(no-expect? n)
                              (cond [rest?
                                     (define addr (make-var-contour `(apply ,i . ,l) δ))                             
@@ -560,32 +532,38 @@
                                          (values (alt-reverse (cons addr addrs)) (cons addr raddrs))
                                          (values (alt-reverse addrs) raddrs))
                                      (aloop (add1 i) (sub-expect n) (cons addr addrs) (cons addr raddrs)))))
+                             (log-debug "Generated addrs (num: ~a, rest?: ~a) ~a ~a" num rest? addrs raddrs*)
                              (define result (box #f))
                              (do-comp #:bind/extra ()
                                       (do (iapσ) ([varg #:in-force iapσ arg])
                                         ;; Make temporary addresses for apply at this application point
                                         ;; and put all pullable arguments into their locations.
                                         (do (iapσ) iloop ([last varg] [-addrs addrs] [i i] [n n]) 
-                                            (match* (last -addrs)
-                                              [((consv A D) (cons addr -addrs))
-                                               (cond
-                                                [(no-expect? n) ;; too many in rest-arg list?
-                                                 (cond
-                                                  [rest? ;; nope, just include this in the final list.
-                                                   (unless (null? -addrs)
-                                                     (error 'apply "Too many addresses generated ~a" addrs))
-                                                   (do (iapσ) ([aprσ #:join iapσ addr (singleton last)])
-                                                     (set-box! result #t)
-                                                     (continue))]
-                                                  [else ;; yes, too many
-                                                   (log-too-many (len-expect num) (add1 i))
-                                                   (continue)])]
-                                                [else
-                                                 ;; Still expect more, so pull another out.
-                                                 (do (iapσ) ([apjσ #:alias iapσ addr A]
-                                                             [next #:in-get apjσ D])
-                                                   (iloop apjσ next -addrs (add1 i) (sub-expect n)))])]
-                                              [('() _)
+                                            (match last
+                                              [(consv A D)
+                                               (match -addrs
+                                                 [(cons addr -addrs)
+                                                  (cond
+                                                   [(no-expect? n) ;; too many in rest-arg list?
+                                                    (cond
+                                                     [rest? ;; nope, just include this in the final list.
+                                                      (unless (null? -addrs)
+                                                        (error 'apply "Too many addresses generated ~a" addrs))
+                                                      (do (iapσ) ([aprσ #:join iapσ addr (singleton last)])
+                                                        (set-box! result #t)
+                                                        (continue))]
+                                                     [else ;; yes, too many
+                                                      (log-too-many (len-expect num) (add1 i))
+                                                      (continue)])]
+                                                   [else
+                                                    ;; Still expect more, so pull another out.
+                                                    (do (iapσ) ([apjσ #:alias iapσ addr A]
+                                                                [next #:in-get apjσ D])
+                                                      (iloop apjσ next -addrs (add1 i) (sub-expect n)))])]
+                                                 [_
+                                                  (log-too-many (len-expect num) (add1 i))
+                                                  (continue)])]
+                                              ['()
                                                (cond
                                                 [(no-expect? n)
                                                  (set-box! result #t)
@@ -597,7 +575,7 @@
                                                      (continue))]
                                                 [else
                                                  ;; Can't pull anything out of empty!
-                                                 (log-too-few (len-expect num) (add1 i))
+                                                 (log-too-few (len-expect num) i)
                                                  (continue)])])))
                                       (do-values (and (unbox result)
                                                       (alt-reverse raddrs*))))])]
@@ -612,10 +590,12 @@
                              (do (iapσ) ([bσ #:join-forcing iapσ addr arg])
                                (loop bσ args (cons addr raddrs) (add1 i) (sub-expect n)))])]))))))
 
-       (define-simple-macro* (internal-applyv iapσ l δ k vs)
+       ;; XXX: Rest-args and can be 'apply'd (FIXME)
+       (define-simple-macro* (internal-applyv iapσ apply? l δ k vs)
          (let* ([-vs vs]
                 [f (unsafe-car -vs)]
                 [args (unsafe-cdr -vs)])
+           (when apply? (error 'apply "TODO: apply"))
            (match-function f
              [(clos: xs e ρ _)
               (do-comp #:bind/extra (#:σ nσ apply-addrs)
@@ -635,9 +615,7 @@
               (when (list? arity) (error 'apply "TODO: multi-arity function apply"))
               (define-values (num rest?)
                 (match arity
-                  [(arity-at-least n)
-                   (error 'apply "TODO: rest-arg primitive apply")
-                   (values n #t)]
+                  [(arity-at-least n) (values n #t)]
                   [n (values n #f)]))
               ;; FIXME: doesn't work with rest-arg primitives
               (do-comp #:bind/extra (#:σ nσ apply-addrs)
@@ -672,10 +650,13 @@
      ;; Numbers
      [add1 #:simple (n -> n) #:widen]
      [sub1 #:simple (n -> n) #:widen]
-     [+    #:simple (#:rest n -> n) #:widen]
-     [-    #:simple (n #:rest n -> n) #:widen]
-     [*    #:simple (#:rest n -> n) #:widen]
-     [/ #:no /v (n #:rest n -> n)]
+     [binary-+ #:simple-alternative + (n n -> n) #:widen]
+     [binary- #:simple-alternative - (n n -> n) #:widen]
+     [binary-* #:simple-alternative * (n n -> n) #:widen]
+     [binary-/ #:simple-alternative / (n n -> n) #:widen #:guard exn:fail:contract:divide-by-zero?]
+     [quotient #:simple (z z -> z) #:widen #:guard exn:fail:contract:divide-by-zero?]
+     [remainder #:simple (z z -> z) #:widen #:guard exn:fail:contract:divide-by-zero?]
+     [modulo #:simple (z z -> z) #:widen #:guard exn:fail:contract:divide-by-zero?]
      [=    #:simple (n #:rest n -> b)]
      [<    #:simple (r #:rest r -> b)]
      [>    #:simple (r #:rest r -> b)]
@@ -685,9 +666,6 @@
      [bitwise-not #:simple (z -> z)]
      [bitwise-ior #:simple (#:rest z -> z)]
      [bitwise-xor #:simple (#:rest z -> z)]
-     [quotient #:no quotientv (z z -> z)]
-     [remainder #:no remainderv (z z -> z)]
-     [modulo #:no modulov (z z -> z)]
      [numerator #:simple (q -> z)]
      [denominator #:simple (q -> z)]
      [make-rectangular #:simple (r r -> n)]
@@ -714,10 +692,10 @@
      [cos #:simple (n -> n) #:widen]
      [asin #:simple (n -> n) #:widen]
      [acos #:simple (n -> n) #:widen]
-     [log #:no logv (n -> n)]
+     [log #:simple (n -> n) #:widen]
      [fl+ #:simple (fl fl -> fl) #:widen]
      [fl* #:simple (fl fl -> fl) #:widen]
-     [fl/ #:no /v (fl fl -> fl)]
+     [fl/ #:no /v2 (fl fl -> fl)]
      [fl- #:simple (fl fl -> fl) #:widen]
      [fl= #:simple (fl fl -> b)]
      [fl< #:simple (fl fl -> b)]
@@ -738,31 +716,44 @@
      [flacos #:simple (fl -> fl) #:widen]
      [flasin #:simple (fl -> fl) #:widen]
      [flatan #:simple (fl -> fl) #:widen]
-     [fllog #:no logv (fl -> fl)]
+     [fllog #:simple (fl -> fl) #:widen]
      [flexp #:simple (fl -> fl) #:widen]
      [flsqrt #:simple (fl -> fl) #:widen]
      [flexpt #:simple (fl fl -> fl) #:widen]
      [->fl #:simple (z -> fl) #:widen]
-     [unsafe-fx= #:simple (fx fx -> b)]
-     [unsafe-fx< #:simple (fx fx -> b)]
-     [unsafe-fx> #:simple (fx fx -> b)]
-     [unsafe-fx<= #:simple (fx fx -> b)]
-     [unsafe-fx>= #:simple (fx fx -> b)]
-     [unsafe-fx- #:simple (fx fx -> fx) #:widen] ;; XXX: could crash?
-     [unsafe-fx+ #:simple (fx fx -> fx) #:widen] ;; XXX: could crash?
-     [unsafe-fx* #:simple (fx fx -> fx) #:widen] ;; XXX: could crash?
-     [unsafe-fxquotient #:simple (fx fx -> fx) #:widen] ;; XXX: could crash?
-     [unsafe-fxremainder #:simple (fx fx -> fx) #:widen] ;; XXX: could crash?
-     [unsafe-fxmodulo #:simple (fx fx -> fx) #:widen] ;; XXX: could crash?
-     [unsafe-fxabs #:simple (fx fx -> fx)] ;; XXX: could crash?
-     [unsafe-fxmin #:simple (fx fx -> fx)]
-     [unsafe-fxmax #:simple (fx fx -> fx)]
-     [unsafe-fxand #:simple (fx fx -> fx) #:widen]
-     [unsafe-fxxor #:simple (fx fx -> fx) #:widen]
-     [unsafe-fxior #:simple (fx fx -> fx) #:widen]
-     [unsafe-fxnot #:simple (fx -> fx) #:widen]
-     [unsafe-fxlshift #:simple (fx fx -> fx) #:widen] ;; XXX: could crash?
-     [unsafe-fxrshift #:simple (fx fx -> fx) #:widen] ;; XXX: could crash?
+     [unsafe-fx= #:simple-alternative fx= (fx fx -> b)]
+     [unsafe-fx< #:simple-alternative fx< (fx fx -> b)]
+     [unsafe-fx> #:simple-alternative fx> (fx fx -> b)]
+     [unsafe-fx<= #:simple-alternative fx<= (fx fx -> b)]
+     [unsafe-fx>= #:simple-alternative fx>= (fx fx -> b)]
+     [unsafe-fxmin #:simple-alternative fxmin (fx fx -> fx)]
+     [unsafe-fxmax #:simple-alternative fxmax (fx fx -> fx)]
+     [unsafe-fx- #:simple-alternative fx- (fx fx -> fx) #:widen
+                 #:guard exn:fail:contract:non-fixnum-result?]
+     [unsafe-fx+ #:simple-alternative fx+ (fx fx -> fx) #:widen
+                 #:guard exn:fail:contract:non-fixnum-result?]
+     [unsafe-fx* #:simple-alternative fx* (fx fx -> fx) #:widen
+                 #:guard exn:fail:contract:non-fixnum-result?]
+     [unsafe-fxquotient #:simple-alternative fxquotient (fx fx -> fx) #:widen
+                        #:guard exn:fail:contract:non-fixnum-result?]
+     [unsafe-fxremainder #:simple-alternative fxremainder (fx fx -> fx) #:widen
+                         #:guard exn:fail:contract:non-fixnum-result?]
+     [unsafe-fxmodulo #:simple-alternative fxmodulo (fx fx -> fx) #:widen
+                      #:guard exn:fail:contract:non-fixnum-result?]
+     [unsafe-fxabs #:simple-alternative fxabs (fx fx -> fx)
+                   #:guard exn:fail:contract:non-fixnum-result?]
+     [unsafe-fxand #:simple-alternative fxand (fx fx -> fx) #:widen
+                   #:guard exn:fail:contract:non-fixnum-result?]
+     [unsafe-fxxor #:simple-alternative fxxor (fx fx -> fx) #:widen
+                   #:guard exn:fail:contract:non-fixnum-result?]
+     [unsafe-fxior #:simple-alternative fxior (fx fx -> fx) #:widen
+                   #:guard exn:fail:contract:non-fixnum-result?]
+     [unsafe-fxnot #:simple-alternative fxnot (fx -> fx) #:widen
+                   #:guard exn:fail:contract:non-fixnum-result?]
+     [unsafe-fxlshift #:simple-alternative fxlshift (fx fx -> fx) #:widen
+                      #:guard exn:fail:contract:non-fixnum-result?]
+     [unsafe-fxrshift #:simple-alternative fxrshift (fx fx -> fx) #:widen
+                      #:guard exn:fail:contract:non-fixnum-result?]
      [number? #:predicate n]
      [complex? #:predicate n]
      [integer? #:predicate z]
