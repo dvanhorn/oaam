@@ -1,7 +1,7 @@
 #lang racket
 
 (require "data.rkt" "notation.rkt" "do.rkt" "parameters.rkt"
-         "primitive-maker.rkt"
+         "primitive-maker.rkt" "egal-box.rkt"
          (for-syntax racket/syntax syntax/parse) ;; for core syntax-classes
          racket/stxparam
          racket/unsafe/ops
@@ -73,12 +73,19 @@
                 (continue)))
 
        (define-simple-macro* (printfv prσ vs)
-         (begin (log-debug "Printing: ~a" (for/list ([v (in-list vs)])
-                                            (match v
-                                              [(addr a) (getter prσ a)]
-                                              [(value-set s) s]
-                                              [_ v])))
-                (yield (void))))
+         (begin (do-comp #:bind (vlst)
+                         (do (prσ) loop ([acc '()] [-vs vs])
+                             (match -vs
+                               [(cons v -vs)
+                                (match v
+                                  [(addr a)
+                                   (do (prσ) ([s #:get prσ a])
+                                     (loop prσ (cons s acc) -vs))]
+                                  [(value-set s) (loop prσ (cons s acc) -vs)]
+                                  [_ (loop prσ (cons v acc) -vs)])]
+                               ['() (do-values (alt-reverse acc))]))
+                         (begin (log-debug "Printing: ~a" vlst)
+                                (yield (void))))))
 
        (define/basic (procedure?v v) (yield (or (clos? v) (rlos? v))))
        (define/basic (vectorv-length v)
@@ -531,7 +538,7 @@
               (do-comp #:bind/extra (#:σ nσ apply-addrs)
                        (tapp pull-arguments #:σ iapσ num rest? l δ-op ... args)
                        (if apply-addrs
-                           (tapp prim-meaning #:σ nσ o (unbox fallback) rest? l δ-op ... k apply-addrs)
+                           (tapp prim-meaning #:σ nσ o (eunbox fallback) rest? l δ-op ... k apply-addrs)
                            (continue)))]
              [(? kont?)
               (do-comp #:bind/extra (#:σ nσ apply-addrs)

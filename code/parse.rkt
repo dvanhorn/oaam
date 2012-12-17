@@ -1,5 +1,5 @@
 #lang racket
-(require "ast.rkt" "primitives.rkt" "data.rkt" "macros.rkt"
+(require "ast.rkt" "primitives.rkt" "data.rkt" "macros.rkt" "egal-box.rkt"
          racket/trace)
 (provide parse parse-prog unparse internal-apply$)
 
@@ -19,7 +19,7 @@
   (define open (make-hasheq))
   (define prims-used (make-hasheq))
   (define (mk-primr tail? which)
-    (define b (hash-ref! prim-fallbacks which (λ () (box #f)) ))
+    (define b (hash-ref! prim-fallbacks which (λ () (ebox #f)) ))
     (primr (fresh-label!) tail? which b))
   (define ((new-free x))
     (match (hash-ref open x #f)

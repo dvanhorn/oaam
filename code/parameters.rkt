@@ -18,9 +18,11 @@
           exn-wrap))
 
 (define-for-syntax (exn-wrap stx syn)
-  #`(with-handlers ([exn:fail:contract:arity?
+  syn
+  #;
+  (quasisyntax/loc syn (with-handlers ([exn:fail:contract:arity?
                      (λ (ex) (error 'do "Problem in ~a~%~a" '#,stx ex))])
-      #,syn))
+      #,syn)))
 
 (define-syntax-rule (mk-syntax-parameters id ...)
   (begin (define-syntax-parameter id #f) ... (provide id ...)))
@@ -199,8 +201,9 @@ and do. do will not initialize an accumulator in the static extent of another do
      (with-syntax ([(accs ...) (map target-param all)])
        (quasisyntax/loc stx
          (λ (f.kw-ids ... f.ids ...)
-            (syntax-parameterize ([accs (make-rename-transformer #'f.kw-ids)] ...)
-              (initialize-targets . body)))))]))
+            (syntax-parameterize ([accs (make-rename-transformer #'f.kw-ids)] ...
+                                  [initialized? #t])
+              . body))))]))
 
 ;; Apply a tλ
 (define-syntax (tapp stx)

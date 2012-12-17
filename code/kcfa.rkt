@@ -1,7 +1,7 @@
 #lang racket
 
 (require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt" "primitives.rkt" "parse.rkt"
-         "parameters.rkt"
+         "parameters.rkt" "egal-box.rkt"
          "notation.rkt" "op-struct.rkt" "do.rkt" "add-lib.rkt"
          (rename-in racket/generator
                     [yield real-yield]
@@ -489,7 +489,7 @@
 
                         [(pfk: cm fallback a)
                          (generator
-                          (set-box! fallback v) ;; haxxx
+                          (set-ebox! fallback v) ;; haxxx
                           (do (co-σ) ([k* #:in-kont co-σ a])
                             (yield (co co-σ k* v))))]
                         [_ (error 'step "Bad continuation ~a" k)]))]
@@ -529,7 +529,7 @@
                                    (arity-error f l (arity-at-least xn) an (map (λ (a) (getter ap-σ a)) arg-addrs))
                                    (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
                            [(primop o fallback _)
-                            (tapp prim-meaning o (unbox fallback) #f l δ-op ... k arg-addrs)]
+                            (tapp prim-meaning o (eunbox fallback) #f l δ-op ... k arg-addrs)]
                            [(? kont? k)
                             ;; continuations only get one argument.
                             (cond [(and (pair? arg-addrs) (null? (cdr arg-addrs)))
