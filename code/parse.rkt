@@ -124,8 +124,7 @@
         [(? vector? d) (parse `(,quote$ ,d) tail?)] ;; ick
         [err (error 'parse "Unknown form ~a" err)])))
   (values expr open prim-fallbacks))
-#;
-(trace parse)
+#;(trace parse)
 (define (unparse e)
   (match e
     [(or (var _ _ x) (datum _ _ x) (primr _ _ x _)) x]

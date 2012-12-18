@@ -102,7 +102,7 @@
              (values (hash-set ξ* a vs) (cons nothing rvss))]
             [else (values ξ* (cons vs rvss))])))
   (values ξ* (alt-reverse rvss)))
-(trace bind-Ξ bind-Ξ*)
+#;(trace bind-Ξ bind-Ξ*)
 
 (define (prepare-cfa2^ parser sexp)
   (set! L (make-hash))

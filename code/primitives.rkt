@@ -549,6 +549,8 @@
                             (original-yield (co nσ f v)))]
                          [_ (continue)]))]))))))
 
+
+
 (define-for-syntax prim-table
   #'([apply #:!! internal-applyv (fn #:rest any -> any)]
      ;; Numbers
@@ -807,12 +809,15 @@
      [time #:no timev (any -> any)]
      [immutable? #:no immutablev? (any -> b)]))
 
+(define-for-syntax prim-aliases
+  #'([apply internal-apply]))
+
 (define-syntax (mk-static-prims stx)
   (syntax-parse stx
     [(_ primitive?:id prim-arities:id)
      (quasisyntax/loc stx
        (mk-static-primitive-functions
-        primitive? prim-arities #,prim-table))]))
+        primitive? prim-arities #,prim-table #,prim-aliases))]))
 
 (mk-static-prims primitive? prim-arities)
 
@@ -825,7 +830,8 @@
           #,compiled? #,global-σ? #,(= K 0)
           mean compile ev co ap clos? rlos kont? (extra ...)
           #,@(prim-defines #'clos #'rlos #'kont? K #'ev #'co)
-          #,prim-table)))]))
+          #,prim-table
+          #,prim-aliases)))]))
 
 (define prim-constants
   (hasheq 'eof eof

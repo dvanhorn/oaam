@@ -6,6 +6,8 @@
                      racket/list (except-in racket/base and)
                      syntax/parse/experimental/template
                      racket/pretty
+                     syntax/id-table
+                     (except-in racket/set for/set for*/set)
                      "notation.rkt")
          racket/trace
          racket/unsafe/ops
@@ -474,16 +476,33 @@
                                 (attribute exn?)
                                 (syntax? (attribute widen?)))))))
 
+(define-for-syntax (populate-aliases origs aliases)
+  (define alias-table (make-free-id-table))
+  (for ([orig (in-list (syntax->list origs))]
+        [alias (in-list (syntax->list aliases))])
+    (free-id-table-set! alias-table orig (set-add (free-id-table-ref alias-table orig (set)) alias)))
+  (define (aliases-of p) (set->list (free-id-table-ref alias-table p (set))))
+  aliases-of)
+
 (define-syntax (mk-static-primitive-functions stx)
   (set! type-checkers (make-hash))
   (syntax-parse stx
     [(_ primitive?:id arities:id
-        ((~var p (prim-entry list)) ...))
-     (quasitemplate/loc stx
-       (begin (define (primitive? o)
-                (case o [(p.prim) #t] ... [else #f]))
-              (define arities
-                (hasheq (?@ 'p.prim p.arity) ...))))]))
+        ((~var p (prim-entry list)) ...)
+        ([origs:id aliases:id] ...))
+     (define aliases-of (populate-aliases #'(origs ...) #'(aliases ...)))
+     (with-syntax* ([((aliasess ...) ...) (map aliases-of (attribute p.prim))]
+                    [((alias* arity*) ...)
+                     (for/fold ([acc '()]) ([aliass (in-list (syntax->list #'((aliasess ...) ...)))]
+                                            [arity (in-list (attribute p.arity))])
+                       (for/fold ([acc acc]) ([alias (in-list (syntax->list aliass))])
+                         (cons (list alias arity) acc)))])
+       (quasitemplate/loc stx
+         (begin (define (primitive? o)
+                  (case o [(p.prim aliasess ...) #t] ... [else #f]))
+                (define arities
+                  (hasheq (?@ 'p.prim p.arity) ...                          
+                          (?@ 'alias* arity*) ...)))))]))
 
 (define-for-syntax (mk-checker-fns chk)
   (define names
@@ -504,13 +523,16 @@
         (extra ...)
         (~bind [rlos? (format-id #'rlos "~a?" #'rlos)]
                [rlos: (format-id #'rlos "~a:" #'rlos)])
-        defines ... ((~var p (prim-entry (type->pred-stx #'clos? #'rlos? #'kont?))) ...))
+        defines ...
+        ((~var p (prim-entry (type->pred-stx #'clos? #'rlos? #'kont?))) ...)
+        ([origs:id aliases:id] ...))
      (define compiled? (syntax-e #'cb?))
      (define 0cfa? (syntax-e #'0b?))
      (define ((apm m) arg-stx)
        (if (procedure? m)
            (m arg-stx)
            (datum->syntax arg-stx (cons m arg-stx) arg-stx)))
+     (define aliases-of (populate-aliases #'(origs ...) #'(aliases ...)))
      (with-syntax ([((type-filters ...)
                      (checker-names ...)) (mk-checker-fns (attribute p.checker-fn))]
                    [(extra-ids ...) (generate-temporaries #'(extra ...))]
@@ -529,7 +551,7 @@
                           [(read-only) #'(nσ vs)]
                           [(simple) #'(vs)]
                           [(full) #'(nσ ℓ δ k vs)])])
-                    #`[(#,p)
+                    #`[(#,p #,@(aliases-of p))
                        (λP (pσ fallv apply? ℓ δ k v-addrs)
                            (with-prim-yield
                             k

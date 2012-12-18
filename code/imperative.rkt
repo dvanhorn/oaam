@@ -92,8 +92,9 @@
                   (cons i v)))
                  (values (format "State count: ~a" (unbox state-count*))
                          (format "Point count: ~a" (hash-count seen))
-                         global-σ
                          #;
+                         global-σ
+                         
                          (clean-σ global-σ vs)
                          vs)]
                 [else
