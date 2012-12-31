@@ -182,9 +182,6 @@
       #,body))
 (define-simple-macro* (bind-join-whole (σjoin sσ a vs) body)
   (let ([σjoin (join sσ a vs)]) #,(bind-help #'σjoin #'body)))
-#;
-(define-simple-macro* (bind-join*-whole (σjoin* sσ as vss) body)
-  (let ([σjoin* (join* sσ as vss)]) #,(bind-help #'σjoin* #'body)))
 
 (define (hash-getter hgσ a)
   (hash-ref hgσ a (λ () (error 'getter "Unbound address ~a in store ~a" a hgσ))))
@@ -221,7 +218,5 @@
 (define-syntax-rule (with-whole-σ body)
   (splicing-syntax-parameterize
    ([bind-join (make-rename-transformer #'bind-join-whole)]
-#;
-    [bind-join* (make-rename-transformer #'bind-join*-whole)]
     [getter (make-rename-transformer #'hash-getter)])
    body))

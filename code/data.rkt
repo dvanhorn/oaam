@@ -1,7 +1,7 @@
 #lang racket
 (require "ast.rkt" "notation.rkt" (for-syntax syntax/parse racket/syntax)
          racket/stxparam)
-(provide define-nonce mk-touches mk-flatten-value cons-limit
+(provide define-nonce touches mk-touches mk-flatten-value cons-limit
          ;; abstract values
          number^;;integer^ rational^
          number^?
@@ -30,7 +30,7 @@
          atomic?
          nothing singleton
          ≡ ⊑? big⊓ ⊓ ⊓1)
-
+(define-syntax-parameter touches #f)
 (define-syntax (define-nonce stx)
   (syntax-case stx () [(_ name) (identifier? #'name)
                        (with-syntax ([-name (format-id #'name "-~a" #'name)])
@@ -97,8 +97,8 @@
       [(or (? vectorv-immutable^?) (? vector?)) vector-immutable^]
       [(or (? input-port^?) (? input-port?)) 'input-port]
       [(or (? output-port^?) (? output-port?)) 'output-port]
-      [(or (clos _ _ _ _)
-           (rlos _ _ _ _ _)) 'function]
+      [(or (clos _ _ _)
+           (rlos _ _ _ _)) 'function]
       [(? kont?) 'continuation]
       [else (error "Unknown base value" v)])))
 
@@ -184,19 +184,23 @@
       (null? x)
       (eof-object? x)))
 
-(define-simple-macro* (mk-touches touches:id clos:id rlos:id promise:id 0cfa?:boolean)
+(define-simple-macro* (mk-touches touches:id clos:id rlos:id
+                                  ls:id lrk:id ltk:id ifk:id sk!:id pfk:id
+                                  ast-fv:id promise:id
+                                  0cfa?:boolean
+                                  pushdown?:boolean)
   (define (touches v)
     (match v
-      [(clos xs e ρ fvs)
+      [(clos xs e ρ)
        #,(if (syntax-e #'0cfa?)
-             #'fvs
-             #'(for/hash ([x (in-set fvs)])
+             #'(ast-fv e)
+             #'(for/hash ([x (in-set (ast-fv e))])
                  (hash-ref ρ x
                            (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ)))))]
-      [(rlos xs rest e ρ fvs)
+      [(rlos xs rest e ρ)
        #,(if (syntax-e #'0cfa?)
-             #'fvs
-             #'(for/hash ([x (in-set fvs)])
+             #'(ast-fv e)
+             #'(for/hash ([x (in-set (ast-fv e))])
                  (hash-ref ρ x
                            (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ)))))]
       [(consv a d) (set a d)]
@@ -207,9 +211,44 @@
       [(? set? s) (for/union ([v (in-set s)]) (touches v))]
       [(promise e ρ)
        #,(if (syntax-e #'0cfa?)
-             #'(free e)
-             #'(for/hash ([x (in-set (free e))])
+             #'(ast-fv e)
+             #'(for/hash ([x (in-set (ast-fv e))])
                  (hash-ref ρ x
                            (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ)))))]
+      ;; Continuation frames
+      #,@(let ([kont-rest
+                (if (syntax-e #'pushdown?)
+                    (λ (stx) #`(∪ #,stx (touches a)))
+                    (λ (stx) #`(∪1 #,stx a)))])
+           #`([(ls _ l n es v-addrs ρ a δ)
+               #,(kont-rest
+                  (if (syntax-e #'0cfa?)
+                      #'(for/set #:initial (for/union ([e (in-list es)]) (ast-fv e))
+                                 ([a (in-list v-addrs)])
+                                 a)
+                      #'(for/set #:initial (for/set ([(_ a) (in-hash ρ)]) a)
+                                 ([a (in-list v-addrs)])
+                                 a)))]
+              [(lrk _ x xs es body ρ a δ)
+               #,(kont-rest
+                  (if (syntax-e #'0cfa?)
+                     #'(for/union #:initial (ast-fv body) ([e (in-list es)]) (ast-fv e))
+                     #'(for/set ([(_ a) (in-hash ρ)]) a)))]
+              [(ltk _ x xs es x-done v-addrs body ρ a δ)
+               #,(kont-rest
+                  (if (syntax-e #'0cfa?)
+                      #'(∪/l (for/union #:initial (ast-fv body)
+                                        ([e (in-list es)])
+                                        (ast-fv e))
+                             v-addrs)
+                      #'(for/set #:initial (list->set v-addrs)
+                                 ([(_ a) (in-hash ρ)]) a)))]
+              [(ifk _ t e ρ a δ)
+               #,(kont-rest
+                  (if (syntax-e #'0cfa?)
+                      #'(∪ (ast-fv t) (ast-fv e))
+                      #'(for/set ([(_ a) (in-hash ρ)]) a)))]
+              [(sk! _ l a) #,(kont-rest #'(set l))]
+              [(pfk _ _ a) #,(kont-rest #'∅)]))
       [_ (set)])))
 

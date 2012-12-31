@@ -35,6 +35,7 @@
          (~optional (~seq #:ap ap:id) #:defaults ([ap (generate-temporary #'ap)]))
          (~optional (~seq #:co co:id) #:defaults ([co (generate-temporary #'co)]))
          (~optional (~seq #:ev ev:id) #:defaults ([ev (generate-temporary #'ev)]))
+         (~optional (~seq #:ast ast:id) #:defaults ([ast (generate-temporary #'ast)]))
          ;; Continuation frames
          (~optional (~seq #:mt mt:id) #:defaults ([mt (generate-temporary #'mt)]))
          (~optional (~seq #:sk! sk!:id) #:defaults ([sk! (generate-temporary #'sk!)]))
@@ -48,9 +49,10 @@
                     #:defaults ([(extra 1) '()]
                                 [(extra-ids 1) '()]))
          ;; Touch relation specialized for clos
-         (~optional (~seq #:touches touches:id))
+         (~optional (~seq #:touches touches-id:id) #:defaults ([touches-id (generate-temporary #'touches-id)]))
          ;; Analysis strategies flags (requires the right parameters too)
          (~optional (~and #:compiled compiled?))
+         (~optional (~and #:pushdown pushdown?))
          ;; Continuation marks incur a representation overhead.
          ;; We allow this feature to be disabled for benchmarking analysis of
          ;; languages that do not have continuation marks.
@@ -75,6 +77,7 @@
                    [ev: (format-id #'ev "~a:" #'ev)]
                    [co: (format-id #'co "~a:" #'co)]
                    [ap: (format-id #'ap "~a:" #'ap)]
+                   [ast-fv (format-id #'ast "~a-fv" #'ast)]
                    [(ls: ls?) (:? #'ls)]
                    [(lrk: lrk?) (:? #'lrk)]
                    [(ifk: ifk?) (:? #'ifk)]
@@ -124,60 +127,73 @@
               (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k p))))]
              [(pfl l _ fallback e)
               (define c (compile e))
+              (define fv (ast-fv c))
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([(σ*-pfl a) #:push ev-σ l δ k])
-                    (yield (ev σ*-pfl c ρ (pfk (marks-of k) fallback a) δ))))]
+                    (yield (ev σ*-pfl c (restrict-to-set ρ fv) (pfk (marks-of k) fallback a) δ))))]
              [(lam l _ x e*)
               (define c (compile e*))
-              (define fv (free e))
-              (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k (clos x c ρ fv)))))]
+              (define fv (ast-fv c))
+              (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k (clos x c (restrict-to-set ρ fv))))))]
              [(rlm l _ x r e*)
               (define c (compile e*))
-              (define fv (free e))
-              (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k (rlos x r c ρ fv)))))]
+              (define fv (ast-fv c))
+              (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k (rlos x r c (restrict-to-set ρ fv))))))]
              [(lrc l _ (and xs (cons x xs*)) (cons e es) b)
               (define c (compile e))
               (define cs (map compile es))
               (define cb (compile b))
               (define ss (map (λ _ nothing) xs))
+              (define fv (ast-fv c))
               (λ% (ev-σ ρ k δ)
                   (define as (map (λ (x) (make-var-contour x δ)) xs))
                   (define/ρ ρ* (extend* ρ xs as))
+                  (define/ρ ρe (restrict-to-set ρ* fv))
                   (do (ev-σ) ([(σ0 a) #:push ev-σ l δ k]
                               [σ*-lrc #:join* σ0 as ss])
-                    (yield (ev σ*-lrc c ρ* (lrk (marks-of k) x xs* cs cb ρ* a δ) δ))))]
+                    (yield (ev σ*-lrc c ρe (lrk (marks-of k) x xs* cs cb ρ* a δ) δ))))]
              [(lte l _ (cons x xs) (cons e es) b)
               (define c (compile e))
               (define cs (map compile es))
               (define cb (compile b))
+              (define fv (ast-fv c))
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([(σ*-app a) #:push ev-σ l δ k])
-                    (yield (ev σ*-app c ρ (ltk (marks-of k) x xs cs '() '() cb ρ a δ) δ))))]
+                    (yield (ev σ*-app c (restrict-to-set ρ fv)
+                               (ltk (marks-of k) x xs cs '() '() cb ρ a δ)
+                               δ))))]
              [(app l _ e es)
               (define c (compile e))
               (define cs (map compile es))
+              (define fv (ast-fv c))
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([(σ*-app a) #:push ev-σ l δ k])
-                    (yield (ev σ*-app c ρ (ls (marks-of k) l 0 cs '() ρ a δ) δ))))]
+                    (yield (ev σ*-app c (restrict-to-set ρ fv)
+                               (ls (marks-of k) l 0 cs '() ρ a δ)
+                               δ))))]
              [(ife l _ e0 e1 e2)
               (define c0 (compile e0))
               (define c1 (compile e1))
               (define c2 (compile e2))
+              (define fv (ast-fv c0))
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([(σ*-ife a) #:push ev-σ l δ k])
-                    (yield (ev σ*-ife c0 ρ (ifk (marks-of k) c1 c2 ρ a δ) δ))))]
+                    (yield (ev σ*-ife c0 (restrict-to-set ρ fv)
+                               (ifk (marks-of k) c1 c2 ρ a δ) δ))))]
              [(st! l _ x e*)
               (define c (compile e*))
+              (define fv (ast-fv c))
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([(σ*-st! a) #:push ev-σ l δ k])
-                    (yield (ev σ*-st! c ρ (sk! (marks-of k) (lookup-env ρ x) a) δ))))]
+                    (yield (ev σ*-st! c (restrict-to-set ρ fv) (sk! (marks-of k) (lookup-env ρ x) a) δ))))]
              ;; let/cc is easier to add than call/cc since we make yield
              ;; always make co states for primitives.
              [(lcc l _ x e*)
               (define c (compile e*))
+              (define fv (ast-fv c))
               (λ% (ev-σ ρ k δ)
                   (define x-addr (make-var-contour x δ))
-                  (define/ρ ρ* (extend ρ x x-addr))
+                  (define/ρ ρ* (restrict-to-set (extend ρ x x-addr) fv))
                   (do (ev-σ) ([σ*-lcc #:join ev-σ x-addr (singleton k)])
                     (yield (ev σ*-lcc c ρ* k δ))))]
              ;; Forms for stack inspection
@@ -209,7 +225,7 @@
                 (quasisyntax/loc stx
                     ((define-syntax-rule (... (λ% (gσ ρ k δ) body ...))
                        (tλ (#:σ gσ ρ-op ... k δ-op ...) body (... ...)))
-                     (define (compile e) #,eval)))]
+                     (define (compile e) (ast #,eval (free e)))))]
                [else
                 ;; brittle, since other identifiers must be the same in ev:
                 (syntax/loc stx
@@ -242,11 +258,16 @@
                          (cm-op ... x xs es x-done v-addrs e ρ-op ... k δ-op ...))
            (mk-op-struct pfk (cm fallback k) (cm-op ... fallback k))
            ;; Values
-           (mk-op-struct clos (x e ρ free) (x e ρ-op ... free) #:expander-id clos:)
-           (mk-op-struct rlos (x r e ρ free) (x r e ρ-op ... free) #:expander-id rlos:)
+           (mk-op-struct clos (x e ρ) (x e ρ-op ...) #:expander-id clos:)
+           (mk-op-struct rlos (x r e ρ) (x r e ρ-op ...) #:expander-id rlos:)
            (define (kont? v) (or (ls? v) (lrk? v) (ltk? v) (ifk? v) (sk!? v) (mt? v) (pfk? v)))
+           
+           #,(if (given compiled?)
+                 #'(struct ast (compiled fv) #:property prop:procedure (struct-field-index compiled))
+                 #'(define ast-fv free))
+           
            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-           ;; Handling of continuation marks
+           ;; handling of continuation marks
            (define (marks-of k)
              #,(if (given CM?)
                    #'(match k
@@ -343,10 +364,11 @@
            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
            ;; End of continuation mark handling
 
-           #,@(if (given touches)
-                  #`((mk-touches touches clos: rlos: list #,(zero? (attribute K))))
-                  #'())
-           (splicing-syntax-parameterize ([yield (... #,yield-ev)])
+           (mk-touches touches-id
+                       clos: rlos: ls: lrk: ltk: ifk: sk!: pfk:
+                       ast-fv list #,(zero? (attribute K)) #,(given pushdown?))
+           (splicing-syntax-parameterize ([yield (... #,yield-ev)]
+                                          [touches (make-rename-transformer #'touches-id)])
             (in-scope-of-extras (extra ...)
              (define-syntax do-macro (mk-do #,(given generators?)))
              (mk-flatten-value flatten-value-fn clos: rlos: kont?)
@@ -506,24 +528,24 @@
                       (generator
                        (do (ap-σ) ([f #:in-get ap-σ fn-addr])
                          (match-function f
-                           [(clos: xs e ρ _)
+                           [(clos: xs e ρ)
                             (define xn (length xs))
                             (define an (length arg-addrs))
                             (cond [(= xn an)
                                    (do (ap-σ)
                                        ([(ρ* σ*-clos δ*) #:bind ρ ap-σ l δ xs arg-addrs])
-                                     (yield (ev σ*-clos e ρ* k δ*)))]
+                                     (yield (ev σ*-clos e (restrict-to-set ρ* (ast-fv e)) k δ*)))]
                                   ;; Yield the same state to signal "stuckness".
                                   [else
                                    (arity-error f l xn an (map (λ (a) (getter ap-σ a)) arg-addrs))
                                    (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-                           [(rlos: xs r e ρ _)
+                           [(rlos: xs r e ρ)
                             (define xn (length xs))
                             (define an (length arg-addrs))
                             (cond [(<= xn an)
                                    (do (ap-σ)
                                        ([(ρ* σ*-clos δ*) #:bind-rest ρ ap-σ l δ xs r arg-addrs])
-                                     (yield (ev σ*-clos e ρ* k δ*)))]
+                                     (yield (ev σ*-clos e (restrict-to-set ρ* (ast-fv e)) k δ*)))]
                                   ;; Yield the same state to signal "stuckness".
                                   [else
                                    (arity-error f l (arity-at-least xn) an (map (λ (a) (getter ap-σ a)) arg-addrs))

@@ -103,7 +103,7 @@
            body))
 
 (define-syntax-rule (bind-big-alias (σ* σ alias all-to-alias) body)
-  (do-comp #:bind (#:σ σi acc)
+  (do-comp #:bind/extra (#:σ σi acc)
            (do (σ) loop ([-all-to-alias all-to-alias] [acc nothing])
                (match -all-to-alias
                  ['() (do-values acc)]

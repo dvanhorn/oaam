@@ -1,6 +1,8 @@
 #lang racket
 (provide extend extend* join join* join-store
-         update update/change would-update? restrict-to-reachable restrict-to-reachable/vector)
+         update update/change would-update?
+         mk-restrict-to-reachable
+         restrict-to-reachable restrict-to-reachable/vector restrict-to-set)
 (require "data.rkt" "ast.rkt" "notation.rkt")
 
 (define (extend ρ x v)
@@ -55,6 +57,10 @@
   (λ (eσ v)
      (for/hash ([a (in-set (reach eσ (touches v)))])
        (values a (ref eσ a)))))
+
+(define (restrict-to-set map s)
+  (for/hash ([a (in-set s)])
+    (values a (hash-ref map a))))
 
 (define reach (mk-reach hash-ref))
 (define reach/vec (mk-reach vector-ref))

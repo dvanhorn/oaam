@@ -15,6 +15,7 @@
          "sparse-wide.rkt"
          "cfa2.rkt"
          "pdcfa.rkt"
+         "gammacfa.rkt"
          racket/splicing)
 (provide debug-check)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -53,12 +54,13 @@
                    #:ans  sp-lazy-0cfa^/c-ans
                    #:touches sp-lazy-0cfa^/c-touches
                    #:fixpoint sp-lazy-0cfa^/c-fix
-                   #:global-σ #:compiled #:wide)))))))
+                   #:global-σ 
+                   #:compiled #:wide)))))))
  (provide sp-lazy-0cfa^/c)
 
 
 ;; "pt2"
-(mk-prealloc/timestamp^-fixpoint 2prealloc/imperative-fixpoint/c 2prealloc-ans/c?
+(mk-imperative/timestamp^-fixpoint 2prealloc/imperative-fixpoint/c 2prealloc-ans/c?
                                  2prealloc-ans/c-v 2prealloc-touches-0/c)
 (with-nonsparse
  (with-lazy
@@ -73,15 +75,26 @@
                      #:touches 2prealloc-touches-0/c
                      #:fixpoint 2prealloc/imperative-fixpoint/c
                      #:global-σ #;
-                     #:compiled #:wide))))))))
+                     #:compiled #:wide #:pushdown))))))))
 (provide lazy-cfa2^/c/prealloc/timestamp!)
 
+;; g0cfa
+(with-nonsparse
+ (with-lazy
+  (with-0-ctx
+   (with-narrow-σ-passing
+    (with-whole-σ
+     (with-set-monad
+      (with-abstract
+       (with-ΓCFA (mk-analysis)
+        (mk-analysis #:aval lazy-ΓCFA/c #:compiled)))))))))
+(provide lazy-ΓCFA/c)
 
 ;; "pts"
-(mk-prealloc/timestamp^-fixpoint sprealloc/imperative-fixpoint/c sprealloc-ans/c?
+(mk-imperative/timestamp^-fixpoint sprealloc/imperative-fixpoint/c sprealloc-ans/c?
                                  sprealloc-ans/c-v sprealloc-touches-0/c)
 (with-nonsparse
- (with-strict
+ (with-lazy
   (with-0-ctx/prealloc
    (with-prealloc/timestamp-store
     (with-mutable-worklist
@@ -92,7 +105,7 @@
                      #:ans sprealloc-ans/c
                      #:touches sprealloc-touches-0/c
                      #:fixpoint sprealloc/imperative-fixpoint/c
-                     #:global-σ #:compiled #:wide))))))))
+                     #:global-σ #:compiled #:wide #:pushdown))))))))
 (provide lazy-pdcfa^/c/prealloc/timestamp!)
 
 #|

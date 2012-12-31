@@ -64,7 +64,7 @@
                 [kont? kont?])
     #`((define-syntax-rule (yield-delay ydσ v)
          (do (ydσ) ([v* #:in-delay ydσ v]) (yield v*)))
-       (define-simple-macro* (errorv vs)
+       (define-simple-macro* (errorv prσ vs)
          (begin (log-info "Error reachable ~a" (for/list ([v (in-list vs)])
                                                  (match v
                                                    [(addr a) (getter prσ a)]
@@ -73,7 +73,7 @@
                 (continue)))
 
        (define-simple-macro* (printfv prσ vs)
-         (begin (do-comp #:bind (vlst)
+         (begin (do-comp #:bind/extra (vlst)
                          (do (prσ) loop ([acc '()] [-vs vs])
                              (match -vs
                                [(cons v -vs)
@@ -514,14 +514,14 @@
                 [f (unsafe-car -vs)]
                 [args (unsafe-cdr -vs)])
            (match-function f
-             [(clos: xs e ρ _)
+             [(clos: xs e ρ)
               (do-comp #:bind/extra (#:σ nσ apply-addrs)
                        (tapp pull-arguments #:σ iapσ xs #f l δ-op ... args)
                        (if apply-addrs
                            (do (nσ) ([(ρ* σ*-apcl δ*) #:bind ρ nσ l δ xs apply-addrs])
                              (original-yield (ev σ*-apcl e ρ* k δ)))
                            (continue)))]
-             [(rlos: xs r e ρ _)
+             [(rlos: xs r e ρ)
               (do-comp #:bind/extra (#:σ nσ apply-addrs)
                        (tapp pull-arguments #:σ iapσ xs #t l δ-op ... args)
                        (if apply-addrs
@@ -770,7 +770,7 @@
      ;; Imperative stuff
      [void? #:predicate !]
      [void #:simple (-> !)]
-     [error #:no errorv (#:rest any -> any)]
+     [error #:ro errorv (#:rest any -> any)]
      ;; Booleans
      [not #:predicate false]
      [boolean? #:predicate b]

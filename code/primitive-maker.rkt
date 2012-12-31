@@ -586,7 +586,7 @@
            (define call-rlos
              (tλ (#:σ σ fnv ℓ δ-op ... k v-addrs)
                (match-function fnv
-                 [(rlos: xs r e ρ fv)
+                 [(rlos: xs r e ρ)
                   (do-comp #:bind/extra (#:σ rσ apply-addrs)
                            (tapp pull-arguments-from-addresses #:σ σ xs #t ℓ δ-op ... v-addrs)
                            (if apply-addrs

@@ -109,8 +109,6 @@
          ;; re-processed.
          (define change? (add-todo p actions))
          (cond [(or change? ∆?)
-                #;
-                (printf "Saw change~%")
                 (set-point-todo?! (node-data p) #t)
                 (i:add-todo! state)]
                [else (void)])
@@ -118,21 +116,33 @@
 
 (define (skip-from ps)
   (define seen (make-hasheq)) ;; no intermediate allocation. eq? okay
+  (define last 1)
   (hash-set! seen current-state #t)
 #;
   (printf "Skipping from ~a~%"
           (for/set ([p (in-set ps)]) (node-state p)))
   (let loop ([todo ps])
     (for ([p (in-set todo)]
-          #:unless (and (hash-has-key? seen p)
+          #:unless (and (hash-has-key? seen p)                        
                         #;
-                        (printf "Seen (skip) ~a~%" (point-state p))))
+                        (printf "Seen (skip) ~a~%" (node-state p))))
       (hash-set! seen p #t)
+      #;
+      (let ([c (hash-count seen)])
+        (printf "Skip seen ~a~%" c)
+        #;
+        (when (> (- c last) 10)
+          (set! last c)
+          (printf "Skip seen ~a~%" c)))
       (match-define (node state-debug pp* (point A todo? _)) p)
       (cond [(and (not todo?) (actions-consonant? A))
              (loop pp*)]
             [else
-             #;(printf "To (todo? ~a) ~a~%" todo? (node-state p))
+             #;
+             (printf "To (todo? ~a, non-consonant addrs ~a) ~a~%"
+                     todo?
+                     A
+                     (node-state p))
              #;
              (set-skips (add1 skips))
              (add-todo/skip! p)]))))
@@ -164,12 +174,10 @@
         [else
          (vector-set! global-σ a upd)
          (set! ∆? #t)
-         (vector-set! σ-history a (add1/debug (vector-ref σ-history a) 'join!/sparse))]))
-
-(define (join*!/sparse as vss)
-  (for ([a (in-list as)]
-        [vs (in-list vss)])
-    (join!/sparse a vs)))
+         (define age (add1 (vector-ref σ-history a)))
+         #;
+         (printf "Set ~a at age ~a~%" a age) (flush-output)
+         (vector-set! σ-history a age)]))
 
 (define steps 0) (define (set-steps v) (set! steps v))
 (define skips 0) (define (set-skips v) (set! skips v))
@@ -192,7 +200,7 @@
       (define state-count* (state-count))
       (set-box! state-count* 0)
       fst
-      (define clean-σ (restrict-to-reachable/vector touches))
+      (define clean-σ (mk-restrict-to-reachable vector-ref))
       (define sparse-step (mk-sparse-step step))
       (define last-count 0)
       (let loop ()
@@ -203,6 +211,11 @@
             (for*/set ([(c _) (in-hash graph)]
                        #:when (ans^? c))
               (ans^-v c)))
+          #;
+          (pretty-print
+           (for/list ([v (in-vector global-σ)]
+                      [i (in-naturals)])
+             (cons i v)))
           (values (format "State count: ~a" (unbox state-count*))
                   (format "Point count: ~a" (hash-count graph))
                   (clean-σ global-σ vs)
@@ -224,33 +237,13 @@
 
 ;; Get and force accumulate uses of addresses
 (define-syntax-rule (bind-get-sparse (res σ a) body)
-  (let ([res (getter σ a)]
-        [actions (hash-set target-actions a (vector-ref σ-history a))])
+  (let* ([res (getter σ a)]
+         [age (vector-ref σ-history a)]
+         [actions (hash-set target-actions a age)])
+    #;
+    (printf "Got ~a at age ~a~%" a age) (flush-output)
     (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
       body)))
-
-;; An aliased address also counts as a use.
-#;
-(define-syntax-rule (bind-big-alias-sparse (σ* σ alias all-to-alias) body)
-  (let-values ([(actions val)
-                (for/fold ([actions target-actions]
-                           [val nothing]) ([to-alias (in-list all-to-alias)])
-                  (values (hash-set actions to-alias (vector-ref σ-history to-alias))
-                          (⊓ val (getter σ to-alias))))])
-    (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
-      (bind-join (σ* σ alias val) body))))
-#;
-(define-syntax-rule (bind-alias*-sparse (σ* σ aliases all-to-alias) body)
-  (let-values ([(actions rev-aliases rev-vals)
-                (for/fold ([actions target-actions] [raliases '()] [vals '()])
-                    ([alias (in-list aliases)]
-                     [to-alias (in-list all-to-alias)])
-                  (values (hash-set actions to-alias (vector-ref σ-history to-alias))
-                          ;; XXX: icky intermediate lists.
-                          (cons alias raliases)
-                          (cons (getter σ to-alias) vals)))])
-    (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
-      (bind-join* (σ* σ rev-aliases rev-vals) body))))
 
 (define-for-syntax (do-body-transform-actions stx)
   (syntax-case stx ()
@@ -278,16 +271,7 @@
 (define-syntax-rule (with-sparse^ body)
   (splicing-syntax-parameterize
    ([bind-get (make-rename-transformer #'bind-get-sparse)]
-    [bind-force (make-rename-transformer #'bind-force-sparse)]
     [st-targets (cons actions-target (syntax-parameter-value #'st-targets))]
-#;
-    [bind-big-alias (make-rename-transformer #'bind-big-alias-sparse)]
-#;
-    [bind-alias* (make-rename-transformer #'bind-alias*-sparse)]
     [bind-join (make-rename-transformer #'bind-join!/sparse)]
-#;
-    [bind-join* (make-rename-transformer #'bind-join*!/sparse)]
-    [getter (make-rename-transformer #'global-vector-getter)]
-#;
-    [empty-actions (make-rename-transformer #'empty-actions-sparse^)])
+    [getter (make-rename-transformer #'global-vector-getter)])
    body))
