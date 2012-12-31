@@ -187,7 +187,6 @@
                     [ap: (format-id ap "~a:" ap)])
         (define getter-tr (syntax-parameter-value #'getter))
         (define bind-join-tr (syntax-parameter-value #'bind-join))
-        #;       (define bind-join*-tr (syntax-parameter-value #'bind-join*))
         (define bind-tr (syntax-parameter-value #'bind))
         (define bind-rest-tr (syntax-parameter-value #'bind-rest))
         (define bind-rest-apply-tr (syntax-parameter-value #'bind-rest-apply))
@@ -258,13 +257,6 @@
                               [(ξ* vs*) (bind-Ξ ξ -a -vs)])
                   (syntax-parameterize ([ξ (make-rename-transformer #'ξ*)])
                     #,(apply-transformer bind-join-tr #'(bind-join (σ* σ -a vs*) body*)))))
-              #;
-              (define-simple-macro* (bind-join*-cfa2 (σ* σ as vss) body*)
-                (let*-values ([(-as) as]
-                              [(-vss) vss]
-                              [(ξ* vss*) (bind-Ξ* ξ -as -vss)])
-                  (syntax-parameterize ([ξ (make-rename-transformer #'ξ*)])
-                    #,(apply-transformer bind-join*-tr #'(bind-join* (σ* σ -as vss*) body*)))))
 
               (define-syntax-rule (bind-get-kont-cfa2 (res σ k) body*)
                 ;; Use let-syntax so that for's singleton optimization kicks in.
@@ -328,6 +320,7 @@
                 (let ([ξ* (hash-set ξ a vs)])
                   (syntax-parameterize ([ξ (make-rename-transformer #'ξ*)])
                     body*)))
+
               (define-for-syntax ξ-target (target #'ξ '#:ξ (syntax-rules () [(_ e) e])))
               (splicing-syntax-parameterize
                   ([al-targets (cons ξ-target (syntax-parameter-value #'al-targets))]
@@ -343,7 +336,6 @@
                    ;; Extra parameters over pdcfa for stack allocation.
                    [bind-join (make-rename-transformer #'bind-join-cfa2)]
                    [bind-join-local (make-rename-transformer #'bind-join-local-cfa2)]
-                   #;[bind-join* (make-rename-transformer #'bind-join*-cfa2)]
                    [getter (make-rename-transformer #'getter-cfa2)]
                    [bind (make-rename-transformer #'bind-cfa2)]
                    [bind-rest (make-rename-transformer #'bind-rest-cfa2)]
@@ -352,13 +344,13 @@
                 body ...)))])))
 
 (define-syntax-rule (with-cfa2^ (mk-analysis) body)
-    (splicing-let-syntax ([mk-analysis
-                           (syntax-rules ()
-                                         [(_ . args)
-                                          (splicing-syntax-parameterize ([in-scope-of-extras (mk-cfa2 #'ev #'co #'ap)])
-                                                                        (mk-analysis #:extra (ξ)
-                                                                                     #:ev ev
-                                                                                     #:co co
-                                                                                     #:ap ap
-                                                                                     . args))])])
-                         body))
+  (splicing-let-syntax ([mk-analysis
+                         (syntax-rules ()
+                           [(_ . args)
+                            (splicing-syntax-parameterize ([in-scope-of-extras (mk-cfa2 #'ev #'co #'ap)])
+                              (mk-analysis #:extra (ξ)
+                                           #:ev ev
+                                           #:co co
+                                           #:ap ap
+                                           . args))])])
+                       body))
