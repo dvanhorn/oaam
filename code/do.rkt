@@ -22,6 +22,7 @@
 (mk-syntax-parameters do do-extra-values)
 ;; Private parameters
 (define-syntax-parameter alloc-ctx? #f)
+(define-syntax-parameter alloc-σ-only-ctx? #f)
 (define-syntax-parameter in-do-ctx? #f)
 (define-syntax-rule (with-do body ...)
   (syntax-parameterize ([in-do-ctx? #t]) body ...))
@@ -29,10 +30,19 @@
 (define-syntax (do-values stx)
   (syntax-parse stx
     [(_ . args)
+     (define-values (al-σ-op al-no-σ)
+       (partition (λ (t) (eq? '#:σ (target-kw t)))
+                  (syntax-parameter-value #'al-targets)))
+     (define add-al? (syntax-parameter-value #'alloc-ctx?))
      (define targets
        (sort (append (syntax-parameter-value #'st-targets)
-                     (if (syntax-parameter-value #'alloc-ctx?)
-                         (syntax-parameter-value #'al-targets)
+                     ;; σ is annoying
+                     (if (or add-al?
+                             (syntax-parameter-value #'alloc-σ-only-ctx?))
+                         al-σ-op
+                         '())
+                     (if add-al?
+                         al-no-σ
                          '()))
              target<=?))
      (unless (let ([c (syntax-parameter-value #'do-extra-values)]
@@ -103,7 +113,7 @@
            body))
 
 (define-syntax-rule (bind-big-alias (σ* σ alias all-to-alias) body)
-  (do-comp #:bind/extra (#:σ σi acc)
+  (do-comp #:bind (#:σ σi acc)
            (do (σ) loop ([-all-to-alias all-to-alias] [acc nothing])
                (match -all-to-alias
                  ['() (do-values acc)]
@@ -121,15 +131,25 @@
   (syntax-parse stx
     [(_ (~or (~optional (~seq (~or (~and #:bind
                                     (~bind [extra? #f]
-                                           [targs (get-st)]))
+                                           [targs (get-st)]
+                                           [ftargs (get-st #:allow-al-σ? #t)]))
                               (~and #:bind/extra
                                     (~bind [extra? #t]
-                                           [targs (get-stal)])))
-                         (~var f (formals (attribute targs)))))
+                                           [targs (get-stal)]
+                                           [ftargs (get-stal)])))
+                         (~var f (formals (attribute ftargs)
+                                          ;; Drop σ from unused identifiers
+                                          ;; when it's unspecified.
+                                          (not (attribute extra?))))))
              (~optional (~seq #:wrap wrapper:id))) ...
         e:expr e1)
+     ;; Sometimes we need to extend the store but not extras.
+     ;; In the narrow case, the store is in al-targets, not st-targets
+     (define add-σ-ctx? (or (and #:bind fkws (attribute f.kws)
+                                 (memq '#:σ fkws))))
+     (define use-targs (if add-σ-ctx? (attribute ftargs) (attribute targs)))
      (define extra (syntax-parameter-value #'do-extra-values))
-     (with-syntax* ([(acc-p ...) (map target-param (attribute targs))]
+     (with-syntax* ([(acc-p ...) (map target-param use-targs)]
                     [(acc-ids ...)
                      (cond
                       [(attribute f) #'(f.kw-ids ...)]
@@ -140,33 +160,38 @@
                       [else (with-do-binds extra #'(extra ...))])])
        (define tr
          (syntax-parser
-           [(_ (~var a (actuals (attribute targs))))
+           [(_ (~var a (actuals use-targs)))
             (with-syntax
                 ([((targ id) ...)
-                  (for/list ([t (in-list (attribute targs))]
+                  (for/list ([t (in-list use-targs)]
                              [id (in-list (syntax->list #'(acc-ids ...)))])
                     (list (target-param t)
                           (or (dict-ref (attribute a.kw-exprs) (target-kw t) #f)
                               id)))])
-              #'(syntax-parameterize ([targ (make-rename-transformer #'id)] ...)
-                  a.exprs ...))]))
+              (syntax/loc stx
+                (syntax-parameterize ([targ (make-rename-transformer #'id)] ...)
+                  a.exprs ...)))]))
        (exn-wrap stx
-       #`(let-values ([(acc-ids ... bind ...)
+       (quasisyntax/loc stx
+         (let-values ([(acc-ids ... bind ...)
                        (expect-do-values
-                           #:values #,(length (syntax->list #'(bind ...)))
+                         #:values #,(length (syntax->list #'(bind ...)))
                          #,@(listy (and (attribute extra?) #'#:extra))
+                         #,@(listy (and add-σ-ctx? #'#:extend-σ))
                          e)])
            #,(if (attribute wrapper)
                  #`(let-syntax ([wrapper #,tr])
                      e1)
-                 (tr #`(wrap e1))))))]))
+                 (tr #'(wrap e1)))))))]))
 
 (define-simple-macro* (expect-do-values (~or (~optional (~seq #:values num:nat))
                                              (~optional (~and #:extra (~bind [extra? #t]))
-                                                        #:defaults ([extra? #f]))) ...
+                                                        #:defaults ([extra? #f]))
+                                             (~optional (~and #:extend-σ extend-σ?))) ...
                                         body:expr ...)
   (syntax-parameterize (#,@(listy (and (attribute num) #'[do-extra-values (syntax-e #'num)]))
-                        #,@(listy (and (attribute extra?) #'[alloc-ctx? #t])))
+                        #,@(listy (and (attribute extra?) #'[alloc-ctx? #t]))
+                        #,@(listy (and (attribute extend-σ?) #'[alloc-σ-only-ctx? #t])))
     body ...))
 
 (define-for-syntax ((mk-do generators?) stx)
@@ -175,7 +200,8 @@
   (define extra? (syntax-parameter-value #'alloc-ctx?))
   (define stal (get-stal))
   (define st* (if extra? stal (get-st)))
-  (define bind-σ? (kw-in-target '#:σ stal))
+  (define bind-σ? (kw-in-target '#:σ st*))
+  (define bind-σ-loop? (kw-in-target '#:σ stal))
 
   (define gen-wrap
     (cond [(or in-do? (not generators?)) values]
@@ -328,8 +354,8 @@
      (define no-σ-stal (remove-kw-target '#:σ stal))
      (define no-σ-stal-params (map target-param no-σ-stal))
      (with-syntax ([(argps ...) (generate-temporaries #'(args ...))]
-                   [(σ-id ...) (listy (and bind-σ? (generate-temporary #'σ)))]
-                   [(σ-acc ...) (listy (and bind-σ? #'target-σ))]
+                   [(σ-id ...) (listy (and bind-σ-loop? (generate-temporary #'σ)))]
+                   [(σ-acc ...) (listy (and bind-σ-loop? #'target-σ))]
                    [(accs ...) no-σ-stal-params]
                    [(acc-ids ...) (generate-temporaries no-σ-stal-params)])       
        (exn-wrap stx
@@ -348,7 +374,7 @@
                     ;; Pass the accumulators if they exist.
                     (let-syntax ([loop (syntax-rules ()
                                          [(_ σ* argps ...)
-                                          (real-loop #,@(listy (and bind-σ? #'σ*))
+                                          (real-loop #,@(listy (and bind-σ-loop? #'σ*))
                                                      accs ...
                                                      argps ...)])])
                       (with-do body ...)))))))))]))

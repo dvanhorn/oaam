@@ -78,6 +78,21 @@
                      #:compiled #:wide #:pushdown))))))))
 (provide lazy-cfa2^/c/prealloc/timestamp!)
 
+;; n0cfa
+(mk-fix lazy-0CFA/c-fixpoint ln0-ans? ln0-ans-v)
+(with-nonsparse
+ (with-lazy
+  (with-0-ctx
+   (with-narrow-σ-passing
+    (with-whole-σ
+     (with-set-monad
+      (with-abstract
+       (mk-analysis #:aval lazy-0CFA/c #:ans ln0-ans
+                    #:fixpoint lazy-0CFA/c-fixpoint
+                    #:compiled))))))))
+(provide lazy-0CFA/c)
+
+(mk-fix lazy-ΓCFA/c-fixpoint lg0-ans? lg0-ans-v)
 ;; g0cfa
 (with-nonsparse
  (with-lazy
@@ -87,7 +102,8 @@
      (with-set-monad
       (with-abstract
        (with-ΓCFA (mk-analysis)
-        (mk-analysis #:aval lazy-ΓCFA/c #:compiled)))))))))
+        (mk-analysis #:aval lazy-ΓCFA/c #:ans lg0-ans #:compiled
+                     #:fixpoint lazy-ΓCFA/c-fixpoint)))))))))
 (provide lazy-ΓCFA/c)
 
 ;; "pts"

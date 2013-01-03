@@ -547,10 +547,10 @@
                   (with-syntax
                       ([(args ...)
                         (case acc
-                          [(read/write) #'(nσ ℓ δ vs)]
-                          [(read-only) #'(nσ vs)]
+                          [(read/write) #'(pσ ℓ δ vs)]
+                          [(read-only) #'(pσ vs)]
                           [(simple) #'(vs)]
-                          [(full) #'(nσ ℓ δ k vs)])])
+                          [(full) #'(pσ ℓ δ k vs)])])
                     #`[(#,p #,@(aliases-of p))
                        (λP (pσ fallv apply? ℓ δ k v-addrs)
                            (with-prim-yield
@@ -562,9 +562,9 @@
                               (cond [(and apply? fallv)
                                      (tapp call-rlos fallv ℓ δ-op ... k v-addrs)]
                                     [else
-                                     (do-comp #:bind (#:σ nσ vss)
+                                     (do-comp #:bind (vss)
                                        (tapp #,checker '#,p v-addrs)
-                                       (do (nσ) ([vs (in-set vss)])
+                                       (do (pσ) ([vs (in-set vss)])
                                          #,(m #'(args ...))))]))))]))))
        (define qs #'quasisyntax) ;; have to lift for below to parse correctly
        (quasisyntax/loc stx

@@ -30,7 +30,7 @@
     (collect-garbage)
     (collect-garbage)
     (with-limit-handler
-      (with-limits (* 10 #;run-for-10-minutes
+      (with-limits (* 30 #;run-for-30-minutes
                       60 #;seconds-in-minutes)
                    1024 ;; Max memory: 1GiB
                    (call-with-values
@@ -42,9 +42,22 @@
  (require racket/cmdline)
  (define test-file
   (command-line #:once-any
+                [("--n0cfa")
+                 "Benchmark narrow compiled 0cfa"
+                 (aval lazy-0CFA/c)]
+                [("--g0cfa")
+                 "Benchmark garbage-collected compiled 0cfa"
+                 (aval lazy-ΓCFA/c)]
+                [("--pt2")
+                 "Benchmark compiled preallocated timestamp approx. cfa2"
+                 (aval lazy-cfa2^/c/prealloc/timestamp!)]
+
                 [("--sparsep")
                  "Benchmark compiled imperative sparse"
                  (aval sp-lazy-0cfa^/c)]
+                [("--pts")
+                 "Benchmark compiled preallocated timestamp approx. pdcfa"
+                 (aval lazy-pdcfa^/c/prealloc/timestamp!)]
 #|                [("--sid")
                  "Benchmark compiled imperative store-diff"
                  (aval 0cfa^/c/∆s!)]
@@ -77,7 +90,7 @@
                  "Benchmark compiled preallocated accumulated store-diff lazy non-determinism"
                  (aval lazy-0cfa^/c/∆s/acc/prealloc!)]
 |#
-                [("--pd")
+#;                [("--pd")
                  "Benchmark compiled preallocated store-diff lazy non-determinism"
                  (aval lazy-0cfa^/c/∆s/prealloc!)]
 #|

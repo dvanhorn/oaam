@@ -95,8 +95,13 @@ and do. do will not initialize an accumulator in the static extent of another do
                  (syntax-parameter-value #'al-targets))
          target<=?))
 
- (define (get-st)
-   (sort (syntax-parameter-value #'st-targets) target<=?))
+ (define (get-st #:allow-al-σ? [allow-al-σ? #f])
+   (sort (append (if allow-al-σ?
+                     (filter (λ (t) (eq? '#:σ (target-kw t)))
+                             (syntax-parameter-value #'al-targets))
+                     '())
+                 (syntax-parameter-value #'st-targets))
+         target<=?))
 
  (define (kw-in-target kw targs)
    (for/or ([t (in-list targs)])
@@ -147,10 +152,10 @@ and do. do will not initialize an accumulator in the static extent of another do
             #:attr after (and bind? #'a)))
 
  (define (sort-by-kw zipped)
-   (map second (sort zipped (λ (s t) (kw<=? (first s) (first t))))))
+   (map second (sort zipped kw<=? #:key first)))
 
- (define-syntax-class (formals all)
-   #:attributes ((kw-ids 1) (ids 1))
+ (define-syntax-class (formals all drop-unused-σ?)
+   #:attributes ((kw-ids 1) (ids 1) (kws 1))
    ;; Target specified (in order)
    (pattern ((~or (~var k (kw-stx all id-err)) ids:id) ...)
             #:do [(define good-kw (filter values (attribute k.kw)))
@@ -164,11 +169,14 @@ and do. do will not initialize an accumulator in the static extent of another do
                     ;; Identifiers that need binding, but not explicitly given
                     (for*/list ([t (in-list all)]
                                 [kw (in-value (target-kw t))]
-                                #:unless (memq kw good-kw))
+                                #:unless (or (memq kw good-kw)
+                                             (and drop-unused-σ?
+                                                  (eq? kw '#:σ))))
                       (define temp (generate-temporary (target-param t)))
                       (list kw temp)))]
             #:with (kw-ids ...)
-            (sort-by-kw (append (map list good-kw good-ids) unspec-bind))))
+            (sort-by-kw (append (map list good-kw good-ids) unspec-bind))
+            #:attr (kws 1) (sort good-kw kw<=?)))
  (define-splicing-syntax-class (actuals all)
    #:attributes ((kw-exprs 1) (exprs 1))
    (pattern (~seq (~or (~var k (kw-stx all expr-err)) e:expr) ...)
@@ -195,7 +203,7 @@ and do. do will not initialize an accumulator in the static extent of another do
   ;; If keyword in the list of targets' keywords, then bind.
   ;; otherwise, drop the binding.
   (syntax-parse stx
-    [(_ (~var f (formals all)) . body)
+    [(_ (~var f (formals all #f)) . body)
      ;; Don't use the parameter's names since then they get rebound
      ;; by λ
      (with-syntax ([(accs ...) (map target-param all)])
