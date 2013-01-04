@@ -14,12 +14,12 @@
   (λ (stx)
      (syntax-case stx (ev co ap)
        [(_ (ev σ e ρ k δ))
-        (yield-tr #`(yield (#%app #,ev (restrict-to-set σ (#,∪ρ (e ρ) (touches k))) e ρ k δ)))]
+        (yield-tr #`(yield (#%app #,ev (restrict-to-reachable σ (#,∪ρ (e ρ) (touches k))) e ρ k δ)))]
        [(_ (co σ k v))
-        (yield-tr #`(yield (#%app #,co (restrict-to-set σ (∪ (touches k) (touches v))) k v)))]
+        (yield-tr #`(yield (#%app #,co (restrict-to-reachable σ (∪ (touches k) (touches v))) k v)))]
        [(_ (ap σ l fn-addr arg-addrs k δ))
         (yield-tr #`(yield (#%app #,ap
-                            (restrict-to-set σ (∪1 (∪/l (touches k) arg-addrs) fn-addr))
+                            (restrict-to-reachable σ (∪1 (∪/l (touches k) arg-addrs) fn-addr))
                             l fn-addr arg-addrs k δ)))]
        [(_ e) (yield-tr #`(yield e))])))
 
