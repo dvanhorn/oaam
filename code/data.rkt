@@ -58,15 +58,15 @@
 ;; - (consv Addr Addr)
 ;; - (vectorv Number (listof Addr))
 ;; - (clos List[Var] Exp Env) ;; or without Env. Constructed by mk-analysis.
-(define-nonce number^) (define (number^? v) (or (eq? v number^) (and (or (eq? v ●) (eq? v qdata^)) ●)))
-(define-nonce string^) (define (string^? v) (or (eq? v string^) (and (or (eq? v ●) (eq? v qdata^)) ●)))
-(define-nonce symbol^) (define (symbol^? v) (or (eq? v symbol^) (and (or (eq? v ●) (eq? v qdata^)) ●)))
-(define-nonce char^) (define (char^? v) (or (eq? v char^) (and (or (eq? v ●) (eq? v qdata^)) ●)))
+(define-nonce number^) (define (number^? v) (or (eq? v number^) (and (or (eq? v ●) (eq? v qdata^)) v)))
+(define-nonce string^) (define (string^? v) (or (eq? v string^) (and (or (eq? v ●) (eq? v qdata^)) v)))
+(define-nonce symbol^) (define (symbol^? v) (or (eq? v symbol^) (and (or (eq? v ●) (eq? v qdata^)) v)))
+(define-nonce char^) (define (char^? v) (or (eq? v char^) (and (or (eq? v ●) (eq? v qdata^)) v)))
 (define-nonce cons^) (define (cons^? v) (or (eq? v cons^) (and (eq? v ●) ●)))
 (define-nonce vector^) (define (vector^? v) (or (eq? v vector^) (and (eq? v ●) ●)))
 (define-nonce vector-immutable^) (define (vector-immutable^? v) (or (eq? v vector-immutable^) (and (eq? v ●) ●)))
-(define-nonce qvector^) (define (qvector^? v) (or (eq? v qvector^) (and (eq? v qdata^) ●)))
-(define-nonce qcons^) (define (qcons^? v) (or (eq? v qcons^) (and (eq? v qdata^) ●)))
+(define-nonce qvector^) (define (qvector^? v) (or (eq? v qvector^) (and (eq? v qdata^) v)))
+(define-nonce qcons^) (define (qcons^? v) (or (eq? v qcons^) (and (eq? v qdata^) v)))
 (define-nonce vec0) ;; 0-length vector.
 (struct input-port^ (status) #:prefab)
 (struct output-port^ (status) #:prefab)
@@ -141,7 +141,7 @@
       [_ (unless (null? -v) (log-info "Bad list for reification ~a" -v))
          (do-values -v)])))
 
-(define cons-limit (make-parameter 8))
+(define cons-limit (make-parameter 1))
 
 (struct vectorv^ (length addr) #:prefab)
 (struct vectorv-immutable^ (length addr) #:prefab)

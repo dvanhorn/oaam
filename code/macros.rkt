@@ -36,22 +36,22 @@
     [`(quote ,d)
      (let loop ([d d])
        (cond [(atomic? d) `(,kwote ,d)]
-             [(list? d)
-              (if (< (length d) limit)
+             [(list? d) ;; must be a cons since '() is atomic
+              (if (<= (length d) limit)
                   `(,cons$ ,(loop (car d)) ,(loop (cdr d)))
                   `(,qlist^$ . ,(map loop d)))]             
              ;; List literals get exploded into conses
              [(pair? d)
-              (cond [(< (improper-length d) limit)
+              (cond [(<= (improper-length d) limit)
                      `(,cons$ ,(loop (car d)) ,(loop (car d)))]
                     [else (define-values (front last) (split-improper d))
                           `(,qimproper^$ (loop last) . ,(map loop front))])]
              [(vector? d)
-              (cond [(< (vector-length d) limit)
+              (cond [(<= (vector-length d) limit)
                      `(,kwote ,d)]
                     [else `(,qvector^$ . ,(map loop (vector->list d)))])]
              [(hash? d)
-              (cond [(< (hash-count d) limit) `(,kwote ,d)]
+              (cond [(<= (hash-count d) limit) `(,kwote ,d)]
                     ;; qhash^ k v k v k v ... ....
                     [else `(,qhash^$ . 
                                      ,(append-map
