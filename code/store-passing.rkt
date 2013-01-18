@@ -9,8 +9,6 @@
          wide-step hash-getter
          mk-set-fixpoint^
          mk-special-set-fixpoint^
-         mk-special2-set-fixpoint^
-         mk-special3-set-fixpoint^
          with-set-monad
          with-wide-σ-passing
          with-narrow-σ-passing
@@ -20,41 +18,34 @@
 ;; Widen set-monad fixpoint
 (define-simple-macro* (wide-step-specialized step)
   (λ (state-count #,@(when-graph #'graph))
-     (λ (state)
-        (match state
-          [(cons wsσ cs)
-           (define-values (σ* cs*)
-             (for/fold ([σ* wsσ] [cs ∅]) ([c (in-set cs)])
-               (define-values (σ** cs*) (step (cons wsσ c)))
-               ;; Add new states to accumulator and construct graph
-               (define cs**
-                 #,(if-graph
-                    #'(for/set #:initial cs ([c* (in-set cs*)])
-                               (add-edge! graph c c*)
-                               c*)
-                    #'(∪ cs cs*)))
-               (values (join-store σ* σ**) cs**)))
-           ;; Stuck states are the same as input. Remove stuck states from the count
-           ;; XXX: Remove for performant version. This is just for statistics.
-           (set-box! state-count (+ (unbox state-count)
-                               (set-count (cs* . ∖ . cs))))
-           (set (cons σ* cs*))]
-          [_ (error 'wide-step "bad output ~a~%" state)]))))
+     (λ (σ₀ cs₀)
+        (define-values (σ* cs*)
+          (for/fold ([σ* σ₀] [cs ∅]) ([c (in-set cs₉)])
+            (define-values (σ** cs*) (step σ₀ c))
+            ;; Add new states to accumulator and construct graph
+            (define cs**
+              #,(if-graph
+                 #'(for/set #:initial cs ([c* (in-set cs*)])
+                            (add-edge! graph c c*)
+                            c*)
+                 #'(∪ cs cs*)))
+            (values (join-store σ* σ**) cs**)))
+        ;; Stuck states are the same as input. Remove stuck states from the count
+        ;; XXX: Remove for performant version. This is just for statistics.
+        (set-box! state-count (+ (unbox state-count)
+                                 (set-count (cs* . ∖ . cs))))
+        (values σ* cs*))))
 
 (define-syntax-rule (wide-step step)
   (λ (state-count)
-     (λ (state)
-        (match state
-          [(cons wsσ cs)
-           (define initial (for/set ([c (in-set cs)]) (cons wsσ c)))
-           (define-values (σ* cs*)
-             (for/fold ([σ (hash)] [cs ∅]) ([s (in-set initial)])
-               (define-values (σ* cs*) (step s))
-               (values (join-store σ σ*) (∪ cs cs*))))
-           (set-box! state-count (+ (unbox state-count)
-                                    (set-count (cs* . ∖ . cs))))
-           (set (cons σ* cs*))]
-          [_ (error 'wide-step "bad output ~a~%" state)]))))
+     (λ (σ₀ cs₀)
+        (define-values (σ* cs*)
+          (for/fold ([σ σ₉] [cs ∅]) ([s (in-set cs₀)])
+            (define-values (σ* cs*) (step σ₀ s))
+            (values (join-store σ σ*) (∪ cs cs*))))
+        (set-box! state-count (+ (unbox state-count)
+                                 (set-count (cs* . ∖ . cs))))
+        (values σ* cs*))))
 
 (define-simple-macro* (mk-special-set-fixpoint^ fix name ans^?)
  (define-syntax-rule (name step fst)
@@ -66,85 +57,18 @@
      (define step^ ((wide-step-specialized step) state-count*
                     #,@(when-graph #'graph)))
      (set-box! (start-time) (current-milliseconds))
-     (define ss (fix step^ (set (cons f^σ cs))))
+     (define-values (last-σ all-cs) (fix2 step^ f^σ cs))
      (state-rate)
-     (define-values (σ final-cs)
-       (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
-         (match s
-           [(cons fsσ cs)
-            #,@(when-graph #'(dump-dot graph))
-            (values (join-store last-σ fsσ) (∪ final-cs cs))]
-           [_ (error 'name "bad output ~a~%" s)])))
+     #,@(when-graph #'(dump-dot graph))
+     (define final-cs
+       (for/set ([c (in-set all-cs)]
+                 #:when (ans^? c))
+         c))
      ;; filter the final results
      (values (format "State count: ~a" (unbox state-count*))
-             (format "Point count: ~a" (set-count final-cs))
-             σ
-             (for/set ([c (in-set final-cs)]
-                       #:when (ans^? c))
-               c)))))
-
-;; stores the last seen heap for each state
-(define-syntax-rule (mk-special2-set-fixpoint^ name ans^?)
- (define-syntax-rule (name step fst)
-   (let ()
-     (define-values (f^σ cs) fst)
-     (define state-count* (state-count))
-     (set-box! state-count* 0)
-     (set-box! (start-time) (current-milliseconds))
-     (define-values (σ final-cs)
-       (let loop ([accum (hash)] [front cs] [σ f^σ])
-         (match (for/first ([c (in-set front)]) c)
-           [#f 
-            (state-rate)
-            (values σ (for/set ([(c _) (in-hash accum)]) c))]
-           [c
-            (set-box! state-count* (add1 (unbox state-count)))
-            (define-values (σ* cs*) (step (cons σ c)))
-            (define-values (accum* front*)
-              (for/fold ([accum* accum] [front* (front . ∖1 . c)])
-                  ([c* (in-set cs*)]
-                   #:unless (equal? σ* (hash-ref accum c* (hash))))                
-                (values (hash-set accum* c* σ*) (∪1 front* c*))))
-            (loop accum* front* σ*)])))
-     ;; filter the final results
-     (values (format "State count: ~a" (unbox state-count*))
-             (format "Point count: ~a" (set-count final-cs))
-             σ
-             (for/set ([c (in-set final-cs)]
-                       #:when (ans^? c))
-               c)))))
-
-;; Uses counting and merges stores between stepping all states.
-(define-syntax-rule (mk-special3-set-fixpoint^ name ans^?)
- (define-syntax-rule (name step fst)
-   (let ()
-     (define-values (f^σ cs) fst)
-     (define state-count* (state-count))
-     (set-box! state-count* 0)
-     (set-box! (start-time) (current-milliseconds))
-     (define-values (σ final-cs)
-       (let loop ([accum (hash)] [front cs] [σ f^σ] [σ-count 0])
-           (match (for/first ([c (in-set front)]) c)
-             [#f 
-              (state-rate)
-              (values σ (for/set ([(c _) (in-hash accum)]) c))]
-             [c
-              (set-box! state-count* (add1 (unbox state-count)))
-              (define-values (σ* cs*) (step (cons σ c)))
-              (define count* (if (equal? σ σ*) σ-count (add1 σ-count)))
-              (define-values (accum* front*)
-                (for/fold ([accum accum] [front (front . ∖1 . c)])
-                    ([c* (in-set cs*)]
-                     #:unless (= count* (hash-ref accum c* -1)))
-                  (values (hash-set accum c* count*) (∪1 front c*))))
-              (loop accum* front* σ* count*)])))
-     ;; filter the final results
-     (values (format "State count: ~a" (unbox state-count*))
-             (format "Point count: ~a" (set-count final-cs))
-             σ
-             (for/set ([c (in-set final-cs)]
-                       #:when (ans^? c))
-               c)))))
+             (format "Point count: ~a" (set-count all-cs))
+             last-σ
+             final-cs))))
 
 (define-syntax-rule (mk-set-fixpoint^ fix name ans^?)
  (define-syntax-rule (name step fst)
@@ -154,19 +78,14 @@
      (set-box! state-count* 0)
      (define step^ ((wide-step step) state-count*))
      (set-box! (start-time) (current-milliseconds))
-     (define ss (fix step^ (set (cons f^σ cs))))
+     (define-values (last-σ all-cs) (fix2 step^ f^σ cs))
      (state-rate)
-     (define-values (last-σ final-cs)
-       (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
-         (match s
-           [(cons fsσ cs)
-            (values (join-store last-σ fsσ)
-                    (for/set #:initial final-cs ([c (in-set cs)]
-                                                 #:when (ans^? c))
-                             c))]
-           [_ (error 'name "bad output ~a~%" s)])))
+     (define final-cs
+       (for/fold ([final-cs ∅]) ([c (in-set all-cs)]
+                                 #:when (ans^? c))
+         c))
      (values (format "State count: ~a" (unbox state-count*))
-             (format "Point count: ~a" (set-count (for/union ([p (in-set ss)]) (cdr p))))
+             (format "Point count: ~a" (set-count all-cs))
              last-σ final-cs))))
 
 (define-for-syntax do-body-transform-cs

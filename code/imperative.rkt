@@ -1,23 +1,25 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          (only-in "store-passing.rkt" bind-help) "data.rkt" "deltas.rkt" "add-lib.rkt"
-         "handle-limits.rkt" "graph.rkt")
+         "handle-limits.rkt" "graph.rkt" "parse.rkt")
 (provide reset-globals! reset-todo! add-todo! inc-unions! set-global-σ!
          saw-change!
          reset-saw-change?!
          mk-mk-imperative/timestamp^-fixpoint
          mk-mk-imperative/∆s/acc^-fixpoint
          mk-mk-imperative/∆s^-fixpoint
+         mk-imperative-narrow-fix
          mk-imperative/timestamp^-fixpoint
          mk-imperative/∆s/acc^-fixpoint
          mk-imperative/∆s^-fixpoint
          mk-add-∆/s
          mk-add-∆/s!
-         prepare-imperative
+         prepare-imperative prepare-imperative-todo
          unions todo seen global-σ graph reset-graph!
          current-state set-current-state!
          with-mutable-store
          with-mutable-worklist
+         with-narrow-mutable-worklist
          with-σ-∆s/acc!
          with-σ-∆s!)
 
@@ -30,6 +32,12 @@
 (define graph #f)
 (define (set-current-state! v) (set! current-state v))
 (define (reset-graph!) (set! graph (new-graph)))
+
+
+(define-syntax in-todo (make-rename-transformer #'in-set))
+(define empty-todo ∅)
+(define (add-todo! c) (set! todo (∪1 todo c)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Timestamp approximation
 (define unions #f)
@@ -45,6 +53,16 @@
     (add-todo! c)
     (add-edge! graph current-state c)))
 
+(define (do-yield-narrow s)
+  (unless (hash-has-key? seen s)
+    (hash-set! seen s #t)
+    (add-todo! s)))
+(define (do-yield-narrow-graph s)
+  (unless (hash-has-key? seen s)
+    (hash-set! seen s #t)
+    (add-todo! s)
+    (add-edge! graph current-state s)))
+
 (define-for-syntax (yield! stx)
   (syntax-case stx ()
     [(_ e)
@@ -52,6 +70,14 @@
                     #`(do-yield-graph e)
                     #`(do-yield e))
               (continue))])) ;; ∪1 → cons
+
+(define-for-syntax (yield-narrow! stx)
+  (syntax-case stx ()
+    [(_ e)
+     #`(begin #,(if (syntax-parameter-value #'generate-graph?)
+                    #`(do-yield-narrow-graph e)
+                    #`(do-yield-narrow e))
+              (continue))]))
 
 (define (join-h! a vs)
   (define prev (hash-ref global-σ a ∅))
@@ -68,6 +94,32 @@
     (join-h! a vs)))
 (define-syntax-rule (bind-join*-h! (σ* jh*σ as vss) body)
   (begin (join*-h! as vss) body))
+
+(define-simple-macro* (mk-imperative-narrow-fix name ans? ans-v ans-σ touches)
+  (define-syntax-rule (name step fst)
+    (let ()
+    (define graph (make-hash))
+    (define state-count* (state-count))
+    (set-box! state-count* 0)
+    (define clean-σ (restrict-to-reachable touches))
+    (set-box! (start-time) (current-milliseconds))
+    fst
+    (let loop ()
+      (cond [(∅? todo)
+             (state-rate)
+             #,@(when-graph #'(dump-dot graph))
+             (values (format "State count: ~a" (hash-count seen))
+                     (for/set ([(s _) (in-hash seen)] #:when (ans? s))
+                       (list (clean-σ (ans-σ s) (ans-v s)) (ans-v s))))]
+            [else
+             (define todo-old todo)
+             (reset-todo!)
+             (define count (+ (unbox state-count*) (set-count todo-old)))
+             (set-box! state-count* count)
+             (for ([c (in-todo todo-old)])
+               #,@(when-graph #'(set-current-state! c))
+               (step c))
+             (loop)])))))
 
 (define-simple-macro* (mk-mk-imperative/timestamp^-fixpoint mk-name cleaner)
   (define-syntax-rule (mk-name name ans^? ans^-v touches)
@@ -105,7 +157,7 @@
                  (when (>= (- count last) 1000)
                    (printf "States: ~a~%" count)
                    (set! last count))
-                 (for ([c (in-set todo-old)])
+                 (for ([c (in-todo todo-old)])
                    #,@(when-graph #'(set-current-state! c))
                    (step c)) ;; → in-list
                  (loop)]))))))
@@ -115,6 +167,10 @@
 (define-syntax-rule (with-mutable-worklist body)
   (splicing-syntax-parameterize
    ([yield yield!])
+   body))
+(define-syntax-rule (with-narrow-mutable-worklist body)
+  (splicing-syntax-parameterize
+   ([yield yield-narrow!])
    body))
 (define-syntax-rule (with-mutable-store body)
   (splicing-syntax-parameterize
@@ -203,7 +259,7 @@
                (define todo-old todo)
                (reset-todo!)
                (set-box! state-count* (+ (unbox state-count*) (set-count todo-old)))
-               (define ∆s (for/append ([c (in-set todo-old)])
+               (define ∆s (for/append ([c (in-todo todo-old)])
                             (reset-saw-change?!)
                             (step c)))
                (for* ([a×vs (in-list ∆s)])
@@ -309,7 +365,7 @@
                ;;    and which governs changing "seen." After the step, bang in the
                ;;    secondary store. (Requires an /immutable/ global store to avoid large copies)
                ;; We choose the first option since it's the cheapest.
-               (for ([c (in-set todo-old)])
+               (for ([c (in-todo todo-old)])
                  (reset-saw-change?!)
                  #,@(when-graph #'(set-current-state! c))
                  (step c))
@@ -340,16 +396,22 @@
   (set! global-σ σ)
   (set! global-∆s '()))
 (define (set-global-σ! v) (set! global-σ v))
-(define (reset-todo!) (set! todo ∅))
-(define (add-todo! c) (set! todo (∪1 todo c)))
+(define (reset-todo!) (set! todo empty-todo))
 
 (define (prepare-imperative parser sexp)
-  (define-values (e renaming ps) (parser sexp gensym gensym))
-  (define e* (add-lib e renaming ps gensym gensym))
+  (define-values (e renaming ps) (parser sexp simple-fresh-label! simple-fresh-variable!))
+  (define e* (add-lib e renaming ps simple-fresh-label! simple-fresh-variable!))
   ;; Start with a constant factor larger store since we are likely to
   ;; allocate some composite data. This way we don't incur a reallocation
   ;; right up front.
   (reset-globals! (make-hash))
+  e*)
+;; Only use imperative methods for the workset.
+(define (prepare-imperative-todo parser sexp)
+  (define-values (e renaming ps) (parser sexp simple-fresh-label! simple-fresh-variable!))
+  (define e* (add-lib e renaming ps simple-fresh-label! simple-fresh-variable!))
+  (reset-todo!)
+  (set! seen (make-hash))
   e*)
 
 (define-syntax-rule (global-hash-getter σ* a)

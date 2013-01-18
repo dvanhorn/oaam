@@ -1,13 +1,17 @@
 #lang racket
 (require "ast.rkt" "primitives.rkt" "data.rkt" "macros.rkt" "egal-box.rkt"
          racket/trace)
-(provide parse parse-prog unparse internal-apply$)
+(provide parse parse-prog unparse internal-apply$
+         simple-fresh-label! simple-fresh-variable! top-ctx)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parser
 
 (define prim-fallbacks #f)
-(define (parse-prog sexp [fresh-label! igensym] [fresh-variable! igensym])
+(define (simple-fresh-label! ctx new?) (gensym))
+(define (simple-fresh-variable! x ctx) (gensym x))
+(define top-ctx 'top)
+(define (parse-prog sexp [fresh-label! simple-fresh-label!] [fresh-variable! simple-fresh-variable!])
   (set! prim-fallbacks (make-hasheq))
   (parse (cons define-ctx sexp) fresh-label! fresh-variable!))
 #;
@@ -18,78 +22,84 @@
   ;; the renamed program, but also a map from free variables to their new names.
   (define open (make-hasheq))
   (define prims-used (make-hasheq))
-  (define (mk-primr tail? which)
+  (define (mk-primr tail? ctx which)
     (define b (hash-ref! prim-fallbacks which (λ () (ebox #f)) ))
-    (primr (fresh-label!) tail? which b))
-  (define ((new-free x))
+    (primr (fresh-label! ctx #f) tail? which b))
+  (define ((new-free x ctx))
     (match (hash-ref open x #f)
-      [#f (define x-id (fresh-variable! x))
+      [#f (define x-id (fresh-variable! x ctx))
           (hash-set! open x x-id)
           x-id]
       [s s]))
   (define expr
     (let parse* ([sexp sexp]
                  [tail? #t]
-                 [ρ (hasheq)])
-      (define (parse sexp tail?) (parse* sexp tail? ρ))
-      (define ((parse_ tail? [ρ ρ]) sexp) (parse* sexp tail? ρ))
-      (define (rename x) (hash-ref ρ x (new-free x)))
-      (define (parse-seq s tail? [ρ ρ]) (parse* (define-ctx-tf s) tail? ρ))
-      (define (fresh-xs xs)
-        (define xs-id (map fresh-variable! xs))
+                 [ctx top-ctx]
+                 [ρ (hasheq)])      
+      (define (parse sexp tail?) (parse* sexp tail? ctx ρ))
+      (define ((parse_ tail? [ρ ρ]) sexp) (parse* sexp tail? ctx ρ))
+      (define (rename x) (hash-ref ρ x (new-free x ctx)))
+      (define (parse-seq s tail? ctx [ρ ρ]) (parse* (define-ctx-tf s) tail? ctx ρ))
+      (define (fresh-label*) (fresh-label! ctx #f))
+      (define (fresh-variable* x) (fresh-variable! x ctx))
+      (define (fresh-xs xs ctx)
+        (define xs-id (map fresh-variable* xs))
         (values xs-id
                 (for/fold ([ρ ρ]) ([x xs] [x-id xs-id]) (hash-set ρ x x-id))))
       (define (parse-core sexp)
         (match sexp
-          [`(set! ,x ,e) (st! (fresh-label!) tail? (rename x) (parse e #f))]
-          [`(letrec () . ,s) (parse-seq s tail?)]
+          [`(set! ,x ,e) (st! (fresh-label*) tail? (rename x) (parse e #f))]
+          [`(letrec () . ,s) (parse-seq s tail? ctx)]
           [`(letrec ((,xs ,es) ...) . ,s)
-           (define-values (xs-id ρ) (fresh-xs xs))
-           (lrc (fresh-label!) tail? xs-id (map (parse_ #f ρ) es) (parse-seq s tail? ρ))]
+           (define-values (xs-id ρ) (fresh-xs xs ctx))
+           (lrc (fresh-label*) tail? xs-id (map (parse_ #f ρ) es) (parse-seq s tail? ctx ρ))]
           [`(lambda (,xs ...) . ,s)
-           (define-values (xs-id ρ) (fresh-xs xs))
-           (lam (fresh-label!) tail? xs-id (parse-seq s #t ρ))]
+           (define ctx* (fresh-label! ctx #t))
+           (define-values (xs-id ρ) (fresh-xs xs ctx*))
+           (lam ctx* tail? xs-id (parse-seq s #t ctx* ρ))]
           [`(lambda (,xs ... . ,rest) . ,s)
-           (define-values (xs-id ρ) (fresh-xs xs))
-           (define r-id (fresh-variable! rest))
-           (rlm (fresh-label!) tail? xs-id r-id (parse-seq s #t (hash-set ρ rest r-id)))]
+           (define ctx* (fresh-label! ctx #t))
+           (define-values (xs-id ρ) (fresh-xs xs ctx*))
+           (define r-id (fresh-variable! rest ctx*))
+           (rlm ctx* tail? xs-id r-id (parse-seq s #t ctx* (hash-set ρ rest r-id)))]
           [`(lambda ,x . ,s)
-           (define x-id (fresh-variable! x))
-           (rlm (fresh-label!) tail? '() x-id (parse-seq s #t (hash-set ρ x x-id)))]
+           (define ctx* (fresh-label! ctx #t))
+           (define x-id (fresh-variable! x ctx*))
+           (rlm ctx* tail? '() x-id (parse-seq s #t ctx* (hash-set ρ x x-id)))]
           ;; Specialize let-like lambda
           [`((,(or 'lambda `(,(== special) . lambda)) () . ,body))
-           (parse-seq body tail?)]
+           (parse-seq body tail? ctx)]
           [(or `((,(or 'lambda `(,(== special) . lambda)) (,xs ...) . ,body) . ,es)
                `(core-let ([,xs ,es] ...) . ,body))
-           (define-values (xs-id ρ*) (fresh-xs xs))
+           (define-values (xs-id ρ*) (fresh-xs xs ctx))
            (unless (list? es)
              (error 'parse "Bad let ~a" sexp))
-           (lte (fresh-label!) tail? xs-id (map (parse_ #f) es) (parse-seq body tail? ρ*))]
+           (lte (fresh-label*) tail? xs-id (map (parse_ #f) es) (parse-seq body tail? ctx ρ*))]
           [`(if ,e0 ,e1 ,e2)
-           (ife (fresh-label!) tail? (parse e0 #f) (parse e1 tail?) (parse e2 tail?))]
+           (ife (fresh-label*) tail? (parse e0 #f) (parse e1 tail?) (parse e2 tail?))]
           [`(if ,g ,t)
            (printf "Warning: If without else: ~a~%" sexp)
            (parse-core `(if ,g ,t (,void$)))]
           [`(let/cc ,x ,e)
-           (define x-id (fresh-variable! x))
-           (lcc (fresh-label!) tail? x-id (parse* e tail? (hash-set ρ x x-id)))]
+           (define x-id (fresh-variable* x))
+           (lcc (fresh-label*) tail? x-id (parse* e tail? ctx (hash-set ρ x x-id)))]
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ;; Continuation marks forms
           [`(test (,(? symbol? Rs) ...) ,t ,e)
-           (tst (fresh-label!) tail? (list->set Rs) (parse t tail?) (parse e tail?))]
+           (tst (fresh-label*) tail? (list->set Rs) (parse t tail?) (parse e tail?))]
           [`(grant (,(? symbol? Rs) ...) ,e)
-           (grt (fresh-label!) tail? (list->set Rs) (parse e #f))]
-          ['(fail) (fal (fresh-label!) tail?)]
+           (grt (fresh-label*) tail? (list->set Rs) (parse e #f))]
+          ['(fail) (fal (fresh-label*) tail?)]
           [`(frame (,(? symbol? Rs) ...) ,e)
-           (frm (fresh-label!) tail? (list->set Rs) (parse e #f))]
+           (frm (fresh-label*) tail? (list->set Rs) (parse e #f))]
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ;; End Continuation marks forms
           [`(,(or 'lambda 'if 'letrec 'set!
                   #;for-continuation-marks
                   'test 'grant 'fail 'frame) . ,rest)
            (error 'parse-core "Ill-formed core form ~a" sexp)]
-          [`(,(== kwote) ,d) (datum (fresh-label!) tail? d)]
-          [`(,(== define-ctx) . ,forms) (parse-seq forms tail?)]
+          [`(,(== kwote) ,d) (datum (fresh-label*) tail? d)]
+          [`(,(== define-ctx) . ,forms) (parse-seq forms tail? ctx)]
           [`(,s . ,es) (=> fail)
            (match (hash-ref macro-env s #f)
              [#f (fail)]
@@ -97,30 +107,30 @@
           [`(,e . ,es)
            (unless (list? es)
              (error 'parse "Bad application ~a" sexp))
-           (app (fresh-label!) tail? (parse e #f) (map (parse_ #f) es))]))
+           (app (fresh-label*) tail? (parse e #f) (map (parse_ #f) es))]))
 
       (match sexp
-        [`(,(== special) . ,s) (mk-primr tail? s)]
+        [`(,(== special) . ,s) (mk-primr tail? ctx s)]
         [`((,(== special) . ,s) . ,es)
          (cond [(primitive? s)
-                (app (fresh-label!) tail?
-                     (mk-primr #f s)
+                (app (fresh-label*) tail?
+                     (mk-primr #f ctx s)
                      (map (parse_ #f) es))]
                [else (parse-core (cons s es))])]
         [`(,e . ,es)
          (cond [(hash-has-key? ρ e)
-                (app (fresh-label!) tail?
-                     (var (fresh-label!) #f (rename e))
+                (app (fresh-label*) tail?
+                     (var (fresh-label*) #f (rename e))
                      (map (parse_ #f) es))]
                [else (parse-core sexp)])]
         [(? symbol? s)
-         (define (mkvar) (var (fresh-label!) tail? (rename s)))
+         (define (mkvar) (var (fresh-label*) tail? (rename s)))
          (cond [(hash-has-key? ρ s) (mkvar)]
-               [(primitive? s) (mk-primr tail? s)]
+               [(primitive? s) (mk-primr tail? ctx s)]
                [(hash-ref prim-constants s #f) =>
-                (λ (d) (datum (fresh-label!) tail? d))]
+                (λ (d) (datum (fresh-label*) tail? d))]
                [else (mkvar)])] ;; will error
-        [(? atomic? d) (datum (fresh-label!) tail? d)]
+        [(? atomic? d) (datum (fresh-label*) tail? d)]
         [(? vector? d) (parse `(,quote$ ,d) tail?)] ;; ick
         [err (error 'parse "Unknown form ~a" err)])))
   (values expr open prim-fallbacks))

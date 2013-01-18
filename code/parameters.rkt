@@ -7,21 +7,22 @@
          racket/stxparam)
 (provide mk-syntax-parameters
          in-scope-of-extras initialize-targets match-function
-         st-targets al-targets av-targets
+         st-targets al-targets cr-targets av-targets empty-heap
          tλ tapp called-function
          (for-syntax
           target target-param target-kw target-initializer ;;(struct-out target)
-          get-targets get-stal get-st #;kw<=? target<=?
+          get-targets get-stalcr get-stcr get-st get-cr #;kw<=? target<=?
           kw-in-target remove-kw-target called-fn-target
           apply-transformer σ-target
           formals actuals comp-clauses
           exn-wrap))
 
 (define-for-syntax (exn-wrap stx syn)
+#;
   syn
-  #;
+  
   (quasisyntax/loc syn (with-handlers ([exn:fail:contract:arity?
-                     (λ (ex) (error 'do "Problem in ~a~%~a" '#,stx ex))])
+                     (λ (ex) (error 'do "Problem in ~a~%as ~a~%~a" '#,stx '#,syn ex))])
       #,syn)))
 
 (define-syntax-rule (mk-syntax-parameters id ...)
@@ -36,6 +37,7 @@
                       target-σ)
 (define-syntax-parameter in-scope-of-extras (syntax-rules () [(_ ids body ...) (begin body ...)]))
 (define-syntax-parameter called-function (λ _ #'#f))
+(define-syntax-parameter empty-heap (make-rename-transformer #'hash))
 
 (define-syntax initialize-σ (syntax-rules () [(_ e) e]))
 
@@ -52,6 +54,7 @@ There are several different classes of bindings that the framework maintains.
 * single-threaded - these bindings are always accumulated through loops.
 * allocation-threaded - these bindings are consistently available, but only
 accumulated in forms that specify #:extra. (XXX: general enough? Might need to extend the filtering)
+* carried - Behave like allocation-threaded, but must be returned as extra values in some forms.
 * available - Not accumulated, but maintained through lifting.
 
 The semantics of the language depends on the heap being single-threaded.
@@ -64,6 +67,7 @@ and do. do will not initialize an accumulator in the static extent of another do
 ;; specific bindings. We need this especially for naming the store.
 (define-syntax-parameter st-targets '())
 (define-syntax-parameter al-targets '())
+(define-syntax-parameter cr-targets '())
 (define-syntax-parameter av-targets '())
 
 ;; A Target is a (target Syntax-Parameter Keyword (U Identifier Transformer))
@@ -87,20 +91,22 @@ and do. do will not initialize an accumulator in the static extent of another do
  (define (get-targets)
    (sort (append (syntax-parameter-value #'st-targets)
                  (syntax-parameter-value #'al-targets)
-                 (syntax-parameter-value #'av-targets))
+                 (syntax-parameter-value #'av-targets)
+                 (syntax-parameter-value #'cr-targets))
          target<=?))
 
- (define (get-stal)
+ (define (get-stalcr)
    (sort (append (syntax-parameter-value #'st-targets)
-                 (syntax-parameter-value #'al-targets))
+                 (syntax-parameter-value #'al-targets)
+                 (syntax-parameter-value #'cr-targets))
          target<=?))
 
- (define (get-st #:allow-al-σ? [allow-al-σ? #f])
-   (sort (append (if allow-al-σ?
-                     (filter (λ (t) (eq? '#:σ (target-kw t)))
-                             (syntax-parameter-value #'al-targets))
-                     '())
-                 (syntax-parameter-value #'st-targets))
+ (define (get-st) (sort (syntax-parameter-value #'st-targets) target<=?))
+ (define (get-cr) (sort (syntax-parameter-value #'cr-targets) target<=?))
+
+ (define (get-stcr)
+   (sort (append (syntax-parameter-value #'st-targets)
+                 (syntax-parameter-value #'cr-targets))
          target<=?))
 
  (define (kw-in-target kw targs)
@@ -154,7 +160,7 @@ and do. do will not initialize an accumulator in the static extent of another do
  (define (sort-by-kw zipped)
    (map second (sort zipped kw<=? #:key first)))
 
- (define-syntax-class (formals all drop-unused-σ?)
+ (define-syntax-class (formals all drop-unused-cr?)
    #:attributes ((kw-ids 1) (ids 1) (kws 1))
    ;; Target specified (in order)
    (pattern ((~or (~var k (kw-stx all id-err)) ids:id) ...)
@@ -170,13 +176,15 @@ and do. do will not initialize an accumulator in the static extent of another do
                     (for*/list ([t (in-list all)]
                                 [kw (in-value (target-kw t))]
                                 #:unless (or (memq kw good-kw)
-                                             (and drop-unused-σ?
-                                                  (eq? kw '#:σ))))
+                                             (and drop-unused-cr?
+                                                  (memf (λ (t) (eq? kw (target-kw t)))
+                                                        (syntax-parameter-value #'cr-targets)))))
                       (define temp (generate-temporary (target-param t)))
                       (list kw temp)))]
             #:with (kw-ids ...)
             (sort-by-kw (append (map list good-kw good-ids) unspec-bind))
             #:attr (kws 1) (sort good-kw kw<=?)))
+ 
  (define-splicing-syntax-class (actuals all)
    #:attributes ((kw-exprs 1) (exprs 1))
    (pattern (~seq (~or (~var k (kw-stx all expr-err)) e:expr) ...)
@@ -186,6 +194,7 @@ and do. do will not initialize an accumulator in the static extent of another do
             "Cannot specify the same keyword twice."
             #:attr (kw-exprs 1) (map cons good-kw good-exprs)
             #:with (exprs ...) #'(e ...)))
+
  ;; Used in do, but not do-specific
  (define-splicing-syntax-class comp-clauses
    #:attributes ((guards 1))

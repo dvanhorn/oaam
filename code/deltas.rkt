@@ -32,16 +32,14 @@
 
 (define-syntax-rule (∆-step step)
   (λ (state-count)
-     (λ (state)
-        (match state
-          [(cons σ cs)
-           (define-values (∆ cs*)
-             (for/fold ([∆ '()] [cs* ∅]) ([c (in-set cs)])
-               (define-values (∆* cs**) (step (cons σ c)))
-               (values (append ∆* ∆) (∪ cs** cs*))))
-           (set-box! state-count (+ (unbox state-count)
-                                    (set-count (cs* . ∖ . cs))))
-           (set (cons (update ∆ σ) cs*))]))))
+     (λ (σ cs)
+        (define-values (∆ cs*)
+          (for/fold ([∆ '()] [cs* ∅]) ([c (in-set cs)])
+            (define-values (∆* cs**) (step σ c))
+            (values (append ∆* ∆) (∪ cs** cs*))))
+        (set-box! state-count (+ (unbox state-count)
+                                 (set-count (cs* . ∖ . cs))))
+        (values (update ∆ σ) cs*))))
 
 (define-syntax-rule (mk-∆-fix^ name ans^?)
   (define-syntax-rule (name step fst)
@@ -50,19 +48,14 @@
       (set-box! state-count* 0)
       (define step^ ((∆-step step) state-count*))
       (set-box! (start-time) (current-milliseconds))
-      (define ss (fix step^ (set (cons (update ∆ (hash)) cs))))
+      (define-values (last-σ all-cs) (fix2 step^ (update ∆ (empty-heap)) cs))
       (state-rate)
-      (define-values (last-σ final-cs)
-        (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
-          (match s
-            [(cons fsσ cs)
-             (values (join-store last-σ fsσ)
-                     (for/set #:initial final-cs ([c (in-set cs)]
-                                                  #:when (ans^? c))
-                              c))]
-            [_ (error 'name "bad output ~a~%" s)])))
+      (define final-cs
+        (for/fold ([final-cs ∅]) ([c (in-set all-cs) ss]
+                                  #:when (ans^? c))
+          c))
       (values (format "State count: ~a" (unbox state-count*))
-              (format "Point count: ~a" (set-count (for/union ([p (in-set ss)]) (cdr p))))
+              (format "Point count: ~a" (set-count all-cs))
               last-σ final-cs))))
 
 ;; Uses counting and merges stores between stepping all states.
@@ -75,7 +68,7 @@
      #,@(when-graph #'(define graph (new-graph)))
      (define-values (∆ cs) fst)
      (define-values (last-σ final-cs)
-       (let loop ([accum (hash)] [front cs] [σ (update ∆ (hash))] [σ-count 0])
+       (let loop ([accum (hash)] [front cs] [σ (update ∆ (empty-heap))] [σ-count 0])
          (cond [(∅? front)
                 (state-rate)
                 #,@(when-graph #'(dump-dot graph))

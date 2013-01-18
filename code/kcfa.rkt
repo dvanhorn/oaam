@@ -29,6 +29,7 @@
                     #:defaults ([fixpoint #'fix]))
          (~once (~seq #:aval aval:id)) ;; name the evaluator to use/provide
          ;; Name representations' structs
+         (~optional (~seq #:state state:id) #:defaults ([state (generate-temporary #'state)]))
          (~optional (~seq #:ans ans:id) #:defaults ([ans (generate-temporary #'ans)]))
          (~optional (~seq #:dr dr:id) #:defaults ([dr (generate-temporary #'dr)]))
          (~optional (~seq #:ar ar:id) #:defaults ([ar (generate-temporary #'ar)]))
@@ -36,6 +37,7 @@
          (~optional (~seq #:co co:id) #:defaults ([co (generate-temporary #'co)]))
          (~optional (~seq #:ev ev:id) #:defaults ([ev (generate-temporary #'ev)]))
          (~optional (~seq #:ast ast:id) #:defaults ([ast (generate-temporary #'ast)]))
+         (~optional (~seq #:call call:id) #:defaults ([call (generate-temporary #'call)]))
          ;; Continuation frames
          (~optional (~seq #:mt mt:id) #:defaults ([mt (generate-temporary #'mt)]))
          (~optional (~seq #:sk! sk!:id) #:defaults ([sk! (generate-temporary #'sk!)]))
@@ -77,6 +79,7 @@
                    [ev: (format-id #'ev "~a:" #'ev)]
                    [co: (format-id #'co "~a:" #'co)]
                    [ap: (format-id #'ap "~a:" #'ap)]
+                   [call: (format-id #'call "~a:" #'call)]
                    [ast-fv (format-id #'ast "~a-fv" #'ast)]
                    [(ls: ls?) (:? #'ls)]
                    [(lrk: lrk?) (:? #'lrk)]
@@ -91,7 +94,7 @@
                    ;; in as (cons rσ state), so expand accordingly.
                    [(expander-flags ...)
                     (cond [(and (given wide?) (not (given global-σ?)))
-                           #'(#:expander #:with-first-cons)]
+                           #'(#:expander #:without-first)]
                           [else #'()])])
        (define yield-ev
          #`(let ([yield-tr (syntax-parameter-value #'yield)])
@@ -106,59 +109,59 @@
          (quasisyntax/loc stx
            (match e
              [(var l _ x)
-              (λ% (ev-σ ρ k δ)
-                  (do (ev-σ) ([v #:in-delay ev-σ (lookup-env ρ x)])
-                    (yield (co ev-σ k v)))
+              (λ% (σ ρ k δ)
+                  (do (σ) ([v #:in-delay σ (lookup-env ρ x)])
+                    (yield (co σ k v)))
                   ;; Needed for strict/compiled, but for lazy this introduces
                   ;; an unnecessary administrative reduction.
                   #;
-                  (do (ev-σ) ()
-                    (yield (dr ev-σ k (lookup-env ρ x)))))]
+                  (do (σ) ()
+                    (yield (dr σ k (lookup-env ρ x)))))]
              [(datum l _ d)
-              (λ% (ev-σ ρ k δ)
+              (λ% (σ ρ k δ)
                   (when (memv d (debug-check))
                     (printf "Reached ~a~%" d)
                     (flush-output))
-                  (do (ev-σ) () (yield (co ev-σ k d))))]
+                  (do (σ) () (yield (co σ k d))))]
              [(primr l _ which fallback)
               (define p (primop (compile-primop which)
                                 fallback
                                 (hash-ref prim-arities which)))
-              (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k p))))]
+              (λ% (σ ρ k δ) (do (σ) () (yield (co σ k p))))]
              [(pfl l _ fallback e)
               (define c (compile e))
               (define fv (ast-fv c))
-              (λ% (ev-σ ρ k δ)
-                  (do (ev-σ) ([(σ*-pfl a) #:push ev-σ l δ k])
+              (λ% (σ ρ k δ)
+                  (do (σ) ([(σ*-pfl a) #:push σ l δ k])
                     (yield (ev σ*-pfl c (restrict-to-set ρ fv) (pfk (marks-of k) fallback a) δ))))]
              [(lam l _ x e*)
               (define c (compile e*))
               (define fv (ast-fv c))
-              (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k (clos x c (restrict-to-set ρ fv))))))]
+              (λ% (σ ρ k δ) (do (σ) () (yield (co σ k (clos x c (restrict-to-set ρ fv))))))]
              [(rlm l _ x r e*)
               (define c (compile e*))
               (define fv (ast-fv c))
-              (λ% (ev-σ ρ k δ) (do (ev-σ) () (yield (co ev-σ k (rlos x r c (restrict-to-set ρ fv))))))]
+              (λ% (σ ρ k δ) (do (σ) () (yield (co σ k (rlos x r c (restrict-to-set ρ fv))))))]
              [(lrc l _ (and xs (cons x xs*)) (cons e es) b)
               (define c (compile e))
               (define cs (map compile es))
               (define cb (compile b))
               (define ss (map (λ _ nothing) xs))
               (define fv (ast-fv c))
-              (λ% (ev-σ ρ k δ)
+              (λ% (σ ρ k δ)
                   (define as (map (λ (x) (make-var-contour x δ)) xs))
                   (define/ρ ρ* (extend* ρ xs as))
                   (define/ρ ρe (restrict-to-set ρ* fv))
-                  (do (ev-σ) ([(σ0 a) #:push ev-σ l δ k]
-                              [σ*-lrc #:join* σ0 as ss])
+                  (do (σ) ([(σ0 a) #:push σ l δ k]
+                           [σ*-lrc #:join* σ0 as ss])
                     (yield (ev σ*-lrc c ρe (lrk (marks-of k) x xs* cs cb ρ* a δ) δ))))]
              [(lte l _ (cons x xs) (cons e es) b)
               (define c (compile e))
               (define cs (map compile es))
               (define cb (compile b))
               (define fv (ast-fv c))
-              (λ% (ev-σ ρ k δ)
-                  (do (ev-σ) ([(σ*-app a) #:push ev-σ l δ k])
+              (λ% (σ ρ k δ)
+                  (do (σ) ([(σ*-app a) #:push σ l δ k])
                     (yield (ev σ*-app c (restrict-to-set ρ fv)
                                (ltk (marks-of k) x xs cs '() '() cb ρ a δ)
                                δ))))]
@@ -166,8 +169,8 @@
               (define c (compile e))
               (define cs (map compile es))
               (define fv (ast-fv c))
-              (λ% (ev-σ ρ k δ)
-                  (do (ev-σ) ([(σ*-app a) #:push ev-σ l δ k])
+              (λ% (σ ρ k δ)
+                  (do (σ) ([(σ*-app a) #:push σ l δ k])
                     (yield (ev σ*-app c (restrict-to-set ρ fv)
                                (ls (marks-of k) l 0 cs '() ρ a δ)
                                δ))))]
@@ -176,47 +179,47 @@
               (define c1 (compile e1))
               (define c2 (compile e2))
               (define fv (ast-fv c0))
-              (λ% (ev-σ ρ k δ)
-                  (do (ev-σ) ([(σ*-ife a) #:push ev-σ l δ k])
+              (λ% (σ ρ k δ)
+                  (do (σ) ([(σ*-ife a) #:push σ l δ k])
                     (yield (ev σ*-ife c0 (restrict-to-set ρ fv)
                                (ifk (marks-of k) c1 c2 ρ a δ) δ))))]
              [(st! l _ x e*)
               (define c (compile e*))
               (define fv (ast-fv c))
-              (λ% (ev-σ ρ k δ)
-                  (do (ev-σ) ([(σ*-st! a) #:push ev-σ l δ k])
+              (λ% (σ ρ k δ)
+                  (do (σ) ([(σ*-st! a) #:push σ l δ k])
                     (yield (ev σ*-st! c (restrict-to-set ρ fv) (sk! (marks-of k) (lookup-env ρ x) a) δ))))]
              ;; let/cc is easier to add than call/cc since we make yield
              ;; always make co states for primitives.
              [(lcc l _ x e*)
               (define c (compile e*))
               (define fv (ast-fv c))
-              (λ% (ev-σ ρ k δ)
+              (λ% (σ ρ k δ)
                   (define x-addr (make-var-contour x δ))
                   (define/ρ ρ* (restrict-to-set (extend ρ x x-addr) fv))
-                  (do (ev-σ) ([σ*-lcc #:join ev-σ x-addr (singleton k)])
+                  (do (σ) ([σ*-lcc #:join σ x-addr (singleton k)])
                     (yield (ev σ*-lcc c ρ* k δ))))]
              ;; Forms for stack inspection
              #,@(if (given CM?)
                     #`([(grt l _ R e*)
                         (define c (compile e*))
-                        (λ% (ev-σ ρ k δ)
-                            (do (ev-σ) () (yield (ev ev-σ c ρ (grant k R) δ))))]
+                        (λ% (σ ρ k δ)
+                            (do (σ) () (yield (ev σ c ρ (grant k R) δ))))]
                        [(fal l _)
-                        (λ% (ev-σ ρ k δ)
-                            (do (ev-σ) () (yield (co ev-σ (mt mt-marks) fail))))]
+                        (λ% (σ ρ k δ)
+                            (do (σ) () (yield (co σ (mt mt-marks) fail))))]
                        [(frm l _ R e)
                         (define c (compile e))
-                        (λ% (ev-σ ρ k δ)
-                            (do (ev-σ) () (yield (ev ev-σ c ρ (frame k R) δ))))]
+                        (λ% (σ ρ k δ)
+                            (do (σ) () (yield (ev σ c ρ (frame k R) δ))))]
                        [(tst l _ R t e*)
                         (define c0 (compile t))
                         (define c1 (compile e*))
-                        (λ% (ev-σ ρ k δ)
-                            (do (ev-σ) ()
-                              (if (OK^ R k ev-σ)
-                                  (yield (ev ev-σ c0 ρ k δ))
-                                  (yield (ev ev-σ c1 ρ k δ)))))])
+                        (λ% (σ ρ k δ)
+                            (do (σ) ()
+                              (if (OK^ R k σ)
+                                  (yield (ev σ c0 ρ k δ))
+                                  (yield (ev σ c1 ρ k δ)))))])
                     #'())
              [_ (error 'eval "Bad expr ~a" e)])))
 
@@ -229,7 +232,7 @@
                [else
                 ;; brittle, since other identifiers must be the same in ev:
                 (syntax/loc stx
-                  ((... (define-syntax-rule (λ% (ev-σ ρ k δ) body ...)
+                  ((... (define-syntax-rule (λ% (σ ρ k δ) body ...)
                           (generator body ...)))
                    (define compile values)))]))
 
@@ -246,6 +249,10 @@
                          #:expander-id ans:)
            (mk-op-struct ap state (l fn-addr v-addrs k δ)
                          (l fn-addr v-addrs k δ-op ...)
+                         expander-flags ...)
+           ;; Need another step for sparse-narrow to get better precision
+           (mk-op-struct call state (l fnv v-addrs k δ)
+                         (l fnv v-addrs k δ-op ...)
                          expander-flags ...)
            (mk-op-struct lt state (e ρ xs as k δ) (e ρ-op ... xs as k δ-op ...) expander-flags ...)
            ;; Continuation frames
@@ -411,7 +418,7 @@
                                   (... (begin body ...)))]))])))
 
                (define (inj e)
-                 (define σ₀ (hash))
+                 (define σ₀ (empty-heap))
                  (generator
                    (bind-extra-initial
                      (do (σ₀) () (yield (ev σ₀ (compile e) (hash) (mt mt-marks) '()))))))
@@ -439,19 +446,19 @@
                #,@compile-def
 
                ;; [Rel State State]
-               (define (step state)
+               (define (step #,@(listy (and (given wide?) (not (given global-σ?)) #'σ)) state)
                  (match state
                    ;; Only for compiled/strict
                    #;
                    [(dr: dr-σ k a)
                    (generator
                    (do (dr-σ) ([v #:in-delay dr-σ a]) (yield (co dr-σ k v))))]
-                   [(co: co-σ extra-ids ... k v)
+                   [(co: σ extra-ids ... k v)
                     (bind-extra (state extra-ids ...)
                       (match k
                         [(mt: cm)
-                         (generator (do (co-σ) ([v #:in-force co-σ v])
-                                      (yield (ans co-σ cm v))))]
+                         (generator (do (σ) ([v #:in-force σ v])
+                                      (yield (ans σ cm v))))]
 
                         ;; We need this intermediate step so that σ-∆s work.
                         ;; The above join is not merged into the store until
@@ -460,14 +467,14 @@
                          (define v-addr (make-var-contour (cons l n) δ))
                          (define args (reverse (cons v-addr v-addrs)))
                          (generator
-                          (do (co-σ) ([σ*-ls #:join-local-forcing co-σ v-addr v]
-                                      [k #:in-kont σ*-ls a])
+                          (do (σ) ([σ*-ls #:join-local-forcing σ v-addr v]
+                                   [k #:in-kont σ*-ls a])
                             (yield (ap σ*-ls l (first args) (rest args) k δ))))]
 
                         [(ls: cm l n (cons e es) v-addrs ρ a δ)
                          (define v-addr (make-var-contour (cons l n) δ))
                          (generator
-                          (do (co-σ) ([σ*-lsn #:join-local-forcing co-σ v-addr v])
+                          (do (σ) ([σ*-lsn #:join-local-forcing σ v-addr v])
                             (yield (ev σ*-lsn e ρ
                                        (ls cm l (add1 n) es (cons v-addr v-addrs) ρ a δ) δ))))]
 
@@ -479,105 +486,110 @@
                          (define/ρ ρ* (extend* ρ x-done* x-addrs))
                          (define v-addr (make-var-contour (cons x 'tmp) δ))
                          (generator
-                          (do (co-σ) ([σ*-ltk #:join-local-forcing co-σ v-addr v]
+                          (do (σ) ([σ*-ltk #:join-local-forcing σ v-addr v]
                                       [k* #:in-kont σ*-ltk a])
                             (yield (lt σ*-ltk e ρ* x-addrs (cons v-addr v-addrs) k* δ))))]
                         [(ltk: cm x (cons y xs) (cons e es) x-done v-addrs b ρ a δ)
                          (define v-addr (make-var-contour (cons x 'tmp) δ))
                          (generator
-                          (do (co-σ) ([σ*-ltkn #:join-local-forcing co-σ v-addr v])
+                          (do (σ) ([σ*-ltkn #:join-local-forcing σ v-addr v])
                             (yield (ev σ*-ltkn e ρ
                                        (ltk cm y xs es (cons x x-done) (cons v-addr v-addrs) b ρ a δ) δ))))]
 
                         [(ifk: cm t e ρ a δ)
                          (generator
-                          (do (co-σ) ([k* #:in-kont co-σ a]
-                                      [v #:in-force co-σ v])
-                            (yield (ev co-σ (if v t e) ρ k* δ))))]
+                          (do (σ) ([k* #:in-kont σ a]
+                                      [v #:in-force σ v])
+                            (yield (ev σ (if v t e) ρ k* δ))))]
                         [(lrk: cm x '() '() e ρ a δ)
                          (generator
-                          (do (co-σ) ([σ*-lrk #:join-forcing co-σ (lookup-env ρ x) v]
+                          (do (σ) ([σ*-lrk #:join-forcing σ (lookup-env ρ x) v]
                                       [k* #:in-kont σ*-lrk a])
                             (yield (ev σ*-lrk e ρ k* δ))))]
                         [(lrk: cm x (cons y xs) (cons e es) b ρ a δ)
                          (generator
-                          (do (co-σ) ([σ*-lrkn #:join-forcing co-σ (lookup-env ρ x) v])
+                          (do (σ) ([σ*-lrkn #:join-forcing σ (lookup-env ρ x) v])
                             (yield (ev σ*-lrkn e ρ (lrk cm y xs es b ρ a δ) δ))))]
                         [(sk!: cm l a)
                          (generator
-                          (do (co-σ) ([σ*-sk! #:join-forcing co-σ l v]
+                          (do (σ) ([σ*-sk! #:join-forcing σ l v]
                                       [k* #:in-kont σ*-sk! a])
                             (yield (co σ*-sk! k* (void)))))]
 
                         [(pfk: cm fallback a)
                          (generator
                           (set-ebox! fallback v) ;; haxxx
-                          (do (co-σ) ([k* #:in-kont co-σ a])
-                            (yield (co co-σ k* v))))]
+                          (do (σ) ([k* #:in-kont σ a])
+                            (yield (co σ k* v))))]
                         [_ (error 'step "Bad continuation ~a" k)]))]
 
-                   [(lt: lt-σ extra-ids ... e ρ x-addrs v-addrs k δ)
+                   [(lt: σ extra-ids ... e ρ x-addrs v-addrs k δ)
                     (bind-extra (state extra-ids ...)
                       (generator
-                       (do (lt-σ) ([lt-σ* #:alias* lt-σ x-addrs v-addrs])
-                         (yield (ev lt-σ* e ρ k δ)))))]
+                       (do (σ) ([σ* #:alias* σ x-addrs v-addrs])
+                         (yield (ev σ* e ρ k δ)))))]
 
-                   ;; v is not a value here. It is an address.
-                   [(ap: ap-σ extra-ids ... l fn-addr arg-addrs k δ)
+                   [(ap: σ extra-ids ... l fn-addr arg-addrs k δ)
                     (bind-extra (state extra-ids ...)
                       (generator
-                       (do (ap-σ) ([f #:in-get ap-σ fn-addr])
-                         (match-function f
-                           [(clos: xs e ρ)
-                            (define xn (length xs))
-                            (define an (length arg-addrs))
-                            (cond [(= xn an)
-                                   (do (ap-σ)
-                                       ([(ρ* σ*-clos δ*) #:bind ρ ap-σ l δ xs arg-addrs])
-                                     (yield (ev σ*-clos e (restrict-to-set ρ* (ast-fv e)) k δ*)))]
-                                  ;; Yield the same state to signal "stuckness".
-                                  [else
-                                   (arity-error f l xn an (map (λ (a) (getter ap-σ a)) arg-addrs))
-                                   (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-                           [(rlos: xs r e ρ)
-                            (define xn (length xs))
-                            (define an (length arg-addrs))
-                            (cond [(<= xn an)
-                                   (do (ap-σ)
-                                       ([(ρ* σ*-clos δ*) #:bind-rest ρ ap-σ l δ xs r arg-addrs])
-                                     (yield (ev σ*-clos e (restrict-to-set ρ* (ast-fv e)) k δ*)))]
-                                  ;; Yield the same state to signal "stuckness".
-                                  [else
-                                   (arity-error f l (arity-at-least xn) an (map (λ (a) (getter ap-σ a)) arg-addrs))
-                                   (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-                           [(primop o fallback _)
-                            (tapp prim-meaning o (eunbox fallback) #f l δ-op ... k arg-addrs)]
-                           [(? kont? k)
-                            ;; continuations only get one argument.
-                            (cond [(and (pair? arg-addrs) (null? (cdr arg-addrs)))
-                                   (do (ap-σ) ([v #:in-delay ap-σ (car arg-addrs)])
-                                     (yield (co ap-σ k v)))]
-                                  [else
-                                   (cont-arity-error (length arg-addrs) f l)
-                                   (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-                           [(== ●) (=> fail)
-                            (log-debug "implement ●-call")
-                            (fail)]
-                           [_
-                            (non-function-error f)
-                            (yield (ap ap-σ l fn-addr arg-addrs k δ))]))))]
+                       (do (σ) ([f #:in-get σ fn-addr])
+                         (yield (call σ l f arg-addrs k δ)))))]
+
+                   [(call: σ extra-ids ... l f arg-addrs k δ)
+                    (bind-extra (state extra-ids ...)
+                     (generator
+                      (do (σ) ()
+                      (match-function f
+                        [(clos: xs e ρ)
+                         (define xn (length xs))
+                         (define an (length arg-addrs))
+                         (cond [(= xn an)
+                                (do (σ)
+                                    ([(ρ* σ*-clos δ*) #:bind ρ σ l δ xs arg-addrs])
+                                  (yield (ev σ*-clos e (restrict-to-set ρ* (ast-fv e)) k δ*)))]
+                               ;; Yield the same state to signal "stuckness".
+                               [else
+                                (arity-error f l xn an (map (λ (a) (getter σ a)) arg-addrs))
+                                (yield (call σ l f arg-addrs k δ))])]
+                        [(rlos: xs r e ρ)
+                         (define xn (length xs))
+                         (define an (length arg-addrs))
+                         (cond [(<= xn an)
+                                (do (σ)
+                                    ([(ρ* σ*-clos δ*) #:bind-rest ρ σ l δ xs r arg-addrs])
+                                  (yield (ev σ*-clos e (restrict-to-set ρ* (ast-fv e)) k δ*)))]
+                               ;; Yield the same state to signal "stuckness".
+                               [else
+                                (arity-error f l (arity-at-least xn) an (map (λ (a) (getter σ a)) arg-addrs))
+                                (yield (call σ l f arg-addrs k δ))])]
+                        [(primop o fallback _)
+                         (tapp prim-meaning o (eunbox fallback) #f l δ-op ... k arg-addrs)]
+                        [(? kont? k)
+                         ;; continuations only get one argument.
+                         (cond [(and (pair? arg-addrs) (null? (cdr arg-addrs)))
+                                (do (σ) ([v #:in-delay σ (car arg-addrs)])
+                                  (yield (co σ k v)))]
+                               [else
+                                (cont-arity-error (length arg-addrs) f l)
+                                (yield (call σ l f arg-addrs k δ))])]
+                        [(== ●) (=> fail)
+                         (log-debug "implement ●-call")
+                         (fail)]
+                        [_
+                         (non-function-error f)
+                         (yield (call σ l f arg-addrs k δ))]))))]
 
                    ;; this code is dead when running compiled code.
                    ;; ev states shouldn't need to step "extra" components.
-                   [(ev: ev-σ extra-ids ... e ρ k δ)
+                   [(ev: σ extra-ids ... e ρ k δ)
                     (bind-extra (state extra-ids ...)
                       #,(if (given compiled?)
-                            #'(generator (do (ev-σ) () (yield (ev ev-σ e ρ k δ))))
+                            #'(generator (do (σ) () (yield (ev σ e ρ k δ))))
                             eval))]
 
-                   [(ans: ans-σ extra-ids ... cm v)
+                   [(ans: σ extra-ids ... cm v)
                     (bind-extra (state extra-ids ...)
-                      (generator (do (ans-σ) () (yield (ans ans-σ cm v)))))]
+                      (generator (do (σ) () (yield (ans σ cm v)))))]
 
                    [_ (error 'step "Bad state ~a" state)])))
 

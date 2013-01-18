@@ -2,6 +2,7 @@
 (require "parse.rkt" "kcfa-instantiations.rkt"
          ;; "LK-instantiations.rkt" FIXME
          "handle-limits.rkt"
+         profile
          racket/sandbox)
 (provide test aval prep)
 
@@ -42,6 +43,10 @@
  (require racket/cmdline)
  (define test-file
   (command-line #:once-any
+                [("--nsparsep")
+                 "Benchmark compiled narrow sparse"
+                 (aval sp-lazy-0cfa/c)]
+#|
                 [("--n0cfa")
                  "Benchmark narrow compiled 0cfa"
                  (aval lazy-0CFA/c)]
@@ -58,7 +63,7 @@
                 [("--pts")
                  "Benchmark compiled preallocated timestamp approx. pdcfa"
                  (aval lazy-pdcfa^/c/prealloc/timestamp!)]
-#|                [("--sid")
+                [("--sid")
                  "Benchmark compiled imperative store-diff"
                  (aval 0cfa^/c/∆s!)]
                 [("--spd")

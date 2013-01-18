@@ -263,7 +263,7 @@
                  [v (in-list v-ids)]
                  [argnum (in-range (length ts) 0 -1)])
               (define tm (type-match t #'σ v))
-              #`(do-comp #:bind (#:σ σ acc)
+              #`(do-comp #:bind/extra (#:σ σ acc)
                          #,(tm #'acc
                                (and (not mult-ary?)
                                     (λ (tmp)
@@ -276,7 +276,7 @@
             (cons
              (generate-temporary #'checker-mk-checker)
              #`(tλ (#:σ σ prim v-addrs)
-                 (expect-do-values #:values 1
+                 (expect-do-values #:values 1 #:extra
                    (match v-addrs
                      [(list-rest vids ... rest-match)
                       #,(if rest
@@ -286,7 +286,7 @@
                                   (match raddrs
                                     ['() (let ([acc (alt-reverse acc)]) #,built)]
                                     [(cons ra rrest)
-                                     (do-comp #:bind (#:σ σ acc)
+                                     (do-comp #:bind/extra (#:σ σ acc)
                                               #,(check-rest #'acc
                                                             (and (not mult-ary?)
                                                                  (λ (tmp)
@@ -391,6 +391,7 @@
             #:attr checker-fn (attribute f.checker-fn)
             #:attr mk-simple (attribute f.mk-simple)
             #:with arity #'f.arity)
+   ;; XXX: Deprecate
    (pattern ((~var fs (flat predfn)) ...)
             #:with arity #'(list fs.arity ...)
             #:attr checker-fn
@@ -466,7 +467,7 @@
                                       [(pσ vs)
                                        #`(do (pσ) ([v #:in-force pσ (car vs)]
                                                    [res (in-list
-                                                         (if (eq? v ●)
+                                                         (if (or (eq? v ●) (eq? v qdata^))
                                                              '(#t #f)
                                                              (list #,(predfn (attribute p.type) #'v))))])
                                            (yield res))]))
@@ -562,7 +563,7 @@
                               (cond [(and apply? fallv)
                                      (tapp call-rlos fallv ℓ δ-op ... k v-addrs)]
                                     [else
-                                     (do-comp #:bind (vss)
+                                     (do-comp #:bind/extra (vss)
                                        (tapp #,checker '#,p v-addrs)
                                        (do (pσ) ([vs (in-set vss)])
                                          #,(m #'(args ...))))]))))]))))

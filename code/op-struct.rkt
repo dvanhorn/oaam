@@ -4,8 +4,7 @@
                      syntax/parse/experimental/template
                      syntax/id-table
                      racket/match
-                     syntax/struct
-                     racket/trace)
+                     syntax/struct)
          racket/stxparam)
 (provide mk-op-struct)
 
@@ -25,7 +24,6 @@
                         (free-id-table-for-each optional (λ (id v) (printf "~a ↦ ~a~%" id v)))
                         (raise-syntax-error #f "Unregistered struct" id))))
 (define-for-syntax (safe-cdr lst) (if (pair? lst) (cdr lst) null))
-(begin-for-syntax (trace safe-cdr))
 
 ;; Specialize representations
 (define-syntax (mk-op-struct stx)
@@ -48,15 +46,17 @@
          (~optional
           (~seq #:expander
                 (~or
-                 (~and #:with-first-cons
+                 (~and #:without-first
                        (~bind [expander
                                #`(λ (stx)
                                     (syntax-case stx ()
                                       [(_ fσ
                                           #,@(safe-cdr (syntax->list #'(parent-fields ...)))
                                           fields ...)
-                                       #'(list-rest fσ parent-subfields ...
-                                                    (container subfields ...))]
+                                       #,(if (null? (syntax->list #'(parent-subfields ...)))
+                                             #'#'(container subfields ...)
+                                             #'(list-rest parent-subfields ...
+                                                          (container subfields ...)))]
                                       [_ (raise-syntax-error #f "Bad cons matcher" stx)]))]))
                      expander:expr)) ;; want a different match expander?
                     #:defaults ([expander

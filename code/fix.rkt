@@ -1,6 +1,6 @@
 #lang racket
 (require "notation.rkt" "graph.rkt" racket/stxparam)
-(provide mk-fix fix appl)
+(provide mk-fix fix appl fix2)
 
 ;; appl : (∀ (X) ((X -> (Setof X)) -> ((Setof X) -> (Setof X))))
 (define ((appl f) s)
@@ -13,6 +13,14 @@
     (cond [(∅? front) accum]
           [else (define new-front ((appl f) front))
                 (loop (∪ accum front) (new-front . ∖ . accum))])))
+
+;; fix2 : (∀ (X Y) ((Y X -> (values Y Set[X])) Y Set[X]) -> (values Y Set[X])
+;; f monotonic for respective inputs and outputs.
+(define (fix2 f σ s)
+  (let loop ((accum ∅) [σ σ] (front s))
+    (cond [(∅? front) (values σ accum)]
+          [else (define-values (σ* new-front) (f σ front))
+                (loop (∪ accum front) σ* (new-front . ∖ . accum))])))
 
 (define-simple-macro* (mk-fix name ans? ans-v)
   (define (name step fst)

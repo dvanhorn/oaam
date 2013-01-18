@@ -426,10 +426,10 @@
 (define (add-lib expr renaming prims-used fresh-label! fresh-variable!)
   (define fv-raw (free expr))
   (define rename-rev (hash-reverse renaming))
-  (define ((fresh-upto var) x)
+  (define ((fresh-upto var) x ctx)
     (if (eq? x var)
         (hash-ref renaming x)
-        (fresh-variable! x)))
+        (fresh-variable! x ctx)))
   ;; maps the fresh name to the meaning.
   (define-values (prims prim-defs)
     (for*/lists (prims prim-defs)
@@ -449,9 +449,9 @@
       ;; in order for the primitive references to match up between expr and the
       ;; parsed meaning, we finagle the meaning of fresh-variable.
       (define-values (d _0 _1) (parse def fresh-label! fresh-variable!))
-      (values (fresh-variable! (string->symbol (format "fallback-~a" name)))
+      (values (fresh-variable! (string->symbol (format "fallback-~a" name)) top-ctx)
               (pfl #f #f box d))))
   (if (null? prims)
       expr
       ;; close the program
-      (lrc (fresh-label!) #t (append fallback-names prims) (append fallback-defs prim-defs) expr)))
+      (lrc (fresh-label! top-ctx #f) #t (append fallback-names prims) (append fallback-defs prim-defs) expr)))
