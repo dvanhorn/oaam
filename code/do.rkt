@@ -11,6 +11,8 @@
          bind-join-local
          bind-get-kont
          bind-push
+         ;; Different modules need to insert start-up sequences
+         init-sequence
          ;; for do-managed accumulators
          do-comp do-values
          do-body-transformer
@@ -20,6 +22,7 @@
 (define-for-syntax (listy x) (if x (list x) '()))
 
 (mk-syntax-parameters do do-extra-values)
+(define-syntax-parameter init-sequence (list #'(void)))
 ;; Private parameters
 (define-syntax-parameter alloc-ctx? #f)
 (define-syntax-parameter cr-ctx '())
@@ -79,7 +82,7 @@
 (define-syntax-parameter bind-push
   (syntax-rules ()
     [(_ (σ* a* bpσ l δ k) body)
-     (let ([a* (make-var-contour l δ)])
+     (let ([a* (make-kont-contour l δ)])
        (bind-join (σ* bpσ a* (singleton k)) body))]))
 (define-syntax-parameter bind-get-kont (make-rename-transformer #'bind-get))
 (define-syntax-parameter bind-join-local (make-rename-transformer #'bind-join))
@@ -286,7 +289,7 @@
                                              #,@(if maybe-accumulators
                                                     #`(#:accumulate #,maybe-accumulators)
                                                     '())
-                                           ([res (in-set res-tmp)])
+                                           ([res (in-abstract-values res-tmp)])
                                            #,rest)))))
 
   (define-splicing-syntax-class (join-clauses maybe-prev-σ maybe-accumulators)

@@ -33,9 +33,22 @@
                       bind bind-rest bind-rest-apply
                       ;; 'alloc' a-la AAM, but with less context. More k-CFA-like.
                       make-var-contour
+                      make-intermediate-contour
+                      make-vector^-contour
+                      make-vector-contour
+                      make-car-contour
+                      make-cdr-contour
+                      make-port-contour
+                      make-apply-contour
+                      make-kont-contour
+                      make-rest^-contour
+                      ;; only concrete
+                      make-rest-contour
+                      make-rest-nA-contour
+                      make-rest-nD-contour
                       ;; single-threaded parameter necessary for semantics
                       target-σ)
-(define-syntax-parameter in-scope-of-extras (syntax-rules () [(_ ids body ...) (begin body ...)]))
+(define-syntax-parameter in-scope-of-extras (syntax-rules () [(_ ids . body) (begin . body)]))
 (define-syntax-parameter called-function (λ _ #'#f))
 (define-syntax-parameter empty-heap (make-rename-transformer #'hash))
 

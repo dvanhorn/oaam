@@ -1,9 +1,10 @@
 #lang racket/base
-(require "notation.rkt" (except-in racket/set for/set for*/set))
+(require "notation.rkt" (except-in racket/set for/set for*/set) racket/contract)
 ;; nnmapc - Nearest-neighbors map collection
 
-(provide new-map map-set map-ref #;map-remove
-         new-map-map map-map-set map-map-ref map-map-close #;map-map-remove
+(provide new-map map-set
+         map-ref map-map-close
+         new-map-map map-map-set map-map-ref
          map-map-iterate-first
          map-map-iterate-key
          map-map-iterate-value
@@ -33,7 +34,8 @@
 
 (define (new-map) (hash))
 (define (map-set m k v) (hash-set m k v))
-(define (map-ref m k) (hash-ref m k ∅))
+(define (map-ref m k [default (λ () (error 'map-ref "Unmapped ~a" k))])
+  (hash-ref m k default))
 #;(define (map-remove m k v) (error 'TODO))
 
 ;; Instead of a collection of maps, we actually map collections to values,
@@ -65,6 +67,8 @@
         (add1 out))))
 
 (define (map-overlap m₀ m₁) 
+  (unless (and (hash? m₀) (hash? m₁))
+    (error 'map-overlap "Bad map-map ~a ~a" m₀ m₁))
   (for*/set ([(a v) (in-hash m₀)]
              [v* (in-value (hash-ref m₁ a #f))]
              #:when (equal? v v*))

@@ -29,7 +29,7 @@
      (define abs-r
        (with-syntax ([(vrest-op ...) (if apply? #'(vrest) #'())])
          #`(let* ([ra sr]
-                  [rA (make-var-contour `(A . ,sr) sδ*)]
+                  [rA (make-rest^-contour ra sδ*)]
                   #,@(if (zero? K) #'() #'([νρ (extend sρ r rA)])))
              #,(if apply?
                    #'(do-comp #:bind/extra (#:σ outσ vrest* rvs)
@@ -40,19 +40,20 @@
                                      (bind-get (res sσ tail)
                                        (if (null? vrest*)
                                            (do-values vrest* res)
-                                           ;; XXX: Exposes that stored values are sets!
-                                           (do (sσ) iloop ([vals res]
+                                           (begin
+                                             (printf "Getting all reses~%")
+                                           (do (sσ) iloop ([vals (sequence->list (in-abstract-values res))]
                                                            [vrest* vrest*]
                                                            [rvs (singleton (consv rA ra))])
-                                               (cond [(∅? vals)
-                                                      (do-values vrest* rvs)]
-                                                     [else
-                                                      (match (set-first vals)
-                                                        ['() (do-values vrest* (⊓1 rvs '()))]
-                                                        [(consv A D)
-                                                         (bind-get (rest sσ D)
-                                                           (iloop sσ (set-rest res) (cons A vrest*) (⊓ rest rvs)))]
-                                                        [_ (iloop sσ (set-rest res) vrest* rvs)])]))))]
+                                               (match vals
+                                                 ['() (do-values vrest* rvs)]
+                                                 [(cons '() rst)
+                                                  (do-values vrest* (⊓1 rvs '()))]
+                                                 [(cons (consv A D) rst)
+                                                  (bind-get (rest sσ D)
+                                                            (iloop sσ rst (cons A vrest*) (⊓ rest rvs)))]
+                                                 [(cons _ rst)
+                                                  (iloop sσ rst vrest* rvs)])))))]
                                     [(cons jA -vrest)
                                      (loop sσ -vrest (cons jA vrest*))]
                                     [_ (error 'bind-rest "Bad match ~a" vrest)]))
@@ -63,7 +64,7 @@
                          (bind-big-alias (νσ νσ rA vrest) body*)))))))
      ;; Concretely, rest-arg is a finite list. FIXME: apply?
      (define conc-r
-       #`(let*-values ([(ra) (make-var-contour sr sδ*)]
+       #`(let*-values ([(ra) (make-rest-contour sr sδ*)]
                        [(νρ) (extend sρ r ra)])
            (do (sσ) loop ([as vrest] [last ra] [count 0])
                (match as
@@ -73,8 +74,8 @@
                           (do (sσ) ([νσ #:join sσ last snull])
                             body*)])
                  [(cons a as)
-                  (define rnextA (make-var-contour `(,sr A . ,count) sδ*))
-                  (define rnextD (make-var-contour `(,sr D . ,count) sδ*))
+                  (define rnextA (make-rest-nA-contour sr count sδ*))
+                  (define rnextD (make-rest-nD-contour sr count sδ*))
                   (do (sσ) ([νσ #:alias sσ rnextA a]
                             [νσ #:join νσ last (singleton (consv rnextA rnextD))])
                     (loop νσ as rnextD (add1 count)))]))))
@@ -83,13 +84,13 @@
            [(< K +inf.0)
             (bind-args (λ (body)
                           #`(let* ([δ* (truncate (cons l δ) #,K)]
-                                   [as (map (λ (x) (make-var-contour x δ*)) xs)]
+                                   [as (map (λ (x) (make-var-contour l x δ*)) xs)]
                                    [ρ* (extend* ρ xs as)])
                               #,body))
                        #'as abs-r)]
            [else
             (bind-args (λ (body) #`(let* ([δ* (cons l δ)]
-                                          [as (map (λ (x) (make-var-contour x δ*)) xs)]
+                                          [as (map (λ (x) (make-var-contour l x δ*)) xs)]
                                           [ρ* (extend* ρ xs as)])
                                      #,body))
                        #'as conc-r)])]))
@@ -110,8 +111,22 @@
                   [as (map (λ (x) (make-var-contour x δ*)) xs)]
                   [ρ* (extend* ρ xs as)])
              #,(vs #'as)))]))
-(define-syntax-rule (make-var-contour-0 x δ) x)
-(define-syntax-rule (make-var-contour-k x δ) (cons x δ))
+
+(define-syntax-rule (make-var-contour-0 l x δ) x)
+(define-syntax-rule (make-intermediate-contour-0 l x δ) (cons x 'temp))
+(define-syntax-rule (make-vector^-contour-0 l δ) (cons 'V l))
+(define-syntax-rule (make-vector-contour-0 l i δ) `(V ,i . ,l))
+(define-syntax-rule (make-car-contour-0 l δ) `(A . ,l))
+(define-syntax-rule (make-cdr-contour-0 l δ) `(D . ,l))
+(define-syntax-rule (make-port-contour-0 l δ) `(Port . ,l))
+(define-syntax-rule (make-apply-contour-0 l i δ) `(apply ,i . ,l))
+(define-syntax-rule (make-kont-contour-0 l δ) l)
+(define-syntax-rule (make-rest^-contour-0 l δ) `(A . ,l))
+
+(define-syntax-rule (make-var-contour-k l x δ) (cons x δ))
+(define-syntax-rule (make-rest-contour l δ) `((A . ,l) . ,δ))
+(define-syntax-rule (make-rest-nA-contour l i δ) `((A ,i . ,l) . ,δ))
+(define-syntax-rule (make-rest-nD-contour l i δ) `((D ,i . ,l) . ,δ))
 
 (define-syntax bind-0 (mk-bind 0))
 (define-syntax bind-1 (mk-bind 1))
@@ -134,7 +149,16 @@
    ([bind (make-rename-transformer #'bind-0)]
     [bind-rest (make-rename-transformer #'bind-rest-0)]
     [bind-rest-apply (make-rename-transformer #'bind-rest-apply-0)]
-    [make-var-contour (make-rename-transformer #'make-var-contour-0)])
+    [make-var-contour (make-rename-transformer #'make-var-contour-0)]
+    [make-intermediate-contour (make-rename-transformer #'make-intermediate-contour-0)]
+    [make-vector^-contour (make-rename-transformer #'make-vector^-contour-0)]
+    [make-vector-contour (make-rename-transformer #'make-vector-contour-0)]
+    [make-car-contour (make-rename-transformer #'make-car-contour-0)]
+    [make-cdr-contour (make-rename-transformer #'make-cdr-contour-0)]
+    [make-port-contour (make-rename-transformer #'make-port-contour-0)]
+    [make-apply-contour (make-rename-transformer #'make-apply-contour-0)]
+    [make-kont-contour (make-rename-transformer #'make-kont-contour-0)]
+    [make-rest^-contour (make-rename-transformer #'make-rest^-contour-0)])
    body))
 
 (define-syntax-rule (with-1-ctx body)

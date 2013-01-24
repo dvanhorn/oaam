@@ -9,10 +9,11 @@
                      syntax/id-table
                      (except-in racket/set for/set for*/set)
                      "notation.rkt")
+         racket/splicing
          racket/trace
          racket/unsafe/ops
          racket/stxparam)
-(provide getter widen yield snull prim-extras alt-reverse arity-error
+(provide getter widen yield prim-extras alt-reverse arity-error
          mk-primitive-meaning mk-static-primitive-functions
          ;; for use only by primitives.rkt
          original-yield mk-pull-arguments)
@@ -38,17 +39,6 @@
     (if (pair? l)
         (recur (unsafe-cdr l) (cons (unsafe-car l) acc))
         acc)))
-
-(define snull (singleton '()))
-
-;; Combinatorial combination of arguments
-(define (toSetOfLists list-of-sets)
-  (match list-of-sets
-    ['() snull]
-    [(cons hdS tail)
-     (for*/set ([hd (in-set hdS)]
-                [restlist (in-set (toSetOfLists tail))])
-       (cons hd restlist))]))
 
 (define (arity-error f l exp giv vals)
   (log-info "Arity error on ~a at ~a. Expected ~a args, given ~a: ~a" f l exp giv vals))
@@ -239,10 +229,10 @@
            [else
             #`(bind-get (gres #,tmσ addr)
                         (let* ([filtered
-                                (for/set ([v (in-set gres)] #:when #,(predfn t #'v)) v)]
+                                (for/join1 ([v (in-abstract-values gres)] #:when #,(predfn t #'v)) v)]
                                [#,acc (cons filtered #,acc)])
                           #,@(listy (and on-err
-                                         #`(when (∅? filtered)
+                                         #`(when (is-nothing? filtered)
                                              #,(on-err #'gres))))
                           (do-values #,acc)))]))
         #`(let ([addr #,addr]) #,body)))
@@ -299,7 +289,7 @@
                      [vs #,@(listy
                              (and (not mult-ary?)
                                   #`(prim-arity-error prim #,(length ts) (length vs))))
-                         (do-values ∅)])))))
+                         (do-values nothing)])))))
           (hash-set! type-checkers key result)
           result)])))
 
@@ -421,7 +411,7 @@
                                 ;; FIXME: Unsound for apply
                                 #`(do-comp #:bind (res)
                                            (tapp check-name prim v-addrs)
-                                           (if (∅? res)
+                                           (if (is-nothing? res)
                                                #,stx
                                                (do-values res)))))))))
                  (hash-set! type-checkers key result)
@@ -516,6 +506,17 @@
       #`(define #,(car pair) #,(cdr pair))))
   (list defs names))
 
+(define setnull (set '()))
+(define-syntax-parameter toSetOfLists #f)
+;; Combinatorial combination of arguments
+(define-syntax-rule (mk-toSetOfLists name)
+  (define/match (name list-of-abstract-values)
+    [('()) setnull]
+    [((cons hdS tail))
+     (for*/set ([hd (in-abstract-values hdS)]
+                [restlist (in-set (name tail))])
+       (cons hd restlist))]))
+
 (define-syntax (mk-primitive-meaning stx)
   (set! type-checkers (make-hash))
   (syntax-parse stx
@@ -565,7 +566,7 @@
                                     [else
                                      (do-comp #:bind/extra (vss)
                                        (tapp #,checker '#,p v-addrs)
-                                       (do (pσ) ([vs (in-set vss)])
+                                       (do (pσ) ([vs (in-set vss)]) ;; set of lists of arguments
                                          #,(m #'(args ...))))]))))]))))
        (define qs #'quasisyntax) ;; have to lift for below to parse correctly
        (quasisyntax/loc stx
@@ -598,7 +599,9 @@
                  [_ (error 'apply "Bad fallback ~a" fnv)])))
            (mk-pull-arguments pull-arguments-from-addresses (δ-op ...) #t)
            defines ...
-           type-filters ...
+           (mk-toSetOfLists internalTSoL)
+           (splicing-syntax-parameterize ([toSetOfLists (make-rename-transformer #'internalTSoL)])
+             type-filters ...)
            ;; λP very much like λ%
            (define-syntax-rule (... (λP (pσ fallv apply? ℓ δ k v-addrs) body ...))
              #,(if compiled?
@@ -632,7 +635,7 @@
                (cond
                 [(no-expect? n)
                  (cond [rest?
-                        (define addr (make-var-contour `(apply ,i . ,l) δ))
+                        (define addr (make-apply-contour l i δ))
                         (do (iapσ) (#,(if (syntax-e #'addrs?)
                                           #'[bσ #:alias iapσ addr arg]
                                           #'[bσ #:join-forcing iapσ addr arg]))
@@ -641,7 +644,7 @@
                 [else
                  (define-values (addrs raddrs*)
                    (let aloop ([i i] [n n] [addrs '()] [raddrs raddrs])
-                     (define addr (make-var-contour `(apply ,i . ,l) δ))
+                     (define addr (make-apply-contour l i δ))
                      (if (no-expect? n)
                          (if rest?
                              (values (alt-reverse (cons addr addrs)) (cons addr raddrs))
@@ -700,7 +703,7 @@
                                           (alt-reverse raddrs*))))])]
               ;; Explicitly given arguments
               [(cons arg args)
-               (define addr (make-var-contour `(apply ,i . ,l) δ))
+               (define addr (make-apply -contour l i δ))
                (cond [(and (no-expect? n) (not rest?)) ;; might we have too many arguments?
                       (log-info "'apply'd function given too many arguments (>= ~a) (expected ~a)"
                                 i (len-expect num))

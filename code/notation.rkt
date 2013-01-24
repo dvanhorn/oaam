@@ -3,7 +3,7 @@
 (require (for-syntax syntax/parse))
 (provide for/append for/union for*/union for/set for*/set
          define-simple-macro* hash-reverse and
-
+         (for-syntax ops)
          (rename-out [safer-match match]
                      [safer-match* match*])
          add1/debug

@@ -423,7 +423,7 @@
      (char-ci>=? . ,(comp 'binary-char-ci>=?))
      (char-ci<=? . ,(comp 'binary-char-ci<=?))))))
 
-(define (add-lib expr renaming prims-used fresh-label! fresh-variable!)
+(define (add-lib expr renaming prims-used fresh-label! fresh-variable! [register-fn (λ _ (void))] [register-datum (λ _ (void))])
   (define fv-raw (free expr))
   (define rename-rev (hash-reverse renaming))
   (define ((fresh-upto var) x ctx)
@@ -448,7 +448,8 @@
          #:when def)
       ;; in order for the primitive references to match up between expr and the
       ;; parsed meaning, we finagle the meaning of fresh-variable.
-      (define-values (d _0 _1) (parse def fresh-label! fresh-variable!))
+      (define-values (d _0 _1) (parse def #:fresh-label! fresh-label! #:fresh-variable! fresh-variable!
+                                      #:register-fn register-fn #:register-datum register-datum))
       (values (fresh-variable! (string->symbol (format "fallback-~a" name)) top-ctx)
               (pfl #f #f box d))))
   (if (null? prims)

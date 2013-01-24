@@ -12,7 +12,7 @@
          define/read define/basic define/write yield-both alt-reverse
          prim-meaning
          ;; reprovide
-         snull yield getter widen prim-extras)
+         yield getter widen prim-extras)
 
 (define-syntax-parameter prim-meaning #f)
 
@@ -218,9 +218,10 @@
             (continue)]
            [(and (? immutable?) (? vector?))
             (cond [(number^? z)
-                   (yield (list->set (map widen (vector->list vec))))]
+                   (do (vrσ) ([v (in-set (list->set (map widen (vector->list vec))))])
+                     (yield v))]
                   [(and (<= 0 z) (< z (vector-length vec)))
-                   (yield (set (vector-ref vec z)))]
+                   (yield (vector-ref vec z))]
                   [else
                    (log-info "Immutable vector accessed out of bounds")
                    (continue)])]
@@ -267,7 +268,7 @@
                  [else
                   (match (widen (length vs))
                     [(? number^?)
-                     (define V-addr (make-var-contour `(V . ,l) δ))
+                     (define V-addr (make-vector^-contour l δ))
                      (do (vσ) loop ([v vs])
                          (match v
                            ['()
@@ -280,7 +281,7 @@
                          (match v
                            ['() (yield (conc size (reverse addrs)))]
                            [(cons v vrest)
-                            (define addr (make-var-contour `(V ,i . ,l) δ))
+                            (define addr (make-vector-contour l i δ))
                             (do (vσ) ([σ*-pv #:join-forcing vσ addr v])
                               (loop σ*-pv vrest (add1 i) (cons addr addrs)))]))])])))
 
@@ -292,11 +293,11 @@
                [else
                 (match (widen size)
                   [(? number^?)
-                   (define V-addr (make-var-contour `(V . ,l) δ))
+                   (define V-addr (make-vector^-contour l δ))
                    (do (vσ) ([σ*-mv^ #:join-forcing vσ V-addr default])
                      (yield (vectorv^ size V-addr)))]
                   [_ (define V-addrs
-                       (for/list ([i (in-range size)]) (make-var-contour `(V ,i . ,l) δ)))
+                       (for/list ([i (in-range size)]) (make-vector-contour l i δ)))
                      (do (vσ) ([fs #:force vσ default]
                                [σ*-mv #:join* vσ V-addrs (make-list size fs)])
                        (yield (vectorv size V-addrs)))])]))
@@ -307,8 +308,8 @@
            [(vectorv len addrs) (error 'TODO "concrete vector->list")]
            [(or (vectorv^ len addr)
                 (vectorv-immutable^ len addr))
-            (define A-addr (make-var-contour `(A . ,l) δ))
-            (define D-addr (make-var-contour `(D . ,l) δ))
+            (define A-addr (make-car-contour l δ))
+            (define D-addr (make-cdr-contour l δ))
             (define val (consv A-addr D-addr))
             (do (vlσ) ([cσ #:alias vlσ A-addr addr]
                        [cσ* #:join cσ D-addr (⊓1 snull val)])
@@ -328,25 +329,25 @@
            [(consv A D)
             #,(if (= +inf.0 K)
                 #'(error 'TODO "concrete list->vector")
-                #'(let ([cell (make-var-contour `(V . ,l) δ)]
+                #'(let ([cell (make-vector^-contour l δ)]
                         [seen (make-hash)])
-                    (do (lvσ) loop ([todo (set lst)])
-                        (cond [(∅? todo) (yield (vectorv^ number^ cell))]
+                    (do (lvσ) loop ([todo (singleton lst)])
+                        (cond [(is-nothing? todo) (yield (vectorv^ number^ cell))]
                               [else
-                               (do (lvσ) ([val (in-set todo)]
+                               (do (lvσ) ([val (in-abstract-values todo)]
                                           #:unless (hash-has-key? seen val))
                                  (hash-set! seen val #t)
                                  (match val
                                    [(? cons^?)
                                     (do (lvσ) ([σ* #:join lvσ cell (singleton ●)])
-                                      (loop σ* (todo . ∖1 . val)))]
+                                      (loop σ* (rem1 todo val)))]
                                    [(? qcons^?)
                                     (do (lvσ) ([σ* #:join lvσ cell (singleton qdata^)])
-                                      (loop σ* (todo . ∖1 . val)))]
+                                      (loop σ* (rem1 todo val)))]
                                    [(consv A D)
                                     (do (lvσ) ([σ* #:alias lvσ cell A]
                                                [more #:get σ* D])
-                                      (loop σ* ((∪ todo more) . ∖1 . val)))]
+                                      (loop σ* (rem1 (⊓ todo more) val)))]
                                    [_
                                     (unless (null? val)
                                       (log-info "list->vector input non-list. Tail: ~a" val))
@@ -356,7 +357,7 @@
        (define-simple-macro* (make-vector^ vσ l δ vs)
          (cond [(null? vs) (yield vec0)]
                [else
-                (define V-addr (make-var-contour `(V . ,l) δ))
+                (define V-addr (make-vector^-contour l δ))
                 (do (vσ) loop ([v vs])
                     (match v
                       ['() (yield (vectorv-immutable^ number^ V-addr))]
@@ -365,16 +366,16 @@
                          (loop jσ vrest))]))]))
 
        (define/write (make-consv cσ l δ v0 v1)
-         (let ([A-addr (make-var-contour `(A . ,l) δ)]
-               [D-addr (make-var-contour `(D . ,l) δ)])
+         (let ([A-addr (make-car-contour l δ)]
+               [D-addr (make-cdr-contour l δ)])
            (do (cσ) ([σ*A #:join-forcing cσ A-addr v0]
                      [σ*D #:join-forcing σ*A D-addr v1])
              (yield (consv A-addr D-addr)))))
 
        ;; INVARIANT: internal, so never 'apply'd.
        (define-simple-macro* (make-list^ cσ l δ vs)
-         (let ([A-addr (make-var-contour `(A . ,l) δ)]
-               [D-addr (make-var-contour `(D . ,l) δ)])
+         (let ([A-addr (make-car-contour l δ)]
+               [D-addr (make-cdr-contour l δ)])
            (define val (consv A-addr D-addr))
            (do (cσ) ([nilσ #:join cσ D-addr (⊓1 snull val)])
              (do (nilσ) loop ([v vs] [J ⊥])
@@ -388,8 +389,8 @@
 
        ;; INVARIANT: internal, so never 'apply'd.
        (define-simple-macro* (make-improper^ cσ l δ vs)
-         (let ([A-addr (make-var-contour `(A . ,l) δ)]
-               [D-addr (make-var-contour `(D . ,l) δ)])
+         (let ([A-addr (make-car-contour l δ)]
+               [D-addr (make-cdr-contour l δ)])
            (define val (consv A-addr D-addr))
            (do (cσ) ([fs #:force cσ (car vs)]
                      [lastσ #:join cσ D-addr (⊓1 fs val)])
@@ -429,7 +430,7 @@
          (define/write (name ioσ l δ s)
            (match (widen s)
              [(? string^?)
-              (define status-addr (make-var-contour `(Port . ,l) δ))
+              (define status-addr (make-port-contour l δ))
               (do (ioσ) ([openσ #:join ioσ status-addr (singleton open@)])
                 (yield (port^ status-addr)))]
              [s (yield (open-port s))])))
@@ -470,7 +471,7 @@
                  (cond [(port-closed? real-port) (continue)]
                        [else
                         (do (ioσ) ([fs #:force ioσ any])
-                          (do (ioσ) loop ([vs (set->list fs)])
+                          (do (ioσ) loop ([vs (abstract-values->list fs)])
                               (match vs
                                 ['() (yield (void))]
                                 [(cons v vs)

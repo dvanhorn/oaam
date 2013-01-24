@@ -1,7 +1,7 @@
 #lang racket
 (require "ast.rkt" "notation.rkt" (for-syntax syntax/parse racket/syntax)
          racket/stxparam)
-(provide define-nonce touches mk-touches mk-flatten-value cons-limit
+(provide define-nonce touches mk-touches cons-limit mk-flatten-value
          ;; abstract values
          number^;;integer^ rational^
          number^?
@@ -15,7 +15,6 @@
          ● ⊥
          open@ closed@
          fail ;; for continuation marks
-         flatten-value reify-list
          (struct-out vectorv^)
          (struct-out vectorv-immutable^)
          (struct-out input-port^)
@@ -28,8 +27,12 @@
          (struct-out addr)
          (struct-out value-set)
          atomic?
-         nothing singleton
-         ≡ ⊑? big⊓ ⊓ ⊓1)
+         grow-vector
+         ;; Parameters
+         nothing is-nothing? singleton mk-flatten-value
+         for/join for/join1 in-abstract-values abstract-values->list
+         abstract-values?
+         ≡ ⊑? big⊓ ⊓ ⊓1 rem1 snull flatten-value)
 (define-syntax-parameter touches #f)
 (define-syntax (define-nonce stx)
   (syntax-case stx () [(_ name) (identifier? #'name)
@@ -81,66 +84,6 @@
 ;; Continutation marks fail token
 (define-nonce fail)
 
-(define-syntax-parameter flatten-value #f)
-(define-simple-macro* (mk-flatten-value name clos rlos kont?)
-  (define (name v)
-    (match v
-      [(? number?) number^]
-      [(? string?) string^]
-      [(? symbol?) symbol^]
-      [(? char?) char^]
-      [(or (? boolean?) '() (? void?) (? eof-object?)) v]
-      [(or (? number^?) (== string^) (== symbol^) (== char^)
-           (? vector^?) (== vector-immutable^)) v]
-      [(? consv?) cons^]
-      [(? vectorv?) vector^]
-      [(or (? vectorv-immutable^?) (? vector?)) vector-immutable^]
-      [(or (? input-port^?) (? input-port?)) 'input-port]
-      [(or (? output-port^?) (? output-port?)) 'output-port]
-      [(or (clos _ _ _)
-           (rlos _ _ _ _)) 'function]
-      [(? kont?) 'continuation]
-      [else (error "Unknown base value" v)])))
-
-;; Everything is all heterogeneous
-(define-syntax nothing (make-rename-transformer #'∅))
-(define-syntax singleton (make-rename-transformer #'set))
-(define ⊓ set-union)
-(define ⊓1 set-add)
-
-(define ⊑? subset?)
-(define (≡ vs0 vs1) (= (set-count vs0) (set-count vs1)))
-
-(define-syntax-rule (big⊓ vs0 V)
-  (let ()
-    (unless (= (set-count vs0) 1)
-      (error 'big⊓ "Expected singleton values for big⊓: ~a ~a" vs0 V))
-    (define v0 (for/first ([v (in-set vs0)]) v))
-    (cond [(eq? ⊥ V) v0]
-          [else (if (equal? v0 V)
-                    V
-                    (let ([v0f (flatten-value v0)])
-                      (if (equal? v0f V)
-                          V
-                          qdata^)))])))
-(define (log-bad-reification addr value)
-  (log-info "Multiple list reifications due to ~a: ~a" addr value))
-(define-syntax-rule (reify-list σ v)
-  (do (σ) loop ([-v v]) #:values 1
-    (match -v
-      [(consv A D)
-       (do (σ) ([ares #:get σ A]
-                [dres #:get σ D])
-         (define car (set-first ares)) ;; XXX: check a/dres for ∅?
-         (define cdr (set-first dres))
-         (unless (∅? (set-rest res)) (log-bad-reification A ares))
-         (unless (∅? (set-rest dres)) (log-bad-reification D dres))
-         (do-comp #:bind (rest)
-                  (loop σ cdr)
-                  (do-values (cons car rest))))]
-      [_ (unless (null? -v) (log-info "Bad list for reification ~a" -v))
-         (do-values -v)])))
-
 (define cons-limit (make-parameter 1))
 
 (struct vectorv^ (length addr) #:prefab)
@@ -184,6 +127,65 @@
       (null? x)
       (eof-object? x)))
 
+;; Tweakable lattice.
+(define-syntax-parameter ⊓ #f)
+(define-syntax-parameter ⊓1 #f)
+(define-syntax-parameter rem1 #f)
+(define-syntax-parameter in-abstract-values #f)
+(define-syntax-parameter abstract-values? #f)
+(define-syntax-parameter nothing #f)
+(define-syntax-parameter is-nothing? #f)
+(define-syntax-parameter singleton #f)
+(define-syntax-parameter ⊑? #f)
+(define-syntax-parameter ≡ #f)
+(define-syntax-parameter snull #f) ;; common but derived
+(define-syntax-parameter flatten-value #f) ;; populated by mk-flatten-value
+
+(define-simple-macro* (mk-flatten-value name clos rlos kont?)
+  (define (name v)
+    (match v
+      [(? number?) number^]
+      [(? string?) string^]
+      [(? symbol?) symbol^]
+      [(? char?) char^]
+      [(or (? boolean?) '() (? void?) (? eof-object?)) v]
+      [(or (? number^?) (== string^) (== symbol^) (== char^)
+           (? vector^?) (== vector-immutable^)) v]
+      [(? consv?) cons^]
+      [(? vectorv?) vector^]
+      [(or (? vectorv-immutable^?) (? vector?)) vector-immutable^]
+      [(or (? input-port^?) (? input-port?)) 'input-port]
+      [(or (? output-port^?) (? output-port?)) 'output-port]
+      [(or (clos _ _ _)
+           (rlos _ _ _ _)) 'function]
+      [(? kont?) 'continuation]
+      [else (error "Unknown base value" v)])))
+
+(define-syntax-rule (big⊓ vs0 V)
+  (let ()
+    (define v0 (for/first ([v (in-abstract-values vs0)]) v))
+    (cond [(eq? ⊥ V) v0]
+          [else (if (equal? v0 V)
+                    V
+                    (let ([v0f (flatten-value v0)])
+                      (if (equal? v0f V)
+                          V
+                          qdata^)))])))
+
+(define (grow-vector fill σ old-size)
+  (for/vector #:length (* 2 old-size) #:fill fill
+                 ([v (in-vector σ)]
+                  [i (in-naturals)]
+                  #:when (< i old-size))
+    v))
+
+(define-simple-macro* (for/join (~var o (ops #'nothing)) guards body ...+)
+  (for/fold ([o.res o.init]) guards (⊓ o.res (let () body ...))))
+(define-simple-macro* (for/join1 (~var o (ops #'nothing)) guards body ...+)
+  (for/fold ([o.res o.init]) guards (⊓1 o.res (let () body ...))))
+(define-syntax-rule (abstract-values->list expr)
+  (for/list ([v (in-abstract-values expr)]) v))
+
 (define-simple-macro* (mk-touches touches:id clos:id rlos:id
                                   ls:id lrk:id ltk:id ifk:id sk!:id pfk:id
                                   ast-fv:id promise:id
@@ -208,7 +210,7 @@
            (vectorv-immutable _ l)) (list->set l)]
       [(or (vectorv^ _ a)
            (vectorv-immutable^ _ a)) (set a)]
-      [(? set? s) (for/union ([v (in-set s)]) (touches v))]
+      [(? abstract-values? s) (for/union ([v (in-abstract-values s)]) (touches v))]
       [(promise e ρ)
        #,(if (syntax-e #'0cfa?)
              #'(ast-fv e)

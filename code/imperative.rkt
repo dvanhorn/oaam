@@ -21,7 +21,8 @@
          with-mutable-worklist
          with-narrow-mutable-worklist
          with-σ-∆s/acc!
-         with-σ-∆s!)
+         with-σ-∆s!
+         (for-syntax bind-joiner))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mutable global store and worklist.
@@ -32,7 +33,6 @@
 (define graph #f)
 (define (set-current-state! v) (set! current-state v))
 (define (reset-graph!) (set! graph (new-graph)))
-
 
 (define-syntax in-todo (make-rename-transformer #'in-set))
 (define empty-todo ∅)
@@ -79,21 +79,16 @@
                     #`(do-yield-narrow e))
               (continue))]))
 
-(define (join-h! a vs)
-  (define prev (hash-ref global-σ a ∅))
-  (define upd (⊓ vs prev))
-  (unless (≡ prev upd)
-    (hash-set! global-σ a upd)
-    (inc-unions!)))
-(define-syntax-rule (bind-join-h! (σ* jhσ a vs) body)
-  (begin (join-h! a vs) body))
-
-(define (join*-h! as vss)
-  (for ([a (in-list as)]
-        [vs (in-list vss)])
-    (join-h! a vs)))
-(define-syntax-rule (bind-join*-h! (σ* jh*σ as vss) body)
-  (begin (join*-h! as vss) body))
+(define-syntax-rule (mk-join-h!)
+  (λ (a vs)
+     (define prev (hash-ref global-σ a nothing))
+     (define upd (⊓ vs prev))
+     (unless (≡ prev upd)
+       (hash-set! global-σ a upd)
+       (inc-unions!))))
+(define-for-syntax ((bind-joiner joiner) stx)
+  (syntax-case stx ()
+    [(_ (σ* jhσ a vs) body) (quasisyntax/loc stx (begin (#,joiner a vs) body))]))
 
 (define-simple-macro* (mk-imperative-narrow-fix name ans? ans-v ans-σ touches)
   (define-syntax-rule (name step fst)
@@ -172,10 +167,9 @@
   (splicing-syntax-parameterize
    ([yield yield-narrow!])
    body))
-(define-syntax-rule (with-mutable-store body)
+(define-syntax-rule (with-mutable-store (joiner) body)
   (splicing-syntax-parameterize
-   ([bind-join (make-rename-transformer #'bind-join-h!)]
-    [bind-join* (make-rename-transformer #'bind-join*-h!)]
+   ([bind-join (bind-joiner #'joiner)]
     [getter (make-rename-transformer #'global-hash-getter)])
    body))
 
@@ -202,7 +196,7 @@
                #`(begin (do-yield/∆s/acc! e)
                         (continue)))]))
 
-(define-syntax-rule (mk-add-∆/s add-∆ add-∆s bind-join bind-join* get-σ)
+(define-syntax-rule (mk-add-∆/s add-∆ add-∆s bind-join get-σ)
   (begin
     (define (add-∆ acc a vs)
       (define prev (get-σ global-σ a nothing))
@@ -220,21 +214,20 @@
            (error 'add-∆s "Expected same length lists. Finished at ~a ~a"
                   as vss)])))
     (define-simple-macro* (bind-join* (∆s* ∆s as vss) body)
-      (let ([∆s* (add-∆s ∆s as vss)]) #,(bind-help #'∆s* #'body)))
-    (define-simple-macro* (bind-join (∆s* ∆s a vs) body)
-      (let ([∆s* (add-∆ ∆s a vs)]) #,(bind-help #'∆s* #'body)))))
-(mk-add-∆/s add-∆ add-∆s bind-join-∆s/change bind-join*-∆s/change hash-ref)
+      (let ([∆s* (add-∆s ∆s as vss)]) #,(bind-help #'∆s* #'body)))))
 
 (define-syntax-rule (with-σ-∆s/acc! body)
-  (splicing-syntax-parameterize
-   ([bind-join (make-rename-transformer #'bind-join-∆s/change)]
-    [bind-join* (make-rename-transformer #'bind-join*-∆s/change)]
-    [yield yield/∆s/acc!]
-    [getter (make-rename-transformer #'global-hash-getter)])
-            body))
+  (begin
+    (mk-add-∆/s add-∆ add-∆s bind-join-∆s/change hash-ref)
+    (splicing-syntax-parameterize
+        ([bind-join (make-rename-transformer #'bind-join-∆s/change)]
+         [yield yield/∆s/acc!]
+         [getter (make-rename-transformer #'global-hash-getter)])
+      body)))
 
-(define-syntax-rule (mk-mk-imperative/∆s/acc^-fixpoint mk-name cleaner joiner set-σ! get-σ)
+(define-syntax-rule (mk-mk-imperative/∆s/acc^-fixpoint mk-name cleaner joiner mk-joiner set-σ! get-σ)
   (define-syntax-rule (mk-name name ans^? ans^-v touches)
+    (begin (define joiner (mk-joiner))
     (define-syntax-rule (name step fst)
       (let ()
       (set-box! (start-time) (current-milliseconds))
@@ -267,9 +260,9 @@
                  (set-σ! global-σ a (⊓ (get-σ global-σ a nothing) (cdr a×vs))))
                ;; Only one inc needed since all updates are synced.
                (unless (null? ∆s) (inc-unions!))
-               (loop)]))))))
+               (loop)])))))))
 (mk-mk-imperative/∆s/acc^-fixpoint
- mk-imperative/∆s/acc^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
+ mk-imperative/∆s/acc^-fixpoint restrict-to-reachable join-h! mk-join-h! hash-set! hash-ref)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Imperative deltas
 (define global-∆s #f)
@@ -277,7 +270,7 @@
 (define saw-change? #f) ;; nasty global to communicate that a state is new
 (define (reset-saw-change?!) (set! saw-change? #f))
 (define (saw-change!) (set! saw-change? #t))
-(define-syntax-rule (mk-add-∆/s! add-∆! add-∆s! bind-join bind-join* get-σ)
+(define-syntax-rule (mk-add-∆/s! add-∆! add-∆s! bind-join get-σ)
   (begin
     (define (add-∆! a vs)
       (define prev (get-σ global-σ a nothing))
@@ -295,10 +288,7 @@
                                           (not (saw-change!)))))
                         (cons (cons a vs) acc))))
     (define-simple-macro* (bind-join (∆s* ∆s a vs) body)
-      (begin (add-∆! a vs) body))
-    (define-simple-macro* (bind-join* (∆s* ∆s as vss) body)
-      (begin (add-∆s! as vss) body))))
-(mk-add-∆/s! add-∆! add-∆s! bind-join-∆s! bind-join*-∆s! hash-ref)
+      (begin (add-∆! a vs) body))))
 
 (define (yield/∆s! c)
   (when (or saw-change?
@@ -321,12 +311,14 @@
                     (continue))]))
 
 (define-syntax-rule (with-σ-∆s! body)
-  (splicing-syntax-parameterize
-   ([yield yield/∆s!]
-    [bind-join (make-rename-transformer #'bind-join-∆s!)]
-    [bind-join* (make-rename-transformer #'bind-join*-∆s!)]
-    [getter (make-rename-transformer #'global-hash-getter)])
-   body))
+  (begin
+    (mk-add-∆/s! add-∆! add-∆s! bind-join-∆s!∆s! hash-ref)
+    (splicing-syntax-parameterize
+        ([yield yield/∆s!]
+         [bind-join (make-rename-transformer #'bind-join-∆s!)]
+         [bind-join* (make-rename-transformer #'bind-join*-∆s!)]
+         [getter (make-rename-transformer #'global-hash-getter)])
+      body)))
 
 (define-simple-macro* (mk-mk-imperative/∆s^-fixpoint mk-name cleaner joiner set-σ! get-σ)
   (define-syntax-rule (mk-name name ans^? ans^-v touches)
@@ -399,7 +391,9 @@
 (define (reset-todo!) (set! todo empty-todo))
 
 (define (prepare-imperative parser sexp)
-  (define-values (e renaming ps) (parser sexp simple-fresh-label! simple-fresh-variable!))
+  (define-values (e renaming ps) (parser sexp
+                                         #:fresh-label! simple-fresh-label!
+                                         #:fresh-variable! simple-fresh-variable!))
   (define e* (add-lib e renaming ps simple-fresh-label! simple-fresh-variable!))
   ;; Start with a constant factor larger store since we are likely to
   ;; allocate some composite data. This way we don't incur a reallocation
@@ -408,7 +402,9 @@
   e*)
 ;; Only use imperative methods for the workset.
 (define (prepare-imperative-todo parser sexp)
-  (define-values (e renaming ps) (parser sexp simple-fresh-label! simple-fresh-variable!))
+  (define-values (e renaming ps) (parser sexp
+                                         #:fresh-label! simple-fresh-label!
+                                         #:fresh-variable! simple-fresh-variable!))
   (define e* (add-lib e renaming ps simple-fresh-label! simple-fresh-variable!))
   (reset-todo!)
   (set! seen (make-hash))
