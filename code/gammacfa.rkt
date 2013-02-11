@@ -1,6 +1,6 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
-         "parameters.rkt" "context.rkt" "add-lib.rkt" "fix.rkt"
+         "parameters.rkt" "context.rkt" "fix.rkt"
          "data.rkt" "store-passing.rkt")
 (provide with-ΓCFA)
 

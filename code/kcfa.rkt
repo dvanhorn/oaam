@@ -2,7 +2,7 @@
 
 (require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt" "primitives.rkt" "parse.rkt"
          "parameters.rkt" "egal-box.rkt"
-         "notation.rkt" "op-struct.rkt" "do.rkt" "add-lib.rkt"
+         "notation.rkt" "op-struct.rkt" "do.rkt"
          (rename-in racket/generator
                     [yield real-yield]
                     [generator real-generator])
@@ -509,10 +509,11 @@
                                                                                   #'+inf.0
                                                                                   #'(cons-limit))])
                                                               (define-values (e* r ps)
-                                                                (parse-prog e gensym gensym))
-                                                              (add-lib e* r ps gensym gensym))))])
+                                                                (parse-prog e))
+                                                              (add-lib e* r ps))))])
+                    (define prepped-e (prepare e))
                     #,@(syntax-parameter-value #'init-sequence)
-                    (fixpoint step (inj (prepare e))))
+                    (fixpoint step (inj prepped-e)))
                   ;; parameterize prim-meaning so we can use it in the definition of apply.
                   (splicing-syntax-parameterize ([prim-meaning (make-rename-transformer #'prim-meaning-def)])
                     (define-syntax mk-prims (mk-mk-prims #,compiled? #,global-σ? #,K))

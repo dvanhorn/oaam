@@ -5,9 +5,12 @@
          racket/unsafe/ops
          racket/trace
          (for-syntax syntax/parse))
-(provide with-bitvector-data)
+(provide with-bitvector-data
+         bv-first-bit
+         exact-zero?
+         value-register bit-register init-bit/value! grow-bit-register)
 
-(define (exact-zero? x) (and (fixnum? x) (unsafe-fx= x 0)))
+(define (exact-zero? x) (eq? 0 x))
 
 (define value-register #f)
 (define bit-register #f)
@@ -32,13 +35,16 @@
   (set! bit-register
         (grow-vector ⊥ bit-register (vector-length bit-register))))
 
-(define (reset-registers!)
+(define (init-bit/value! initial-values)
   (set! value-register (make-hash))
   (set! bit-register (make-vector 128))
   (for ([idx (in-naturals)]
         [v (in-list initial-values)])
-    (hash-set! value-register v (expt 2 idx))
-    (vector-set! bit-register idx v))
+    (hash-set! value-register v (arithmetic-shift 1 idx))
+    (vector-set! bit-register idx v)))
+
+(define (reset-registers!)
+  (init-bit/value! initial-values)
   (set! kill-numbers -1)
   (set! kill-strings -1)
   (set! kill-symbols -1)
@@ -53,7 +59,7 @@
   (hash-ref! value-register v
              (λ ()
                 (define num (hash-count value-register))
-                (define new-bit (expt 2 num))
+                (define new-bit (arithmetic-shift 1 num))
                 (cond
                  [(number? v) (set! kill-numbers (add-to-mask kill-numbers new-bit))]
                  [(string? v) (set! kill-strings (add-to-mask kill-strings new-bit))]
@@ -90,6 +96,7 @@
                          (bitwise-and union kill-chars)
                          union)])
                union)))))
+
 ;; Make top values clobber concrete values to decrease irrelevant flows.
 (define (join1 bv val) (join bv (value->bv val)))
 
@@ -103,24 +110,22 @@
 ;; sparseness of the set, and use faster fixnum operations and
 ;; skip known useless iterations over several zeroes.
 ;; For now, do the naive thing.
-(define (bv-next-bit idx bv)
-  (define bv* (quotient bv 2))
-  (cond [(exact-zero? bv*) (values #f 0)]
-        [(exact-zero? (bitwise-and bv* 1)) (bv-next-bit (add1 idx) bv*)]
-        [else (values (add1 idx) bv*)]))
-(define (bv-first-bit bv)
+;; lowest-bit-set: Exact-Positive-Integer -> Exact-Nonnegative-Integer
+(define (lowest-bit-set bv)
+  (let loop ([idx 0] [bv bv])
+    (if (eq? 0 (bitwise-and bv 1))
+        (loop (add1 idx) (arithmetic-shift bv -1))
+        idx)))
+(define (bv-first-bit idx bv)
   (cond [(exact-zero? bv) (values #f 0)]
-        [(exact-zero? (bitwise-and bv 1)) (bv-next-bit 0 bv)]
-        [else (values 0 bv)]))
+        [else (define idx* (lowest-bit-set bv))
+              (values (+ 1 idx idx*) (arithmetic-shift bv (sub1 (- idx*))))]))
 (define (bv-next-bit-seq pos)
   (define idx (unsafe-struct-ref pos 0))
   (define bv (quotient (unsafe-struct-ref pos 1) 2))
-  (if (exact-zero? bv)
-      (bv-seq #f 0)
-      (let loop ([idx idx] [bv bv])
-        (if (exact-zero? (bitwise-and bv 1))
-            (loop (add1 idx) (quotient bv 2))
-            (bv-seq (add1 idx) bv)))))
+  (cond [(exact-zero? bv) (bv-seq #f 0)]
+        [else (define-values (idx bv) (bv-first-bit idx bv))
+              (bv-seq idx bv)]))
 
 (struct bv-seq (idx bv*) #:prefab)
 
@@ -129,7 +134,7 @@
    (λ ()
       (values (λ (pos) (vector-ref bit-register (bv-seq-idx pos)))
               bv-next-bit-seq
-              (let-values ([(idx bv*) (bv-first-bit bv)])
+              (let-values ([(idx bv*) (bv-first-bit -1 bv)])
                 (bv-seq idx bv*))
               (λ (pos) (bv-seq-idx pos)) #f #f))))
 
@@ -142,12 +147,12 @@
        [[(id) (_ bv-expr)]
         #'[(id)
            (:do-in
-            ([(idx bv) (bv-first-bit bv-expr)])
+            ([(idx bv) (bv-first-bit -1 bv-expr)])
             (void)
             ([bv bv]
              [idx idx])
             idx
-            ([(idx* bv*) (bv-next-bit idx bv)]
+            ([(idx* bv*) (bv-first-bit idx bv)]
              [(id) (vector-ref bit-register idx)])
             #t
             #t

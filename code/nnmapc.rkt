@@ -1,15 +1,21 @@
 #lang racket/base
-(require "notation.rkt" (except-in racket/set for/set for*/set) racket/contract)
+(require "notation.rkt"
+         racket/stxparam racket/splicing
+         (for-syntax racket/base)
+         (except-in racket/set for/set for*/set) racket/contract)
 ;; nnmapc - Nearest-neighbors map collection
 
 (provide new-map map-set
          map-ref map-map-close
-         new-map-map map-map-set map-map-ref
-         map-map-iterate-first
-         map-map-iterate-key
-         map-map-iterate-value
-         map-map-iterate-next)
-
+         new-map-map map-map-add! map-map-ref
+         in-map-map-values
+         ;; for use in rtee-nnmapc
+         map-overlap
+         with-simple-nnmapc)
+(define-syntax-rule (define-syntax-parameters p ...)
+  (begin (define-syntax-parameter p #f) ...))
+(define-syntax-parameters new-map map-set map-ref map-map-close
+  new-map-map map-map-add! map-map-ref in-map-map-values)
 ;; This module defines and naively implements an interface for a
 ;; collection of finite maps that form a metric space with the
 ;; ability to compute a (approximate if need be) nearest-neighbors set.
@@ -32,9 +38,7 @@
 ;; That is, if a state has been seen, we use an equal? hash to check.
 ;; Not equal -> possible non-termination
 
-(define (new-map) (hash))
-(define (map-set m k v) (hash-set m k v))
-(define (map-ref m k [default (λ () (error 'map-ref "Unmapped ~a" k))])
+(define (s-map-ref m k [default (λ () (error 'map-ref "Unmapped ~a" k))])
   (hash-ref m k default))
 #;(define (map-remove m k v) (error 'TODO))
 
@@ -46,15 +50,10 @@
 ;; Informally, this is the amount of changes needed to transform a map to the other.
 ;; This forms a true metric (self-0, symmetric and triangle-ineq)
 
-(define (new-map-map) (hash))
-(define (map-map-set mm m v) (hash-set mm m v))
-(define map-map-ref hash-ref)
-#;(define (map-map-remove mm m) (error 'TODO))
-
-(define (map-map-iterate-first mm) (hash-iterate-first mm))
-(define (map-map-iterate-key mm itr) (hash-iterate-key mm itr))
-(define (map-map-iterate-value mm itr) (hash-iterate-value mm itr))
-(define (map-map-iterate-next mm itr) (hash-iterate-next mm itr))
+(define (s-map-map-add! mm m v)
+  (define m-hash (hash-ref! mm m make-hasheq))
+  (hash-set! m-hash v #t)
+  mm)
 
 ;; INVARIANT: maps never contain #f
 (define (map-distance m₀ m₁)
@@ -67,8 +66,6 @@
         (add1 out))))
 
 (define (map-overlap m₀ m₁) 
-  (unless (and (hash? m₀) (hash? m₁))
-    (error 'map-overlap "Bad map-map ~a ~a" m₀ m₁))
   (for*/set ([(a v) (in-hash m₀)]
              [v* (in-value (hash-ref m₁ a #f))]
              #:when (equal? v v*))
@@ -77,17 +74,33 @@
 ;; Map-Map[A] Map -> (values Map Set[Key])
 ;; Find a map in the given collection that is "reasonably close" to
 ;; the given map, and which key Also return the set of keys on which both maps overlap.
-(define (map-map-close mm m)
-  (define-values (min-map min-dist max-overlap)
-    (for/fold ([min-map #f] [mind #f] [maxo #f])
+(define (s-map-map-close mm m accept)
+  (unless (hash? mm) (error 'map-map-close "Bad ~a" mm))
+  (define-values (min-map min-value min-dist max-overlap)
+    (for/fold ([min-map #f] [minv #f] [mind #f] [maxo #f])
         ([(key val) (in-hash mm)])
       (define dist (map-distance key m))
       (cond [(or (not mind) (< dist mind))
-             (values key dist (map-overlap key m))]
+             (values key val dist (map-overlap key m))]
             [(= dist mind)
              (define ovr (map-overlap key m))
              (if (< (set-count maxo) (set-count ovr))
-                 (values key dist ovr)
-                 (values min-map mind maxo))]
-            [else (values min-map mind maxo)])))
-  (values min-map max-overlap))
+                 (values key val dist ovr)
+                 (values min-map minv mind maxo))]
+            [else (values min-map minv mind maxo)])))
+  (define-values (out0 out1) (accept min-map max-overlap min-value))
+  (if out0
+      (values min-map max-overlap out0 out1)
+      (values #f #f #f #f)))
+
+(define-syntax-rule (with-simple-nnmapc . rest-body)
+  (splicing-syntax-parameterize
+      ([map-ref (make-rename-transformer #'s-map-ref)]
+       [map-set (make-rename-transformer #'hash-set)]
+       [new-map (make-rename-transformer #'hash)]
+       [new-map-map (make-rename-transformer #'make-hash)]
+       [map-map-ref (make-rename-transformer #'hash-ref)]
+       [map-map-close (make-rename-transformer #'s-map-map-close)]
+       [map-map-add! (make-rename-transformer #'s-map-map-add!)]
+       [in-map-map-values (make-rename-transformer #'in-set)])
+    . rest-body))

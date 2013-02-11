@@ -14,7 +14,7 @@
          mk-imperative/∆s^-fixpoint
          mk-add-∆/s
          mk-add-∆/s!
-         prepare-imperative prepare-imperative-todo
+         with-prepare-imperative with-prepare-imperative-todo
          unions todo seen global-σ graph reset-graph!
          current-state set-current-state!
          with-mutable-store
@@ -390,25 +390,27 @@
 (define (set-global-σ! v) (set! global-σ v))
 (define (reset-todo!) (set! todo empty-todo))
 
-(define (prepare-imperative parser sexp)
-  (define-values (e renaming ps) (parser sexp
-                                         #:fresh-label! simple-fresh-label!
-                                         #:fresh-variable! simple-fresh-variable!))
-  (define e* (add-lib e renaming ps simple-fresh-label! simple-fresh-variable!))
-  ;; Start with a constant factor larger store since we are likely to
-  ;; allocate some composite data. This way we don't incur a reallocation
-  ;; right up front.
-  (reset-globals! (make-hash))
-  e*)
+(define-syntax-rule (with-prepare-imperative (name) . rest)
+  (begin
+    (define (name parser sexp)
+      (define-values (e renaming ps) (parser sexp))
+      (define e* (add-lib e renaming ps))
+      ;; Start with a constant factor larger store since we are likely to
+      ;; allocate some composite data. This way we don't incur a reallocation
+      ;; right up front.
+      (reset-globals! (make-hash))
+      e*)
+    . rest))
 ;; Only use imperative methods for the workset.
-(define (prepare-imperative-todo parser sexp)
-  (define-values (e renaming ps) (parser sexp
-                                         #:fresh-label! simple-fresh-label!
-                                         #:fresh-variable! simple-fresh-variable!))
-  (define e* (add-lib e renaming ps simple-fresh-label! simple-fresh-variable!))
-  (reset-todo!)
-  (set! seen (make-hash))
-  e*)
+(define-syntax-rule (with-prepare-imperative-todo (name) . rest)
+  (begin
+    (define (name parser sexp)
+      (define-values (e renaming ps) (parser sexp))
+      (define e* (add-lib e renaming ps))
+      (reset-todo!)
+      (set! seen (make-hash))
+      e*)
+    . rest))
 
 (define-syntax-rule (global-hash-getter σ* a)
   (hash-ref global-σ a (λ () (error 'global-hash-getter "Unbound address ~a" a))))

@@ -2,6 +2,7 @@
 
 (require (for-syntax syntax/parse))
 (provide for/append for/union for*/union for/set for*/set
+         for/max for*/max
          define-simple-macro* hash-reverse and
          (for-syntax ops)
          (rename-out [safer-match match]
@@ -72,6 +73,7 @@
   (for/hash ([(k v) (in-hash h)])
     (values v k)))
 
+
 (define-simple-macro* (for/union (~var o (ops #'∅)) guards body ...+)
   (for/fold ([o.res o.init]) guards (∪ o.res (let () body ...))))
 (define-simple-macro* (for*/union (~var o (ops #'∅)) guards body ...+)
@@ -80,3 +82,17 @@
   (for/fold ([o.res o.init]) guards (∪1 o.res (let () body ...))))
 (define-simple-macro* (for*/set (~var o (ops #'∅)) guards body ...+)
   (for*/fold ([o.res o.init]) guards (∪1 o.res (let () body ...))))
+
+(define-syntax-rule (define-for/for*-max name for)
+  (...
+   (define-simple-macro* (name (~optional (~seq #:lt (lt:expr min:expr))
+                                          #:defaults ([lt #'<]
+                                                      [min -inf.0]))
+                               guards body ...+)
+     (for ([cur-max min]) guards
+          (let ([v (let () body ...)])
+            (if (cur-max . lt . v)
+                v
+                cur-max))))))
+(define-for/for*-max for/max for/fold)
+(define-for/for*-max for*/max for*/fold)

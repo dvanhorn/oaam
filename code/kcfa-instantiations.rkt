@@ -2,7 +2,8 @@
 (require (rename-in racket/generator [yield real-yield])
          racket/stxparam)
 (require "kcfa.rkt" "data.rkt" "parse.rkt"
-         "primitives.rkt" "fix.rkt"
+         "primitives.rkt" "fix.rkt" "env.rkt"
+         "simple-data.rkt" "bitvector-data.rkt" "bitvector-data-with-intervals.rkt"
          ;; different components of instantiantiations
          "lazy-strict.rkt"
          "context.rkt"
@@ -13,6 +14,7 @@
          "prealloc.rkt"
          "nonsparse.rkt"
          "sparse-wide.rkt"
+         "sparse-narrow.rkt"
          "cfa2.rkt"
          "pdcfa.rkt"
          "gammacfa.rkt"
@@ -38,6 +40,19 @@
    ([widen (make-rename-transformer #'flatten-value)])
    body))
 
+(with-bitvector-data/intervals
+ (with-lazy
+  (with-0-ctx
+   (with-abstract
+    (with-sparse (mk-analysis)
+     (begin #;#;
+      with-ΓCFA (mk-analysis) 
+       (mk-analysis #:aval sp-lazy-0cfa/c                    
+                    #:touches sp-lazy-0cfa/c-touches
+                    #:wide)))))))
+(provide sp-lazy-0cfa/c)
+
+#|
  (mk-sparse^-fixpoint
                 sp-lazy-0cfa^/c-fix
                 sp-lazy-0cfa^/c-ans? sp-lazy-0cfa^/c-ans-v
@@ -57,7 +72,6 @@
                    #:global-σ 
                    #:compiled #:wide)))))))
  (provide sp-lazy-0cfa^/c)
-
 
 ;; "pt2"
 (mk-imperative/timestamp^-fixpoint 2prealloc/imperative-fixpoint/c 2prealloc-ans/c?
@@ -92,18 +106,21 @@
                     #:compiled))))))))
 (provide lazy-0CFA/c)
 
-(mk-fix lazy-ΓCFA/c-fixpoint lg0-ans? lg0-ans-v)
+(mk-imperative-narrow-fix lazy-ΓCFA/c-fixpoint lg0-ans? lg0-ans-v lg0-state-rσ lg0-touches)
 ;; g0cfa
 (with-nonsparse
  (with-lazy
   (with-0-ctx
    (with-narrow-σ-passing
     (with-whole-σ
-     (with-set-monad
+     (with-narrow-mutable-worklist
       (with-abstract
        (with-ΓCFA (mk-analysis)
-        (mk-analysis #:aval lazy-ΓCFA/c #:ans lg0-ans #:compiled
-                     #:fixpoint lazy-ΓCFA/c-fixpoint)))))))))
+        (mk-analysis #:aval lazy-ΓCFA/c #:ans lg0-ans #:touches lg0-touches
+                     #:state lg0-state
+                     #:prepare (λ (sexp) (prepare-imperative-todo parse-prog sexp))
+                     #:fixpoint lazy-ΓCFA/c-fixpoint
+                     #:compiled)))))))))
 (provide lazy-ΓCFA/c)
 
 ;; "pts"
@@ -123,6 +140,8 @@
                      #:fixpoint sprealloc/imperative-fixpoint/c
                      #:global-σ #:compiled #:wide #:pushdown))))))))
 (provide lazy-pdcfa^/c/prealloc/timestamp!)
+
+|#
 
 #|
  ;; "sid"
@@ -324,22 +343,25 @@
                    #:global-σ #:compiled #:wide)))))))
 (provide lazy-0cfa^/c/timestamp!)
 |#
-#;#;#;
+#;#;
 ;; "pt"
-(mk-prealloc/timestamp^-fixpoint prealloc/imperative-fixpoint/c prealloc-ans/c?
-                                 prealloc-ans/c-v prealloc-touches-0/c)
 (with-nonsparse
  (with-lazy
   (with-0-ctx/prealloc
-   (with-prealloc/timestamp-store
-    (with-mutable-worklist
-     (with-abstract
-      (mk-analysis #:aval lazy-0cfa^/c/prealloc/timestamp!
-                   #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
-                   #:ans prealloc-ans/c
-                   #:touches prealloc-touches-0/c
-                   #:fixpoint prealloc/imperative-fixpoint/c
-                   #:global-σ #:compiled #:wide)))))))
+   (with-simple-data (clos: rlos: kont?)
+     (mk-prealloc/timestamp^-fixpoint prealloc/imperative-fixpoint/c prealloc-ans/c?
+                                      prealloc-joiner
+                                      prealloc-ans/c-v prealloc-touches-0/c)
+     (with-prealloc/timestamp-store (prealloc-joiner)
+     (with-mutable-worklist
+      (with-abstract
+       (mk-analysis #:aval lazy-0cfa^/c/prealloc/timestamp!
+                    #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
+                    #:ans prealloc-ans/c
+                    #:touches prealloc-touches-0/c
+                    #:fixpoint prealloc/imperative-fixpoint/c
+                    #:global-σ #:compiled #:wide
+                    #:clos clos #:rlos rlos #:kont kont?))))))))
 (provide lazy-0cfa^/c/prealloc/timestamp!)
 
 #|
@@ -428,31 +450,7 @@
                             #:fixpoint lazy-0cfa∆^-timestamp-fixpoint
                             #:wide #:σ-∆s #:set-monad
                             #:compiled)))))))
- (provide lazy-0cfa∆/c/timestamp)
- 
- (mk-special2-set-fixpoint^ fix lazy-0cfa-set-fixpoint^2 lazy-0cfa-ans^2?)
- (with-nonsparse
-  (with-lazy
-   (with-0-ctx
-    (with-whole-σ
-     (with-σ-passing-set-monad
-      (with-abstract
-       (mk-analysis #:aval lazy-0cfa^2 #:ans lazy-0cfa-ans^2
-                    #:fixpoint lazy-0cfa-set-fixpoint^2
-                    #:σ-passing #:wide #:set-monad)))))))
- (provide lazy-0cfa^2)
- 
- (mk-special3-set-fixpoint^ fix lazy-0cfa-set-fixpoint^3 lazy-0cfa-ans^3?)
- (with-nonsparse
-  (with-lazy
-   (with-0-ctx
-    (with-whole-σ
-     (with-σ-passing-set-monad
-      (with-abstract
-       (mk-analysis #:aval lazy-0cfa^3 #:ans lazy-0cfa-ans^3
-                    #:fixpoint lazy-0cfa-set-fixpoint^3
-                    #:σ-passing #:wide #:set-monad)))))))
- (provide lazy-0cfa^3)
+ (provide lazy-0cfa∆/c/timestamp) 
  
  (mk-fix fix-filtered 0cfa-ans? 0cfa-ans-v)
  (with-nonsparse

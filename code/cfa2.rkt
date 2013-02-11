@@ -7,7 +7,7 @@
          racket/trace
          (for-template "op-struct.rkt" racket/base racket/stxparam)
          (for-syntax racket/syntax))
-(provide with-cfa2^ prepare-cfa2^)
+(provide with-cfa2^ with-prepare-cfa2^)
 
 ;; Instead of heap-allocating continuation frames, pushdown systems
 ;; handle pushing and popping in a better way. In CFA2, a pushes only happen
@@ -88,33 +88,23 @@
            (add-memos! kont memos) ;; transitive summaries.
            (forward (hash-ref L kont) fnv)])))))
 
-(define (bind-Ξ ξ a vs)
-  (cond [(hash-ref Ξ? a #f)
-         (values (hash-set ξ a vs) nothing)]
-        [else (values ξ vs)]))
-
-(define (bind-Ξ* ξ as vss)
-  (define-values (ξ* rvss)
-    (for/fold ([ξ* ξ] [rvss '()])
-        ([a (in-list as)]
-         [vs (in-list vss)])
-      (cond [(hash-ref Ξ? a #f)
-             (values (hash-set ξ* a vs) (cons nothing rvss))]
-            [else (values ξ* (cons vs rvss))])))
-  (values ξ* (alt-reverse rvss)))
 #;(trace bind-Ξ bind-Ξ*)
 
-(define (prepare-cfa2^ parser sexp)
-  (set! L (make-hash))
-  (set! M (make-hash))
-  (set! Ξ? (make-hasheq))
-  (set! fake-rebinding-candidates (make-hasheq))
-  (define e (prepare-prealloc parser sexp))
-  (classify-bindings! e)
-  (pretty-print e) (newline)
-  (printf "Stack coloring:~%")
-  (pretty-print Ξ?)
-  e)
+(define-syntax-rule (with-prepare-cfa2^ (name) . rest)
+  (begin
+    (with-prepare-prealloc (prepare-prealloc)
+      (define (name parser sexp)
+        (set! L (make-hash))
+        (set! M (make-hash))
+        (set! Ξ? (make-hasheq))
+        (set! fake-rebinding-candidates (make-hasheq))
+        (define e (prepare-prealloc parser sexp))
+        (classify-bindings! e)
+        (pretty-print e) (newline)
+        (printf "Stack coloring:~%")
+        (pretty-print Ξ?)
+        e))
+    . rest))
 
 (define (classify-bindings! e)
   (define check-classification (make-hasheq))
@@ -250,6 +240,21 @@
                                       [fn-call-ξ (make-rename-transformer #'ξ*)]
                                       [fn-call-label (make-rename-transformer #'ℓ)])
                   . body*))
+
+              (define (bind-Ξ ξ a vs)
+                (cond [(hash-ref Ξ? a #f)
+                       (values (hash-set ξ a vs) nothing)]
+                      [else (values ξ vs)]))
+
+              (define (bind-Ξ* ξ as vss)
+                (define-values (ξ* rvss)
+                  (for/fold ([ξ* ξ] [rvss '()])
+                      ([a (in-list as)]
+                       [vs (in-list vss)])
+                    (cond [(hash-ref Ξ? a #f)
+                           (values (hash-set ξ* a vs) (cons nothing rvss))]
+                          [else (values ξ* (cons vs rvss))])))
+                (values ξ* (alt-reverse rvss)))
 
               (define-simple-macro* (bind-join-cfa2 (σ* σ a vs) body*)
                 (let*-values ([(-a) a]

@@ -31,7 +31,7 @@
          ;; Parameters
          nothing is-nothing? singleton mk-flatten-value
          for/join for/join1 in-abstract-values abstract-values->list
-         abstract-values?
+         abstract-values? interval-abstraction
          ≡ ⊑? big⊓ ⊓ ⊓1 rem1 snull flatten-value)
 (define-syntax-parameter touches #f)
 (define-syntax (define-nonce stx)
@@ -125,7 +125,10 @@
       (string? x)
       (symbol? x)
       (null? x)
-      (eof-object? x)))
+      (eof-object? x)
+      (and (vector? x) (immutable? x))
+      #;(and (hash? x) (immutable? x))
+      ))
 
 ;; Tweakable lattice.
 (define-syntax-parameter ⊓ #f)
@@ -140,6 +143,10 @@
 (define-syntax-parameter ≡ #f)
 (define-syntax-parameter snull #f) ;; common but derived
 (define-syntax-parameter flatten-value #f) ;; populated by mk-flatten-value
+(define-syntax-parameter interval-abstraction
+  (λ (stx)
+     (syntax-case stx ()
+       [(_ e) #'(error 'interval-abstraction "Current data abstraction incompatible with R-trees")])))
 
 (define-simple-macro* (mk-flatten-value name clos rlos kont?)
   (define (name v)
@@ -236,7 +243,7 @@
                   (if (syntax-e #'0cfa?)
                      #'(for/union #:initial (ast-fv body) ([e (in-list es)]) (ast-fv e))
                      #'(for/set ([(_ a) (in-hash ρ)]) a)))]
-              [(ltk _ x xs es x-done v-addrs body ρ a δ)
+              [(ltk _ _ x xs es x-done v-addrs body ρ a δ)
                #,(kont-rest
                   (if (syntax-e #'0cfa?)
                       #'(∪/l (for/union #:initial (ast-fv body)

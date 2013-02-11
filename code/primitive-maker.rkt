@@ -263,7 +263,7 @@
             (and rest
                  (type-match rest #'σ #'ra)))
           (define result
-            (cons
+            (list
              (generate-temporary #'checker-mk-checker)
              #`(tλ (#:σ σ prim v-addrs)
                  (expect-do-values #:values 1 #:extra
@@ -289,7 +289,7 @@
                      [vs #,@(listy
                              (and (not mult-ary?)
                                   #`(prim-arity-error prim #,(length ts) (length vs))))
-                         (do-values nothing)])))))
+                         (do-values ∅)])))))
           (hash-set! type-checkers key result)
           result)])))
 
@@ -339,7 +339,7 @@
               (do (pσ) (force-clauses ...)
                 (cond [(or mand-guard non-ap-rest-guard) #,(return-out #'pσ)]
                       [else #,(catch-tr #'(yield (wrap (ap ... op args ... rest-op ...))))]))]
-             [_ (error 'mk-simple "Internal error ~a" vs)]))))
+             [_ (error 'mk-simple "Internal error ~a ~a" vs '#,mtypes)]))))
      ;; mk-simple
      (λ (stx)
         (syntax-parse stx
@@ -394,7 +394,7 @@
                 [(hash-ref type-checkers key #f) => car]
                 [else
                  (define result
-                   (cons
+                   (list
                     (generate-temporary #'checker-multi)
                     #`(tλ (prim v-addrs)
                         (expect-do-values #:values 1
@@ -409,11 +409,13 @@
                                                             checker*
                                                             (car checker*))])
                                 ;; FIXME: Unsound for apply
-                                #`(do-comp #:bind (res)
+                                #`(begin
+                                    (printf "UGH NOOO~%")
+                                    (do-comp #:bind (res)
                                            (tapp check-name prim v-addrs)
                                            (if (is-nothing? res)
                                                #,stx
-                                               (do-values res)))))))))
+                                               (do-values res))))))))))
                  (hash-set! type-checkers key result)
                  result]))
             #:attr mk-simple
@@ -502,20 +504,24 @@
           checker
           (car checker))))
   (define defs
-    (for/list ([(_ pair) (in-hash type-checkers)])
-      #`(define #,(car pair) #,(cdr pair))))
+    (for/list ([(_ tcs) (in-hash type-checkers)])
+      (match-define (list name body) tcs)
+      #`(define #,name #,body)))
   (list defs names))
 
 (define setnull (set '()))
 (define-syntax-parameter toSetOfLists #f)
 ;; Combinatorial combination of arguments
 (define-syntax-rule (mk-toSetOfLists name)
+  (begin
   (define/match (name list-of-abstract-values)
     [('()) setnull]
     [((cons hdS tail))
      (for*/set ([hd (in-abstract-values hdS)]
                 [restlist (in-set (name tail))])
-       (cons hd restlist))]))
+       (cons hd restlist))])
+  ;;(trace name)
+  ))
 
 (define-syntax (mk-primitive-meaning stx)
   (set! type-checkers (make-hash))
@@ -535,11 +541,19 @@
            (m arg-stx)
            (datum->syntax arg-stx (cons m arg-stx) arg-stx)))
      (define aliases-of (populate-aliases #'(origs ...) #'(aliases ...)))
-     (with-syntax ([((type-filters ...)
-                     (checker-names ...)) (mk-checker-fns (attribute p.checker-fn))]
+     (match-define (list ltype-filters lchecker-names)
+                   (mk-checker-fns (attribute p.checker-fn)))
+     (with-syntax ([(type-filters ...) ltype-filters]
+                   [(checker-names ...) lchecker-names]
                    [(extra-ids ...) (generate-temporaries #'(extra ...))]
                    [(σ-gop ...) (if (syntax-e #'gσ?) #'() #'(pσ))]
-                   [(δ-op ...) (if 0cfa? #'() #'(δ))])
+                   [(δ-op ...) (if 0cfa? #'() #'(δ))]
+                   [(checkers-no-dup ...)
+                    (let ([fid (make-free-id-table)])
+                      (for/list ([checker-name (in-list lchecker-names)]
+                                 #:unless (free-id-table-ref fid checker-name #f))
+                        (free-id-table-set! fid checker-name #t)
+                        checker-name))])
        (define eval
          #`(case o
              #,@(for/list ([p (in-list (syntax->list #'(p.prim ...)))]
@@ -566,8 +580,10 @@
                                     [else
                                      (do-comp #:bind/extra (vss)
                                        (tapp #,checker '#,p v-addrs)
-                                       (do (pσ) ([vs (in-set vss)]) ;; set of lists of arguments
-                                         #,(m #'(args ...))))]))))]))))
+                                       (begin
+                                         (unless (set? vss) (error 'primset))
+                                         (do (pσ) ([vs (in-set vss)]) ;; set of lists of arguments
+                                         #,(m #'(args ...)))))]))))]))))
        (define qs #'quasisyntax) ;; have to lift for below to parse correctly
        (quasisyntax/loc stx
          (begin
@@ -601,7 +617,9 @@
            defines ...
            (mk-toSetOfLists internalTSoL)
            (splicing-syntax-parameterize ([toSetOfLists (make-rename-transformer #'internalTSoL)])
-             type-filters ...)
+             type-filters ...
+             ;;(trace checker-names) ...
+             )
            ;; λP very much like λ%
            (define-syntax-rule (... (λP (pσ fallv apply? ℓ δ k v-addrs) body ...))
              #,(if compiled?
@@ -703,7 +721,7 @@
                                           (alt-reverse raddrs*))))])]
               ;; Explicitly given arguments
               [(cons arg args)
-               (define addr (make-apply -contour l i δ))
+               (define addr (make-apply-contour l i δ))
                (cond [(and (no-expect? n) (not rest?)) ;; might we have too many arguments?
                       (log-info "'apply'd function given too many arguments (>= ~a) (expected ~a)"
                                 i (len-expect num))

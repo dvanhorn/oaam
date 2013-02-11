@@ -5,7 +5,7 @@
          "graph.rkt"
          (for-template "op-struct.rkt" racket/base racket/stxparam)
          (for-syntax racket/syntax))
-(provide with-pdcfa^ prepare-pdcfa^)
+(provide with-pdcfa^ with-prepare-pdcfa^)
 
 (struct entry (fn #;ρ) #:prefab)
 (define L #f) ;; Map[entry, Set[Pair[KontSection, Frame]]] (non-tail-call continuations)
@@ -47,10 +47,14 @@
                (forward (hash-ref L kont))]
               [else (for ([v (in-set memos)]) (do kont v))])))))
 
-(define (prepare-pdcfa^ parser sexp)
-  (set! L (make-hash))
-  (set! M (make-hash))
-  (prepare-prealloc parser sexp))
+(define-syntax-rule (with-prepare-pdcfa^ (name) . rest)
+  (begin
+    (with-prepare-prealloc (prepare-prealloc)
+      (define (prepare-pdcfa^ parser sexp)
+        (set! L (make-hash))
+        (set! M (make-hash))
+        (prepare-prealloc parser sexp)))
+    . rest))
 
 (define-for-syntax ((mk-pdcfa ev co ap) stx)
   (syntax-case stx ()

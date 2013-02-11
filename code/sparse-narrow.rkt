@@ -4,11 +4,11 @@
          (for-syntax syntax/parse syntax/parse/experimental/template
                      racket/syntax)
          "do.rkt" "context.rkt" "deltas.rkt" "handle-limits.rkt"
-         "parameters.rkt" "nnmapc.rkt" "add-lib.rkt"
+         "parameters.rkt" "add-lib.rkt"
          (for-template "primitives.rkt") racket/unsafe/ops
          (only-in "kcfa.rkt" parameters-minus analysis-parameters)
          "env.rkt" "parse.rkt"
-         "bitvector-data.rkt"
+         "nnmapc.rkt" "rtree-nnmapc.rkt"
          syntax/parse/experimental/template
          racket/trace)
 (provide with-sparse)
@@ -33,56 +33,10 @@
               [succ #:mutable]
               [todo? #:mutable]
               #;[data #:mutable]) #:prefab)
-
 (define-syntax-rule (mk-node state)
   (node state (new-map-map) #f))
-(define-syntax-rule (mk-conf state σ data)
-  (conf state σ (node-of! sparse-graph state) (seteq) #t #;data))
 (define (new-sparse-graph) (make-hash)) ;; 1 lever hash Map[State,Node]
 (define (new-graph) (make-hash)) ;; 2 level hash Map[State,Map[Heap,conf]]
-(define-syntax-rule (conf-of/data! g state σ data)
-  (let ([hsh (begin
-               (unless (hash? g) (error 'BORF))
-               (hash-ref g state #f))])
-    (cond
-     [hsh (hash-ref! hsh σ (λ () (mk-conf state σ data)))]
-     [else (define hsh (make-hash))
-           (define c (mk-conf state σ data))
-           (hash-set! hsh σ c)
-           (hash-set! g state hsh)
-           c])))
-(define-syntax-rule (register-conf/data/todo! g state σ data)
-  (let ([hsh (begin
-               (unless (hash? g) (error 'BARF))
-               (hash-ref g state #f))])
-    (cond
-     [hsh (hash-ref! hsh σ
-                     (λ ()
-                        (define c (mk-conf state σ data))
-                        (hash-set! hsh σ c)
-                        (hash-set! todo c #t)
-                        c))]
-     [else (define hsh (make-hash))
-           (define c (mk-conf state σ data))
-           (hash-set! hsh σ c)
-           (hash-set! g state hsh)
-           (hash-set! todo c #t)
-           c])))
-(define (node-of! g state) (hash-ref! g state (λ () (mk-node state))))
-(define (conf-of! g state σ) (conf-of/data! g state σ #f))
-(define (conf-of/todo! g state σ) (register-conf/data/todo! g state σ #f))
-(define (conf-of g state σ) (hash-ref (hash-ref g state) σ))
-
-(define (add-sparse-edge! from to-σ to)
-  (define fsm (node-succmap from))
-  (set-node-succmap! from (map-map-set fsm to-σ
-                                       (∪1 (map-map-ref fsm to-σ (seteq)) to))))
-(define (add-edge! from to-σ to actions)
-  (define to-cnf (conf-of/todo! graph to to-σ))
-  (match-define (conf _ _ from-node succ _ #;_data) from)
-  (set-conf-succ! from (∪1 succ to-cnf))
-  (set-node-actions! from-node (join-actions (node-actions from-node) actions))
-  to-cnf)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Globals
@@ -95,30 +49,29 @@
 (define (reset-todo!) (set! todo (make-hasheq)))
 
 ;; Should already be seen, so the ref won't fail.
-(define (processed! conf) (set-conf-todo?! conf #f))
-(define (prepare-sparse parser sexp)
-  (define label 0) (define (inc-label!) (begin0 label (set! label (add1 label))))
-  (define (sparse-fresh-label! ctx new?)
-    (if new?
-        (inc-label!)
-        (cons ctx (inc-label!))))
-  (define (sparse-fresh-variable! x ctx)
-    (cons ctx (gensym x)))
-  (define-values (e renaming ps) (parser sexp
-                                         #:fresh-label! sparse-fresh-label!
-                                         #:fresh-variable! sparse-fresh-variable!))
-  (define e* (add-lib e renaming ps sparse-fresh-label! sparse-fresh-variable!))
-  (reset-graph!)
-  (reset-sparse-graph!)
-  (reset-todo!)
-  (set-current-conf! (conf-of! graph 'initial (empty-heap)))
-  e*)
+(define (processed! conf)
+  (unless (node-actions (conf-node conf))
+    (error 'processed! "No actions, but processed ~a" conf))
+  (set-conf-todo?! conf #f))
+
+(define label 0) (define (reset-label!) (set! label 0))
+(define (inc-label!) (begin0 label (set! label (add1 label))))
+(define sparse-top-ctx '())
+(define (sparse-ext-ctx label ctx kind) (cons label ctx))
+(define (sparse-get-ctx ctx) (reverse ctx))
+(define (sparse-fresh-label! ctx new?)
+  (if new?
+      (inc-label!)
+      (cons (inc-label!) ctx)))
+(define (sparse-fresh-variable! x ctx)
+  (cons (gensym x) ctx))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-syntax-parameter target-actions (λ (stx) (raise-syntax-error #f "Actions unset" stx)))
 (define-syntax-rule (initialize-actions body ...)
-  (let ([actions (hasheq)])
-    (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
+  (let ([initial-actions (hasheq)])
+    (syntax-parameterize ([target-actions (make-rename-transformer #'initial-actions)])
       body ...)))
 (define-for-syntax actions-target
   (target #'target-actions '#:actions (make-rename-transformer #'initialize-actions)))
@@ -148,25 +101,83 @@
 
 (define-syntax-rule (mk-actions-collector name pred)
   (define (name actions [initial ∅])
+    (unless (hash? actions) (error 'name "Bad ~a~%" actions))
     (for/set #:initial initial ([(a act) (in-hash actions)] #:when (pred act)) a)))
 (mk-actions-collector actions-uses used?)
 (mk-actions-collector actions-changes changed?)
 
 (define (actions-consonant? ≅ actions)
+  (unless (hash? actions) (error 'actions-consonant? "Bad ~a~%" actions))
   (for/and ([(a act) (in-hash actions)]
             #:when (used? act))
     (a . ∈ . ≅)))
 
+(define-syntax-rule (bind-get-sparse (res σ a) body)
+  (let ([res (getter σ a)]
+        [actions (set-action target-actions a U)])
+    (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
+      body)))
 
-(define-syntax-rule (mk-sparse-narrow bind-join-sparse mk-sparse-fixpoint)
+(define-syntax-rule (safe-map-ref m k) (map-ref m k nothing))
+
+(define-syntax-parameter sp-mk-fix #f)
+(define-syntax-parameter sp-fix #f)
+(define-syntax-parameter sp-ans #f)
+(define-syntax-parameter sp-touches #f)
+(define-syntax-rule (with-sparse (mk-analysis) . body)
   (begin
+    (with-rtree-nnmapc
+    (define-syntax-rule (mk-conf state σ data)
+      (conf state σ (node-of! sparse-graph state) (seteq) #t #;data))
+    (define-syntax-rule (conf-of/data! g state σ data)
+      (let ([hsh (begin
+                   (unless (hash? g) (error 'BORF))
+                   (hash-ref g state #f))])
+        (cond
+         [hsh (hash-ref! hsh σ (λ () (mk-conf state σ data)))]
+         [else (define hsh (make-hash))
+               (define c (mk-conf state σ data))
+               (hash-set! hsh σ c)
+               (hash-set! g state hsh)
+               c])))
+    (define-syntax-rule (register-conf/data/todo! g state σ data)
+      (let ([hsh (begin
+                   (unless (hash? g) (error 'BARF))
+                   (hash-ref g state #f))])
+        (cond
+         [hsh (hash-ref! hsh σ
+                         (λ ()
+                            (define c (mk-conf state σ data))
+                            (hash-set! hsh σ c)
+                            (hash-set! todo c #t)
+                            c))]
+         [else (define hsh (make-hash))
+               (define c (mk-conf state σ data))
+               (hash-set! hsh σ c)
+               (hash-set! g state hsh)
+               (hash-set! todo c #t)
+               c])))
+    (define (node-of! g state) (hash-ref! g state (λ () (mk-node state))))
+    (define (conf-of! g state σ) (conf-of/data! g state σ #f))
+    (define (conf-of/todo! g state σ) (register-conf/data/todo! g state σ #f))
+    (define (conf-of g state σ) (hash-ref (hash-ref g state) σ))
+    
+    (define (add-edge! from to-σ to actions)
+      (define to-cnf (conf-of/todo! graph to to-σ))
+      (match-define (conf _ _ from-node succ _ #;_data) from)
+      (set-conf-succ! from (∪1 succ to-cnf))
+      (set-node-actions! from-node (join-actions (node-actions from-node) actions))
+      to-cnf)
+    (define (add-sparse-edge! from to-σ to)
+      (define fsm (node-succmap from))
+      (set-node-succmap! from (map-map-add! fsm to-σ to)))
     (define (map-join m k vs)
       (map-set m k (⊓ (safe-map-ref m k) vs)))
 
     (define-syntax-rule (bind-join-sparse (σ* σ a vs) body*)
-      (let ([actions (set-action target-actions a D)]
+      (let ([bind-actions (set-action target-actions a D)]
             [σ* (map-join σ a vs)])
-        (syntax-parameterize ([target-actions (make-rename-transformer #'actions)]
+        (syntax-parameterize ([target-actions (make-rename-transformer #'bind-actions)]
                               [target-σ (make-rename-transformer #'σ*)])
           body*)))
 
@@ -185,6 +196,7 @@
                  [from-cnfs cnfs]
                  ;; Accumulated heap changes along path
                  [actions actions])
+        (unless (set? from-cnfs) (error 'duh))
         (for ([cnf (in-set from-cnfs)])
           (cond
            [(hash-has-key? seen cnf) (void)]
@@ -192,6 +204,7 @@
             (hash-set! seen cnf #t)
             (match-define (conf state last-σ node succ todo? #;_data) cnf)
             (define actions-out (node-actions node))
+            (unless (or actions-out todo?) (error 'todo/skip "Bad actions for ~a" cnf))
             (if (or ;; Can't skip a state yet be stepped.
                  todo?
                  ;; Can't travel across an edge that uses addresses
@@ -205,24 +218,24 @@
         (match-define (conf c σ current-node succ todo? #;data) cnf)
         (set-current-conf! cnf)
         (define succmap (node-succmap current-node))
-        (define-values (next-σ ≅) (map-map-close succmap σ))
-        (cond [next-σ
-               (define nds (map-map-ref succmap next-σ))
-               (cond [nds
-                      (define actions (node-actions current-node))
-                      #;(printf "Succ~%")
-                      (define cnfs (for/seteq ([nd (in-set nds)])
-                                     (conf-of graph (node-state nd) next-σ)))
-                      (cond
-                       [(not (for/or ([cnf (in-set cnfs)])
-                               (or (conf-todo? cnf)
-                                   (not (actions-consonant? ≅ actions)))))
-                        #;
-                        (printf "Skip ~a~%" (conf-state cnf))
-                        (skip-from ≅ cnfs σ actions)]
-                        [else (step σ c)])]
-                      [else (step σ c)])]
-               [else (step σ c)])
+        (define (accept next-σ ≅ nds)
+          (cond
+           [next-σ
+            (define actions (node-actions current-node))
+            (define cnfs (for/seteq ([nd (in-map-map-values nds)])
+                           (conf-of graph (node-state nd) next-σ)))
+            (if (and 
+                 (not (for/or ([cnf (in-set cnfs)])
+                        (or (conf-todo? cnf)
+                            (not (actions-consonant? ≅ actions))))))
+                (values cnfs actions)
+                (values #f #f))]
+           [else (values #f #f)]))
+        (define-values (≅ cnfs actions) (map-map-close succmap σ accept))
+        (cond [cnfs #;(printf "Skip ~a~%" (conf-state cnf))
+                    (skip-from ≅ cnfs σ actions)]
+              [else (step σ c)])
+        ;; FIXME: need invariant that node-actions is non-#f
         (processed! cnf)))
 
       (define-syntax (mk-sparse-fixpoint stx)
@@ -250,7 +263,10 @@
                        (define vs
                          (for*/set ([(c σ↦cnf) (in-hash graph)]
                                     #:when (ans? c)
-                                    [(σ _) (in-hash σ↦cnf)])
+                                    [(σ _) (in-hash
+                                            (begin
+                                              (unless (hash? σ↦cnf) (error 'fix "Bad ~a~%" σ↦cnf))
+                                              σ↦cnf))])
                            (list (clean-σ σ (ans-v c))
                                  (ans-v c))))
                        (values (format "State count: ~a" (unbox state-count*))
@@ -265,77 +281,78 @@
                          (printf "States: ~a~%" last))
                        (reset-todo!)
                        (for ([(conf _) (in-hash todo-old)]) (sparse-step conf))
-                       (loop)]))))))]))))
+                       (loop)]))))))]))
 
-;; XXX: Per-state actions rather than per-transition actions make
-;; narrowing given GC difficult/impossible. (Maybe not. Per-node use/def but per-state GC?)
-(define (do-narrow-yield σ actions state)
-  (define to-cnf (add-edge! current-conf σ state actions))
-  (add-sparse-edge! (conf-node current-conf) σ (conf-node to-cnf)))
-
-(define-for-syntax (yield-narrow-sparse stx)
-  (syntax-case stx ()
-    [(_ e) #'(begin (do-narrow-yield target-σ target-actions e) (continue))]))
-
-(define-syntax-rule (bind-get-sparse (res σ a) body)
-  (let ([res (getter σ a)]
-        [actions (set-action target-actions a U)])
-    (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
-      body)))
-
-(define-syntax-rule (safe-map-ref m k) (map-ref m k nothing))
-
-(define-syntax-parameter sp-mk-fix #f)
-(define-syntax-parameter sp-fix #f)
-(define-syntax-parameter sp-ans #f)
-(define-syntax-parameter sp-touches #f)
-(define-syntax-rule (with-sparse (mk-analysis) . body)
-  (begin
-    (mk-sparse-narrow bind-join-sparse mk-sparse-fixpoint)
-    (splicing-syntax-parameterize
-        ([bind-get (make-rename-transformer #'bind-get-sparse)]
-         [cr-targets (list* σ-target actions-target (syntax-parameter-value #'cr-targets))]
-         [getter (make-rename-transformer #'safe-map-ref)]
-         [bind-join (make-rename-transformer #'bind-join-sparse)]
-         [empty-heap (make-rename-transformer #'new-map)]
-         [yield yield-narrow-sparse]
-         [sp-mk-fix (make-rename-transformer #'mk-sparse-fixpoint)])
-      (splicing-let-syntax
-       ([new-tr
-         (let ([in-tr (syntax-parameter-value #'in-scope-of-extras)])
-           (λ (stx)
-              (syntax-case stx ()
-                [(... (_ (extras ...) body* ...))
-                 (in-tr (quasisyntax/loc stx
-                          (...
-                           (in-scope-of-extras
-                            (extras ...)
-                            (sp-mk-fix #,(syntax-local-introduce
-                                          (rename-transformer-target
-                                           (syntax-parameter-value #'sp-fix)))
-                                       #,(syntax-local-introduce
-                                          (rename-transformer-target
-                                           (syntax-parameter-value #'sp-ans)))
-                                       #,(syntax-local-introduce
-                                          (rename-transformer-target
-                                           (syntax-parameter-value #'sp-touches))))
-                            body* ...))))])))])
-      (splicing-let-syntax
-       ([mk-analysis
-         (λ (stx)
-            (syntax-parse stx
-              [(_ p:analysis-parameters)
-               (quasitemplate/loc stx
-                 (splicing-syntax-parameterize
-                     ([in-scope-of-extras (syntax-local-value #'new-tr)]
-                      [sp-fix (make-rename-transformer #'fixpoint)]
-                      [sp-ans (make-rename-transformer #'p.ans)]
-                      [sp-touches (make-rename-transformer #'p.touches-id)])
-                   (mk-analysis #:ans p.ans
-                                #:fixpoint sp-fix
-                                #:touches p.touches-id
-                                #:prepare (?? p.prep-fn
-                                              (λ (sexp) (prepare-sparse parse-prog sexp)))
-                                #,@(parameters-minus #'(p.all (... ...))
-                                                     '(#:fixpoint #:ans #:touches #:prepare)))))]))])
-       . body)))))
+      
+      ;; XXX: Per-state actions rather than per-transition actions make
+      ;; narrowing given GC difficult/impossible. (Maybe not. Per-node use/def but per-state GC?)
+      (define (do-narrow-yield σ actions state)
+        (define to-cnf (add-edge! current-conf σ state actions))
+        (add-sparse-edge! (conf-node current-conf) σ (conf-node to-cnf)))
+      (define-for-syntax (yield-narrow-sparse stx)
+        (syntax-case stx ()
+          [(_ e) #'(begin (do-narrow-yield target-σ target-actions e) (continue))]))
+     (splicing-syntax-parameterize
+         ([fresh-label! (make-rename-transformer #'sparse-fresh-label!)]
+          [fresh-variable! (make-rename-transformer #'sparse-fresh-variable!)]
+          [top-ctx (make-rename-transformer #'sparse-top-ctx)]
+          [ext-ctx (make-rename-transformer #'sparse-ext-ctx)]
+          [get-ctx (make-rename-transformer #'sparse-get-ctx)])
+       (with-parse
+        (with-add-lib
+         (define (prepare-sparse parser sexp)
+           (reset-label!)
+           (define-values (e renaming ps) (parser sexp))
+           (define e* (add-lib e renaming ps))
+           (reset-graph!)
+           (reset-sparse-graph!)
+           (reset-todo!)
+           (set-current-conf! (conf-of! graph 'initial (empty-heap)))
+           e*)
+         (splicing-syntax-parameterize
+              ([bind-get (make-rename-transformer #'bind-get-sparse)]
+               [cr-targets (list* σ-target actions-target (syntax-parameter-value #'cr-targets))]
+               [getter (make-rename-transformer #'safe-map-ref)]
+               [bind-join (make-rename-transformer #'bind-join-sparse)]
+               [empty-heap (make-rename-transformer #'new-map)]
+               [yield yield-narrow-sparse]
+               [sp-mk-fix (make-rename-transformer #'mk-sparse-fixpoint)])
+            (splicing-let-syntax
+             ([new-tr
+               (let ([in-tr (syntax-parameter-value #'in-scope-of-extras)])
+                 (λ (stx)
+                    (syntax-case stx ()
+                      [(... (_ (extras ...) body* ...))
+                       (in-tr (quasisyntax/loc stx
+                                (...
+                                 (in-scope-of-extras
+                                  (extras ...)
+                                  (sp-mk-fix #,(syntax-local-introduce
+                                                (rename-transformer-target
+                                                 (syntax-parameter-value #'sp-fix)))
+                                             #,(syntax-local-introduce
+                                                (rename-transformer-target
+                                                 (syntax-parameter-value #'sp-ans)))
+                                             #,(syntax-local-introduce
+                                                (rename-transformer-target
+                                                 (syntax-parameter-value #'sp-touches))))
+                                  body* ...))))])))])
+             (splicing-let-syntax
+              ([mk-analysis
+                (λ (stx)
+                   (syntax-parse stx
+                     [(_ p:analysis-parameters)
+                      (quasitemplate/loc stx
+                        (splicing-syntax-parameterize
+                            ([in-scope-of-extras (syntax-local-value #'new-tr)]
+                             [sp-fix (make-rename-transformer #'fixpoint)]
+                             [sp-ans (make-rename-transformer #'p.ans)]
+                             [sp-touches (make-rename-transformer #'p.touches-id)])
+                          (mk-analysis #:ans p.ans
+                                       #:fixpoint sp-fix
+                                       #:touches p.touches-id
+                                       #:prepare (?? p.prep-fn
+                                                     (λ (sexp) (prepare-sparse parse-prog sexp)))
+                                       #,@(parameters-minus #'(p.all (... ...))
+                                                            '(#:fixpoint #:ans #:touches #:prepare)))))]))])
+              . body)))))))))

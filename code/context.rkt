@@ -113,7 +113,7 @@
              #,(vs #'as)))]))
 
 (define-syntax-rule (make-var-contour-0 l x δ) x)
-(define-syntax-rule (make-intermediate-contour-0 l x δ) (cons x 'temp))
+(define-syntax-rule (make-intermediate-contour-0 l x δ) `(temp ,x . ,l))
 (define-syntax-rule (make-vector^-contour-0 l δ) (cons 'V l))
 (define-syntax-rule (make-vector-contour-0 l i δ) `(V ,i . ,l))
 (define-syntax-rule (make-car-contour-0 l δ) `(A . ,l))
@@ -124,9 +124,9 @@
 (define-syntax-rule (make-rest^-contour-0 l δ) `(A . ,l))
 
 (define-syntax-rule (make-var-contour-k l x δ) (cons x δ))
-(define-syntax-rule (make-rest-contour l δ) `((A . ,l) . ,δ))
-(define-syntax-rule (make-rest-nA-contour l i δ) `((A ,i . ,l) . ,δ))
-(define-syntax-rule (make-rest-nD-contour l i δ) `((D ,i . ,l) . ,δ))
+(define-syntax-rule (make-rest-contour-k l δ) `((A . ,l) . ,δ))
+(define-syntax-rule (make-rest-nA-contour-k l i δ) `((A ,i . ,l) . ,δ))
+(define-syntax-rule (make-rest-nD-contour-k l i δ) `((D ,i . ,l) . ,δ))
 
 (define-syntax bind-0 (mk-bind 0))
 (define-syntax bind-1 (mk-bind 1))

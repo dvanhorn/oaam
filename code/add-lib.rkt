@@ -1,7 +1,8 @@
 #lang racket
 
-(require "parse.rkt" "ast.rkt" "notation.rkt")
-(provide add-lib)
+(require "parse.rkt" "ast.rkt" "notation.rkt"
+         racket/splicing)
+(provide with-add-lib)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Non-primitive primitives.
@@ -423,36 +424,40 @@
      (char-ci>=? . ,(comp 'binary-char-ci>=?))
      (char-ci<=? . ,(comp 'binary-char-ci<=?))))))
 
-(define (add-lib expr renaming prims-used fresh-label! fresh-variable! [register-fn (λ _ (void))] [register-datum (λ _ (void))])
-  (define fv-raw (free expr))
-  (define rename-rev (hash-reverse renaming))
-  (define ((fresh-upto var) x ctx)
-    (if (eq? x var)
-        (hash-ref renaming x)
-        (fresh-variable! x ctx)))
-  ;; maps the fresh name to the meaning.
-  (define-values (prims prim-defs)
-    (for*/lists (prims prim-defs)
-        ([v (in-set fv-raw)]
-         [primv (in-value (hash-ref rename-rev v))]
-         [def (in-value (hash-ref r4rs-prims primv
-                                  (λ () (error 'add-lib "Unsupported ~a" primv))))])
-      ;; in order for the primitive references to match up between expr and the
-      ;; parsed meaning, we finagle the meaning of fresh-variable.
-      (define-values (d _0 _1) (parse def fresh-label! (fresh-upto primv)))
-      (values v d)))
-  (define-values (fallback-names fallback-defs)
-    (for*/lists (names defs)
-        ([(name box) (in-hash prims-used)]
-         [def (in-value (hash-ref fallbacks name #f))]
-         #:when def)
-      ;; in order for the primitive references to match up between expr and the
-      ;; parsed meaning, we finagle the meaning of fresh-variable.
-      (define-values (d _0 _1) (parse def #:fresh-label! fresh-label! #:fresh-variable! fresh-variable!
-                                      #:register-fn register-fn #:register-datum register-datum))
-      (values (fresh-variable! (string->symbol (format "fallback-~a" name)) top-ctx)
-              (pfl #f #f box d))))
-  (if (null? prims)
-      expr
-      ;; close the program
-      (lrc (fresh-label! top-ctx #f) #t (append fallback-names prims) (append fallback-defs prim-defs) expr)))
+(define-syntax-rule (with-add-lib . rest-body)
+  (begin
+    (define (add-lib-local expr renaming prims-used)
+      (define fv-raw (free expr))
+      (define rename-rev (hash-reverse renaming))
+      (define ((fresh-upto var) x ctx)
+        (if (eq? x var)
+            (hash-ref renaming x)
+            (fresh-variable! x ctx)))
+      ;; maps the fresh name to the meaning.
+      (define-values (prims prim-defs)
+        (for*/lists (prims prim-defs)
+            ([v (in-set fv-raw)]
+             [primv (in-value (hash-ref rename-rev v))]
+             [def (in-value (hash-ref r4rs-prims primv
+                                      (λ () (error 'add-lib "Unsupported ~a" primv))))])
+          ;; in order for the primitive references to match up between expr and the
+          ;; parsed meaning, we finagle the meaning of fresh-variable.
+          (define-values (d _0 _1) (parse def fresh-label! (fresh-upto primv)))
+          (values v d)))
+      (define-values (fallback-names fallback-defs)
+        (for*/lists (names defs)
+            ([(name box) (in-hash prims-used)]
+             [def (in-value (hash-ref fallbacks name #f))]
+             #:when def)
+          ;; in order for the primitive references to match up between expr and the
+          ;; parsed meaning, we finagle the meaning of fresh-variable.
+          (define-values (d _0 _1) (parse def))
+          (values (fresh-variable! (string->symbol (format "fallback-~a" name)) top-ctx)
+                  (pfl #f #f box d))))
+      (if (null? prims)
+          expr
+          ;; close the program
+          (lrc (fresh-label! top-ctx #f) #t (append fallback-names prims) (append fallback-defs prim-defs) expr)))
+    (splicing-syntax-parameterize
+        ([add-lib (make-rename-transformer #'add-lib-local)])
+      . rest-body)))

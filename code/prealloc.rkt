@@ -1,9 +1,9 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          "parameters.rkt"
-         "data.rkt" "imperative.rkt" "context.rkt" "add-lib.rkt"
+         "data.rkt" "imperative.rkt" "context.rkt"
          "deltas.rkt")
-(provide prepare-prealloc with-0-ctx/prealloc
+(provide with-prepare-prealloc with-0-ctx/prealloc
          mk-prealloc/timestamp^-fixpoint
          mk-prealloc/∆s/acc^-fixpoint
          mk-prealloc/∆s^-fixpoint
@@ -12,32 +12,21 @@
          global-vector-getter
          next-loc contour-table
          inc-next-loc!
+         prealloc-freshes
          with-prealloc/timestamp-store)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Mutable pre-allocated store
+;; Mutable pre-allocated store needs indexed addresses.
 (define next-loc #f)
+(define (set-next-loc! v) (set! next-loc v))
+(define (inc-next-loc!) (set-next-loc! (add1/debug next-loc 'inc-next-loc!)))
+
 (define contour-table #f)
+(define (reset-contour-table!) (set! contour-table (make-hash)))
 
-(define (inc-next-loc!) (set! next-loc (add1/debug next-loc 'inc-next-loc!)))
-
-(define (prepare-prealloc parser sexp)
-  (define nlabels 0)
-  (define (fresh-label! ctx new?) (begin0 nlabels (set! nlabels (add1 nlabels))))
-  (define (fresh-variable! x ctx) (begin0 nlabels (set! nlabels (add1 nlabels))))
-  (define-values (e renaming ps) (parser sexp fresh-label! fresh-variable!))
-  (define e* (add-lib e renaming ps fresh-label! fresh-variable!))
-  ;; Start with a constant factor larger store since we are likely to
-  ;; allocate some composite data. This way we don't incur a reallocation
-  ;; right up front.
-  (set! next-loc nlabels)
-  (set! contour-table (make-hash))
-  (reset-globals! (make-vector (* 2 nlabels) ∅ #;nothing)) ;; ∅ → '()
-  e*)
 
 (define-syntax-rule (global-vector-getter σ* a)
   (vector-ref global-σ a))
-
 
 (define-syntax-rule (get-contour-index!-0 ensure-σ-size c)
   (or (hash-ref contour-table c #f)
@@ -67,6 +56,33 @@
          [bind-rest-apply (make-rename-transformer #'bind-rest-apply-0)]
          [make-var-contour (make-var-contour-0-prealloc #'ensure-σ-size)])
       body)))
+
+(define (prealloc-freshes)
+  (define nlabels 0)
+  (define (reset-count!) (set! nlabels 0))
+  (define (fresh-label! ctx new?) (begin0 nlabels (set! nlabels (add1 nlabels))))
+  (define (fresh-variable! x ctx) (begin0 nlabels (set! nlabels (add1 nlabels))))
+  (values reset-count! fresh-label! fresh-variable!))
+
+(define-syntax-rule (with-prepare-prealloc (name) . rest-body)
+(begin
+  (define-values (reset-count! prealloc-fresh-label! prealloc-fresh-variable!)
+    (prealloc-freshes))
+  (splicing-syntax-parameterize
+      ([fresh-label! (make-rename-transformer #'prealloc-fresh-label!)]
+       [fresh-variable! (make-rename-transformer #'prealloc-fresh-variable!)])
+    (define (name parser sexp)
+      (reset-count!)
+      (define-values (e renaming ps) (parser sexp))
+      (define e* (add-lib e renaming ps))
+      ;; Start with a constant factor larger store since we are likely to
+      ;; allocate some composite data. This way we don't incur a reallocation
+      ;; right up front.
+      (set-next-loc! nlabels)
+      (reset-contour-table!)
+      (reset-globals! (make-vector (* 2 nlabels) ∅ #;nothing)) ;; ∅ → '()
+      e*)
+    . rest-body)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Timestamp approximation
