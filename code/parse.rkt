@@ -41,14 +41,15 @@
       (custom-parse (cons define-ctx sexp)))
     #;(trace parse-prog)
 
-    (define (custom-parse sexp)
+    (define (custom-parse sexp #:fresh-variable! [pfresh-variable! #f])
+      (define -fresh-variable! (or pfresh-variable! fresh-variable!))
       ;; in order for the renaming to work on open programs, we not only have to return
       ;; the renamed program, but also a map from free variables to their new names.
       (define open (make-hasheq))
       (define prims-used (make-hasheq))
       (define ((new-free x ctx))
         (match (hash-ref open x #f)
-          [#f (define x-id (fresh-variable! x ctx))
+          [#f (define x-id (-fresh-variable! x ctx))
               (hash-set! open x x-id)
               x-id]
           [s s]))
@@ -63,7 +64,7 @@
           (define (parse-seq s tail? ctx [ρ ρ]) (parse* (define-ctx-tf s) tail? ctx ρ))
           (define (ext-ctx* label kind) (ext-ctx label ctx kind))
           (define (fresh-label*) (fresh-label! ctx #f))
-          (define (fresh-variable* x) (fresh-variable! x ctx))
+          (define (fresh-variable* x) (-fresh-variable! x ctx))
           (define (fresh-xs xs ctx)
             (define xs-id (map fresh-variable* xs))
             (values xs-id
@@ -96,13 +97,13 @@
               [`(lambda (,xs ... . ,rest) . ,s)
                (define/ctx (ctx* ℓ) λ)
                (define-values (xs-id ρ) (fresh-xs xs ctx*))
-               (define r-id (fresh-variable! rest ctx*))
+               (define r-id (-fresh-variable! rest ctx*))
                (define fn (rlm ℓ tail? xs-id r-id (parse-seq s #t ctx* (hash-set ρ rest r-id))))
                (register-fn fn)
                fn]
               [`(lambda ,x . ,s)
                (define/ctx (ctx* ℓ) λ)
-               (define x-id (fresh-variable! x ctx*))
+               (define x-id (-fresh-variable! x ctx*))
                (define fn (rlm ℓ tail? '() x-id (parse-seq s #t ctx* (hash-set ρ x x-id))))
                (register-fn fn)
                fn]

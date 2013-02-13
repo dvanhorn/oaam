@@ -328,6 +328,7 @@
      (define (non-apply stx pσ vs)
        (with-syntax* ([pσ pσ]
                       [vs vs]
+                      ;; The checker forced all non-any positions
                       [(force-clauses ...)
                        (for/list ([t (in-list mtypes)]
                                   [arg (in-list arglist)]
@@ -339,7 +340,11 @@
               (do (pσ) (force-clauses ...)
                 (cond [(or mand-guard non-ap-rest-guard) #,(return-out #'pσ)]
                       [else #,(catch-tr #'(yield (wrap (ap ... op args ... rest-op ...))))]))]
-             [_ (error 'mk-simple "Internal error ~a ~a" vs '#,mtypes)]))))
+             [_ (error 'mk-simple "Internal error ~a ~a" vs
+                       '#,(for/list ([t (in-list mtypes)])
+                            (match t
+                              [(type-union ts) (cons '∪ ts)]
+                              [_ t])))]))))
      ;; mk-simple
      (λ (stx)
         (syntax-parse stx
@@ -494,7 +499,7 @@
          (begin (define (primitive? o)
                   (case o [(p.prim aliasess ...) #t] ... [else #f]))
                 (define arities
-                  (hasheq (?@ 'p.prim p.arity) ...                          
+                  (hasheq (?@ 'p.prim p.arity) ...
                           (?@ 'alias* arity*) ...)))))]))
 
 (define-for-syntax (mk-checker-fns chk)

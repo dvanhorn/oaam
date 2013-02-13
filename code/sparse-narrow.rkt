@@ -7,6 +7,7 @@
          "parameters.rkt" "add-lib.rkt"
          (for-template "primitives.rkt") racket/unsafe/ops
          (only-in "kcfa.rkt" parameters-minus analysis-parameters)
+         "../../r-tree/pure-sparse-r-tree.rkt"
          "env.rkt" "parse.rkt"
          "nnmapc.rkt" "rtree-nnmapc.rkt"
          syntax/parse/experimental/template
@@ -113,10 +114,13 @@
     (a . ∈ . ≅)))
 
 (define-syntax-rule (bind-get-sparse (res σ a) body)
-  (let ([res (getter σ a)]
-        [actions (set-action target-actions a U)])
+  (let ([aid a])
+    #;(printf "Trying to get ~a, " aid)
+  (let ([res (getter σ aid)]
+        [actions (set-action target-actions aid U)])
+    #;(printf "got ~a~%" res)
     (syntax-parameterize ([target-actions (make-rename-transformer #'actions)])
-      body)))
+      body))))
 
 (define-syntax-rule (safe-map-ref m k) (map-ref m k nothing))
 
@@ -160,7 +164,9 @@
     (define (node-of! g state) (hash-ref! g state (λ () (mk-node state))))
     (define (conf-of! g state σ) (conf-of/data! g state σ #f))
     (define (conf-of/todo! g state σ) (register-conf/data/todo! g state σ #f))
-    (define (conf-of g state σ) (hash-ref (hash-ref g state) σ))
+    (define (conf-of g state σ)
+      (and #:bind σ↦conf (hash-ref g state #f)
+           (hash-ref σ↦conf σ #f)))
     
     (define (add-edge! from to-σ to actions)
       (define to-cnf (conf-of/todo! graph to to-σ))
@@ -171,12 +177,10 @@
     (define (add-sparse-edge! from to-σ to)
       (define fsm (node-succmap from))
       (set-node-succmap! from (map-map-add! fsm to-σ to)))
-    (define (map-join m k vs)
-      (map-set m k (⊓ (safe-map-ref m k) vs)))
 
     (define-syntax-rule (bind-join-sparse (σ* σ a vs) body*)
       (let ([bind-actions (set-action target-actions a D)]
-            [σ* (map-join σ a vs)])
+            [σ* (map-join-key σ a vs)])
         (syntax-parameterize ([target-actions (make-rename-transformer #'bind-actions)]
                               [target-σ (make-rename-transformer #'σ*)])
           body*)))
@@ -186,7 +190,8 @@
       (define ffσ
         (for/fold ([σ σ]) ([(a act) (in-hash actions)]
                            #:when (changed? act))
-          (map-join σ a (safe-map-ref last-σ a))))
+          (map-join-key σ a (safe-map-ref last-σ a))))
+      #;(printf "Skipping~%")
       (add-edge! start-conf ffσ state actions))
     ;; Find a skipping path through the sparse graph and collect the addresses that
     ;; get changed along the path.
@@ -196,7 +201,6 @@
                  [from-cnfs cnfs]
                  ;; Accumulated heap changes along path
                  [actions actions])
-        (unless (set? from-cnfs) (error 'duh))
         (for ([cnf (in-set from-cnfs)])
           (cond
            [(hash-has-key? seen cnf) (void)]
@@ -222,19 +226,26 @@
           (cond
            [next-σ
             (define actions (node-actions current-node))
-            (define cnfs (for/seteq ([nd (in-map-map-values nds)])
-                           (conf-of graph (node-state nd) next-σ)))
+            (define cnfs (for/fold ([acc (seteq)])
+                             ([nd (in-map-map-values nds)])
+                           #:break (not acc)
+                           (and #:bind conf (conf-of graph (node-state nd) next-σ)
+                                (∪1 acc conf))))            
             (if (and 
+                 cnfs
                  (not (for/or ([cnf (in-set cnfs)])
                         (or (conf-todo? cnf)
                             (not (actions-consonant? ≅ actions))))))
                 (values cnfs actions)
                 (values #f #f))]
            [else (values #f #f)]))
+        (printf "Rtree size ~a~%" (size succmap))
         (define-values (≅ cnfs actions) (map-map-close succmap σ accept))
+        #;(printf "Start step~%")
         (cond [cnfs #;(printf "Skip ~a~%" (conf-state cnf))
                     (skip-from ≅ cnfs σ actions)]
               [else (step σ c)])
+        #;(printf "End step~%")
         ;; FIXME: need invariant that node-actions is non-#f
         (processed! cnf)))
 
@@ -247,7 +258,7 @@
              (syntax/loc stx
                (define-syntax-rule (name step fst)
                  (let ()
-                   (printf "START~%")
+                   #;(printf "START~%")
                    (define clean-σ restrict-to-reachable)
                    (define state-count* (state-count))
                    (define last 0)
@@ -287,11 +298,16 @@
       ;; XXX: Per-state actions rather than per-transition actions make
       ;; narrowing given GC difficult/impossible. (Maybe not. Per-node use/def but per-state GC?)
       (define (do-narrow-yield σ actions state)
+        #;(printf "Yielding~%")
         (define to-cnf (add-edge! current-conf σ state actions))
         (add-sparse-edge! (conf-node current-conf) σ (conf-node to-cnf)))
+      #;(trace do-narrow-yield)
+
       (define-for-syntax (yield-narrow-sparse stx)
         (syntax-case stx ()
           [(_ e) #'(begin (do-narrow-yield target-σ target-actions e) (continue))]))
+
+      ;; The final setup.
      (splicing-syntax-parameterize
          ([fresh-label! (make-rename-transformer #'sparse-fresh-label!)]
           [fresh-variable! (make-rename-transformer #'sparse-fresh-variable!)]

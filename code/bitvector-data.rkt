@@ -35,16 +35,17 @@
   (set! bit-register
         (grow-vector ⊥ bit-register (vector-length bit-register))))
 
-(define (init-bit/value! initial-values)
+(define (init-bit/value! initial-values mk-single)
   (set! value-register (make-hash))
   (set! bit-register (make-vector 128))
   (for ([idx (in-naturals)]
         [v (in-list initial-values)])
-    (hash-set! value-register v (arithmetic-shift 1 idx))
+    (hash-set! value-register v (mk-single idx))
     (vector-set! bit-register idx v)))
 
+(define (mk-bare-single x) (arithmetic-shift 1 x))
 (define (reset-registers!)
-  (init-bit/value! initial-values)
+  (init-bit/value! initial-values mk-bare-single)
   (set! kill-numbers -1)
   (set! kill-strings -1)
   (set! kill-symbols -1)
@@ -158,6 +159,20 @@
             #t
             (bv* idx*))]]
        [_ #f])))
+
+(module+ test
+  (require rackunit)
+  (test-check
+   "in-abstract-values"
+   equal?
+   (begin (init-bit/value! '(a b c d e f g h i) mk-bare-single)
+          (for/list ([x (*in-bv->values (bitwise-ior
+                                         (arithmetic-shift 1 0)
+                                         (arithmetic-shift 1 3)
+                                         (arithmetic-shift 1 8)
+                                         ))])
+            x))
+   '(a d i)))
 
 (define-syntax-rule (with-bitvector-data . body)
   (splicing-syntax-parameterize

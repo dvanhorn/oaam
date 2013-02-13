@@ -442,7 +442,7 @@
                                       (λ () (error 'add-lib "Unsupported ~a" primv))))])
           ;; in order for the primitive references to match up between expr and the
           ;; parsed meaning, we finagle the meaning of fresh-variable.
-          (define-values (d _0 _1) (parse def fresh-label! (fresh-upto primv)))
+          (define-values (d _0 _1) (parse def #:fresh-variable! (fresh-upto primv)))
           (values v d)))
       (define-values (fallback-names fallback-defs)
         (for*/lists (names defs)

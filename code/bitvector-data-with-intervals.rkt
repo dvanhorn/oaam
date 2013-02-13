@@ -21,7 +21,8 @@
   [(_ _) #f])
 (define/match (αbv-interval abv)
   [((αbv start extent _)) (cons start extent)]
-  [(#f) #f])
+  [(#f) #f]
+  [(_) (error 'αbv-interval "Bad match ~a" abv)])
 
 ;; Literals accumulated during parsing.
 (define number-literals ∅)
@@ -150,7 +151,8 @@
            qvector-range ;; will be extended, thus the interval will be coarse.
            ;; The following top elements are not covered by qdata, and in some cases
            ;; they cover part of qdata (like qcons^ qvector^ and all immutable vector literals)
-           (list vector-immutable^ vector^ cons^))))
+           (list vector-immutable^ vector^ cons^))
+   (λ (x) (αbv x 1 (arithmetic-shift 1 x)))))
 
 ;; For all top elements e, if e set in dv-tst, enormalize bv-dst.
 (define (conditionally-⊤ize bv-dst bv-tst)
@@ -173,8 +175,10 @@
 ;; Set
 (define (add-to-mask mask bit) (bitwise-and mask (bitwise-not bit)))
 (define (αbv-rem1 abv v)
-  (match-define (αbv start extent bv) abv)
-  (αbv start extent (add-to-mask bv (value->αbv v))))
+  (match abv
+    [(αbv start extent bv)
+     (αbv start extent (add-to-mask bv (value->αbv v)))]
+    [_ (error 'αbv-rem1 "Bad match ~a" abv)]))
 (define (value->αbv v)
   (hash-ref! value-register v
              (λ ()
@@ -189,7 +193,7 @@
                 (when (>= num (vector-length bit-register))
                   (grow-bit-register))
                 (vector-set! bit-register num v)
-                (αbv new-bit 1 new-bit))))
+                (αbv num 1 new-bit))))
 
 ;; Consider bv1 to be "new" and thus if it contains any tops,
 ;; we kill all values under them in the join.
@@ -233,7 +237,8 @@
         (let ([bv0 (conditionally-⊤ize bv0 bv1)])
           (exact-zero? (bitwise-and bv0 (bitwise-not bv1)))))]
   [(#f _) #t]
-  [(_ #f) #f])
+  [(_ #f) #f]
+  [(_ _) (error 'bv-⊑? "Bad match ~a ~a" αbv0 αbv1)])
 
 ;; TODO: To have a faster next-bit check, we can subdivide
 ;; the bitvector into chunks of 62, 31, 16 and 8 bits given the
@@ -245,12 +250,14 @@
    (cond [(exact-zero? bv) (values #f 0)]
          [else
           (define bv* (arithmetic-shift bv (- start)))
-          (orig-bv-first-bit start bv*)])]
-  [(#f) (values #f 0)])
+          (orig-bv-first-bit (sub1 start) bv*)])]
+  [(#f) (values #f 0)]
+  [(_) (error 'bv-first-bit "Bad match ~a" bv)])
+#;(trace bv-first-bit)
 
 (define (bv-next-bit-seq pos)
   (define idx (unsafe-struct-ref pos 0))
-  (define bv (quotient (unsafe-struct-ref pos 1) 2))
+  (define bv (unsafe-struct-ref pos 1))
   (if (exact-zero? bv)
       (bv-seq #f 0)
       (let-values ([(idx bv) (orig-bv-first-bit idx bv)])

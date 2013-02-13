@@ -1,6 +1,6 @@
 #lang racket
 (require "../../r-tree/pure-sparse-r-tree.rkt"
-         racket/splicing
+         racket/splicing racket/trace
          "nnmapc.rkt"
          "data.rkt")
 (provide with-rtree-nnmapc)
@@ -25,7 +25,7 @@
      (hash-set! map-data m m-hash)
      (hash-set! m-hash v #t)
      (insert mm (cons h m-hash) sh)]
-    [(cons _ m-hash)
+    [m-hash
      (hash-set! m-hash v #t)
      mm]))
 
@@ -52,18 +52,21 @@
 
 (define-syntax-rule (with-rtree-nnmapc . rest-body)
   (begin
-    (define (r-map-set m k av)
+    (define (r-map-join-key m k av)
       (match-define (boxed-hash sh h) m)
-      (define int (interval-abstraction av))
+      (define av* (⊓ (hash-ref h k nothing) av))
+      (define int (interval-abstraction av*))
       (boxed-hash (if int (hash-set sh k int) sh) 
-                  (hash-set h k av)))
+                  (hash-set h k av*)))
+    
     (splicing-syntax-parameterize
         ([map-ref (make-rename-transformer #'r-map-ref)]
-         [map-set (make-rename-transformer #'r-map-set)]
+         [map-join-key (make-rename-transformer #'r-map-join-key)]
          [new-map (make-rename-transformer #'r-new-map)]
          [new-map-map (make-rename-transformer #'r-new-map-map)]
          [map-map-ref (make-rename-transformer #'r-map-map-ref)]
          [map-map-close (make-rename-transformer #'r-map-map-close)]
          [map-map-add! (make-rename-transformer #'r-map-map-add!)]
-         [in-map-map-values (make-rename-transformer #'in-hash-keys)])
+         [in-map-map-values (make-rename-transformer #'in-hash-keys)]
+         [map-overlap (make-rename-transformer #'s-map-overlap)])
       . rest-body)))

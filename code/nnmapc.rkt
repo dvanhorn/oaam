@@ -5,17 +5,11 @@
          (except-in racket/set for/set for*/set) racket/contract)
 ;; nnmapc - Nearest-neighbors map collection
 
-(provide new-map map-set
-         map-ref map-map-close
-         new-map-map map-map-add! map-map-ref
-         in-map-map-values
-         ;; for use in rtee-nnmapc
-         map-overlap
-         with-simple-nnmapc)
+(provide with-simple-nnmapc s-map-overlap)
 (define-syntax-rule (define-syntax-parameters p ...)
-  (begin (define-syntax-parameter p #f) ...))
-(define-syntax-parameters new-map map-set map-ref map-map-close
-  new-map-map map-map-add! map-map-ref in-map-map-values)
+  (begin (define-syntax-parameter p #f) ... (provide p) ...))
+(define-syntax-parameters new-map map-join-key map-ref map-map-close
+  new-map-map map-map-add! map-map-ref in-map-map-values map-overlap)
 ;; This module defines and naively implements an interface for a
 ;; collection of finite maps that form a metric space with the
 ;; ability to compute a (approximate if need be) nearest-neighbors set.
@@ -65,7 +59,7 @@
         out
         (add1 out))))
 
-(define (map-overlap m₀ m₁) 
+(define (s-map-overlap m₀ m₁) 
   (for*/set ([(a v) (in-hash m₀)]
              [v* (in-value (hash-ref m₁ a #f))]
              #:when (equal? v v*))
@@ -81,9 +75,9 @@
         ([(key val) (in-hash mm)])
       (define dist (map-distance key m))
       (cond [(or (not mind) (< dist mind))
-             (values key val dist (map-overlap key m))]
+             (values key val dist (s-map-overlap key m))]
             [(= dist mind)
-             (define ovr (map-overlap key m))
+             (define ovr (s-map-overlap key m))
              (if (< (set-count maxo) (set-count ovr))
                  (values key val dist ovr)
                  (values min-map minv mind maxo))]
@@ -94,13 +88,17 @@
       (values #f #f #f #f)))
 
 (define-syntax-rule (with-simple-nnmapc . rest-body)
-  (splicing-syntax-parameterize
-      ([map-ref (make-rename-transformer #'s-map-ref)]
-       [map-set (make-rename-transformer #'hash-set)]
-       [new-map (make-rename-transformer #'hash)]
-       [new-map-map (make-rename-transformer #'make-hash)]
-       [map-map-ref (make-rename-transformer #'hash-ref)]
-       [map-map-close (make-rename-transformer #'s-map-map-close)]
-       [map-map-add! (make-rename-transformer #'s-map-map-add!)]
-       [in-map-map-values (make-rename-transformer #'in-set)])
-    . rest-body))
+  (begin
+    (define (s-map-join-key m k av)
+      (hash-set m k (⊓ (hash-ref m k nothing) av)))
+    (splicing-syntax-parameterize
+        ([map-ref (make-rename-transformer #'s-map-ref)]
+         [map-join-key (make-rename-transformer #'s-map-join-key)]
+         [new-map (make-rename-transformer #'hash)]
+         [new-map-map (make-rename-transformer #'make-hash)]
+         [map-map-ref (make-rename-transformer #'hash-ref)]
+         [map-map-close (make-rename-transformer #'s-map-map-close)]
+         [map-map-add! (make-rename-transformer #'s-map-map-add!)]
+         [in-map-map-values (make-rename-transformer #'in-set)]
+         [map-overlap (make-rename-transformer #'s-map-overlap)])
+      . rest-body)))
