@@ -6,7 +6,8 @@
          define-simple-macro* hash-reverse and
          (for-syntax ops)
          (rename-out [safer-match match]
-                     [safer-match* match*])
+                     [safer-match* match*]
+                     [safer-define/match define/match])
          add1/debug
          ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
 
@@ -21,6 +22,23 @@
        #`(match* e
            [(pats ...) rhs ...] ...
            [(t ...) (error 'match "Bad match ~a ~a" (list t ...) '#,stx)]))]))
+(define-syntax (safer-define/match stx)
+  (syntax-parse stx
+    [(_ (id args ...) [(pats ...) rhs ...] ...)
+     (let* ([argsl (syntax->list #'(args ...))]
+            [argl (length argsl)]
+            [patsl (syntax->list #'((pats ...) ...))])
+       (unless (and (identifier? #'id) (andmap identifier? argsl))
+         (raise-syntax-error #f "Expected identifiers for function header" stx))
+       (unless
+           (andmap (λ (pat) (= argl (length (syntax->list pat)))) patsl)
+         (raise-syntax-error #f "Expected as many patterns as arguments" stx)))
+     (with-syntax ([(t ...) (generate-temporaries (car (syntax->list #'((pats ...) ...))))])
+       #`(define (id args ...)
+           (match* (args ...)
+           [(pats ...) rhs ...] ...
+           [(t ...) (error 'match "Bad match ~a ~a" (list t ...) '#,stx)])))]))
+
 
 (define (add1/debug n from)
   (unless (number? n)

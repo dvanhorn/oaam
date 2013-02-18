@@ -9,7 +9,7 @@
          (only-in "kcfa.rkt" parameters-minus analysis-parameters)
          "../../r-tree/pure-sparse-r-tree.rkt"
          "env.rkt" "parse.rkt"
-         "nnmapc.rkt" "rtree-nnmapc.rkt"
+         "nnmapc.rkt" "rtree-nnmapc.rkt" "spectral-heap.rkt" "simple-heap.rkt"
          syntax/parse/experimental/template
          racket/trace)
 (provide with-sparse)
@@ -130,7 +130,8 @@
 (define-syntax-parameter sp-touches #f)
 (define-syntax-rule (with-sparse (mk-analysis) . body)
   (begin
-    (with-rtree-nnmapc
+    (with-simple-heap
+    (with-simple-nnmapc
     (define-syntax-rule (mk-conf state σ data)
       (conf state σ (node-of! sparse-graph state) (seteq) #t #;data))
     (define-syntax-rule (conf-of/data! g state σ data)
@@ -371,4 +372,4 @@
                                                      (λ (sexp) (prepare-sparse parse-prog sexp)))
                                        #,@(parameters-minus #'(p.all (... ...))
                                                             '(#:fixpoint #:ans #:touches #:prepare)))))]))])
-              . body)))))))))
+              . body))))))))))

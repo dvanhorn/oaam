@@ -2,7 +2,7 @@
 
 (require (for-syntax syntax/parse syntax/id-table racket/base racket/match
                      racket/dict racket/syntax racket/list)
-         #;racket/match (except-in racket/match match match*)
+         #;racket/match (except-in racket/match match match* define/match)
          "notation.rkt"
          racket/stxparam)
 (provide mk-syntax-parameters
@@ -20,7 +20,7 @@
 (define-for-syntax (exn-wrap stx syn)
 #;
   syn
-  
+
   (quasisyntax/loc syn (with-handlers ([exn:fail:contract:arity?
                      (λ (ex) (error 'do "Problem in ~a~%as ~a~%~a" '#,stx '#,syn ex))])
       #,syn)))
@@ -47,7 +47,13 @@
                       make-rest-nA-contour
                       make-rest-nD-contour
                       ;; single-threaded parameter necessary for semantics
-                      target-σ)
+                      target-σ
+                      ;; Only sparse
+                      new-map map-join-key map-ref map-overlap 
+                      map-distance ;; for simple-nnmapc
+                      map-boundary map-store ;; for rtree-nnmapc
+                      new-map-map map-map-add! map-map-ref
+                      in-map-map-values map-map-close)
 (define-syntax-parameter in-scope-of-extras (syntax-rules () [(_ ids . body) (begin . body)]))
 (define-syntax-parameter called-function (λ _ #'#f))
 (define-syntax-parameter empty-heap (make-rename-transformer #'hash))
@@ -197,7 +203,7 @@ and do. do will not initialize an accumulator in the static extent of another do
             #:with (kw-ids ...)
             (sort-by-kw (append (map list good-kw good-ids) unspec-bind))
             #:attr (kws 1) (sort good-kw kw<=?)))
- 
+
  (define-splicing-syntax-class (actuals all)
    #:attributes ((kw-exprs 1) (exprs 1))
    (pattern (~seq (~or (~var k (kw-stx all expr-err)) e:expr) ...)

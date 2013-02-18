@@ -1,6 +1,6 @@
 #lang racket
 (require (for-syntax syntax/parse racket/syntax racket/list racket/dict
-                     (except-in racket/match match match*)
+                     (except-in racket/match match match* define/match)
                      "notation.rkt")
          racket/stxparam "notation.rkt" "data.rkt" "parameters.rkt"
          racket/generator)
