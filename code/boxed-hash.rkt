@@ -1,5 +1,6 @@
 #lang racket/base
-(require "parameters.rkt" (only-in "nnmapc.rkt" s-map-overlap)
+(require "notation.rkt"
+         "parameters.rkt" (only-in "nnmapc.rkt" s-map-overlap)
          "data.rkt"
          racket/splicing racket/unsafe/ops)
 

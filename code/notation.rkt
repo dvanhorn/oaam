@@ -1,27 +1,41 @@
 #lang racket
 
-(require (for-syntax syntax/parse))
+(require (for-syntax syntax/parse racket/lazy-require))
 (provide for/append for/union for*/union for/set for*/set
          for/max for*/max
          define-simple-macro* hash-reverse and
          (for-syntax ops)
          (rename-out [safer-match match]
                      [safer-match* match*]
-                     [safer-define/match define/match])
+                     [safer-define/match define/match]
+                     [safer-match-define match-define])
          add1/debug
          ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
+
+(begin-for-syntax
+ (lazy-require [racket/match/parse (parse)]
+               [racket/match/patterns (bound-vars)]))
 
 (define-syntax (safer-match stx)
   (syntax-parse stx
     [(_ e others ...)
      #`(match e others ... [t (error 'match "Bad match ~a ~a" t '#,stx)])]))
+(define-syntax (safer-match-define stx)
+  (syntax-parse stx
+    [(_ pat rhs)
+     (let ([p (parse #'pat)])
+       (with-syntax ([vars (bound-vars p)])
+         (quasisyntax/loc stx
+           (define-values vars (match*/derived (rhs) #,stx
+                                 [(pat) (values . vars)]
+                                 [(v) (error 'match-define "Bad match ~a ~a") v '#,stx])))))]))
 (define-syntax (safer-match* stx)
   (syntax-parse stx
     [(_ e [(pats ...) rhs ...] ...)
      (with-syntax ([(t ...) (generate-temporaries (car (syntax->list #'((pats ...) ...))))])
        #`(match* e
            [(pats ...) rhs ...] ...
-           [(t ...) (error 'match "Bad match ~a ~a" (list t ...) '#,stx)]))]))
+           [(t ...) (error 'match* "Bad match ~a ~a" (list t ...) '#,stx)]))]))
 (define-syntax (safer-define/match stx)
   (syntax-parse stx
     [(_ (id args ...) [(pats ...) rhs ...] ...)
@@ -37,7 +51,7 @@
        #`(define (id args ...)
            (match* (args ...)
            [(pats ...) rhs ...] ...
-           [(t ...) (error 'match "Bad match ~a ~a" (list t ...) '#,stx)])))]))
+           [(t ...) (error 'define/match "Bad match ~a ~a" (list t ...) '#,stx)])))]))
 
 
 (define (add1/debug n from)

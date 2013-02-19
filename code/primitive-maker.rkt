@@ -2,7 +2,7 @@
 
 (require "data.rkt" "notation.rkt" "do.rkt" "parameters.rkt"
          (for-syntax syntax/parse racket/syntax
-                     #;racket/match (except-in racket/match match match* define/match)
+                     #;racket/match (except-in racket/match match match* define/match match-define)
                      racket/list (except-in racket/base and)
                      syntax/parse/experimental/template
                      racket/pretty

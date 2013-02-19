@@ -5,7 +5,7 @@
 (provide bind-0 bind-1 bind-∞
          bind-rest-0 bind-rest-1 bind-rest-∞
          bind-rest-apply-0 bind-rest-apply-1 bind-rest-apply-∞
-         with-0-ctx with-1-ctx with-∞-ctx
+         with-0-ctx with-0-contours with-1-ctx with-∞-ctx
          make-var-contour-0 make-var-contour-k)
 
 (define-for-syntax ((mk-bind-rest K apply?) stx)
@@ -144,22 +144,26 @@
         [else
          (cons (first δ) (truncate (rest δ) (sub1 k)))]))
 
+(define-syntax-rule (with-0-contours . body)
+  (splicing-syntax-parameterize
+      ([make-var-contour (make-rename-transformer #'make-var-contour-0)]
+       [make-intermediate-contour (make-rename-transformer #'make-intermediate-contour-0)]
+       [make-vector^-contour (make-rename-transformer #'make-vector^-contour-0)]
+       [make-vector-contour (make-rename-transformer #'make-vector-contour-0)]
+       [make-car-contour (make-rename-transformer #'make-car-contour-0)]
+       [make-cdr-contour (make-rename-transformer #'make-cdr-contour-0)]
+       [make-port-contour (make-rename-transformer #'make-port-contour-0)]
+       [make-apply-contour (make-rename-transformer #'make-apply-contour-0)]
+       [make-kont-contour (make-rename-transformer #'make-kont-contour-0)]
+       [make-rest^-contour (make-rename-transformer #'make-rest^-contour-0)])
+    . body))
+
 (define-syntax-rule (with-0-ctx body)
   (splicing-syntax-parameterize
    ([bind (make-rename-transformer #'bind-0)]
     [bind-rest (make-rename-transformer #'bind-rest-0)]
-    [bind-rest-apply (make-rename-transformer #'bind-rest-apply-0)]
-    [make-var-contour (make-rename-transformer #'make-var-contour-0)]
-    [make-intermediate-contour (make-rename-transformer #'make-intermediate-contour-0)]
-    [make-vector^-contour (make-rename-transformer #'make-vector^-contour-0)]
-    [make-vector-contour (make-rename-transformer #'make-vector-contour-0)]
-    [make-car-contour (make-rename-transformer #'make-car-contour-0)]
-    [make-cdr-contour (make-rename-transformer #'make-cdr-contour-0)]
-    [make-port-contour (make-rename-transformer #'make-port-contour-0)]
-    [make-apply-contour (make-rename-transformer #'make-apply-contour-0)]
-    [make-kont-contour (make-rename-transformer #'make-kont-contour-0)]
-    [make-rest^-contour (make-rename-transformer #'make-rest^-contour-0)])
-   body))
+    [bind-rest-apply (make-rename-transformer #'bind-rest-apply-0)])
+   (with-0-contours body)))
 
 (define-syntax-rule (with-1-ctx body)
   (splicing-syntax-parameterize

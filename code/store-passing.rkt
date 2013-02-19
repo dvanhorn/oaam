@@ -113,6 +113,8 @@
 (define-for-syntax cs-target (target #'target-cs '#:cs (make-rename-transformer #'init-cs)))
 
 (define-syntax-rule (with-set-monad body)
+  (begin
+    (define-syntax hidden (syntax-parameter-value #'do-body-transformer))
   (splicing-syntax-parameterize
    ([yield (syntax-rules ()
              [(_ e)
@@ -120,9 +122,9 @@
                 (syntax-parameterize ([target-cs (make-rename-transformer #'cs)])
                   (continue)))])]
     [st-targets (cons cs-target (syntax-parameter-value #'st-targets))]
-    [do-body-transformer (let ([tr (syntax-parameter-value #'do-body-transformer)])
-                           (λ (stx) (tr #`(do-body-transform #,(do-body-transform-cs stx)))))])
-   body))
+    [do-body-transformer (λ (stx) ((syntax-local-value #'hidden)
+                                   #`(do-body-transform #,(do-body-transform-cs stx))))])
+   body)))
 
 (define-syntax-rule (with-wide-σ-passing body)
   (splicing-syntax-parameterize

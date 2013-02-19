@@ -1,7 +1,7 @@
 #lang racket
 (require (rename-in racket/generator [yield real-yield])
          racket/stxparam)
-(require "kcfa.rkt" "data.rkt" "parse.rkt"
+(require "kcfa.rkt" "data.rkt" "parse.rkt" "add-lib.rkt"
          "primitives.rkt" "fix.rkt" "env.rkt"
          "simple-data.rkt" "bitvector-data.rkt" "bitvector-data-with-intervals.rkt"
          ;; different components of instantiantiations
@@ -39,7 +39,7 @@
   (splicing-syntax-parameterize
    ([widen (make-rename-transformer #'flatten-value)])
    body))
-
+#;#;
 (with-bitvector-data/intervals
  (with-lazy
   (with-0-ctx
@@ -51,6 +51,27 @@
                     #:touches sp-lazy-0cfa/c-touches
                     #:wide)))))))
 (provide sp-lazy-0cfa/c)
+
+(mk-sparse^-fixpoint
+ sp-lazy-0cfa^/c-fix
+ sp-lazy-0cfa^/c-ans? sp-lazy-0cfa^/c-ans-v
+ sp-lazy-0cfa^/c-touches)
+(with-bitvector-data
+ (with-sparse^
+  (with-lazy
+   (with-0-ctx/prealloc/sparse
+    (with-sparse-mutable-worklist
+     (with-abstract
+      (with-prepare-sparse-wide/prealloc (prepare-sparse-wide/prealloc)
+       (mk-analysis #:aval sp-lazy-0cfa^/c
+                    #:prepare (λ (sexp) (prepare-sparse-wide/prealloc parse-prog sexp))
+                    #:ans  sp-lazy-0cfa^/c-ans
+                    #:touches sp-lazy-0cfa^/c-touches
+                    #:fixpoint sp-lazy-0cfa^/c-fix
+                    #:global-σ 
+                    #;
+                    #:compiled #:wide))))))))
+(provide sp-lazy-0cfa^/c)
 
 #|
  (mk-sparse^-fixpoint

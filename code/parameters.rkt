@@ -2,7 +2,7 @@
 
 (require (for-syntax syntax/parse syntax/id-table racket/base racket/match
                      racket/dict racket/syntax racket/list)
-         #;racket/match (except-in racket/match match match* define/match)
+         #;racket/match (except-in racket/match match match* define/match match-define)
          "notation.rkt"
          racket/stxparam)
 (provide mk-syntax-parameters

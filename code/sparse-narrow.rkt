@@ -9,7 +9,8 @@
          (only-in "kcfa.rkt" parameters-minus analysis-parameters)
          "../../r-tree/pure-sparse-r-tree.rkt"
          "env.rkt" "parse.rkt"
-         "nnmapc.rkt" "rtree-nnmapc.rkt" "spectral-heap.rkt" "simple-heap.rkt"
+         "nnmapc.rkt" "simple-heap.rkt"
+;;         "rtree-nnmapc.rkt" "spectral-heap.rkt"
          syntax/parse/experimental/template
          racket/trace)
 (provide with-sparse)

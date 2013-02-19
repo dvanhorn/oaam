@@ -1,6 +1,6 @@
 #lang racket
 (require (for-syntax syntax/parse racket/syntax racket/list racket/dict
-                     (except-in racket/match match match* define/match)
+                     (except-in racket/match match match* define/match match-define)
                      "notation.rkt")
          racket/stxparam "notation.rkt" "data.rkt" "parameters.rkt"
          racket/generator)
@@ -170,7 +170,6 @@
                      (cond
                       [(attribute f) #'(f.ids ...)]
                       [else (with-do-binds extra #'(extra ...))])])
-
        (define tr
          (syntax-parser
            [(_ (~var a (actuals use-targs)))
@@ -180,13 +179,13 @@
                              [id (in-list (syntax->list #'(acc-ids ...)))])
                     (list (target-param t)
                           (or (dict-ref (attribute a.kw-exprs) (target-kw t) #f)
-                              id)))])              
+                              id)))])
               (quasisyntax/loc stx
-                (syntax-parameterize ([targ (make-rename-transformer #'id)] ...)
-                  a.exprs ...)))]))
-
+                 (syntax-parameterize ([targ (make-rename-transformer #'id)] ...)
+                   a.exprs ...)))]))
        (exn-wrap stx
         (quasisyntax/loc stx
+          (begin
           (let-values ([(acc-ids ... bind ...)
                         (expect-do-values
                             #:values #,(length (syntax->list #'(bind ...)))
@@ -198,7 +197,7 @@
             #,(if (attribute wrapper)
                   #`(let-syntax ([wrapper #,tr])
                       e1)
-                  (tr #'(wrap e1)))))))]))
+                  (tr #'(wrap e1))))))))]))
 
 (define-simple-macro* (expect-do-values (~or (~optional (~seq #:values num:nat))
                                              (~optional (~and #:extra (~bind [extra? #t]))

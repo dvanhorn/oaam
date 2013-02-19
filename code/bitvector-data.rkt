@@ -123,17 +123,18 @@
               (values (+ 1 idx idx*) (arithmetic-shift bv (sub1 (- idx*))))]))
 (define (bv-next-bit-seq pos)
   (define idx (unsafe-struct-ref pos 0))
-  (define bv (quotient (unsafe-struct-ref pos 1) 2))
+  (define bv (unsafe-struct-ref pos 1))
   (cond [(exact-zero? bv) (bv-seq #f 0)]
-        [else (define-values (idx bv) (bv-first-bit idx bv))
-              (bv-seq idx bv)]))
+        [else (define-values (idx* bv*) (bv-first-bit idx bv))
+              (bv-seq idx* bv*)]))
 
 (struct bv-seq (idx bv*) #:prefab)
 
 (define (in-bv->values bv)
   (make-do-sequence
    (λ ()
-      (values (λ (pos) (vector-ref bit-register (bv-seq-idx pos)))
+      (values (λ (pos)
+                 (vector-ref bit-register (bv-seq-idx pos)))
               bv-next-bit-seq
               (let-values ([(idx bv*) (bv-first-bit -1 bv)])
                 (bv-seq idx bv*))

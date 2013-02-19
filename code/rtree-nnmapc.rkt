@@ -1,5 +1,6 @@
 #lang racket
-(require "../../r-tree/pure-sparse-r-tree.rkt"
+(require "notation.rkt"
+         "../../r-tree/pure-sparse-r-tree.rkt"
          racket/splicing racket/trace
          "parameters.rkt"
          "data.rkt")

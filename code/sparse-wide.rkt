@@ -7,7 +7,7 @@
 (provide mk-sparse^-fixpoint with-sparse^
          with-sparse-mutable-worklist
          with-0-ctx/prealloc/sparse
-         prepare-sparse-wide/prealloc)
+         with-prepare-sparse-wide/prealloc)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Instrumented fixpoint for /widened/ step function xthat takes
 ;;; "big steps" when it can find reusable paths through the abstract state graph.
@@ -24,9 +24,9 @@
 ;;   part of the todo set afterwards, todo? is reset to #f
 (struct point (actions todo? skips) #:mutable #:prefab)
 ;; Stores the union count for each address's last update
-(define σ-history #f)
+(define σ-history #f) (define (set-σ-history! v) (set! σ-history v))
 ;; Any store changes during this step?
-(define ∆? #f)
+(define ∆? #f) (define (set-∆?!) (set! ∆? #t)) (define (unset-∆?!) (set! ∆? #f))
 ;; Intern states.
 (define (register-state s)
   (node-of/data graph s (point #f #t (seteq))))
@@ -73,21 +73,11 @@
     (set-skips (add1/debug skips 'add-todo/skip!))
     (i:add-todo! state)))
 
-(define (ensure-σ-size/sparse)
-  (when (= next-loc (vector-length global-σ))
-    (set-global-σ! (grow-vector nothing global-σ next-loc))
-    (set! σ-history (grow-vector 0 σ-history next-loc))))
-
-(define-syntax-rule (get-contour-index!-0 c)
-  (hash-ref! contour-table c
-             (λ ()
-                (begin0 next-loc
-                        (ensure-σ-size/sparse)
-                        (inc-next-loc!)))))
-
-(define-syntax-rule (make-var-contour-0-prealloc/sparse x δ)
-  (cond [(exact-nonnegative-integer? x) x]
-        [else (get-contour-index!-0 x)]))
+(define-syntax-rule (mk-ensure-σ-size/sparse name)
+  (define (name)
+    (when (= next-loc (vector-length global-σ))
+      (set-global-σ! (grow-vector nothing global-σ next-loc))
+      (set-σ-history! (grow-vector 0 σ-history next-loc)))))
 
 ;; Joins don't accumulate "changed" addresses in the stored widened semantics
 ;; since the store fast-forwarding would be a no-op anyway.
@@ -147,13 +137,17 @@
              (set-skips (add1 skips))
              (add-todo/skip! p)]))))
 
-(define (prepare-sparse-wide/prealloc parser sexp)
-  (define e (prepare-prealloc parser sexp))
-  (reset-graph!) ;; creates current-state as a node
-  (set-node-data! current-state (point #f #t (seteq)))
-  (set! σ-history (make-vector (vector-length global-σ)))
-  (pretty-print e) (newline)
-  e)
+(define-syntax-rule (with-prepare-sparse-wide/prealloc (name) . rest)
+  (begin
+    (with-prepare-prealloc (prepare-prealloc)
+      (define (name parser sexp)
+        (define e (prepare-prealloc parser sexp))
+        (reset-graph!) ;; creates current-state as a node
+        (set-node-data! current-state (point #f #t (seteq)))
+        (set-σ-history! (make-vector (vector-length global-σ)))
+        (pretty-print e) (newline)
+        e)
+      . rest)))
 
 ;; An address is consonant with a past state if its union count is smaller than
 ;; the union count of that state.
@@ -164,26 +158,27 @@
 
 ;; Increase union count only if the abstract values have changed.
 ;; Also, save the union count for the modified address for future sparseness.
-(define (join!/sparse a vs)
-  (define prev (vector-ref global-σ a))
-  (define upd (⊓ vs prev))
-  (cond [(≡ prev upd)
-         (void)
-         #;
-         (printf "No change to ~a with ~a~%" a vs)]
-        [else
-         (vector-set! global-σ a upd)
-         (set! ∆? #t)
-         (define age (add1 (vector-ref σ-history a)))
-         #;
-         (printf "Set ~a at age ~a~%" a age) (flush-output)
-         (vector-set! σ-history a age)]))
+(define-syntax-rule (mk-join!/sparse)
+  (λ (a vs)
+     (define prev (vector-ref global-σ a))
+     (define upd (⊓ vs prev))
+     (cond [(≡ prev upd)
+            (void)
+            #;
+            (printf "No change to ~a with ~a~%" a vs)]
+            [else
+             (vector-set! global-σ a upd)
+             (set-∆?!)
+             (define age (add1 (vector-ref σ-history a)))
+             #;
+             (printf "Set ~a at age ~a~%" a age) (flush-output)
+             (vector-set! σ-history a age)])))
 
 (define steps 0) (define (set-steps v) (set! steps v))
 (define skips 0) (define (set-skips v) (set! skips v))
 (define ((mk-sparse-step step) c)
   (set-current-state! (register-state c))
-  (set! ∆? #f)
+  (unset-∆?!)
   (match-define (node state ps (and (point A _ _) p)) current-state)
   (define consonant? (actions-consonant? A))
 #;
@@ -200,7 +195,7 @@
       (define state-count* (state-count))
       (set-box! state-count* 0)
       fst
-      (define clean-σ (mk-restrict-to-reachable vector-ref))
+      (define clean-σ restrict-to-reachable/vector)
       (define sparse-step (mk-sparse-step step))
       (define last-count 0)
       (let loop ()
@@ -254,24 +249,39 @@
                     (w #:actions actions (do-values extra ...)))))]))
 
 (define-syntax-rule (with-sparse-mutable-worklist body)
+  (begin (define-syntax hidden (syntax-parameter-value #'do-body-transformer))
   (splicing-syntax-parameterize
    ([yield yield-global-sparse]
-    [do-body-transformer (let ([tr (syntax-parameter-value #'do-body-transformer)])
-                           (λ (stx) (tr #`(do-body-transformer #,(do-body-transform-actions stx)))))])
-   body))
+    [do-body-transformer (λ (stx) ((syntax-local-value #'hidden)
+                                   #`(do-body-transformer #,(do-body-transform-actions stx))))])
+   body)))
 
 (define-syntax-rule (with-0-ctx/prealloc/sparse body)
-  (splicing-syntax-parameterize
-   ([bind (make-rename-transformer #'bind-0)]
-    [bind-rest (make-rename-transformer #'bind-rest-0)]
-    [bind-rest-apply (make-rename-transformer #'bind-rest-apply-0)]
-    [make-var-contour (make-rename-transformer #'make-var-contour-0-prealloc/sparse)])
-   body))
+  (begin
+    (mk-ensure-σ-size/sparse ensure-σ-size/sparse)
+    (with-0-contours
+    (splicing-syntax-parameterize
+        ([bind (make-rename-transformer #'bind-0)]
+         [bind-rest (make-rename-transformer #'bind-rest-0)]
+         [bind-rest-apply (make-rename-transformer #'bind-rest-apply-0)]
+         [make-var-contour (syntax-rules () [(_ l x δ) x])]
+         [make-intermediate-contour (mk-prealloc-contour #'make-intermediate-contour #'ensure-σ-size/sparse)]
+         [make-vector^-contour (mk-prealloc-contour #'make-vector^-contour #'ensure-σ-size/sparse)]
+         [make-vector-contour (mk-prealloc-contour #'make-vector-contour #'ensure-σ-size/sparse)]
+         [make-car-contour (mk-prealloc-contour #'make-car-contour #'ensure-σ-size/sparse)]
+         [make-cdr-contour (mk-prealloc-contour #'make-cdr-contour #'ensure-σ-size/sparse)]
+         [make-port-contour (mk-prealloc-contour #'make-port-contour #'ensure-σ-size/sparse)]
+         [make-apply-contour (mk-prealloc-contour #'make-apply-contour #'ensure-σ-size/sparse)]
+         [make-kont-contour (mk-prealloc-contour #'make-kont-contour #'ensure-σ-size/sparse)]
+         [make-rest^-contour (mk-prealloc-contour #'make-rest^-contour #'ensure-σ-size/sparse)])
+      body))))
 
 (define-syntax-rule (with-sparse^ body)
-  (splicing-syntax-parameterize
-   ([bind-get (make-rename-transformer #'bind-get-sparse)]
-    [st-targets (cons actions-target (syntax-parameter-value #'st-targets))]
-    [bind-join (make-rename-transformer #'bind-join!/sparse)]
-    [getter (make-rename-transformer #'global-vector-getter)])
-   body))
+  (begin
+    (define join!/sparse (mk-join!/sparse))
+    (splicing-syntax-parameterize
+        ([bind-get (make-rename-transformer #'bind-get-sparse)]
+         [st-targets (cons actions-target (syntax-parameter-value #'st-targets))]
+         [bind-join (bind-joiner #'join!/sparse)]
+         [getter (make-rename-transformer #'global-vector-getter)])
+      body)))

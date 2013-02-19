@@ -190,6 +190,7 @@
                  [(vectorv? v) (ext-mask kill-vectors)]
                  [(consv? v) (ext-mask kill-conses)]
                  [else (void)])
+                (printf "Mer~%")
                 (when (>= num (vector-length bit-register))
                   (grow-bit-register))
                 (vector-set! bit-register num v)
