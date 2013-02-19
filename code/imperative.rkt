@@ -71,7 +71,7 @@
                      (ans^-v c)))
                  (values (format "State count: ~a" (unbox state-count*))
                          (format "Point count: ~a" (hash-count seen))
-                         (clean-σ global-σ vs)
+                         global-σ
                          vs)]
                 [else
                  (define todo-old todo)
@@ -154,7 +154,7 @@
                    (ans^-v c)))
                (values (format "State count: ~a" (unbox state-count*))
                        (format "Point count: ~a" (hash-count seen))
-                       (clean-σ global-σ vs)
+                       global-σ
                        vs)]
               [else
                (define todo-old todo)
@@ -234,7 +234,7 @@
                    (ans^-v c)))
                (values (format "State count: ~a" (unbox state-count*))
                        (format "Point count: ~a" (hash-count seen))
-                       (clean-σ global-σ vs)
+                       global-σ
                        vs)]
               [else
                (define todo-old todo)

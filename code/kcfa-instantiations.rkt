@@ -28,10 +28,10 @@
    ([widen (make-rename-transformer #'eval-widen)])
    body))
 
-(define-syntax-rule (with-abstract body)
+(define-syntax-rule (with-abstract . body)
   (splicing-syntax-parameterize
    ([widen (make-rename-transformer #'flatten-value)])
-   body))
+   . body))
 
 #|
 ;; "sid"
@@ -204,12 +204,24 @@
   (with-0-ctx/prealloc
    (with-σ-∆s/prealloc!
     (with-abstract
+     (define e (box #f))
       (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc!
-                   #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
+                   #:prepare (λ (sexp)
+                                (define e* (prepare-prealloc parse-prog sexp))
+                                (set-box! e e*)
+                                e*)
                    #:ans prealloc/∆s-ans/c
                    #:touches prealloc/∆s-touches-0/c
                    #:fixpoint prealloc/∆s-fixpoint/c
-                   #:global-σ #:compiled #:wide))))))
+                   #:global-σ #:compiled #:wide
+                   #:clos clos
+                   #:rlos rlos
+                   #:primop primop)
+      #;#;
+      (define-values (_0 _1 σ _3) (lazy-0cfa^/c/∆s/prealloc! test-program))
+      ;; constant-fold should be a macro that constructs the match expanders'
+      ;; identifiers from clos/rlos/primop to analyze e with output store σ.
+      (constant-fold (unbox e) σ clos rlos primop))))))
 (provide lazy-0cfa^/c/∆s/prealloc!)
 
 ;; "it"
