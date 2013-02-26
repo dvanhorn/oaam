@@ -13,7 +13,7 @@
 \newcommand{\ans}[1]{\tuple{ans}{#1}}
 
 % Continuations
-\newcommand{\kmt}{\tt mt}
+\newcommand{\kmt}{{\tt mt}}
 \newcommand{\kar}[2][\ ]{\tuple[#1]{ar}{#2}}
 \newcommand{\kfn}[2][\ ]{\tuple[#1]{fn}{#2}}
 \newcommand{\kif}[2][\ ]{\tuple[#1]{fi}{#2}}
@@ -51,6 +51,7 @@
 % Metavariables
 \newcommand{\maddr}{a}
 \newcommand{\maddralt}{b}
+\newcommand{\maddrx}[1]{#1}
 \newcommand{\mvar}{x}
 \newcommand{\mvarf}{f}
 \newcommand{\mexp}{e}
@@ -59,6 +60,7 @@
 \newcommand{\menv}{\rho}
 \newcommand{\mkont}{\kappa}
 \newcommand{\msto}{\sigma}
+\newcommand{\mstor}{s}
 \newcommand{\mop}{o}
 \newcommand{\mval}{v}
 \newcommand{\mnum}{z}
@@ -74,6 +76,7 @@
 \newcommand{\msdiff}{\xi}
 
 \newcommand{\compile}[1]{\llbracket#1\rrbracket}
+\newcommand{\reachable}[1]{\mathit{reachable}(#1)}
 
 \newcommand{\mlab}{{\ell}}
 \newcommand{\mcntr}{{\delta}}
@@ -87,14 +90,27 @@
 \newcommand{\lift}{\mathit{lift}}
 \newcommand{\eval}{\mathit{eval}}
 \newcommand{\replay}{\mathit{replay}}
+\newcommand{\replayall}{\forall\mathit{replay}}
+\newcommand{\replaychange}{\mathit{replay}\Delta}
+\newcommand{\replaychangeall}{\forall\mathit{replay}\Delta}
 \newcommand{\states}{\mathit{cs}}
 \newcommand{\concat}{\mathit{concat}}
 \newcommand{\append}{\mathit{append}}
 \newcommand{\step}{\mathit{step}}
 \newcommand{\wn}{\mathit{wn}}
+\newcommand{\nw}{\mathit{nw}}
 \newcommand{\fmerge}{\mathit{merge}}
 \newcommand{\force}{\mathit{force}}
+\newcommand{\bind}{\mathit{bind}}
+\newcommand{\push}{\mathit{push}}
+\newcommand{\stash}{\mathit{stash}}
 
+\newcommand{\hd}{\mathit{hd}}
+\newcommand{\updatedp}{\mathit{updated?}}
+\newcommand{\joinp}{\mathit{join?}}
+\newcommand{\lfp}[1]{\mathbf{lfp}(#1)}
+
+\newcommand{\deceq}{\mathbin{\overset{?}{=}}}
 
 % Spaces
 \newcommand{\Store}{\mathit{Store}}
@@ -106,6 +122,10 @@
 \newcommand{\Kont}{\mathit{Kont}}
 \newcommand{\State}{\mathit{State}}
 \newcommand{\Storeable}{\mathit{Storeable}}
+\newcommand{\System}{\mathit{System}}
+\newcommand{\Label}{\mathit{Label}}
+\newcommand{\Counter}{\mathit{Contour}}
+\newcommand{\Compiled}{\mathit{Compiled}}
 
 \newcommand{\changep}{\Delta\mbox{{\tt ?}}}
 

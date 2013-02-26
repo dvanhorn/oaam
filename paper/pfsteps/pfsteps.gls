@@ -1,0 +1,16 @@
+
+ \begin{theglossary} 
+
+    \makeatletter\scan@allowedfalse
+
+  \item v0.1\efill 
+ \subitem General:\ Initial documented release\pfill \hdpindex{}{1}
+  \item v0.2\efill 
+ \subitem General:\ Included listproc.sty\pfill \hdpindex{}{1}
+  \item v0.3\efill 
+ \subitem General:\ Input encoding bug fix for right guillemet\pfill \hdpindex{}{15}
+  \item v0.4\efill 
+ \subitem \verb*+pfsteps+:\ Spacing bug fixes: Sets parskip to 0pt, so we don't get really wide spacing in proofs. Avoids weird behavior when proof steps are too long.\pfill 
+		\hdpindex{}{13}
+
+ \end{theglossary}

@@ -1,0 +1,1221 @@
+% \iffalse meta-comment
+%
+% Copyright (C) 2011 by Jesse A. Tov <tov@ccs.neu.edu>
+% ----------------------------------------------------
+% 
+% This file may be distributed and/or modified under the
+% conditions of the LaTeX Project Public License, either version 1.2
+% of this license or (at your option) any later version.
+% The latest version of this license is in:
+%
+%    http://www.latex-project.org/lppl.txt
+%
+% and version 1.2 or later is part of all distributions of LaTeX 
+% version 1999/12/01 or later.
+%
+% ------------------------------------------------------------------
+% This is a LaTeX package to make it easy to refer to nested labels
+% using both an outer number (such as a theorem number) and an inner
+% number (such as an item in an enumeration).
+% ------------------------------------------------------------------
+%
+%   *** The package file:
+%<package>\NeedsTeXFormat{LaTeX2e}[1999/12/01]
+%<package>\ProvidesPackage{pfsteps}
+%<package> [2011/04/04 v0.4 proof tools]
+%
+%   *** The driver file:
+%<driver>\NeedsTeXFormat{LaTeX2e}
+%
+%   *** date, version, and stuff:
+%\fi
+%\ProvidesFile{pfsteps}
+%  [2011/04/04 v0.4 proof tools]
+% \changes{v0.2}{2011/03/30}{Included listproc.sty}
+% \changes{v0.1}{2011/03/26}{Initial documented release}
+%
+% \CheckSum{476}
+% \CharacterTable
+%  {Upper-case    \A\B\C\D\E\F\G\H\I\J\K\L\M\N\O\P\Q\R\S\T\U\V\W\X\Y\Z
+%   Lower-case    \a\b\c\d\e\f\g\h\i\j\k\l\m\n\o\p\q\r\s\t\u\v\w\x\y\z
+%   Digits        \0\1\2\3\4\5\6\7\8\9
+%   Exclamation   \!     Double quote  \"     Hash (number) \#
+%   Dollar        \$     Percent       \%     Ampersand     \&
+%   Acute accent  \'     Left paren    \(     Right paren   \)
+%   Asterisk      \*     Plus          \+     Comma         \,
+%   Minus         \-     Point         \.     Solidus       \/
+%   Colon         \:     Semicolon     \;     Less than     \<
+%   Equals        \=     Greater than  \>     Question mark \?
+%   Commercial at \@     Left bracket  \[     Backslash     \\
+%   Right bracket \]     Circumflex    \^     Underscore    \_
+%   Grave accent  \`     Left brace    \{     Vertical bar  \|
+%   Right brace   \}     Tilde         \~}
+%
+% \iffalse
+%
+%<*driver>
+\documentclass{ltxdoc}
+\usepackage{pfsteps} \relax
+\usepackage{hypdoc}
+\EnableCrossrefs
+\CodelineIndex
+\RecordChanges
+\begin{document}
+  \DocInput{pfsteps.dtx}
+\end{document}
+%</driver>
+% \fi
+%
+% \GetFileInfo{pfsteps}
+%
+% \DoNotIndex{\newcommand,\newenvironment,\def,\relax,\do,\@gobble}
+% \DoNotIndex{\if,\ifx,\else,\fi,\providecommand,\let,\global,\ignorespaces}
+% \DoNotIndex{\@undefined,\expandafter,\@for,\@ifnextchar,\addtolength}
+% \DoNotIndex{\aftergroup,\begin,\dp,\ht,\wd,\end,\ifdim}
+% \DoNotIndex{\@firstoftwo,\@secondoftwo,\@notfound,\@tester}
+% \DoNotIndex{\addtocounter,\advance,\edef,\empty,\gdef,\ifnum}
+% \DoNotIndex{\long,\newcounter,\renewcommand,\setcounter,\the,\toksdef}
+% \DoNotIndex{\value,\xdef,\\,\begingroup,\endgroup,\x,\a}
+% 
+% {\catcode`\|=0 \catcode`\\=12
+%  |gdef|bslash{\}}
+% \makeatletter\relax
+%
+% \newcommand{\usemacro}[2][altusage]{\relax
+%   \texttt{\bslash#2}\relax
+%   \indexmacro[#1]{#2}\relax
+% }
+% \newcommand{\seemacro}[2][altusage]{\relax
+%   \hyperlink{macro:#2}{\texttt{\bslash#2}}\relax
+%   \indexmacro[#1]{#2}\relax
+% }
+% \newcommand{\defmacro}[2][usage]{\relax
+%   \hypertarget{macro:#2}{\usemacro[#1]{#2}}\relax
+% }
+% \newcommand{\indexmacro}[2][altusage]{\relax
+%   \index{#2=\string\verb!*+\bslash#2+\string|#1}\relax\iffalse!\fi
+% }
+% \newcommand{\useenviron}[2][altusage]{\relax
+%   \texttt{#2}\relax
+%   \indexenviron[#1]{#2}\relax
+% }
+% \newcommand{\seeenviron}[2][altusage]{\relax
+%   \hyperlink{environ:#2}{\texttt{#2}}\relax
+%   \indexenviron[#1]{#2}\relax
+% }
+% \newcommand{\defenviron}[2][usage]{\relax
+%   \hypertarget{environ:#2}{\useenviron[#1]{#2}}\relax
+% }
+% \newcommand{\indexenviron}[2][altusage]{\relax
+%   \index{#2={\string\ttfamily\space#2} (environment)\string|#1}\relax
+%   \index{environments:>#2={\string\ttfamily\space#2}\string|#1}\relax
+% }
+% \newcommand{\useoption}[2][altusage]{\relax
+%   \texttt{#2}\relax
+%   \indexoption[#1]{#2}\relax
+% }
+% \newcommand{\seeoption}[2][altusage]{\relax
+%   \hyperlink{option:#2}{\texttt{#2}}\relax
+%   \indexoption[#1]{#2}\relax
+% }
+% \newcommand{\defoption}[2][usage]{\relax
+%   \hypertarget{option:#2}{\useoption[#1]{#2}}\relax
+% }
+% \newcommand{\indexoption}[2][altusage]{\relax
+%   \index{#2={\string\ttfamily\space#2} (package option)\string|#1}\relax
+%   \index{package options:>#2={\string\ttfamily\space#2}\string|#1}\relax
+% }
+% \newcommand{\useother}[2][altusage]{\relax
+%   \texttt{#2}\relax
+%   \indexother[#1]{#2}\relax
+% }
+% \newcommand{\seeother}[2][altusage]{\relax
+%   \hyperlink{other:#2}{\texttt{#2}}\relax
+%   \indexother[#1]{#2}\relax
+% }
+% \newcommand{\defother}[2][usage]{\relax
+%   \useother[#1]{#2}\relax
+% }
+% \newcommand{\indexother}[2][usage]{\relax
+%   \index{#2=\string\verb!*+#2+\string|#1}\relax\iffalse!\fi
+% }
+% \newcommand{\altusage}[1]{\emph{(#1)}}
+%
+% {
+% \makeatletter
+% \global\let\doc@old@tabular\tabular
+% \global\def\doctabular{\begingroup\catcode`\|=12\relax\doc@tabular}
+% \global\def\doc@tabular#1{\endgroup\doc@old@tabular{#1}}
+% }
+% \let\enddoctabular\endtabular
+%
+% \catcode`\|=12\relax
+% \newenvironment{decl}[1][3ex]
+%     {\par\addvspace{#1}\noindent
+%      \begin{tabular}{|l|l|}\hline\ignorespaces}
+%     {\\\hline\end{tabular}\nopagebreak\par\addvspace{1ex}\noindent
+%      \aftergroup\ignorespaces}
+% \catcode`\|=\active\relax
+%
+% \newcounter{macrosenv}
+% \newenvironment{macros}[1]
+%   {\setcounter{macrosenv}{0}
+%    \@for\@each@macro:=#1\do{
+%      \addtocounter{macrosenv}{1}
+%      \expandafter\macro\expandafter{\csname\@each@macro\endcsname}
+%    }}
+%   {\@whilenum\value{macrosenv}>0\do{
+%      \addtocounter{macrosenv}{-1}
+%      \endmacro
+%    }}
+%
+% ^^A Setup for printing guillemets and bullets in \tt for code listings
+% \newsavebox{\lguilbox}
+% \newsavebox{\rguilbox}
+% \newsavebox{\bulbox}
+% \newlength{\lguillen}
+% \newlength{\rguillen}
+% \newlength{\bullen}
+% \newlength{\ttcharlen}
+%
+% \sbox{\lguilbox}{\tt<}\setlength{\ttcharlen}{\wd\lguilbox}
+%
+% \sbox{\lguilbox}{\tt\tiny<}\setlength{\lguillen}{\wd\lguilbox}
+% \def\ttlguil{\mbox{\raisebox{1.5pt}{^^A
+%   \kern0.5pt{\tt\tiny<}^^A
+%   \kern\ttcharlen\kern-2\lguillen\kern-1pt^^A
+%   {\tt\tiny<}\kern0.5pt}}}
+%
+% \sbox{\rguilbox}{\tt\tiny>}\setlength{\rguillen}{\wd\rguilbox}
+% \def\ttrguil{\mbox{\raisebox{1.5pt}{^^A
+%   \kern0.5pt{\tt\tiny>}^^A
+%   \kern\ttcharlen\kern-2\rguillen\kern-1pt^^A
+%   {\tt\tiny>}\kern0.5pt}}}
+%
+% \def\ttbul{\raisebox{1.5pt}
+%   {\makebox[\ttcharlen]{\hfill{$\scriptscriptstyle\bullet$}\hfill}}}
+%
+% \title{The \textsf{pfsteps} package}
+% \author{Jesse A. Tov \\ \texttt{tov@ccs.neu.edu}}
+% \date{This document
+%   corresponds to \textsf{\filename}~\fileversion, dated \filedate.}
+% 
+% \maketitle
+%
+% \tableofcontents
+%
+% \section{Introduction}
+% \label{sec:intro}
+%
+% This package provides three distinct facilities for writing
+% mathematical proofs: proof step labeling, proof sequences, and the
+% |byCases| environment for case analysis.
+%
+% \paragraph{Proof step labeling.}
+% The package provides a set of commands for numbering proof steps locally
+% and referring back to those numbers.^^A
+% \footnote{The idea is based on
+% Didier R\'emy's \textsf{locallabel} package
+% (\url{http://cristal.inria.fr/~remy/latex/}), but the execution is
+% different.  In \textsf{locallabel}, a proof step number is printed and
+% labeled at the same time, whereas in this package, printing a proof
+% step number merely sets the current label so that a subsequent
+% \usemacro{pflabel} command can then attach a label to it. This is
+% appropriate for writing other commands that generate proof step
+% numbers automatically but don't always require the user to name them.
+% Also, unlike \textsf{locallabel}, we store proof step labels between
+% runs, so that forward references work.}
+% For example, to get
+% \begin{quote}
+% \usepfcounter[socrates]~Socrates is a man, and
+% \usepfcounter[men]~all men are mortal.
+% Therefore, by \pfref{socrates,men}, Socrates is mortal.
+% \end{quote}
+% we might type:
+% \begin{quote}
+% \begin{verbatim}
+% \usepfcounter[socrates]~Socrates is a man, and
+% \usepfcounter[men]~all men are mortal.
+% Therefore, by \pfref{socrates,men}, Socrates is mortal.\end{verbatim}
+% \end{quote}
+% The \usemacro{usepfcounter} command prints the next proof step
+% number, and if given an optional argument, associates that label name
+% with the proof step number.  Alternatively, if we leave the optional
+% argument out, we can capture the most recent proof step number using
+% the \usemacro{pflabel} command. For example, for the first line above,
+% we could have instead written:
+% \begin{quote}
+% \begin{verbatim}
+% \usepfcounter~Socrates is a man\pflabel{socrates}, and\end{verbatim}
+% \end{quote}
+% We can then refer to proof step labels using the \usemacro{pfref}
+% command, which takes a comma-separated list of proof step labels.
+%
+% Finally, the proof step labels are local. The command
+% \usemacro{resetpfcounter} ends the current numbering run, starts
+% at 1 again, and allows reusing the same labels as the previous
+% numbering run.  The package does not currently support refering to
+% proof steps outside the current numbering run.
+%
+% \paragraph{Proof sequences.}
+%
+% We provide environment \useenviron{pfsteps} and \useenviron{pfsteps*}
+% for line-by-line
+% proofs with justifications.
+% The |pfsteps| environment puts proof steps in math mode, and the
+% |pfsteps*| environment puts steps in text mode.
+% The lines are numbered using the proof
+% step labeling commands described above.  Combined together this
+% supports interspersing proof steps with explanatory text.
+% The |pfsteps|$[$|*|$]$ environments work like the |enumerate| list
+% environment,
+% except that their numbering uses proof labels, which can be named locally
+% with \usemacro{pflabel}, and they defines a command \usemacro{BY}, which
+% places proof step justifications to the right.
+% For example, to get:
+% \begin{quote}
+%   \setlength{\parskip}{0pt}
+%   \vspace{-1em}
+%   \resetpfcounter
+%   \begin{pfsteps*}
+%     \item Socrates is a man.  \pflabel{socrates}
+%     \item All men are mortal. \pflabel{men}
+%   \end{pfsteps*}
+%   Therefore,
+%   \begin{pfsteps*}
+%     \item Socrates is mortal.
+%             \BY{\pfref{men,socrates}}
+%   \end{pfsteps*}
+% \end{quote}
+% we can type:
+% \begin{quote}
+% \begin{verbatim}
+% \resetpfcounter
+% \begin{pfsteps*}
+%   \item Socrates is a man.  \pflabel{socrates}
+%   \item All men are mortal. \pflabel{men}
+% \end{pfsteps*}
+% Therefore,
+% \begin{pfsteps*}
+%   \item Socrates is mortal.
+%           \BY{\pfref{men,socrates}}
+% \end{pfsteps*}\end{verbatim}
+% \end{quote}
+%
+% We also (optionally) define an abbreviated syntax, which looks like
+% this:
+%
+% \begin{quote}
+% |\pfstepstextmode| \\
+% \ttlguil|@socrates Socrates is a man.| \\
+% \ttbul|@men All men are mortal.|\ttrguil \\
+% |Therefore,| \\
+% \ttlguil|Socrates is mortal.  \BY{\pfref{men,socrates}}|\ttrguil
+% \end{quote}
+%
+% \paragraph{The \texttt{byCases} environment.}
+%
+% We provide the \useenviron{byCases} environment for proofs by cases.
+% For example, to get this:
+% \begin{quote}
+% By cases on $n$:
+% \begin{byCases}
+%   \case{0} Something.
+%   \case{n' + 1} Something else.
+%   \otherwise There is no otherwise!
+% \end{byCases}
+% \end{quote}
+% type this:
+% \begin{quote}
+% \begin{verbatim}
+% By cases on $n$:
+% \begin{byCases}
+%   \case{0} Something.
+%   \case{n' + 1} Something else.
+%   \otherwise There is no otherwise!
+% \end{byCases}\end{verbatim}
+% \end{quote}
+%
+% \subsection{Requirements \& Other Packages}
+%
+% The \textsf{pfsteps} package depends on the \textsf{listproc} package,
+% which is a non-standard \LaTeX{} package available at
+%     \url{http://www.ccs.neu.edu/~tov/code/latex/}.
+%
+% It cooperates with several other packages if they are loaded, and can
+% load them by request:
+% \begin{description}
+%   \item[\sf{hyperref}] If loaded, this package is used to
+%     create hyperlinks to proof steps from proof step references.
+%   \item[\sf{mathpartir}] If loaded, we define an \usemacro{icase}
+%     command
+%     within the \useenviron{byCases} environment
+%     for considering inference rules by
+%     cases.  This non-standard package is available at
+%     \url{http://cristal.inria.fr/~remy/latex/}.
+%   \item[\normalfont{\sf ucs}, {\sf inputenc}]
+%     If these
+%     packages are loaded, we can use them to define a nice notation for
+%     writing sequence of proof steps.  The \textsf{inputenc} package
+%     must be loaded with the |utf8x| option.
+% \end{description}
+%
+% \section{Package Options}
+%
+% The package provides several options, which we document here.
+%
+% \newcommand{\optionbox}[2]{
+%   \addvspace{2ex}
+%   \par\noindent
+%   \begin{minipage}[t]{0.5\linewidth}
+%     \begin{decl}#1\end{decl}
+%   \end{minipage}{\emph{default:} #2}\par\noindent\ignorespaces
+% }
+%
+% \optionbox{\defoption{atsign}, \defoption{noatsign}}{true}
+% This option controls whether |@| may be used inside the
+% \useenviron{pfsteps}$[$|*|$]$ environment as a shorthand for
+% \usemacro{pflabel}.  This is on by default, but supplying the
+% |noatsign| option will turn it off.
+%
+% \optionbox{\defoption{hyperref}, \defoption{nohyperref}}{detect}
+% This controls integration with the \textsf{hyperref} package. If
+% neither option is specified, then we attempt to detect
+% \textsf{hyperref} and use it if it's detected.  Passing the
+% |nohyperref| option will prevent this integration, even if
+% \textsf{hyperref} is loaded.  Passing the |hyperref| option will cause
+% \textsf{hyperref} to be loaded if it wasn't already.  Because
+% \textsf{hyperref} likes to be loaded after other packages, it's
+% probably best not to specify either of these options and load it
+% yourself after other packages.
+%
+% \optionbox{\defoption{loadunicode}, \defoption{noloadunicode}}
+%       {state of \seeoption{unicode} option}
+% This option has no effect unless the
+% |unicode| option is turned on \emph{explicitly}, in which
+% case it defaults to true as well.  If
+% this option is on, we load two packages:
+% \begin{verbatim}
+%   \RequirePackage{ucs}
+%   \RequirePackage[utf8x]{inputenc}\end{verbatim}
+% Turning this option off by supplying |noloadunicode| will prevent
+% those packages from being loaded.  (Note that if the |unicode| option
+% is on, you probably need to load these or something like them in order
+% for it to work, or even for \textsf{pfsteps} to load properly.)
+%
+% \optionbox{\defoption{mathpartir}, \defoption{nomathpartir}}{detect}
+% As with the \seeoption{hyperref} option, this controls integration
+% with another package---in this case, Didier R\'emy's
+% \textsf{mathpartir}. We try to detect \textsf{mathpartir} by default,
+% but specifying |nomathpartir| will prevent detection and integration,
+% whereas explicitly passing the |mathpartir| option will cause it to be
+% loaded.
+%
+% \optionbox{\defoption{unicode}, \defoption{nounicode}}{false}
+% If this option is turned on, we define \ttlguil{} and \ttrguil{} as
+% shorthand for the \useenviron{pfsteps} environment and \ttbul{} as
+% |\item| within the environment.  By default, enabling this option
+% enables \seeoption{loadunicode} as well.
+%
+% Alternatively, it's possible to manually turn on the shorthand notation using
+% different characters with \seemacro{pfstepsSetupUnicode}.
+%
+% \section{Command Reference}
+%
+% \subsection{Proof Step Labeling}
+%
+% \begin{decl}
+%   \defmacro{resetpfcounter} \oarg{proof-step}
+% \end{decl}
+% Reset the proof step counter to \meta{proof-step} (default 0), which
+% starts a new proof section.  Labels from before using this command
+% become no longer accessible, but their names may be reused.  By
+% default, this is called by every \seemacro{case} command in the
+% |byCases| environment, but it may be disabled by redefining
+% \seemacro{byCasesEveryCase}.
+%
+% \begin{decl}
+%   \defmacro{usepfcounter} \oarg{label-name}
+% \end{decl}
+% Increment and print the proof counter.  If \meta{label-name}
+% is given, then we associate that name with the new proof step value.
+% To change how the proof counter is formatted, redefine
+% \seemacro{pfcounteranchor}.
+%
+% \begin{decl}
+%   \defmacro{pflabel} \marg{label-name}
+% \end{decl}
+% Associate \meta{label-name} with the current value of the proof
+% step counter.
+%
+% \begin{decl}
+%    \defmacro{pfref}
+%    |{|\meta{label-name}$_1$|,|$\ldots$|,|\meta{label-name}$_k$|}|
+% \end{decl}
+% Print references to the proof steps associated with one or label
+% names, which must be separated by commas.  The proof step numbers are
+% sorted, and then adjacent numbers are compressed into ranges.
+%
+% \begin{decl}
+%   \defmacro{steppfcounter} \oarg{label-name}
+% \end{decl}
+% Increment the proof counter, but don't print it.  If \meta{label-name}
+% is given, then we associate that name with the new proof step value.
+%
+% \begin{decl}
+%   \defmacro{thepfcounter} \\
+%   \hline
+%   \defmacro{thepfsectioncounter}
+% \end{decl}
+% These show the current proof counter and the proof section counter,
+% respectively.  (The proof section counter is incremented by each call
+% to \usemacro{resetpfcounter}.
+%
+% \begin{decl}
+%   \defmacro{pfcounteranchor} \marg{proof-step} \\
+%   \hline
+%   \defmacro{pfcounterref} \marg{proof-step}
+% \end{decl}
+% These are used to format proof step anchors and references. By
+% default, they just place parentheses around their arguments. Redefine
+% them to change how proof step numbers appear.
+%
+% \subsection{Proof Sequences}
+%
+% \begin{decl}
+%   |\begin{|\defenviron{pfsteps}|}| \\
+%   |  |\defmacro{item} \meta{math}
+%               $[$\defmacro{BY}\marg{justification}$]$ \\
+%   |  |$\vdots$ \\
+%   |\end{pfsteps}|
+% \end{decl}
+% Make a list of numbered proof steps.  Each |\item| is numbered using
+% \seemacro{usepfcounter}, so several instances of the |pfsteps|
+% environment in sequence will continue numbering from each to the next
+% instead of starting each at 1. (To reset the numbering, use
+% \seemacro{resetpfcounter}).  Optionally, |\BY|\marg{justification}
+% will print the provided justification for the given step in a
+% column on the right.
+%
+% Within the extent of this environment, a macro \defmacro{AND} is
+% defined, which prints the word ``and'' with appropriate space around
+% it in math mode.
+%
+% \begin{decl}
+%   |\begin{|\defenviron{pfsteps*}|}| \\
+%   |  |\defmacro{item} \meta{text}
+%               $[$\defmacro{BY}\marg{justification}$]$ \\
+%   |  |$\vdots$ \\
+%   |\end{pfsteps*}|
+% \end{decl}
+% Like the |pfsteps| environment, but the proof steps are in text rather
+% than math mode.
+%
+% \begin{decl}
+%   \defother{@}\meta{label-name}\verb*+ +
+% \end{decl}
+% Inside the |pfstep|$[$|*|$]$ environments, this is equivalent to
+% \usemacro{pflabel}\marg{label-name}, unless option
+% \seeoption{noatsign} is supplied, in which case |@| has no special
+% meaning inside the proof step environments.
+%
+% \begin{decl}
+%   \defmacro{proofleftskip}|=|\meta{dimen} & \emph{default:} |2pc|
+% \end{decl}
+% This dimension parameter determines the space reserved to the left of
+% each proof step for the step number.
+%
+% \begin{decl}
+%   \defmacro{proofrightwidth}|=|\meta{dimen} & \emph{default:}
+%   |0.3|\usemacro{linewidth}
+% \end{decl}
+% This dimension parameter determines the width used for proof step
+% justifications printed in the right column by |\BY|.
+%
+% \subsubsection{Unicode Shorthand}
+%
+% If option \seeoption{unicode} is enabled, then this notation is
+% defined:
+% \begin{decl}
+%   \ttlguil \meta{math} $[$\defmacro{BY}\marg{justification}$]$\\
+%   \ttbul \meta{math} $[$\defmacro{BY}\marg{justification}$]$\\
+%   $\vdots$ \\
+%   \ttrguil
+% \end{decl}
+% This is equivalent to using the \useenviron{pfsteps} environment,
+% where the first |\item| is started implicitly, and the Unicode bullet
+% \ttbul\ starts subsequent items.
+%
+% \begin{decl}
+%   \defmacro{pfstepsmathmode} \\
+%   \hline
+%   \defmacro{pfstepstextmode}
+% \end{decl}
+% Toggle the meaning of \ttlguil\ldots\ttrguil\ between math mode
+% (like environment |pfsteps|) and text mode (like environment
+% |pfsteps*|).  The initial state is math mode.
+%
+% \begin{decl}
+%   \defmacro{pfstepsSetupUnicode} \marg{start-code} \marg{stop-text}
+%               \marg{item-code}
+% \end{decl}
+% If option \seeoption{nounicode} is set, then this command may be used
+% to customize the |pfsteps| environment shorthand notation to use other
+% characters.  The arguments are as follows:
+% \begin{description}
+% \item[\rm\meta{start-code}] The Unicode code point, in decimal, for
+%    starting the notation. When setup automatically using the |unicode|
+%    option, this is |171|, which is the code
+%    point for \ttlguil.
+% \item[\rm\meta{stop-text}] The actual text for terminating the notation.
+%     When setup by the |unicode| option, this is \ttrguil.
+% \item[\rm\meta{item-code}] The Unicode code point, in decimal, for the
+%     |\item| separator. When setup by the |unicode| option, this is
+%     |8226|, which is the code point for \ttbul.
+% \end{description}
+% Note that the first and third arguments are decimal numbers
+% representing Unicode code points, whereas the second argument is the
+% actual symbol or sequence of symbols to use.
+%
+% \subsection{The \texttt{byCases} Environment}
+%
+% \begin{decl}
+%    |\begin{|\defenviron{byCases}|}| \\
+%    |  |\meta{by-cases-item} \ldots \\
+%    |\end{byCases}|
+% \end{decl}
+% Introduce a case analysis section.  Its contents must be a sequence of
+% items, which may be constructed out of several commands detailed
+% below.
+% This is similar to the
+% \useenviron{description} environment, but it changes the behavior of
+% |\item| and defines several other commands within its scope.
+% These are the commands defined or affected by |byCases|:
+% \begin{quotation}
+%   \begin{decl}[1ex]
+%     \defmacro{item} \oarg{math} \meta{text}
+%   \end{decl}
+%   Insert a case list item.  If \meta{math} is supplied, then the
+%   ``bullet'' is ``\textbf{Case }|$|\meta{math}|$|\textbf{.}''
+%   If \meta{math} is not supplied,
+%   then we begin the item with ``\textbf{Otherwise.}''
+%   \begin{decl}
+%     \defmacro{case} \oarg{extra} \marg{math} \meta{text}
+%   \end{decl}
+%   Insert a case list item with ``\textbf{Case
+%   }|$|\meta{math}|$|\textbf.'
+%   Unlike |\item|,
+%   this always puts a line break before \meta{text}.
+%   To change the appearance or language, redefine
+%   \seemacro{byCasesCaseTemplate}.
+%
+%   The optional argument \meta{extra} is some text to insert after the
+%   case head but before the line break. The default value is
+%   \seemacro{byCasesEveryCase}.
+%   \begin{decl}
+%     \defmacro{otherwise} \oarg{extra} \meta{text}
+%   \end{decl}
+%   Insert a case list item, with ``\textbf{Otherwise.}''  Unlike |\item|,
+%   this always puts a line break before \meta{text}.
+%   To change the appearance or language, redefine
+%   \seemacro{byCasesOtherwiseTemplate}.
+%
+%   The optional argument \meta{extra} is some text to insert after the
+%   case head but before the line break. The default value is
+%   \seemacro{byCasesEveryOtherwise}.
+%   \begin{decl}
+%      \defmacro{icase} \oarg{rule-name} \marg{premises} \\
+%      |      | \marg{conclusion} \oarg{where-clause}
+%       \\
+%   \hline
+%      \defmacro{icase*} \oarg{inferrule*-opts} \marg{premises} \\
+%      |       | \marg{conclusion} \oarg{where-clause}
+%   \end{decl}
+%   These commands are defined only
+%   if the \textsf{mathpartir} package is detected or loaded explicitly
+%   with the \seeoption{mathpartir} option.  In that case, they typeset
+%   a case using an inference rule.  The non-starred variant uses
+%   \usemacro{inferrule} and the starred variant uses
+%   \usemacro{inferrule*}. Thus, the first optional argument to |icase|
+%   is a rule name and the first optional argument to |icase*| is a
+%   key-value list of options understood by |\inferrule*|.
+%
+%   The second
+%   and third arguments are the premises and conclusion to put in the
+%   inference rule.
+%
+%   Then, the final, optional argument, allows
+%   specifying a side condition, which will be printed after the
+%   inference rule like
+%   ``~\textbf{where}~|$|\meta{where-clause}|$|\textbf.''  The text can
+%   be changed by redefining \seeoption{byCasesWhereTemplate}.
+% \end{quotation}
+%
+% \begin{decl}
+%   \defmacro{byCasesEveryCase} \\
+%   \hline
+%   \defmacro{byCasesEveryOtherwise}
+% \end{decl}
+% These are the default values for the optional argument \oarg{extra} of
+% |\case| and |\otherwise|.  The initial value of |\byCasesEveryCase| is
+% \seemacro{resetpfcounter}, so that every case implicitly resets the
+% proof counter. The initial value of |\byCasesEveryOtherwise| points to
+% |\byCasesEveryCase|.  These can be redefined to avoid automatic proof
+% counter resets, or to change the behavior of |\case| and |\otherwise|
+% in some other ways.  Or, they can be ignored on a case-by-case basis
+% by passing a blank for \meta{extra}.
+%
+% \begin{decl}
+%   \textbf{command} & \textbf{default} \\
+%   \hline
+%   \hline
+%   \defmacro{byCasesCaseTemplate} \marg{case-text}
+%   & |\textbf{Case |\marg{case-text}|.}|
+%   \\
+%   \hline
+%   \defmacro{byCasesOtherwiseTemplate}
+%   & |\textbf{Otherwise.}|
+%   \\
+%   \hline
+%   \defmacro{byCasesWhereTemplate}
+%   & |\textbf{where}|
+% \end{decl}
+% These are used by the |\case|, |\otherwise|, and |\icase| templates to
+% create the text ``Case,'' ``Otherwise'', and ``where'' along with the
+% styling. Redefine them to change how these are presented.
+%
+% \StopEventually{
+%   \PrintChanges
+%   \setcounter{IndexColumns}{2}
+%   \clearpage
+%   \PrintIndex
+% }
+%
+% \section{Implementation}
+%
+% We begin by loading the \textsf{listproc} package:
+%    \begin{macrocode}
+\RequirePackage{listproc}
+%    \end{macrocode}
+% \subsection{Package Options}
+% \begin{macros}{pfsteps@set,pfsteps@option}
+% These macros make it easy to add package options.  Each use of
+% |\pfsteps@option|\marg{name} creates both the named option \meta{name}
+% and its opposite, |no|\meta{name}, and sets things up so that we can
+% detect whether an option has been explicitly set, explicitly unset, or
+% left to default.
+%    \begin{macrocode}
+\newcommand*\pfsteps@set[3][]{
+  \expandafter\let\csname #1pfsteps@#2\endcsname#3
+}
+\newcommand*\pfsteps@option[2][\iffalse]{
+  \pfsteps@set[if]{#2}#1
+  \pfsteps@set[if]{#2@set}\iffalse
+  \DeclareOption{#2}{
+    \pfsteps@set[if]{#2}\iftrue
+    \pfsteps@set[if]{#2@set}\iftrue
+  }
+  \DeclareOption{no#2}{
+    \pfsteps@set[if]{#2}\iffalse
+    \pfsteps@set[if]{#2@set}\iftrue
+  }
+}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{ifpfsteps@atsign,ifpfsteps@atsign@set,ifpfsteps@hyperref,ifpfsteps@hyperref@set,ifpfsteps@loadunicode,ifpfsteps@loadunicode@set,ifpfsteps@mathpartir,ifpfsteps@mathpartir@set,ifpfsteps@unicode,ifpfsteps@unicode@set}
+% This sets up all the options.  The first four of them default to
+% \emph{true}.  Then, we process the package options.
+%    \begin{macrocode}
+\pfsteps@option[\iftrue]{atsign}
+\pfsteps@option[\iftrue]{hyperref}
+\pfsteps@option[\iftrue]{loadunicode}
+\pfsteps@option[\iftrue]{mathpartir}
+\pfsteps@option{unicode}
+\ProcessOptions
+%    \end{macrocode}
+% \end{macros}
+% If both the \seeoption{unicode} and \seeoption{loadunicode} options
+% are set, we load the relevant packages.
+%    \begin{macrocode}
+\ifpfsteps@unicode
+  \ifpfsteps@loadunicode
+    \RequirePackage{ucs}
+    \RequirePackage[utf8x]{inputenc}
+  \fi
+\fi
+%    \end{macrocode}
+% If \seeoption{mathpartir} has been explicitly set, load it.
+%    \begin{macrocode}
+\ifpfsteps@mathpartir
+  \ifpfsteps@mathpartir@set
+    \RequirePackage{mathpartir}
+  \fi
+\fi
+%    \end{macrocode}
+% If \seeoption{hyperref} has been explicitly set, load it.
+%    \begin{macrocode}
+\ifpfsteps@hyperref
+  \ifpfsteps@hyperref@set
+    \RequirePackage{hyperref}
+  \fi
+\fi
+%    \end{macrocode}
+% \subsection{Proof Step Numbering}
+% This section is based on Didier R\'emy’s \textsf{locallabel} package.
+% It differs in terms of the protocol for when proof steps are defined
+% versus displayed.
+% \begin{macros}{pfcounteranchor,pfcounterref}
+% User redefinable commands for formatting proof step numbers:
+%    \begin{macrocode}
+\newcommand{\pfcounteranchor}[1]{(#1)}
+\newcommand{\pfcounterref}[1]{(#1)}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{c@pfsteps@pfc@global,c@pfsteps@pfc@local}
+% Two counters for proof steps, one to keep track of how many times
+% we've reset the count, and the other to keep the current step count.
+%    \begin{macrocode}
+\newcounter{pfsteps@pfc@global}
+\newcounter{pfsteps@pfc@local}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{resetpfcounter,thepfcounter,thepfsectioncounter,steppfcounter}
+% Simple counter management:
+%    \begin{macrocode}
+\newcommand{\resetpfcounter}[1][0]
+  {\stepcounter{pfsteps@pfc@global}\setcounter{pfsteps@pfc@local}{#1}}
+\newcommand{\thepfcounter}
+  {\the\value{pfsteps@pfc@local}}
+\newcommand{\thepfsectioncounter}
+  {\the\value{pfsteps@pfc@global}}
+\newcommand{\steppfcounter}[1][\relax]{%
+  \addtocounter{pfsteps@pfc@local}{1}%
+   \ifx\relax#1\relax\else
+     \pflabel{#1}%
+   \fi
+}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{usepfcounter}
+% To advance and print the proof counter.  We use
+% \usemacro{pfsteps@hypertarget}, which delegates to
+% \usemacro{hypertarget} if \textsf{hyperref} has been detected.
+%    \begin{macrocode}
+\newcommand{\usepfcounter}[1][\relax]{%
+  \steppfcounter[#1]%
+  \pfsteps@hypertarget{pfc:\thepfsectioncounter:\thepfcounter}{%
+    \pfcounteranchor{\thepfcounter}%
+  }%
+}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{pfsteps@pfc@cs,pfsteps@pfc@,pfsteps@strip}
+% These are helper macros for turning a proof label name into the name
+% of the command that we store its number in.  |\pfsteps@pfc@cs|
+% actually returns the control sequence, whereas |\pfsteps@pfc@| just
+% returns the name of the control sequence.  Both use |\pfsteps@strip|
+% to remove spaces from the proof label.
+%    \begin{macrocode}
+\newcommand{\pfsteps@pfc@cs}[1]
+  {\csname\pfsteps@pfc@{\pfsteps@strip#1 \@empty}\endcsname}
+\newcommand{\pfsteps@pfc@}[1]
+  {pfsteps@pfc@\pfsteps@strip#1 \@empty @\thepfsectioncounter}
+\def\pfsteps@strip#1 #2{%
+  #1%
+  \ifx#2\@empty\else\expandafter\pfsteps@strip\fi
+  #2}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{pflabel}
+% This associates a name with the current state of the proof counter.
+% It both defines a macro in current session for producing backward proof step
+% references write away, and writes code to the auxiliary file so that
+% forward proof step referenced work in the next run.  To make this work
+% smoothly, it actually defines two macros whose names are based on the
+% current proof state.  The main one is used to hold the proof step
+% number. The extra macro, which ends with |@thisrun|, is defined for
+% the current session but not in the auxiliary file.  We can then use
+% |@thisrun| to detect attempts to reuse the same label name in the same
+% proof section in the same run, in order to issue a warning.
+%    \begin{macrocode}
+\newcommand{\pflabel}[1]
+  {\expandafter\ifx\csname\pfsteps@pfc@{#1}@thisrun\endcsname\relax
+     \expandafter\xdef\csname\pfsteps@pfc@{#1}\endcsname
+       {\thepfcounter}%
+     \expandafter\gdef\csname\pfsteps@pfc@{#1}@thisrun\endcsname
+       {}%
+     \immediate\write\@auxout{
+       \noexpand\pfsteps@def@label
+         {#1}{\thepfsectioncounter}{\thepfcounter}
+     }%
+   \else
+     \PackageWarning{pfsteps}
+        {Proof step (#1) already defined in this section}%
+   \fi}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{pfsteps@def@label}
+% This is the command written to the auxiliary file, so we have it
+% defined here in order to run it when loading the auxiliary file.
+%    \begin{macrocode}
+\newcommand*{\pfsteps@def@label}[3]{
+  \expandafter\gdef
+    \csname pfsteps@pfc@#1@#2\endcsname
+    {#3}
+}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{pfref}
+% For creating proof step references.  The bulk of this is a large
+% \textsf{listproc} list expression, which does several steps: parse the
+% argument as a comma-separated list of label names; map over those
+% names to build pairs of the raw number as a sorting key and the
+% formatted (possibly hyperlinked) references, or suitable error
+% messages if the label isn't defined; sort by the numeric key, which is
+% the proof step number, and compress adjacent keys into ranges.
+%    \begin{macrocode}
+\newcommand*{\pfref}[1]
+{{\ListExprTo
+    {\Compress[\@apply@group\@firstoftwo]
+     {\Sort[\@apply@group\@firstoftwo]
+      {\Map
+       {%
+        {\@ifundefined{\pfsteps@pfc@{##1}}
+           {-1}
+           {\csname\pfsteps@pfc@{##1}\endcsname}}%
+        {\@ifundefined{\pfsteps@pfc@{##1}}
+           {\PackageWarning{pfsteps}
+              {Proof step (##1) not yet defined in this section}%
+            \textbf{?}}
+           {\pfsteps@hyperlink
+             {pfc:\thepfsectioncounter:\pfsteps@pfc@cs{##1}}
+             {\pfsteps@pfc@cs{##1}}}}}
+       {\List{#1}}}}}
+    \pfsteps@pfref@list
+%    \end{macrocode}
+% We finish up by setting singleton proof steps to print as-is and
+% ranges to print with en dashes.  We set \usemacro{listitem} to print
+% the first list item with no punctuation and to redefine itself to
+% print commas for subsequent items.
+%    \begin{macrocode}
+  \let\listitem\pfsteps@pfref@listitem@first
+  \def\@single##1{\@secondoftwo##1}%
+  \def\@range##1##2{\@secondoftwo##1--\@secondoftwo##2}%
+  \pfcounterref{\pfsteps@pfref@list}%
+}}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{pfsteps@pfref@listitem@first,pfsteps@pfref@listitem@rest}
+% |\pfref| uses these to print a comma separated list.
+%    \begin{macrocode}
+\newcommand\pfsteps@pfref@listitem@first[1]{%
+  #1\let\listitem\pfsteps@pfref@listitem@rest
+}
+\newcommand\pfsteps@pfref@listitem@rest[1]{%
+  , #1\let\listitem\pfsteps@pfref@listitem@rest
+}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{pfsteps@hypertarget,pfsteps@hyperlink}
+% This is the \textsf{hyperref} compatibility layer. We initially define
+% our compatibility commands to ignore the first argument (which is an
+% anchor name) and just print the second.  Then, if the
+% \seeoption{hyperref} option is enabled, either by default or by
+% choice, we wait until the preamble ends and attempt to detect
+% \textsf{hyperref}.  If it's detected, we redefine the compatibility
+% macros to use the real things.
+%    \begin{macrocode}
+\newcommand\pfsteps@hypertarget[2]{#2}
+\newcommand\pfsteps@hyperlink[2]{#2}
+\ifpfsteps@hyperref
+  \AtBeginDocument{
+    \ifcsname hypertarget\endcsname
+      \let\pfsteps@hypertarget=\hypertarget
+      \let\pfsteps@hyperlink=\hyperlink
+    \fi
+  }
+\fi
+%    \end{macrocode}
+% \end{macros}
+% \subsection{Proof Sequences}
+% \begin{macros}{proofleftskip,proofrightwidth}
+% Length parameters for configuring spacing of the |pfsteps|
+% environment.
+%    \begin{macrocode}
+\newlength{\proofleftskip}
+\newlength{\proofrightwidth}
+\setlength{\proofleftskip}{2pc}
+\setlength{\proofrightwidth}{0.3\linewidth}
+%    \end{macrocode}
+% \end{macros}
+% \begin{environment}{pfsteps}
+% \changes{v0.4}{2011/04/04}{Spacing bug fixes: Sets parskip to 0pt,
+% so we don't get really wide spacing in proofs. Avoids weird behavior
+% when proof steps are too long.}
+% \begin{environment}{pfsteps*}
+% The |pfsteps| and |pfsteps*| environments are both defined in terms of
+% the underlying |pfsteps@with| environment, which takes an argument to
+% determine whether proof steps are in math mode.
+%    \begin{macrocode}
+\newenvironment{pfsteps}
+        {\begin{pfsteps@with}$}
+        {\end{pfsteps@with}}
+\newenvironment{pfsteps*}
+        {\begin{pfsteps@with}{}}
+        {\end{pfsteps@with}}
+%    \end{macrocode}
+% \end{environment}
+% \end{environment}
+% \begin{environment}{pfsteps@with}
+% The implementation of the |pfsteps| environment.  The whole thing is
+% set in a \usemacro{trivlist}, using \usemacro{item} for line breaks.
+%    \begin{macrocode}
+\newenvironment{pfsteps@with}[1]
+{
+  \leavevmode\begingroup
+  \setlength{\parskip}{0pt}%
+  \trivlist
+  \raggedright
+  \setlength{\leftskip}{1.5\proofleftskip}
+%    \end{macrocode}
+% Save some commands that we want to redefine in here.
+%    \begin{macrocode}
+  \let\pfstepsSavedItem\item
+  \let\pfstepsSavedLabel\label
+  \let\pfstepsSavedQedhere\qedhere
+%    \end{macrocode}
+% \begin{macros}{AND,BY,item,label,qedhere}
+% We then setup several commands that are internal to the environment.
+% The interesting ones are |\BY| and |\item|.  For |\BY|, we break out
+% of math mode if we're in it, and then set the justification in a
+% minipage of the configured with. However, right before the minipage,
+% we use |\penalty-1| to encourage a page break if there isn't enough
+% room left on the line for the justification box, and then we |\hfill|
+% to right align it.  The result is that justifications appear cleanly
+% to the right of proof steps, on new lines only when necessary.
+%    \begin{macrocode}
+  \newcommand\AND[1][and]{\mathrel{\mbox{##1}}}
+  \newcommand\BY[2][by]
+    {\pfsteps@unmath{\penalty-1 \mbox{~}\hfill%
+     \begin{minipage}[t]{\proofrightwidth}%
+       \raggedright##1 ##2%
+     \end{minipage}}}
+%    \end{macrocode}
+% For |\item|, we break out of math mode if necessary, then start a new
+% underlying |\item|, generate a proof step number, and optionall go
+% back into math mode.
+%    \begin{macrocode}
+  \def\pfstepsItem{%
+    \pfsteps@stopmath
+    \pfstepsSavedItem\mbox{}\kern-1.25\proofleftskip
+    \makebox[\proofleftskip]{\hfill\usepfcounter}\kern0.25\proofleftskip
+    #1\relax}
+%    \end{macrocode}
+% For |\qedhere|, we need to temporarily break out of math mode, or the
+% QED box ends up in a weird place.
+%    \begin{macrocode}
+  \def\pfstepsQedhere{\pfsteps@unmath{\pfstepsSavedQedhere}}
+%    \end{macrocode}
+% We redefine |\item|, |\label|, and |\qedhere| to use the proof steps
+% versions of the same.
+%    \begin{macrocode}
+  \let\item\pfstepsItem
+  \let\label\pflabel
+  \let\qedhere\pfstepsQedhere
+%    \end{macrocode}
+% \end{macros}
+%    \begin{macrocode}
+  \ifpfsteps@atsign
+    \pfsteps@setup@atsign
+  \fi
+  \relax
+}
+{
+  \pfsteps@stopmath
+  \endtrivlist\endgroup
+  \noindent\ignorespaces
+}
+%    \end{macrocode}
+% \end{environment}
+% \begin{macros}{pfsteps@stopmath,pfsteps@unmath}
+% Two commands for getting us out of math mode, but only if we're in it.
+% |\pfsteps@unmath| takes an argument to set outside of math mode, and
+% then reinstates math mode only if we were in math mode to begin with.
+% This is useful compared to creating an |\mbox| in math mode, because
+% it \emph{ends} the current math environment, which will then let us do
+% something like start a new list item before entering math mode again.
+%    \begin{macrocode}
+\newcommand\pfsteps@stopmath{\ifmmode$\fi}
+\newcommand\pfsteps@unmath[1]{\ifmmode$\relax#1\relax$\else\relax#1\relax\fi}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{pfsetps@setup@atsign}
+% A macro to make |@| active and define it to alias |\pflabel|.  A bit
+% tricky, since we also want |@| in the name of the command.
+%    \begin{macrocode}
+{
+  \def\atsign{@}
+  \catcode`\@=\active\relax
+  \expandafter\gdef\csname pfsteps\atsign setup\atsign atsign\endcsname{
+    \catcode`\@=\active\relax
+    \gdef@##1 {\pflabel{##1}}
+  }
+}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{pfstepsmathmode,pfstepstextmode}
+% Commands to determine whether the Unicode short hand is in math or
+% text mode.
+%    \begin{macrocode}
+\newcommand\pfstepsmathmode{\def\pfsteps@unicode@arg{$}}
+\newcommand\pfstepstextmode{\def\pfsteps@unicode@arg{\relax}}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{pfstepsSetupUnicode,pfsteps@unicode@startpfsteps,pfsteps@unicode@startpfsteps@kont,pfsteps@unicode@item}
+% For setting up the Unicode |pfsteps| shortcut. This associates the
+% code points of the start and item sequences with commands that
+% implement them, and then defines those commands.  We default to math
+% mode.
+%    \begin{macrocode}
+\newcommand\pfstepsSetupUnicode[3]{
+  \DeclareUnicodeCharacter{#1}{\pfsteps@unicode@startpfsteps}
+  \DeclareUnicodeCharacter{#3}{\pfsteps@unicode@item}
+  \def\pfsteps@unicode@startpfsteps
+    {\begingroup
+     \ifpfsteps@atsign\catcode`\@=\active\relax\fi
+     \pfsteps@unicode@startpfsteps@kont}
+  \def\pfsteps@unicode@startpfsteps@kont##1#2
+    {\begin{pfsteps@with}\pfsteps@unicode@arg\item##1\end{pfsteps@with}%
+     \endgroup}
+  \def\pfsteps@unicode@item{\item}
+  \pfstepsmathmode
+}
+%    \end{macrocode}
+% \end{macros}
+% If the \seeoption{unicode} option is set, then we setup unicode with
+% left and right guillemets as the delimiters and bullet as the item
+% separator.  The second argument to |\pfstepsSetupUnicode| below, which
+% appears empty in the documentation, is the right guillemet \ttrguil.
+% The two numbers, 171 and 8226, are the code
+% points for left guillemet and bullet, respectively.
+% \changes{v0.3}{2011/03/31}{Input encoding bug fix for right guillemet}
+%    \begin{macrocode}
+\ifpfsteps@unicode
+  \pfstepsSetupUnicode{171}{»}{8226} % « » •
+\fi
+%    \end{macrocode}
+% \subsection{The \texttt{byCases} Environment}
+%
+% \begin{macros}{byCasesEveryCase,byCasesEveryOtherwise,byCasesOtherwiseTemplate,byCasesCaseTemplate,byCasesWhereTemplate}
+% User configuration macros. The first two cause the proof
+% step to be automatically reset for every case item, and the last three
+% specify how case items are to appear.
+%    \begin{macrocode}
+\newcommand\byCasesEveryCase{\resetpfcounter}
+\newcommand\byCasesEveryOtherwise{\byCasesEveryCase}
+\providecommand{\byCasesOtherwiseTemplate}{\textbf{Otherwise.}}
+\providecommand{\byCasesCaseTemplate}[1]{\textbf{Case {#1}.}}
+\providecommand{\byCasesWhereTemplate}{\textbf{where}}
+%    \end{macrocode}
+% \end{macros}
+% \begin{environment}{byCases}
+% This environment is based on the |description| environment built-in to
+% \LaTeX.  However, we also bring |\case| and |\otherwise| into scope by
+% aliasing them to the actual definitions (below).
+%    \begin{macrocode}
+\newenvironment{byCases}
+  {%
+    \begingroup
+    \let\case\byCases@case
+    \let\otherwise\byCases@otherwise
+%    \end{macrocode}
+% Package \textsf{mathpartir} integration: if the option is set and the
+% command is in scope, then we bring |\icase| into scope.
+%    \begin{macrocode}
+    \ifpfsteps@mathpartir
+      \ifcsname inferrule\endcsname\let\icase\byCases@icase\fi
+    \fi
+    \list{}{\labelwidth\z@ \itemindent-\leftmargin
+            \let\makelabel\byCases@label}%
+  }
+  {%
+    \endlist
+    \endgroup
+  }
+%    \end{macrocode}
+% \end{environment}
+% \begin{macros}{item}
+% This is the implementation of |\item| labels for |byCases| lists.
+%    \begin{macrocode}
+\newcommand*\byCases@label[1]{%
+  \hspace\labelsep
+  \normalfont~\strut
+  \expandafter\ifx#1\relax\relax
+    \byCasesOtherwiseTemplate
+  \else
+    \byCasesCaseTemplate{\normalfont${#1}$}%
+  \fi
+}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{case,otherwise,AND,byCases@case,byCases@otherwise,pfsteps@reallynopagebreak}
+% These are the actual definitions of |\case| and |\otherwise| that
+% |\byCases| brings into scope with accessible names.  Mostly, they
+% delegate to |\item| and then produce a line break while suppressing
+% any page break.  In |\case|, it defines |\AND| to produce a properly
+% spaced text `` and '' in math mode, just for the scope of
+% the item label.
+%    \begin{macrocode}
+\newcommand*\byCases@case[2][\byCasesEveryCase]
+  {\item[{\let\AND\byCases@and #2}]\strut#1\pfsteps@reallynopagebreak}
+\newcommand*\byCases@otherwise[1][\byCasesEveryOtherwise]
+  {\item[]\strut#1\pfsteps@reallynopagebreak}
+\newcommand\pfsteps@reallynopagebreak{\par\nopagebreak\@nobreaktrue}
+\newcommand\byCases@and[1][and]{\mathrel{\mbox{\textbf{#1}}}}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{icase,byCases@icase,byCases@icase@start,byCases@icase@nostar}
+% The first thing |\icase| does is detect whether it is being called as
+% |\icase| or as |\icase*| and dispatches accordingly.  These then
+% select either \usemacro{inferrule} or \usemacro{inferrule*}.
+%    \begin{macrocode}
+\newcommand*\byCases@icase{
+  \@ifnextchar* \byCases@icase@star \byCases@icase@nostar
+}
+\def\byCases@icase@nostar{\byCases@icase@i{\inferrule}}
+\def\byCases@icase@star*{\byCases@icase@i{\inferrule*}}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{byCases@icase@i,byCases@icase@opts,byCases@icase@noopts}
+% The next thing to check for is the first optional argument; we
+% dispatch accordingly and pass the version of |inferrule| to use along
+% with the optional argument, if necessary, to |byCases@icase@ii|.
+%    \begin{macrocode}
+\newcommand*\byCases@icase@i[1]{
+  \@ifnextchar [{\byCases@icase@opts{#1}}{\byCases@icase@noopts{#1}}
+}
+\def\byCases@icase@opts#1[#2]{\byCases@icase@ii{#1[#2]}}
+\def\byCases@icase@noopts#1{\byCases@icase@ii{#1}}
+%    \end{macrocode}
+% \end{macros}
+% \begin{macros}{byCases@icase@ii,byCases@icase@where,byCases@icase@nowhere}
+% This macro receives three arguments: (|#1|) the variant of |inferrule|
+% along with any optional argument, (|#2|) the premises, and (|#3|) the
+% conclusion. It then checks for the final, optional argument which
+% specifies a where clause, and dispatches accordingly.
+%    \begin{macrocode}
+\newcommand*\byCases@icase@ii[3]{
+  \@ifnextchar [
+    {\byCases@icase@where{#1}{#2}{#3}}
+    {\byCases@icase@nowhere{#1}{#2}{#3}}
+}
+\def\byCases@icase@where#1#2#3[#4]{
+  \case{#1{#2}{#3}\AND[\byCasesWhereTemplate]#4}%
+}
+\def\byCases@icase@nowhere#1#2#3{\case{#1{#2}{#3}}}
+%    \end{macrocode}
+% \end{macros}
+%
+% \Finale
+%
+\endinput

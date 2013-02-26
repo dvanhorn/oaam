@@ -1,0 +1,279 @@
+%%
+%% This is file `pfsteps.sty',
+%% generated with the docstrip utility.
+%%
+%% The original source files were:
+%%
+%% pfsteps.dtx  (with options: `package')
+%% 
+%% Copyright (C) 2011 by Jesse A. Tov
+%% 
+%% This file may be distributed and/or modified under the conditions of the
+%% LaTeX Project Public License, either version 1.2 of this license or (at
+%% your option) any later version. The latest version of this license is
+%% in:
+%% 
+%%    http://www.latex-project.org/lppl.txt
+%% 
+%% and version 1.2 or later is part of all distributions of LaTeX
+%% version 1999/12/01 or later.
+%% 
+\NeedsTeXFormat{LaTeX2e}[1999/12/01]
+\ProvidesPackage{pfsteps}
+ [2011/04/04 v0.4 proof tools]
+\RequirePackage{listproc}
+\newcommand*\pfsteps@set[3][]{
+  \expandafter\let\csname #1pfsteps@#2\endcsname#3
+}
+\newcommand*\pfsteps@option[2][\iffalse]{
+  \pfsteps@set[if]{#2}#1
+  \pfsteps@set[if]{#2@set}\iffalse
+  \DeclareOption{#2}{
+    \pfsteps@set[if]{#2}\iftrue
+    \pfsteps@set[if]{#2@set}\iftrue
+  }
+  \DeclareOption{no#2}{
+    \pfsteps@set[if]{#2}\iffalse
+    \pfsteps@set[if]{#2@set}\iftrue
+  }
+}
+\pfsteps@option[\iftrue]{atsign}
+\pfsteps@option[\iftrue]{hyperref}
+\pfsteps@option[\iftrue]{loadunicode}
+\pfsteps@option[\iftrue]{mathpartir}
+\pfsteps@option{unicode}
+\ProcessOptions
+\ifpfsteps@unicode
+  \ifpfsteps@loadunicode
+    \RequirePackage{ucs}
+    \RequirePackage[utf8x]{inputenc}
+  \fi
+\fi
+\ifpfsteps@mathpartir
+  \ifpfsteps@mathpartir@set
+    \RequirePackage{mathpartir}
+  \fi
+\fi
+\ifpfsteps@hyperref
+  \ifpfsteps@hyperref@set
+    \RequirePackage{hyperref}
+  \fi
+\fi
+\newcommand{\pfcounteranchor}[1]{(#1)}
+\newcommand{\pfcounterref}[1]{(#1)}
+\newcounter{pfsteps@pfc@global}
+\newcounter{pfsteps@pfc@local}
+\newcommand{\resetpfcounter}[1][0]
+  {\stepcounter{pfsteps@pfc@global}\setcounter{pfsteps@pfc@local}{#1}}
+\newcommand{\thepfcounter}
+  {\the\value{pfsteps@pfc@local}}
+\newcommand{\thepfsectioncounter}
+  {\the\value{pfsteps@pfc@global}}
+\newcommand{\steppfcounter}[1][\relax]{%
+  \addtocounter{pfsteps@pfc@local}{1}%
+   \ifx\relax#1\relax\else
+     \pflabel{#1}%
+   \fi
+}
+\newcommand{\usepfcounter}[1][\relax]{%
+  \steppfcounter[#1]%
+  \pfsteps@hypertarget{pfc:\thepfsectioncounter:\thepfcounter}{%
+    \pfcounteranchor{\thepfcounter}%
+  }%
+}
+\newcommand{\pfsteps@pfc@cs}[1]
+  {\csname\pfsteps@pfc@{\pfsteps@strip#1 \@empty}\endcsname}
+\newcommand{\pfsteps@pfc@}[1]
+  {pfsteps@pfc@\pfsteps@strip#1 \@empty @\thepfsectioncounter}
+\def\pfsteps@strip#1 #2{%
+  #1%
+  \ifx#2\@empty\else\expandafter\pfsteps@strip\fi
+  #2}
+\newcommand{\pflabel}[1]
+  {\expandafter\ifx\csname\pfsteps@pfc@{#1}@thisrun\endcsname\relax
+     \expandafter\xdef\csname\pfsteps@pfc@{#1}\endcsname
+       {\thepfcounter}%
+     \expandafter\gdef\csname\pfsteps@pfc@{#1}@thisrun\endcsname
+       {}%
+     \immediate\write\@auxout{
+       \noexpand\pfsteps@def@label
+         {#1}{\thepfsectioncounter}{\thepfcounter}
+     }%
+   \else
+     \PackageWarning{pfsteps}
+        {Proof step (#1) already defined in this section}%
+   \fi}
+\newcommand*{\pfsteps@def@label}[3]{
+  \expandafter\gdef
+    \csname pfsteps@pfc@#1@#2\endcsname
+    {#3}
+}
+\newcommand*{\pfref}[1]
+{{\ListExprTo
+    {\Compress[\@apply@group\@firstoftwo]
+     {\Sort[\@apply@group\@firstoftwo]
+      {\Map
+       {%
+        {\@ifundefined{\pfsteps@pfc@{##1}}
+           {-1}
+           {\csname\pfsteps@pfc@{##1}\endcsname}}%
+        {\@ifundefined{\pfsteps@pfc@{##1}}
+           {\PackageWarning{pfsteps}
+              {Proof step (##1) not yet defined in this section}%
+            \textbf{?}}
+           {\pfsteps@hyperlink
+             {pfc:\thepfsectioncounter:\pfsteps@pfc@cs{##1}}
+             {\pfsteps@pfc@cs{##1}}}}}
+       {\List{#1}}}}}
+    \pfsteps@pfref@list
+  \let\listitem\pfsteps@pfref@listitem@first
+  \def\@single##1{\@secondoftwo##1}%
+  \def\@range##1##2{\@secondoftwo##1--\@secondoftwo##2}%
+  \pfcounterref{\pfsteps@pfref@list}%
+}}
+\newcommand\pfsteps@pfref@listitem@first[1]{%
+  #1\let\listitem\pfsteps@pfref@listitem@rest
+}
+\newcommand\pfsteps@pfref@listitem@rest[1]{%
+  , #1\let\listitem\pfsteps@pfref@listitem@rest
+}
+\newcommand\pfsteps@hypertarget[2]{#2}
+\newcommand\pfsteps@hyperlink[2]{#2}
+\ifpfsteps@hyperref
+  \AtBeginDocument{
+    \ifcsname hypertarget\endcsname
+      \let\pfsteps@hypertarget=\hypertarget
+      \let\pfsteps@hyperlink=\hyperlink
+    \fi
+  }
+\fi
+\newlength{\proofleftskip}
+\newlength{\proofrightwidth}
+\setlength{\proofleftskip}{2pc}
+\setlength{\proofrightwidth}{0.3\linewidth}
+\newenvironment{pfsteps}
+        {\begin{pfsteps@with}$}
+        {\end{pfsteps@with}}
+\newenvironment{pfsteps*}
+        {\begin{pfsteps@with}{}}
+        {\end{pfsteps@with}}
+\newenvironment{pfsteps@with}[1]
+{
+  \leavevmode\begingroup
+  \setlength{\parskip}{0pt}%
+  \trivlist
+  \raggedright
+  \setlength{\leftskip}{1.5\proofleftskip}
+  \let\pfstepsSavedItem\item
+  \let\pfstepsSavedLabel\label
+  \let\pfstepsSavedQedhere\qedhere
+  \newcommand\AND[1][and]{\mathrel{\mbox{##1}}}
+  \newcommand\BY[2][by]
+    {\pfsteps@unmath{\penalty-1 \mbox{~}\hfill%
+     \begin{minipage}[t]{\proofrightwidth}%
+       \raggedright##1 ##2%
+     \end{minipage}}}
+  \def\pfstepsItem{%
+    \pfsteps@stopmath
+    \pfstepsSavedItem\mbox{}\kern-1.25\proofleftskip
+    \makebox[\proofleftskip]{\hfill\usepfcounter}\kern0.25\proofleftskip
+    #1\relax}
+  \def\pfstepsQedhere{\pfsteps@unmath{\pfstepsSavedQedhere}}
+  \let\item\pfstepsItem
+  \let\label\pflabel
+  \let\qedhere\pfstepsQedhere
+  \ifpfsteps@atsign
+    \pfsteps@setup@atsign
+  \fi
+  \relax
+}
+{
+  \pfsteps@stopmath
+  \endtrivlist\endgroup
+  \noindent\ignorespaces
+}
+\newcommand\pfsteps@stopmath{\ifmmode$\fi}
+\newcommand\pfsteps@unmath[1]{\ifmmode$\relax#1\relax$\else\relax#1\relax\fi}
+{
+  \def\atsign{@}
+  \catcode`\@=\active\relax
+  \expandafter\gdef\csname pfsteps\atsign setup\atsign atsign\endcsname{
+    \catcode`\@=\active\relax
+    \gdef@##1 {\pflabel{##1}}
+  }
+}
+\newcommand\pfstepsmathmode{\def\pfsteps@unicode@arg{$}}
+\newcommand\pfstepstextmode{\def\pfsteps@unicode@arg{\relax}}
+\newcommand\pfstepsSetupUnicode[3]{
+  \DeclareUnicodeCharacter{#1}{\pfsteps@unicode@startpfsteps}
+  \DeclareUnicodeCharacter{#3}{\pfsteps@unicode@item}
+  \def\pfsteps@unicode@startpfsteps
+    {\begingroup
+     \ifpfsteps@atsign\catcode`\@=\active\relax\fi
+     \pfsteps@unicode@startpfsteps@kont}
+  \def\pfsteps@unicode@startpfsteps@kont##1#2
+    {\begin{pfsteps@with}\pfsteps@unicode@arg\item##1\end{pfsteps@with}%
+     \endgroup}
+  \def\pfsteps@unicode@item{\item}
+  \pfstepsmathmode
+}
+\ifpfsteps@unicode
+  \pfstepsSetupUnicode{171}{»}{8226} % « » •
+\fi
+\newcommand\byCasesEveryCase{\resetpfcounter}
+\newcommand\byCasesEveryOtherwise{\byCasesEveryCase}
+\providecommand{\byCasesOtherwiseTemplate}{\textbf{Otherwise.}}
+\providecommand{\byCasesCaseTemplate}[1]{\textbf{Case {#1}.}}
+\providecommand{\byCasesWhereTemplate}{\textbf{where}}
+\newenvironment{byCases}
+  {%
+    \begingroup
+    \let\case\byCases@case
+    \let\otherwise\byCases@otherwise
+    \ifpfsteps@mathpartir
+      \ifcsname inferrule\endcsname\let\icase\byCases@icase\fi
+    \fi
+    \list{}{\labelwidth\z@ \itemindent-\leftmargin
+            \let\makelabel\byCases@label}%
+  }
+  {%
+    \endlist
+    \endgroup
+  }
+\newcommand*\byCases@label[1]{%
+  \hspace\labelsep
+  \normalfont~\strut
+  \expandafter\ifx#1\relax\relax
+    \byCasesOtherwiseTemplate
+  \else
+    \byCasesCaseTemplate{\normalfont${#1}$}%
+  \fi
+}
+\newcommand*\byCases@case[2][\byCasesEveryCase]
+  {\item[{\let\AND\byCases@and #2}]\strut#1\pfsteps@reallynopagebreak}
+\newcommand*\byCases@otherwise[1][\byCasesEveryOtherwise]
+  {\item[]\strut#1\pfsteps@reallynopagebreak}
+\newcommand\pfsteps@reallynopagebreak{\par\nopagebreak\@nobreaktrue}
+\newcommand\byCases@and[1][and]{\mathrel{\mbox{\textbf{#1}}}}
+\newcommand*\byCases@icase{
+  \@ifnextchar* \byCases@icase@star \byCases@icase@nostar
+}
+\def\byCases@icase@nostar{\byCases@icase@i{\inferrule}}
+\def\byCases@icase@star*{\byCases@icase@i{\inferrule*}}
+\newcommand*\byCases@icase@i[1]{
+  \@ifnextchar [{\byCases@icase@opts{#1}}{\byCases@icase@noopts{#1}}
+}
+\def\byCases@icase@opts#1[#2]{\byCases@icase@ii{#1[#2]}}
+\def\byCases@icase@noopts#1{\byCases@icase@ii{#1}}
+\newcommand*\byCases@icase@ii[3]{
+  \@ifnextchar [
+    {\byCases@icase@where{#1}{#2}{#3}}
+    {\byCases@icase@nowhere{#1}{#2}{#3}}
+}
+\def\byCases@icase@where#1#2#3[#4]{
+  \case{#1{#2}{#3}\AND[\byCasesWhereTemplate]#4}%
+}
+\def\byCases@icase@nowhere#1#2#3{\case{#1{#2}{#3}}}
+\endinput
+%%
+%% End of file `pfsteps.sty'.

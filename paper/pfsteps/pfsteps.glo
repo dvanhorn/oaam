@@ -1,0 +1,4 @@
+\glossaryentry{v0.2> =General:>Included listproc.sty|hdpindex{}}{1}
+\glossaryentry{v0.1> =General:>Initial documented release|hdpindex{}}{1}
+\glossaryentry{v0.4>fsteps=\verb!*+pfsteps+:>Spacing bug fixes: Sets parskip to 0pt, so we don't get really wide spacing in proofs. Avoids weird behavior when proof steps are too long.|hdpindex{}}{13}
+\glossaryentry{v0.3> =General:>Input encoding bug fix for right guillemet|hdpindex{}}{15}

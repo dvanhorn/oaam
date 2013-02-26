@@ -1,0 +1,442 @@
+
+ \begin{theindex} 
+ \makeatletter\scan@allowedfalse
+{\bfseries\hfil Symbols\hfil}\nopagebreak
+
+  \item \verb*+@+\pfill \usage{6}
+  \item \verb*+\@+\pfill \hdclindex{208}{}{177}, \hdclindex{210}{}{179}, 
+		\hdclindex{227}{}{190}
+  \item \verb*+\@apply@group+\pfill \hdclindex{108}{}{91}, 
+		\hdclindex{109}{}{92}
+  \item \verb*+\@auxout+\pfill \hdclindex{91}{}{76}
+  \item \verb*+\@empty+\pfill \hdclindex{77}{}{63}, 
+		\hdclindex{79}{}{65}, \hdclindex{82}{}{68}
+  \item \verb*+\@ifundefined+\pfill \hdclindex{112}{}{95}, 
+		\hdclindex{115}{}{98}
+  \item \verb*+\@nobreaktrue+\pfill \hdclindex{283}{}{234}
+  \item \verb*+\@range+\pfill \hdclindex{126}{}{109}
+  \item \verb*+\@single+\pfill \hdclindex{125}{}{108}
+
+  \indexspace
+{\bfseries\hfil A\hfil}\nopagebreak
+
+  \item \verb*+\active+\pfill \hdclindex{208}{}{177}, 
+		\hdclindex{210}{}{179}, \hdclindex{227}{}{190}
+  \item \verb*+\AND+\pfill \usage{5}, \hdclindex{171}{main}{148}, 
+		\hdclindex{176}{}{148}, \hdclindex{275}{main}{230}, 
+		\hdclindex{280}{}{231}, \hdclindex{311}{}{252}
+  \item \verb*+\AtBeginDocument+\pfill \hdclindex{142}{}{121}
+  \item \verb*+\atsign+\pfill \hdclindex{207}{}{176}, 
+		\hdclindex{209}{}{178}
+  \item {\ttfamily atsign} (package option)\pfill \usage{3}
+
+  \indexspace
+{\bfseries\hfil B\hfil}\nopagebreak
+
+  \item \verb*+\BY+\pfill \altusage{2}, \usage{5, 6}, 
+		\hdclindex{172}{main}{148}, \hdclindex{177}{}{149}
+  \item {\ttfamily byCases} (environment)\pfill \altusage{3}, \usage{7}, 
+		\hdclindex{247}{main}{206}
+  \item \verb*+\byCases@and+\pfill \hdclindex{280}{}{231}, 
+		\hdclindex{284}{}{235}
+  \item \verb*+\byCases@case+\pfill \hdclindex{251}{}{209}, 
+		\hdclindex{276}{main}{230}, \hdclindex{279}{}{230}
+  \item \verb*+\byCases@icase+\pfill \hdclindex{254}{}{212}, 
+		\hdclindex{286}{main}{236}, \hdclindex{289}{}{236}
+  \item \verb*+\byCases@icase@i+\pfill \hdclindex{292}{}{239}, 
+		\hdclindex{293}{}{240}, \hdclindex{294}{main}{241}, 
+		\hdclindex{297}{}{241}
+  \item \verb*+\byCases@icase@ii+\pfill \hdclindex{300}{}{244}, 
+		\hdclindex{301}{}{245}, \hdclindex{302}{main}{246}, 
+		\hdclindex{305}{}{246}
+  \item \verb*+\byCases@icase@noopts+\pfill \hdclindex{296}{main}{241}, 
+		\hdclindex{298}{}{242}, \hdclindex{301}{}{245}
+  \item \verb*+\byCases@icase@nostar+\pfill \hdclindex{288}{main}{236}, 
+		\hdclindex{290}{}{237}, \hdclindex{292}{}{239}
+  \item \verb*+\byCases@icase@nowhere+\pfill \hdclindex{304}{main}{246}, 
+		\hdclindex{308}{}{249}, \hdclindex{313}{}{254}
+  \item \verb*+\byCases@icase@opts+\pfill \hdclindex{295}{main}{241}, 
+		\hdclindex{298}{}{242}, \hdclindex{300}{}{244}
+  \item \verb*+\byCases@icase@star+\pfill \hdclindex{290}{}{237}, 
+		\hdclindex{293}{}{240}
+  \item \verb*+\byCases@icase@start+\pfill \hdclindex{287}{main}{236}
+  \item \verb*+\byCases@icase@where+\pfill \hdclindex{303}{main}{246}, 
+		\hdclindex{307}{}{248}, \hdclindex{310}{}{251}
+  \item \verb*+\byCases@label+\pfill \hdclindex{257}{}{215}, 
+		\hdclindex{264}{}{221}
+  \item \verb*+\byCases@otherwise+\pfill \hdclindex{252}{}{210}, 
+		\hdclindex{277}{main}{230}, \hdclindex{281}{}{232}
+  \item \verb*+\byCasesCaseTemplate+\pfill \altusage{7}, \usage{8}, 
+		\hdclindex{241}{main}{201}, \hdclindex{246}{}{204}, 
+		\hdclindex{270}{}{227}
+  \item \verb*+\byCasesEveryCase+\pfill \altusage{4}, \altusage{7}, 
+		\usage{8}, \hdclindex{238}{main}{201}, 
+		\hdclindex{243}{}{201}, \hdclindex{244}{}{202}, 
+		\hdclindex{279}{}{230}
+  \item \verb*+\byCasesEveryOtherwise+\pfill \altusage{7}, \usage{8}, 
+		\hdclindex{239}{main}{201}, \hdclindex{244}{}{202}, 
+		\hdclindex{281}{}{232}
+  \item \verb*+\byCasesOtherwiseTemplate+\pfill \altusage{7}, \usage{8}, 
+		\hdclindex{240}{main}{201}, \hdclindex{245}{}{203}, 
+		\hdclindex{268}{}{225}
+  \item \verb*+\byCasesWhereTemplate+\pfill \usage{8}, 
+		\hdclindex{242}{main}{201}, \hdclindex{247}{}{205}, 
+		\hdclindex{311}{}{252}
+  \item {\ttfamily byCasesWhereTemplate} (package option)\pfill 
+		\altusage{8}
+
+  \indexspace
+{\bfseries\hfil C\hfil}\nopagebreak
+
+  \item \verb*+\c@pfsteps@pfc@global+\pfill \hdclindex{46}{main}{42}
+  \item \verb*+\c@pfsteps@pfc@local+\pfill \hdclindex{47}{main}{42}
+  \item \verb*+\case+\pfill \altusage{4}, \usage{7}, 
+		\hdclindex{251}{}{209}, \hdclindex{273}{main}{230}, 
+		\hdclindex{311}{}{252}, \hdclindex{313}{}{254}
+  \item \verb*+\catcode+\pfill \hdclindex{208}{}{177}, 
+		\hdclindex{210}{}{179}, \hdclindex{227}{}{190}
+  \item \verb*+\Compress+\pfill \hdclindex{108}{}{91}
+  \item \verb*+\csname+\pfill \hdclindex{5}{}{3}, \hdclindex{77}{}{63}, 
+		\hdclindex{86}{}{71}, \hdclindex{87}{}{72}, 
+		\hdclindex{89}{}{74}, \hdclindex{102}{}{86}, 
+		\hdclindex{114}{}{97}, \hdclindex{209}{}{178}
+
+  \indexspace
+{\bfseries\hfil D\hfil}\nopagebreak
+
+  \item \verb*+\DeclareOption+\pfill \hdclindex{10}{}{8}, 
+		\hdclindex{14}{}{12}
+  \item \verb*+\DeclareUnicodeCharacter+\pfill \hdclindex{223}{}{186}, 
+		\hdclindex{224}{}{187}
+  \item {\ttfamily description} (environment)\pfill \altusage{7}
+
+  \indexspace
+{\bfseries\hfil E\hfil}\nopagebreak
+
+  \item \verb*+\endcsname+\pfill \hdclindex{5}{}{3}, 
+		\hdclindex{77}{}{63}, \hdclindex{86}{}{71}, 
+		\hdclindex{87}{}{72}, \hdclindex{89}{}{74}, 
+		\hdclindex{102}{}{86}, \hdclindex{114}{}{97}, 
+		\hdclindex{143}{}{122}, \hdclindex{209}{}{178}, 
+		\hdclindex{254}{}{212}
+  \item \verb*+\endlist+\pfill \hdclindex{260}{}{218}
+  \item \verb*+\endtrivlist+\pfill \hdclindex{198}{}{170}
+  \item environments:\efill 
+ \subitem {\ttfamily byCases}\pfill \altusage{3}, \usage{7}, 
+		\hdclindex{247}{main}{206}
+    \subitem {\ttfamily description}\pfill \altusage{7}
+    \subitem {\ttfamily pfsteps}\pfill \altusage{2--4}, \usage{5}, 
+		\altusage{6}, \hdclindex{154}{main}{132}
+    \subitem {\ttfamily pfsteps*}\pfill \altusage{2}, \usage{6}, 
+		\hdclindex{154}{main}{132}
+    \subitem {\ttfamily pfsteps@with}\pfill \hdclindex{160}{main}{138}
+
+  \indexspace
+{\bfseries\hfil G\hfil}\nopagebreak
+
+  \item \verb*+\gdef@+\pfill \hdclindex{211}{}{180}
+
+  \indexspace
+{\bfseries\hfil H\hfil}\nopagebreak
+
+  \item \verb*+\hfill+\pfill \hdclindex{178}{}{150}, 
+		\hdclindex{185}{}{157}
+  \item \verb*+\hspace+\pfill \hdclindex{265}{}{222}
+  \item \verb*+\hyperlink+\pfill \hdclindex{145}{}{124}
+  \item {\ttfamily hyperref} (package option)\pfill \altusage{4}, 
+		\usage{4}, \altusage{9}, \altusage{12}
+  \item \verb*+\hypertarget+\pfill \altusage{10}, 
+		\hdclindex{144}{}{123}
+
+  \indexspace
+{\bfseries\hfil I\hfil}\nopagebreak
+
+  \item \verb*+\icase+\pfill \altusage{3}, \usage{8}, 
+		\hdclindex{254}{}{212}, \hdclindex{285}{main}{236}
+  \item \verb*+\icase*+\pfill \usage{8}
+  \item \verb*+\ifcsname+\pfill \hdclindex{143}{}{122}, 
+		\hdclindex{254}{}{212}
+  \item \verb*+\iffalse+\pfill \hdclindex{7}{}{5}, \hdclindex{9}{}{7}, 
+		\hdclindex{15}{}{13}
+  \item \verb*+\ifmmode+\pfill \hdclindex{203}{}{173}, 
+		\hdclindex{204}{}{174}
+  \item \verb*+\ifpfsteps@atsign+\pfill \hdclindex{19}{main}{17}, 
+		\hdclindex{191}{}{163}, \hdclindex{227}{}{190}
+  \item \verb*+\ifpfsteps@hyperref+\pfill \hdclindex{37}{}{35}, 
+		\hdclindex{141}{}{120}
+  \item \verb*+\ifpfsteps@hyperref@set+\pfill \hdclindex{38}{}{36}
+  \item \verb*+\ifpfsteps@loadunicode+\pfill \hdclindex{27}{}{25}
+  \item \verb*+\ifpfsteps@mathpartir+\pfill \hdclindex{32}{}{30}, 
+		\hdclindex{253}{}{211}
+  \item \verb*+\ifpfsteps@mathpartir@set+\pfill \hdclindex{33}{}{31}
+  \item \verb*+\ifpfsteps@unicode+\pfill \hdclindex{26}{}{24}, 
+		\hdclindex{235}{}{198}
+  \item \verb*+\iftrue+\pfill \hdclindex{11}{}{9}, \hdclindex{12}{}{10}, 
+		\hdclindex{16}{}{14}, \hdclindex{20}{}{18}, 
+		\hdclindex{21}{}{19}, \hdclindex{22}{}{20}, 
+		\hdclindex{23}{}{21}
+  \item \verb*+\immediate+\pfill \hdclindex{91}{}{76}
+  \item \verb*+\inferrule+\pfill \altusage{8}, \altusage{16}, 
+		\hdclindex{292}{}{239}, \hdclindex{293}{}{240}
+  \item \verb*+\inferrule*+\pfill \altusage{8}, \altusage{16}
+  \item \verb*+\item+\pfill \usage{5--7}, \altusage{13}, 
+		\hdclindex{168}{}{145}, \hdclindex{173}{main}{148}, 
+		\hdclindex{188}{}{160}, \hdclindex{230}{}{193}, 
+		\hdclindex{232}{}{195}, \hdclindex{263}{main}{221}, 
+		\hdclindex{280}{}{231}, \hdclindex{282}{}{233}
+  \item \verb*+\itemindent+\pfill \hdclindex{256}{}{214}
+
+  \indexspace
+{\bfseries\hfil K\hfil}\nopagebreak
+
+  \item \verb*+\kern+\pfill \hdclindex{184}{}{156}, 
+		\hdclindex{185}{}{157}
+
+  \indexspace
+{\bfseries\hfil L\hfil}\nopagebreak
+
+  \item \verb*+\label+\pfill \hdclindex{169}{}{146}, 
+		\hdclindex{174}{main}{148}, \hdclindex{189}{}{161}
+  \item \verb*+\labelsep+\pfill \hdclindex{265}{}{222}
+  \item \verb*+\labelwidth+\pfill \hdclindex{256}{}{214}
+  \item \verb*+\leavevmode+\pfill \hdclindex{163}{}{140}
+  \item \verb*+\leftmargin+\pfill \hdclindex{256}{}{214}
+  \item \verb*+\leftskip+\pfill \hdclindex{167}{}{144}
+  \item \verb*+\linewidth+\pfill \altusage{6}, \hdclindex{154}{}{131}
+  \item \verb*+\List+\pfill \hdclindex{122}{}{105}
+  \item \verb*+\list+\pfill \hdclindex{256}{}{214}
+  \item \verb*+\ListExprTo+\pfill \hdclindex{107}{}{90}
+  \item \verb*+\listitem+\pfill \altusage{12}, \hdclindex{124}{}{107}, 
+		\hdclindex{132}{}{113}, \hdclindex{135}{}{116}
+  \item {\ttfamily loadunicode} (package option)\pfill \altusage{4}, 
+		\usage{4}, \altusage{9}
+
+  \indexspace
+{\bfseries\hfil M\hfil}\nopagebreak
+
+  \item \verb*+\makebox+\pfill \hdclindex{185}{}{157}
+  \item \verb*+\makelabel+\pfill \hdclindex{257}{}{215}
+  \item \verb*+\Map+\pfill \hdclindex{110}{}{93}
+  \item {\ttfamily mathpartir} (package option)\pfill \usage{4}, 
+		\altusage{8, 9}
+  \item \verb*+\mathrel+\pfill \hdclindex{176}{}{148}, 
+		\hdclindex{284}{}{235}
+  \item \verb*+\mbox+\pfill \hdclindex{176}{}{148}, 
+		\hdclindex{178}{}{150}, \hdclindex{184}{}{156}, 
+		\hdclindex{284}{}{235}
+
+  \indexspace
+{\bfseries\hfil N\hfil}\nopagebreak
+
+  \item \verb*+\newlength+\pfill \hdclindex{151}{}{128}, 
+		\hdclindex{152}{}{129}
+  \item {\ttfamily noatsign} (package option)\pfill \usage{3}, 
+		\altusage{6}
+  \item \verb*+\noexpand+\pfill \hdclindex{92}{}{77}
+  \item {\ttfamily nohyperref} (package option)\pfill \usage{4}
+  \item \verb*+\noindent+\pfill \hdclindex{199}{}{171}
+  \item {\ttfamily noloadunicode} (package option)\pfill \usage{4}
+  \item {\ttfamily nomathpartir} (package option)\pfill \usage{4}
+  \item \verb*+\nopagebreak+\pfill \hdclindex{283}{}{234}
+  \item \verb*+\normalfont+\pfill \hdclindex{266}{}{223}, 
+		\hdclindex{270}{}{227}
+  \item {\ttfamily nounicode} (package option)\pfill \usage{4}, 
+		\altusage{6}
+
+  \indexspace
+{\bfseries\hfil O\hfil}\nopagebreak
+
+  \item \verb*+\otherwise+\pfill \usage{7}, \hdclindex{252}{}{210}, 
+		\hdclindex{274}{main}{230}
+
+  \indexspace
+{\bfseries\hfil P\hfil}\nopagebreak
+
+  \item package options:\efill 
+ \subitem {\ttfamily atsign}\pfill \usage{3}
+    \subitem {\ttfamily byCasesWhereTemplate}\pfill \altusage{8}
+    \subitem {\ttfamily hyperref}\pfill \altusage{4}, \usage{4}, 
+		\altusage{9}, \altusage{12}
+    \subitem {\ttfamily loadunicode}\pfill \altusage{4}, \usage{4}, 
+		\altusage{9}
+    \subitem {\ttfamily mathpartir}\pfill \usage{4}, \altusage{8, 9}
+    \subitem {\ttfamily noatsign}\pfill \usage{3}, \altusage{6}
+    \subitem {\ttfamily nohyperref}\pfill \usage{4}
+    \subitem {\ttfamily noloadunicode}\pfill \usage{4}
+    \subitem {\ttfamily nomathpartir}\pfill \usage{4}
+    \subitem {\ttfamily nounicode}\pfill \usage{4}, \altusage{6}
+    \subitem {\ttfamily unicode}\pfill \altusage{4}, \usage{4}, 
+		\altusage{6}, \altusage{9}, \altusage{15}
+  \item \verb*+\PackageWarning+\pfill \hdclindex{96}{}{81}, 
+		\hdclindex{116}{}{99}
+  \item \verb*+\par+\pfill \hdclindex{283}{}{234}
+  \item \verb*+\parskip+\pfill \hdclindex{164}{}{141}
+  \item \verb*+\penalty+\pfill \hdclindex{178}{}{150}
+  \item \verb*+\pfcounteranchor+\pfill \altusage{5}, \usage{5}, 
+		\hdclindex{42}{main}{40}, \hdclindex{44}{}{40}, 
+		\hdclindex{70}{}{59}
+  \item \verb*+\pfcounterref+\pfill \usage{5}, \hdclindex{43}{main}{40}, 
+		\hdclindex{45}{}{41}, \hdclindex{127}{}{110}
+  \item \verb*+\pflabel+\pfill \altusage{1--3}, \usage{5}, \altusage{6}, 
+		\hdclindex{63}{}{53}, \hdclindex{84}{main}{70}, 
+		\hdclindex{85}{}{70}, \hdclindex{189}{}{161}, 
+		\hdclindex{211}{}{180}
+  \item \verb*+\pfref+\pfill \altusage{2}, \usage{5}, 
+		\hdclindex{105}{main}{89}, \hdclindex{106}{}{89}
+  \item \verb*+\pfsetps@setup@atsign+\pfill \hdclindex{205}{main}{175}
+  \item {\ttfamily pfsteps} (environment)\pfill \altusage{2--4}, 
+		\usage{5}, \altusage{6}, \hdclindex{154}{main}{132}
+  \item {\ttfamily pfsteps*} (environment)\pfill \altusage{2}, 
+		\usage{6}, \hdclindex{154}{main}{132}
+  \item \verb*+\pfsteps@def@label+\pfill \hdclindex{92}{}{77}, 
+		\hdclindex{100}{}{84}, \hdclindex{99}{main}{84}
+  \item \verb*+\pfsteps@hyperlink+\pfill \hdclindex{119}{}{102}, 
+		\hdclindex{138}{main}{118}, \hdclindex{140}{}{119}, 
+		\hdclindex{145}{}{124}
+  \item \verb*+\pfsteps@hypertarget+\pfill \altusage{10}, 
+		\hdclindex{69}{}{58}, \hdclindex{137}{main}{118}, 
+		\hdclindex{139}{}{118}, \hdclindex{144}{}{123}
+  \item \verb*+\pfsteps@option+\pfill \hdclindex{3}{main}{2}, 
+		\hdclindex{7}{}{5}, \hdclindex{20}{}{18}, 
+		\hdclindex{21}{}{19}, \hdclindex{22}{}{20}, 
+		\hdclindex{23}{}{21}, \hdclindex{24}{}{22}
+  \item \verb*+\pfsteps@pfc@+\pfill \hdclindex{74}{main}{62}, 
+		\hdclindex{77}{}{63}, \hdclindex{78}{}{64}, 
+		\hdclindex{86}{}{71}, \hdclindex{87}{}{72}, 
+		\hdclindex{89}{}{74}, \hdclindex{112}{}{95}, 
+		\hdclindex{114}{}{97}, \hdclindex{115}{}{98}
+  \item \verb*+\pfsteps@pfc@cs+\pfill \hdclindex{73}{main}{62}, 
+		\hdclindex{76}{}{62}, \hdclindex{120}{}{103}, 
+		\hdclindex{121}{}{104}
+  \item \verb*+\pfsteps@pfref@list+\pfill \hdclindex{123}{}{106}, 
+		\hdclindex{127}{}{110}
+  \item \verb*+\pfsteps@pfref@listitem@first+\pfill 
+		\hdclindex{124}{}{107}, \hdclindex{129}{main}{112}, 
+		\hdclindex{131}{}{112}
+  \item \verb*+\pfsteps@pfref@listitem@rest+\pfill 
+		\hdclindex{130}{main}{112}, \hdclindex{132}{}{113}, 
+		\hdclindex{134}{}{115}, \hdclindex{135}{}{116}
+  \item \verb*+\pfsteps@reallynopagebreak+\pfill 
+		\hdclindex{278}{main}{230}, \hdclindex{280}{}{231}, 
+		\hdclindex{282}{}{233}, \hdclindex{283}{}{234}
+  \item \verb*+\pfsteps@set+\pfill \hdclindex{2}{main}{2}, 
+		\hdclindex{4}{}{2}, \hdclindex{8}{}{6}, 
+		\hdclindex{9}{}{7}, \hdclindex{11}{}{9}, 
+		\hdclindex{12}{}{10}, \hdclindex{15}{}{13}, 
+		\hdclindex{16}{}{14}
+  \item \verb*+\pfsteps@setup@atsign+\pfill \hdclindex{192}{}{164}
+  \item \verb*+\pfsteps@stopmath+\pfill \hdclindex{183}{}{155}, 
+		\hdclindex{197}{}{169}, \hdclindex{201}{main}{173}, 
+		\hdclindex{203}{}{173}
+  \item \verb*+\pfsteps@strip+\pfill \hdclindex{75}{main}{62}, 
+		\hdclindex{77}{}{63}, \hdclindex{79}{}{65}, 
+		\hdclindex{80}{}{66}, \hdclindex{82}{}{68}
+  \item \verb*+\pfsteps@unicode@arg+\pfill \hdclindex{216}{}{183}, 
+		\hdclindex{217}{}{184}, \hdclindex{230}{}{193}
+  \item \verb*+\pfsteps@unicode@item+\pfill \hdclindex{221}{main}{185}, 
+		\hdclindex{224}{}{187}, \hdclindex{232}{}{195}
+  \item \verb*+\pfsteps@unicode@startpfsteps+\pfill 
+		\hdclindex{219}{main}{185}, \hdclindex{223}{}{186}, 
+		\hdclindex{225}{}{188}
+  \item \verb*+\pfsteps@unicode@startpfsteps@kont+\pfill 
+		\hdclindex{220}{main}{185}, \hdclindex{228}{}{191}, 
+		\hdclindex{229}{}{192}
+  \item \verb*+\pfsteps@unmath+\pfill \hdclindex{178}{}{150}, 
+		\hdclindex{187}{}{159}, \hdclindex{202}{main}{173}, 
+		\hdclindex{204}{}{174}
+  \item {\ttfamily pfsteps@with} (environment)\pfill 
+		\hdclindex{160}{main}{138}
+  \item \verb*+\pfstepsItem+\pfill \hdclindex{182}{}{154}, 
+		\hdclindex{188}{}{160}
+  \item \verb*+\pfstepsmathmode+\pfill \usage{6}, 
+		\hdclindex{214}{main}{183}, \hdclindex{216}{}{183}, 
+		\hdclindex{233}{}{196}
+  \item \verb*+\pfstepsQedhere+\pfill \hdclindex{187}{}{159}, 
+		\hdclindex{190}{}{162}
+  \item \verb*+\pfstepsSavedItem+\pfill \hdclindex{168}{}{145}, 
+		\hdclindex{184}{}{156}
+  \item \verb*+\pfstepsSavedLabel+\pfill \hdclindex{169}{}{146}
+  \item \verb*+\pfstepsSavedQedhere+\pfill \hdclindex{170}{}{147}, 
+		\hdclindex{187}{}{159}
+  \item \verb*+\pfstepsSetupUnicode+\pfill \altusage{4}, \usage{6}, 
+		\hdclindex{218}{main}{185}, \hdclindex{222}{}{185}, 
+		\hdclindex{236}{}{199}
+  \item \verb*+\pfstepstextmode+\pfill \usage{6}, 
+		\hdclindex{215}{main}{183}, \hdclindex{217}{}{184}
+  \item \verb*+\ProcessOptions+\pfill \hdclindex{25}{}{23}
+  \item \verb*+\proofleftskip+\pfill \usage{6}, 
+		\hdclindex{149}{main}{128}, \hdclindex{151}{}{128}, 
+		\hdclindex{153}{}{130}, \hdclindex{167}{}{144}, 
+		\hdclindex{184}{}{156}, \hdclindex{185}{}{157}
+  \item \verb*+\proofrightwidth+\pfill \usage{6}, 
+		\hdclindex{150}{main}{128}, \hdclindex{152}{}{129}, 
+		\hdclindex{154}{}{131}, \hdclindex{179}{}{151}
+
+  \indexspace
+{\bfseries\hfil Q\hfil}\nopagebreak
+
+  \item \verb*+\qedhere+\pfill \hdclindex{170}{}{147}, 
+		\hdclindex{175}{main}{148}, \hdclindex{190}{}{162}
+
+  \indexspace
+{\bfseries\hfil R\hfil}\nopagebreak
+
+  \item \verb*+\raggedright+\pfill \hdclindex{166}{}{143}, 
+		\hdclindex{180}{}{152}
+  \item \verb*+\RequirePackage+\pfill \hdclindex{1}{}{1}, 
+		\hdclindex{28}{}{26}, \hdclindex{29}{}{27}, 
+		\hdclindex{34}{}{32}, \hdclindex{39}{}{37}
+  \item \verb*+\resetpfcounter+\pfill \altusage{2}, \usage{4}, 
+		\altusage{5}, \altusage{8}, \hdclindex{50}{main}{44}, 
+		\hdclindex{54}{}{44}, \hdclindex{243}{}{201}
+
+  \indexspace
+{\bfseries\hfil S\hfil}\nopagebreak
+
+  \item \verb*+\setlength+\pfill \hdclindex{153}{}{130}, 
+		\hdclindex{154}{}{131}, \hdclindex{164}{}{141}, 
+		\hdclindex{167}{}{144}
+  \item \verb*+\Sort+\pfill \hdclindex{109}{}{92}
+  \item \verb*+\stepcounter+\pfill \hdclindex{55}{}{45}
+  \item \verb*+\steppfcounter+\pfill \usage{5}, 
+		\hdclindex{53}{main}{44}, \hdclindex{60}{}{50}, 
+		\hdclindex{68}{}{57}
+  \item \verb*+\strut+\pfill \hdclindex{266}{}{223}, 
+		\hdclindex{280}{}{231}, \hdclindex{282}{}{233}
+
+  \indexspace
+{\bfseries\hfil T\hfil}\nopagebreak
+
+  \item \verb*+\textbf+\pfill \hdclindex{118}{}{101}, 
+		\hdclindex{245}{}{203}, \hdclindex{246}{}{204}, 
+		\hdclindex{247}{}{205}, \hdclindex{284}{}{235}
+  \item \verb*+\thepfcounter+\pfill \usage{5}, \hdclindex{51}{main}{44}, 
+		\hdclindex{56}{}{46}, \hdclindex{69}{}{58}, 
+		\hdclindex{70}{}{59}, \hdclindex{88}{}{73}, 
+		\hdclindex{93}{}{78}
+  \item \verb*+\thepfsectioncounter+\pfill \usage{5}, 
+		\hdclindex{52}{main}{44}, \hdclindex{58}{}{48}, 
+		\hdclindex{69}{}{58}, \hdclindex{79}{}{65}, 
+		\hdclindex{93}{}{78}, \hdclindex{120}{}{103}
+  \item \verb*+\trivlist+\pfill \altusage{13}, \hdclindex{165}{}{142}
+
+  \indexspace
+{\bfseries\hfil U\hfil}\nopagebreak
+
+  \item {\ttfamily unicode} (package option)\pfill \altusage{4}, 
+		\usage{4}, \altusage{6}, \altusage{9}, \altusage{15}
+  \item \verb*+\usepfcounter+\pfill \altusage{1}, \altusage{5}, 
+		\usage{5}, \hdclindex{66}{main}{56}, 
+		\hdclindex{67}{}{56}, \hdclindex{185}{}{157}
+
+  \indexspace
+{\bfseries\hfil W\hfil}\nopagebreak
+
+  \item \verb*+\write+\pfill \hdclindex{91}{}{76}
+
+  \indexspace
+{\bfseries\hfil Z\hfil}\nopagebreak
+
+  \item \verb*+\z@+\pfill \hdclindex{256}{}{214}
+
+ \end{theindex}
