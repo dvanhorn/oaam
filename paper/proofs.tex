@@ -167,6 +167,11 @@ Reduction semantics:
 \mbox{ where }\maddr \notin\msto
 \end{align*}
 
+\begin{align*}
+\inject(\mexp) &= \ev[^\mtcntr]{\mexp,\bot,\bot,\kmt} \\
+\reachable{\mexp} &= \setof{\mstate \mid \inject(\mexp) \machstep^* \mstate}
+\end{align*}
+
 \subsection{Store-allocated results with lazy nondeterminism}
 
 Machine configuration space:
@@ -251,6 +256,11 @@ Reduction semantics:
 \mbox{ where }\maddr \notin\msto \\
 \push_\mlab^\mcntr(\msto,\mstor) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
 \mbox{ where }\maddr \notin\msto
+\end{align*}
+
+\begin{align*}
+\inject(\mexp) &= \ev[^\mtcntr]{\mexp,\bot,\bot,\kmt} \\
+\reachable{\mexp} &= \setof{\mstate \mid \inject(\mexp) \machstep^* \mstate}
 \end{align*}
 
 \subsection{Lazy nondeterminism with abstract compilation}
@@ -341,6 +351,11 @@ Reduction semantics:
 \end{align*}
 \end{gather*}
 
+\begin{align*}
+\inject(\mexp) &= \compile{\mexp}^{\mtcntr}(\bot,\bot,\kmt) \\
+\reachable{\mexp} &= \setof{\mstate \mid \inject(\mexp) \machstep^* \mstate}
+\end{align*}
+
 \subsection{Widened abstract compilation}
 
 Machine configuration space:
@@ -362,10 +377,13 @@ Machine configuration space:
 
 Reduction semantics:
 \begin{align*}
-\reachable{e} &= \lfp{{\mathcal F}}(\varnothing,\setof{\mstate'},\msto) \\
- \text{ where } \mstate &= \compile{e}^{\mtcntr}(\bot,\bot,\kmt) \\
+\inject(\mexp) &= (\varnothing,\setof{\mstate'},\msto) \\
+ \text{ where } \mstate &= \compile{\mexp}^{\mtcntr}(\bot,\bot,\kmt) \\
                 \mstate', \msto &= \nw(\mstate) \\
-{\mathcal F}(S,F,\msto) &= (S \cup S', F', \msto') \\
+\reachable{\mexp} &= \setof{\wn(\mstate,\msto') \mid
+                             \inject(\mexp) \machstep^* (S,F,\msto),
+                             \ttuple{\mstate}{\msto'} \in S} \\
+(S,F,\msto) &\machstep (S \cup S', F', \msto') \\
  \text{ where }
   I &= \setof{ \nw(\mstate^*) \mid \mstate \in F, \wn(\mstate,\msto) \machstep \mstate^*, \nw(\mstate^*)\notin S} \\
   F' &= \setof{\mstate \mid \exists \msto. \ttuple{\mstate}{\msto} \in S'} \\
@@ -466,9 +484,12 @@ Reduction semantics helper (write $\mstate \machstep_\msto \mstate',\msdiff$ to 
 
 Reduction semantics:
 \begin{align*}
-\reachable{e} &= \lfp{{\mathcal F}}(\varnothing, \setof{\mstate}, \replay(\msdiff,\bot)) \\
+\inject(\mexp) &= (\varnothing, \setof{\mstate}, \replay(\msdiff,\bot)) \\
  \text{ where } \mstate, \msdiff &= \compile{e}^{\mtcntr}(\bot,\bot,\bot,\kmt) \\
-{\mathcal F}(S,F,\msto) &= (S \cup S', F', \msto') \\
+\reachable{\mexp} &= \setof{\wn(\mstate,\msto') \mid
+                             \inject(\mexp) \machstep^* (S,F,\msto),
+                             \ttuple{\mstate}{\msto'} \in S} \\
+(S,F,\msto) &\machstep (S \cup S', F', \msto') \\
  \text{ where } I &=
    \setof{ \ttuple{\mstate'}{\msdiff} \mid \mstate \in F, \mstate \machstep_\msto \mstate', \msdiff} \\
    F' &= \setof{\mstate \mid \exists \msdiff. \ttuple{\mstate}{\msdiff} \in I} \\
