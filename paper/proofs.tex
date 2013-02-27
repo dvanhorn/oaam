@@ -754,8 +754,9 @@ Let $\hat{\mstate}' = \co{\mkont, \mval',\msto^*}$. Conclusion holds by definiti
 We show that in the presence of abstract compilation, even though
 there are fewer represented states in the reduction relation, that
 there is a bisimulation between the two. Particularly, the compiled
-semantics is a WEB refinement of the non-compiled semantics. We equate
-states that ``commit'' to non-$\ev{}$ states.
+semantics is a WEB refinement (defined in pages 57-64 of Manolios'
+dissertation) of the non-compiled semantics. We equate states that
+``commit'' to non-$\ev{}$ states.
 
 To differentiate the two states spaces, denote the machine
 configuration space from the abstractly-compiled machine as
@@ -777,6 +778,7 @@ $\CompState$. We additionally denote the reduction relation as $\cmachstep$.
 
 Next, the refinement map from non-compiled to compiled states.
 \begin{align*}
+r &: \State \to \CompState \\
 %% STATES
 r(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont}) &= r(\commit(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont})) \\
 r(\co{\mkont, \mval,\msto}) &= \co{r(\mkont), r(\mval), r(\msto)} \\
@@ -798,13 +800,15 @@ r(\clos{\mvar,\mexp,\menv}) &= \clos{\mvar,\compile{\mexp},\menv}
 $r$ terminates because the non-structurally descreasing call case is
 guaranteed to not happen unless on a structurally smaller
 counterpart. This is because $\commit$ never returns an $\ev{}$
-state. As a corollary, $r$ is idempotent.
+state.
 
 Next we relate states across the different machines with an
-equivalence relation $B$ on the two state spaces $S = \State \cup \CompState$, such that $\forall \mstate \in \State. s B r(s)$:
-\begin{align*}
-(s,s') \in B \iff r(s) = r(s')
-\end{align*}
+equivalence relation $B$ on the two state spaces $S = \State \cup \CompState$,
+such that $\forall \mstate \in \State. s B r(s)$. Let $B$ be the reflexive, symmetric closure of $B^*$:
+\begin{mathpar}
+\inferrule{r(s) = r(s')}{s B^* s'} \qquad
+\inferrule{r(s) = s'}{s B^* s'}
+\end{mathpar}
 
 Finally, we show that $B$ is a WEB on the transition system
 $\langle S, \Rightarrow \rangle$ where $\Rightarrow = \machstep \cup \cmachstep$.
@@ -818,6 +822,7 @@ Let $\langle W, \lessdot \rangle$ be the well-ordered set of expressions (ordere
 
 \begin{proof}
 Let $s,u,w \in S$ be arbitrary such that $s B w$ and $s \Rightarrow u$.
+If $w = s$, the first case of WEB trivially holds with witness $u$. We assume $w \neq s$.
 By cases on $s \Rightarrow u$:
 \begin{byCases}
 %% NON-COMPILED
@@ -825,36 +830,64 @@ By cases on $s \Rightarrow u$:
 \case{
  \ev{\svar\mvar,\menv,\msto,\mkont} \machstep
  \co{\mkont,\saddr{\menv(\mvar)},\msto}}{
-...}
+By cases on $w$:
+ \begin{byCases}
+  \case{\ev{\svar{\mvar},\menv,\msto,\mkont}}{...}
+  \case{\ev{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto^*,\mkont^*}}{...}
+  \case{\ev{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto^*,\mkont^*}}{...}
+  \otherwise{Vacuously true ($s B w$ is false).}
+ \end{byCases}}
 
 \case{
  \ev{\slit\mlit,\menv,\msto,\mkont} \machstep
  \co{\mkont,\mlit,\msto}}{
-...}
+By cases on $w$:
+ \begin{byCases}
+  \case{\ev{\slit{\mlit},\menv,\msto,\mkont}}{...}
+  \case{\ev{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto^*,\mkont^*}}{...}
+  \case{\ev{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto^*,\mkont^*}}{...}
+  \otherwise{Vacuously true ($s B w$ is false).}
+ \end{byCases}}
 
 \case{
  \ev{\slam\mvar\mexp,\menv,\msto,\mkont} \machstep
  \co{\mkont,\clos{\mvar,\mexp,\menv},\msto}}{
-...}
+By cases on $w$:
+ \begin{byCases}
+  \case{\ev{\slam{\mvar}{\mexp},\menv,\msto,\mkont}}{...}
+  \case{\ev{\sapp{\mexpi0}{\mexpi1},\menv,\msto^*,\mkont^*}}{...}
+  \case{\ev{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto^*,\mkont^*}}{...}
+  \otherwise{Vacuously true ($s B w$ is false).}
+ \end{byCases}
+Thus the first case of WEB holds.}
 
 \case{
  \ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} \machstep
  \ev[^\mcntr]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}}{
   where $\maddr,\msto' = \push^\mcntr_\mlab(\msto,\mkont)$
-...}
+
+By definition of $B$, $r(s) = w$. By definition of $\commit$, $r(u) = w$, thus $u B w$.
+By definition of $\lessdot$, $erankt(u) < erankt(s)$.
+Thus the second case of WEB holds.}
 
 \case{
  \ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} \machstep
  \ev[^\mcntr]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}}{
   where $\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)$
-...}
+
+By definition of $B$, $w = r(s)$. By definition of $\commit$, $r(u) =
+r(s) = w$. By definition of $\lessdot$, $\erankt(u) \lessdot
+\erankt(s)$. Thus the second case of WEB holds.}
 
 %% CONTINUE
 \case{
  \co{\kmt,\mval,\msto} \machstep
  \ans{\msto,\mvalx{u}}}{
   where $\mvalx{u} \in \force(\msto, \mval)$
-...}
+
+By definition of $B$, either $w = s$ (ruled out) or $w = r(s)$. By
+definition of $\cmachstep$, $w \cmachstep r(u)$, satisfying the first
+case of WEB.}
 
 \case{
  \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto} \machstep
@@ -866,7 +899,10 @@ By cases on $s \Rightarrow u$:
  \co{\kfn[^\mcntr_\mlab]{\maddralt,\maddr},\mval,\msto}  \machstep
  \ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont,\msto}}{
   where $\mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddralt)$
-...}
+
+By definition of $B$, either $w = s$ (ruled out) or $w = r(s)$. By
+definition of $\cmachstep$, $w \cmachstep r(u)$, satisfying the first
+case of WEB.}
 
 \case{
  \co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto}  \machstep
@@ -891,7 +927,10 @@ By cases on $s \Rightarrow u$:
  \ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont}  \machstep
  \co{\mkont,\mval',\msto}}{
   where $\mvalx{u} \in \force(\msto, \mval), \mval'\in\interpdelta(\mop,\mvalx{u})$
-...}
+
+By definition of $B$, either $w = s$ (ruled out) or $w = r(s)$. By
+definition of $\cmachstep$, $w \cmachstep r(u)$, satisfying the first
+case of WEB.}
 
 %% COMPILED
 
@@ -940,7 +979,7 @@ By cases on $s \Rightarrow u$:
  and $\mvalx{u} \in \force(\msto,\mval), \mval'\in\interpdelta(\mop,\mvalx{u})$
 ...}
 \end{byCases}
-% (a) case is for non-ev to non-ev
+% (a) case is non-compiled to non-ev
 % (b) is for s \equiv ev w is r(s)
 % (c) is for s compiled, r(w) = s
 \end{proof}
