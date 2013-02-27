@@ -806,7 +806,6 @@ Next we relate states across the different machines with an
 equivalence relation $B$ on the two state spaces $S = \State \cup \CompState$,
 such that $\forall \mstate \in \State. s B r(s)$. Let $B$ be the reflexive, symmetric closure of $B^*$:
 \begin{mathpar}
-\inferrule{r(s) = r(s')}{s B^* s'} \qquad
 \inferrule{r(s) = s'}{s B^* s'}
 \end{mathpar}
 
@@ -817,12 +816,41 @@ Let $\langle W, \lessdot \rangle$ be the well-ordered set of expressions (ordere
 \begin{align*}
 \erankt(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont}) &= \mexp \\
 \erankt(\mstate) &= \bot \quad \text{otherwise} \\
-\erankl(s,s') &= \text{steps until $s$ commits to $s'$, +1. 0 if never.}
+\erankl(s,s') &= 0 \quad \text{{\it Unnecessary}}
 \end{align*}
 
+We need one lemma:
+\begin{lemma}[Compile/Commit]
+For all $\mcntr,\mexp,\menv,\msto,\mkont$,
+$\compile{\mexp}^\mcntr(\menv,r(\msto),r(\mkont)) = r(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont})$.
+\end{lemma}
+\begin{proof}
+By induction on $\mexp$.
+\begin{byCases}
+ \case{\text{Base: } \svar{\mvar}}{By definitions of $\compile{\_}, r, \commit$.}
+ \case{\text{Base: } \slit{\mlit}}{By definitions of $\compile{\_}, r, \commit$.}
+ \case{\text{Induction step: } \slam{\mvar}{\mexp'}}{By definitions of $\compile{\_}, r, \commit$.}
+ \case{\text{Induction step: } \sapp[^\mlab]{\mexpi0}{\mexpi1}}{
+   By IH, $\compile{\mexpi0}^\mcntr(\menv,r(\msto'),r(\mkont')) =
+           r(\ev[^\mcntr]{\mexpi0}{\menv,\msto',\mkont'})$
+   where $\mkont' = \kar[^\mcntr_\mlab]{\mexpi1,\menv,\maddr}$
+     and $\maddr, \msto' = \push_\mlab^\mcntr(\msto,\mkont')$.
+  Thus holds by definitions of $r, \commit, \compile{\_}$.}
+ \case{\text{Induction step: } \sif{\mexpi0}{\mexpi1}{\mexpi2}}{
+   By IH, $\compile{\mexpi0}^\mcntr(\menv,r(\msto'),r(\mkont')) =
+           r(\ev[^\mcntr]{\mexpi0}{\menv,\msto',\mkont'})$
+   where $\mkont' = \kif[^\mcntr_\mlab]{\mexpi1,\mexpi2,\menv,\maddr}$
+     and $\maddr, \msto' = \push_\mlab^\mcntr(\msto,\mkont')$.
+  Thus holds by definitions of $r, \commit, \compile{\_}$.}
+\end{byCases}
+\end{proof}
+
+\begin{theorem}
+$B$ is a WEB on the transition system $\langle S, \Rightarrow \rangle$.
+\end{theorem}
 \begin{proof}
 Let $s,u,w \in S$ be arbitrary such that $s B w$ and $s \Rightarrow u$.
-If $w = s$, the first case of WEB trivially holds with witness $u$. We assume $w \neq s$.
+If $w = s$, the first case of WEB trivially holds with witness $u$. We assume $w \neq s$. Thus $w = r(s)$.
 By cases on $s \Rightarrow u$:
 \begin{byCases}
 %% NON-COMPILED
@@ -830,54 +858,44 @@ By cases on $s \Rightarrow u$:
 \case{
  \ev{\svar\mvar,\menv,\msto,\mkont} \machstep
  \co{\mkont,\saddr{\menv(\mvar)},\msto}}{
-By cases on $w$:
- \begin{byCases}
-  \case{\ev{\svar{\mvar},\menv,\msto,\mkont}}{...}
-  \case{\ev{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto^*,\mkont^*}}{...}
-  \case{\ev{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto^*,\mkont^*}}{...}
-  \otherwise{Vacuously true ($s B w$ is false).}
- \end{byCases}}
+
+Since $w = r(s)$, $w = r(u)$ by definition of $r$. The second case of
+WEB holds by definition of $\erankt$, $\lessdot$ and case analysis on
+$w$.}
 
 \case{
  \ev{\slit\mlit,\menv,\msto,\mkont} \machstep
  \co{\mkont,\mlit,\msto}}{
-By cases on $w$:
- \begin{byCases}
-  \case{\ev{\slit{\mlit},\menv,\msto,\mkont}}{...}
-  \case{\ev{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto^*,\mkont^*}}{...}
-  \case{\ev{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto^*,\mkont^*}}{...}
-  \otherwise{Vacuously true ($s B w$ is false).}
- \end{byCases}}
+
+Since $w = r(s)$, $w = r(u)$ by definition of $r$. The second case of
+WEB holds by definition of $\erankt$, $\lessdot$ and case analysis on
+$w$.}
 
 \case{
  \ev{\slam\mvar\mexp,\menv,\msto,\mkont} \machstep
  \co{\mkont,\clos{\mvar,\mexp,\menv},\msto}}{
-By cases on $w$:
- \begin{byCases}
-  \case{\ev{\slam{\mvar}{\mexp},\menv,\msto,\mkont}}{...}
-  \case{\ev{\sapp{\mexpi0}{\mexpi1},\menv,\msto^*,\mkont^*}}{...}
-  \case{\ev{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto^*,\mkont^*}}{...}
-  \otherwise{Vacuously true ($s B w$ is false).}
- \end{byCases}
-Thus the first case of WEB holds.}
+
+Since $w = r(s)$, $w = r(u)$ by definition of $r$. The second case of
+WEB holds by definition of $\erankt$, $\lessdot$ and case analysis on
+$w$.}
 
 \case{
  \ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} \machstep
  \ev[^\mcntr]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}}{
   where $\maddr,\msto' = \push^\mcntr_\mlab(\msto,\mkont)$
 
-By definition of $B$, $r(s) = w$. By definition of $\commit$, $r(u) = w$, thus $u B w$.
-By definition of $\lessdot$, $erankt(u) < erankt(s)$.
-Thus the second case of WEB holds.}
+By definition of $\commit$, $r(u) = w$, thus $u B w$.  By definition
+of $\lessdot$, $erankt(u) < erankt(s)$.  Thus the second case of WEB
+holds.}
 
 \case{
  \ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} \machstep
  \ev[^\mcntr]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}}{
   where $\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)$
 
-By definition of $B$, $w = r(s)$. By definition of $\commit$, $r(u) =
-r(s) = w$. By definition of $\lessdot$, $\erankt(u) \lessdot
-\erankt(s)$. Thus the second case of WEB holds.}
+By definition of $\commit$, $r(u) = r(s) = w$. By definition of
+$\lessdot$, $\erankt(u) \lessdot \erankt(s)$. Thus the second case of
+WEB holds.}
 
 %% CONTINUE
 \case{
@@ -885,99 +903,67 @@ r(s) = w$. By definition of $\lessdot$, $\erankt(u) \lessdot
  \ans{\msto,\mvalx{u}}}{
   where $\mvalx{u} \in \force(\msto, \mval)$
 
-By definition of $B$, either $w = s$ (ruled out) or $w = r(s)$. By
-definition of $\cmachstep$, $w \cmachstep r(u)$, satisfying the first
-case of WEB.}
+By definition of $\Rightarrow, \cmachstep$, $w \Rightarrow r(u)$, satisfying the
+first case of WEB.}
 
 \case{
  \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto} \machstep
  \ev[^\mcntr]{\mexp,\menv,\msto',\kfn[^\mcntr_\mlab]{\maddralt,\maddr}}}{
   where $\maddralt,\msto' = \stash_\mlab^\mcntr(\msto,\mval)$
-...}
+
+By definition of $\Rightarrow, \cmachstep$,
+$w \Rightarrow \compile{\mexp}^{\mcntr}(\menv,r(\msto'),r(\kfn[^\mcntr_\mlab]{\maddralt,\maddr}))$.
+By the compile/commit lemma, $w \Rightarrow r(u)$.
+Thus the first case of WEB holds with witness $r(u)$.}
 
 \case{
  \co{\kfn[^\mcntr_\mlab]{\maddralt,\maddr},\mval,\msto}  \machstep
  \ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont,\msto}}{
   where $\mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddralt)$
 
-By definition of $B$, either $w = s$ (ruled out) or $w = r(s)$. By
-definition of $\cmachstep$, $w \cmachstep r(u)$, satisfying the first
-case of WEB.}
+By definition of $\cmachstep$, $w \cmachstep r(u)$, satisfying the
+first case of WEB.}
 
 \case{
  \co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto}  \machstep
  \ev[^\mcntr]{\mexpi0,\menv,\msto,\mkont}}{
   where $\mkont\in\msto(\maddr)$
-...}
+
+By definition of $\Rightarrow, \cmachstep$, $w \Rightarrow \compile{\mexpi0}^{\mcntr}(\menv,r(\msto),r(\mkont))$.
+By the compile/commit lemma, $w \Rightarrow r(u)$.
+Thus the first case of WEB holds with witness $r(u)$.}
 
 \case{
  \co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\sfalse,\msto}  \machstep
  \ev[^\mcntr]{\mexpi1,\menv,\msto,\mkont}}{
   where $\mkont\in\msto(\maddr)$
-...}
+
+By definition of $\Rightarrow, \cmachstep$, $w \Rightarrow \compile{\mexpi0}^{\mcntr}(\menv,r(\msto),r(\mkont))$.
+By the compile/commit lemma, $w \Rightarrow r(u)$.
+Thus the first case of WEB holds with witness $r(u)$.}
 
 %% APPLY
 \case{
  \ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont}  \machstep
  \ev[^{\mcntr'}\!]{\mexp,\menv',\msto',\mkont}}{
   where $\menv',\msto',\mcntr' = \bind^{ \mcntr}_\mlab(\menv,\msto,\mvar,\mval)$
-...}
+
+By definition of $\Rightarrow, \cmachstep$,
+$w \Rightarrow \compile{\mexp}^{\mcntr'}(\menv',r(\msto'),r(\mkont))$.
+By the compile/commit lemma, $w \Rightarrow r(u)$.
+Thus the first case of WEB holds with witness $r(u)$.}
 
 \case{
  \ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont}  \machstep
  \co{\mkont,\mval',\msto}}{
   where $\mvalx{u} \in \force(\msto, \mval), \mval'\in\interpdelta(\mop,\mvalx{u})$
 
-By definition of $B$, either $w = s$ (ruled out) or $w = r(s)$. By
-definition of $\cmachstep$, $w \cmachstep r(u)$, satisfying the first
-case of WEB.}
+By definition of $\cmachstep$, $w \cmachstep r(u)$, satisfying the
+first case of WEB.}
 
 %% COMPILED
 
-%% CONTINUE
-\case{
- \co{\kmt,\mval,\msto} \cmachstep
- \ans{\msto,\mvalx{u}}}{
- where $\mvalx{u} \in \force(\msto,\mval)$
-...}
-
-\case{
- \co{\kar[^\mcntr_\mlab]{\mcomp,\menv,\maddr},\mval,\msto}  \cmachstep
- \mcomp^\mcntr(\menv,\msto',\kfn[^\mcntr_\mlab]{\maddralt,\maddr})}{
- where $\maddralt,\msto' = \stash_\mlab^\mcntr(\msto,\mval)$
-...}
-
-\case{
- \co{\kfn[^\mcntr_\mlab]{\maddralt,\maddr},\mval,\msto}  \cmachstep
- \ap[^\mcntr_\mlab]{\mvalx{u},\mval,\msto,\mkont}}{
-  where $\mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddralt)$
-...}
-
-\case{
- \co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\strue,\msto}  \cmachstep
- \mcompi0^\mcntr(\menv,\msto,\mkont)}{
-  where $\mkont\in\msto(\maddr)$
-...}
-
-\case{
- \co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\sfalse,\msto}  \cmachstep
- \mcompi1^\mcntr(\menv,\msto,\mkont)}{
-  where $\mkont\in\msto(\maddr)$
-...}
-
-%% APPLY
-\case{
- \ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\msto,\mkont}  \cmachstep
- \mcomp^{\mcntr'}(\menv',\msto',\mkont)}{
- where $\menv',\msto',\mcntr' = \bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval)$
-...}
-
-\case{
- \ap{\mop,\mval,\msto,\mkont}  \cmachstep
- \co{\mkont,\mval',\msto}}{
- where $\mkont \in\msto(\maddr)$
- and $\mvalx{u} \in \force(\msto,\mval), \mval'\in\interpdelta(\mop,\mvalx{u})$
-...}
+\case{s \cmachstep u}{Must be the case that $s = w$, thus the first case of WEB holds.}
 \end{byCases}
 % (a) case is non-compiled to non-ev
 % (b) is for s \equiv ev w is r(s)
