@@ -74,6 +74,13 @@ response.txt:
 response.out:
 	openssl base64 -aes-256-cbc -salt -in response.txt -out response.out
 
+reviews.txt:
+	openssl base64 -d -aes-256-cbc -in reviews.out -out reviews.txt
+
+reviews.out:
+	openssl base64 -aes-256-cbc -salt -in reviews.txt -out reviews.out
+
+
 flush: clean
 	rm -f dvanhorn.bib
 
