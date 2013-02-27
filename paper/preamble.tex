@@ -51,7 +51,6 @@
 % Metavariables
 \newcommand{\maddr}{a}
 \newcommand{\maddralt}{b}
-\newcommand{\maddrx}[1]{#1}
 \newcommand{\mvar}{x}
 \newcommand{\mvarf}{f}
 \newcommand{\mexp}{e}
@@ -60,7 +59,6 @@
 \newcommand{\menv}{\rho}
 \newcommand{\mkont}{\kappa}
 \newcommand{\msto}{\sigma}
-\newcommand{\mstor}{s}
 \newcommand{\mop}{o}
 \newcommand{\mval}{v}
 \newcommand{\mnum}{z}
@@ -76,7 +74,6 @@
 \newcommand{\msdiff}{\xi}
 
 \newcommand{\compile}[1]{\llbracket#1\rrbracket}
-\newcommand{\reachable}[1]{\mathit{reachable}(#1)}
 
 \newcommand{\mlab}{{\ell}}
 \newcommand{\mcntr}{{\delta}}
@@ -90,27 +87,40 @@
 \newcommand{\lift}{\mathit{lift}}
 \newcommand{\eval}{\mathit{eval}}
 \newcommand{\replay}{\mathit{replay}}
-\newcommand{\replayall}{\forall\mathit{replay}}
-\newcommand{\replaychange}{\mathit{replay}\Delta}
-\newcommand{\replaychangeall}{\forall\mathit{replay}\Delta}
 \newcommand{\states}{\mathit{cs}}
 \newcommand{\concat}{\mathit{concat}}
 \newcommand{\append}{\mathit{append}}
 \newcommand{\step}{\mathit{step}}
 \newcommand{\wn}{\mathit{wn}}
-\newcommand{\nw}{\mathit{nw}}
 \newcommand{\fmerge}{\mathit{merge}}
 \newcommand{\force}{\mathit{force}}
 \newcommand{\bind}{\mathit{bind}}
 \newcommand{\push}{\mathit{push}}
 \newcommand{\stash}{\mathit{stash}}
 
-\newcommand{\hd}{\mathit{hd}}
+% Notations for proofs
+\newcommand{\maddrx}[1]{#1}
+\newcommand{\CompState}{\compile{\State}}
+\newcommand{\cmachstep}{\mathbin{\compile{\machstep}}}
+\newcommand{\mstor}{s}
 \newcommand{\updatedp}{\mathit{updated?}}
 \newcommand{\joinp}{\mathit{join?}}
+\newcommand{\hd}{\mathit{hd}}
+\newcommand{\replayall}{\forall\mathit{replay}}
 \newcommand{\lfp}[1]{\mathbf{lfp}(#1)}
-
+\newcommand{\reachable}[1]{\mathit{reachable}(#1)}
+\newcommand{\nw}{\mathit{nw}}
+\newcommand{\commit}{\mathit{commit}}
+\newcommand{\commitev}{\mathit{commitev}}
+\newcommand{\replaychange}{\mathit{replay}\Delta}
+\newcommand{\replaychangeall}{\forall\mathit{replay}\Delta}
 \newcommand{\deceq}{\mathbin{\overset{?}{=}}}
+\newcommand{\Label}{\mathit{Label}}
+\newcommand{\Counter}{\mathit{Contour}}
+\newcommand{\System}{\mathit{System}}
+\newcommand{\Compiled}{\mathit{Compiled}}
+\newcommand{\erankt}{\mathit{erankt}}
+\newcommand{\erankl}{\mathit{erankl}}
 
 % Spaces
 \newcommand{\Store}{\mathit{Store}}
@@ -122,10 +132,6 @@
 \newcommand{\Kont}{\mathit{Kont}}
 \newcommand{\State}{\mathit{State}}
 \newcommand{\Storeable}{\mathit{Storeable}}
-\newcommand{\System}{\mathit{System}}
-\newcommand{\Label}{\mathit{Label}}
-\newcommand{\Counter}{\mathit{Contour}}
-\newcommand{\Compiled}{\mathit{Compiled}}
 
 \newcommand{\changep}{\Delta\mbox{{\tt ?}}}
 

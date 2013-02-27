@@ -87,9 +87,9 @@ Machine configuration space:
                       \kif[_\mlab^\mcntr]{\mexp, \mexp, \menv, \mkont} \\
 \mlab \in \Label &\text{ an infinite set} \\
 \mcntr \in \Counter &= \Label^* \\
-\mval \in \Value &::= \mlit \alt
+\mval \in \Value &::= \mlit \alt \mop \alt
                       \clos{\mvar,\mexp,\menv} \\
-\mstor \in \Storeable &::= \mlit \alt
+\mstor \in \Storeable &::= \mlit \alt \mop \alt
                            \clos{\mvar,\mexp,\menv} \alt
                            \mkont \\
 \menv \in \Env &= \Var \finto \Addr \\
@@ -180,7 +180,7 @@ Machine configuration space:
                      \co{\mkont, \mval, \msto} \alt
                      \ap[_\mlab^\mcntr]{\mval,\mval,\msto,\mkont} \alt
                      \ans{\msto,\mval}\\
-\mval \in \Value &::= \mlit \alt
+\mval \in \Value &::= \mlit \alt \mop \alt
                       \clos{\mvar,\mexp,\menv} \alt
                       \saddr\maddr
 \end{align*}
@@ -275,10 +275,10 @@ Machine configuration space:
                       \kar[_\mlab^\mcntr]{\mcomp, \menv, \maddr} \alt
                       \kfn[_\mlab^\mcntr]{\maddr, \maddr} \alt
                       \kif[_\mlab^\mcntr]{\mcomp, \mcomp, \menv, \maddr} \\
-\mval \in \Value &::= \mlit \alt
+\mval \in \Value &::= \mlit \alt \mop \alt
                       \clos{\mvar,\mcomp,\menv} \alt
                       \saddr\maddr \\
-\Storeable &::= \mlit \alt
+\Storeable &::= \mlit \alt \mop \alt
                 \clos{\mvar,\mcomp,\menv} \alt
                 \mkont \\
 \end{align*}
@@ -377,7 +377,7 @@ Machine configuration space:
 
 Reduction semantics:
 \begin{align*}
-\inject(\mexp) &= (\varnothing,\setof{\mstate'},\msto) \\
+\inject(\mexp) &= (\setof{\mstate'},\setof{\mstate'},\msto) \\
  \text{ where } \mstate &= \compile{\mexp}^{\mtcntr}(\bot,\bot,\kmt) \\
                 \mstate', \msto &= \nw(\mstate) \\
 \reachable{\mexp} &= \setof{\wn(\mstate,\msto') \mid
@@ -484,7 +484,7 @@ Reduction semantics helper (write $\mstate \machstep_\msto \mstate',\msdiff$ to 
 
 Reduction semantics:
 \begin{align*}
-\inject(\mexp) &= (\varnothing, \setof{\mstate}, \replay(\msdiff,\bot)) \\
+\inject(\mexp) &= (\setof{\mstate}, \setof{\mstate}, \replay(\msdiff,\bot)) \\
  \text{ where } \mstate, \msdiff &= \compile{e}^{\mtcntr}(\bot,\bot,\bot,\kmt) \\
 \reachable{\mexp} &= \setof{\wn(\mstate,\msto') \mid
                              \inject(\mexp) \machstep^* (S,F,\msto),
@@ -527,11 +527,18 @@ Reduction semantics:
 \subsection{Store deltas with timestamped store}
 
 \begin{align*}
-\mathit{reachable}(e) &= \lfp{{\mathcal F}}(\lambda\mstate. \epsilon, \setof{\mstate}, \replay(\msdiff,\bot)) \\
+\inject(\mexp) &=
+ (S_0, \setof{\mstate},
+  \replay(\msdiff,\bot), 0) \\
  \text{ where } \mstate, \msdiff &= \compile{e}^\mcntr(\bot,\bot,\bot,\kmt) \\
+                S_0 &= \lambda\mstate'.
+                        \left\{\begin{array}{ll}
+                         0 & \text{if } \mstate' = \mstate \\
+                         \epsilon & \text{otherwise}
+                        \end{array}\right. \\
+\mathit{reachable}(\mexp) &= \setof{\wn(\mstate,\Sigma(n)) \mid \inject(\mexp) \machstep^* (S,F,\Sigma,n'), \hd(S(\mstate)) = n} \\
 \System &= (\State \to {\mathbb N}^*) \times \wp(\State) \times ({\mathbb N} \finto \Store) \times {\mathbb N} \\
-{\mathcal F} &: \System \to \System \\
-{\mathcal F}(S,F,\Sigma,n) &= (S', F \cup F', \Sigma[n' \mapsto \msto'],n') \\
+(S,F,\Sigma,n) &\machstep (S', F \cup F', \Sigma[n' \mapsto \msto'],n') \\
  \text{ where }
  \msto &= \Sigma(n) \\
   I &= \setof{ \ttuple{\mstate'}{\msdiff} \mid \mstate \in F, \mstate \machstep_\msto \mstate', \msdiff} \\
@@ -746,11 +753,201 @@ Let $\hat{\mstate}' = \co{\mkont, \mval',\msto^*}$. Conclusion holds by definiti
 
 We show that in the presence of abstract compilation, even though
 there are fewer represented states in the reduction relation, that
-there is a skipping bisimulation between the two.
+there is a bisimulation between the two. Particularly, the compiled
+semantics is a WEB refinement of the non-compiled semantics. We equate
+states that ``commit'' to non-$\ev{}$ states.
+
+To differentiate the two states spaces, denote the machine
+configuration space from the abstractly-compiled machine as
+$\CompState$. We additionally denote the reduction relation as $\cmachstep$.
+
+\begin{align*}
+\commit(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont}) &= \commitev(\mcntr,\menv,\msto,\mkont,\mexp) \\
+\commit(\mstate) &= \mstate \quad \text{otherwise} \\
+\commitev(\mcntr,\menv,\msto,\mkont,\svar{\mvar}) &= \co{\mkont,\saddr{\menv(\mvar)},\msto} \\
+\commitev(\mcntr,\menv,\msto,\mkont,\slit\mlit) &= \co{\mkont,\slit\mlit,\msto} \\
+\commitev(\mcntr,\menv,\msto,\mkont,\slam{\mvar,\mexp,\menv}) &= \co{\mkont,\clos{\mvar,\mexp,\menv},\msto} \\
+\commitev(\mcntr,\menv,\msto,\mkont,\sapp[^\mlab]{\mexpi0}{\mexpi1}) &=
+  \commitev(\mcntr,\menv,\msto',\kar[^\mcntr_\mlab]{\mexpi1, \menv, \maddr},\mexpi0) \\
+ \text{ where } \maddr, \msto' &= \push_\mlab^\mcntr(\msto,\mkont) \\
+\commitev(\mcntr,\menv,\msto,\mkont,\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}) &=
+  \commitev(\mcntr,\menv,\msto',\kif[^\mcntr_\mlab]{\mexpi1, \mexpi2, \menv, \maddr},\mexpi0) \\
+ \text{ where } \maddr, \msto' &= \push_\mlab^\mcntr(\msto,\mkont)
+\end{align*}
+
+Next, the refinement map from non-compiled to compiled states.
+\begin{align*}
+%% STATES
+r(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont}) &= r(\commit(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont})) \\
+r(\co{\mkont, \mval,\msto}) &= \co{r(\mkont), r(\mval), r(\msto)} \\
+r(\ap[_\mlab^\mcntr]{\mvalx{u},\mval,\msto,\mkont}) &= \ap[_\mlab^\mcntr]{r(\mvalx{u}),r(\mval),r(\msto),r(\mkont)} \\
+r(\ans{\msto,\mval}) &= \ans{r(\msto), r(\mval)} \\[2mm]
+%% STORE
+r(\msto) &= \lambda \maddr. \setof{r(\mval) \mid \mval \in \msto(\maddr)} \\[2mm]
+%% CONTINUATIONS
+r(\kmt) &= \kmt \\
+r(\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr}) &= \kar[^\mcntr_\mlab]{\compile{\mexp},\menv,\maddr} \\
+r(\kfn[^\mcntr_\mlab]{\maddralt,\maddr}) &= \kfn[^\mcntr_\mlab]{\maddralt,\maddr} \\
+r(\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr}) &= \kif[^\mcntr]{\compile{\mexpi0},\compile{\mexpi1},\menv,\maddr} \\[2mm]
+%% VALUES
+r(\mop) &= \mop \\
+r(\mlit) &= \mlit \\
+r(\saddr{\maddr}) &= \saddr{\maddr} \\
+r(\clos{\mvar,\mexp,\menv}) &= \clos{\mvar,\compile{\mexp},\menv}
+\end{align*}
+$r$ terminates because the non-structurally descreasing call case is
+guaranteed to not happen unless on a structurally smaller
+counterpart. This is because $\commit$ never returns an $\ev{}$
+state. As a corollary, $r$ is idempotent.
+
+Next we relate states across the different machines with an
+equivalence relation $B$ on the two state spaces $S = \State \cup \CompState$, such that $\forall \mstate \in \State. s B r(s)$:
+\begin{align*}
+(s,s') \in B \iff r(s) = r(s')
+\end{align*}
+
+Finally, we show that $B$ is a WEB on the transition system
+$\langle S, \Rightarrow \rangle$ where $\Rightarrow = \machstep \cup \cmachstep$.
+
+Let $\langle W, \lessdot \rangle$ be the well-ordered set of expressions (ordered structurally) with a bottom element $\bot$.
+\begin{align*}
+\erankt(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont}) &= \mexp \\
+\erankt(\mstate) &= \bot \quad \text{otherwise} \\
+\erankl(s,s') &= \text{steps until $s$ commits to $s'$, +1. 0 if never.}
+\end{align*}
+
+\begin{proof}
+Let $s,u,w \in S$ be arbitrary such that $s B w$ and $s \Rightarrow u$.
+By cases on $s \Rightarrow u$:
+\begin{byCases}
+%% NON-COMPILED
+%% EVAL
+\case{
+ \ev{\svar\mvar,\menv,\msto,\mkont} \machstep
+ \co{\mkont,\saddr{\menv(\mvar)},\msto}}{
+...}
+
+\case{
+ \ev{\slit\mlit,\menv,\msto,\mkont} \machstep
+ \co{\mkont,\mlit,\msto}}{
+...}
+
+\case{
+ \ev{\slam\mvar\mexp,\menv,\msto,\mkont} \machstep
+ \co{\mkont,\clos{\mvar,\mexp,\menv},\msto}}{
+...}
+
+\case{
+ \ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} \machstep
+ \ev[^\mcntr]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}}{
+  where $\maddr,\msto' = \push^\mcntr_\mlab(\msto,\mkont)$
+...}
+
+\case{
+ \ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} \machstep
+ \ev[^\mcntr]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}}{
+  where $\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)$
+...}
+
+%% CONTINUE
+\case{
+ \co{\kmt,\mval,\msto} \machstep
+ \ans{\msto,\mvalx{u}}}{
+  where $\mvalx{u} \in \force(\msto, \mval)$
+...}
+
+\case{
+ \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto} \machstep
+ \ev[^\mcntr]{\mexp,\menv,\msto',\kfn[^\mcntr_\mlab]{\maddralt,\maddr}}}{
+  where $\maddralt,\msto' = \stash_\mlab^\mcntr(\msto,\mval)$
+...}
+
+\case{
+ \co{\kfn[^\mcntr_\mlab]{\maddralt,\maddr},\mval,\msto}  \machstep
+ \ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont,\msto}}{
+  where $\mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddralt)$
+...}
+
+\case{
+ \co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto}  \machstep
+ \ev[^\mcntr]{\mexpi0,\menv,\msto,\mkont}}{
+  where $\mkont\in\msto(\maddr)$
+...}
+
+\case{
+ \co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\sfalse,\msto}  \machstep
+ \ev[^\mcntr]{\mexpi1,\menv,\msto,\mkont}}{
+  where $\mkont\in\msto(\maddr)$
+...}
+
+%% APPLY
+\case{
+ \ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont}  \machstep
+ \ev[^{\mcntr'}\!]{\mexp,\menv',\msto',\mkont}}{
+  where $\menv',\msto',\mcntr' = \bind^{ \mcntr}_\mlab(\menv,\msto,\mvar,\mval)$
+...}
+
+\case{
+ \ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont}  \machstep
+ \co{\mkont,\mval',\msto}}{
+  where $\mvalx{u} \in \force(\msto, \mval), \mval'\in\interpdelta(\mop,\mvalx{u})$
+...}
+
+%% COMPILED
+
+%% CONTINUE
+\case{
+ \co{\kmt,\mval,\msto} \cmachstep
+ \ans{\msto,\mvalx{u}}}{
+ where $\mvalx{u} \in \force(\msto,\mval)$
+...}
+
+\case{
+ \co{\kar[^\mcntr_\mlab]{\mcomp,\menv,\maddr},\mval,\msto}  \cmachstep
+ \mcomp^\mcntr(\menv,\msto',\kfn[^\mcntr_\mlab]{\maddralt,\maddr})}{
+ where $\maddralt,\msto' = \stash_\mlab^\mcntr(\msto,\mval)$
+...}
+
+\case{
+ \co{\kfn[^\mcntr_\mlab]{\maddralt,\maddr},\mval,\msto}  \cmachstep
+ \ap[^\mcntr_\mlab]{\mvalx{u},\mval,\msto,\mkont}}{
+  where $\mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddralt)$
+...}
+
+\case{
+ \co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\strue,\msto}  \cmachstep
+ \mcompi0^\mcntr(\menv,\msto,\mkont)}{
+  where $\mkont\in\msto(\maddr)$
+...}
+
+\case{
+ \co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\sfalse,\msto}  \cmachstep
+ \mcompi1^\mcntr(\menv,\msto,\mkont)}{
+  where $\mkont\in\msto(\maddr)$
+...}
+
+%% APPLY
+\case{
+ \ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\msto,\mkont}  \cmachstep
+ \mcomp^{\mcntr'}(\menv',\msto',\mkont)}{
+ where $\menv',\msto',\mcntr' = \bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval)$
+...}
+
+\case{
+ \ap{\mop,\mval,\msto,\mkont}  \cmachstep
+ \co{\mkont,\mval',\msto}}{
+ where $\mkont \in\msto(\maddr)$
+ and $\mvalx{u} \in \force(\msto,\mval), \mval'\in\interpdelta(\mop,\mvalx{u})$
+...}
+\end{byCases}
+% (a) case is for non-ev to non-ev
+% (b) is for s \equiv ev w is r(s)
+% (c) is for s compiled, r(w) = s
+\end{proof}
 
 \subsection{Soundness of widened abstract compilation}
 
-...9
+...
 
 \subsection{Semantic equivalence with locally log-based store deltas}
 
