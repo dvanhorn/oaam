@@ -377,7 +377,7 @@ Machine configuration space:
 
 Reduction semantics:
 \begin{align*}
-\inject(\mexp) &= (\setof{\mstate'},\setof{\mstate'},\msto) \\
+\inject(\mexp) &= (\setof{\ttuple{\mstate'}{\msto}},\setof{\mstate'},\msto) \\
  \text{ where } \mstate &= \compile{\mexp}^{\mtcntr}(\bot,\bot,\kmt) \\
                 \mstate', \msto &= \nw(\mstate) \\
 \reachable{\mexp} &= \setof{\wn(\mstate,\msto') \mid
@@ -404,7 +404,7 @@ their changes.
 \\
 Machine configuration space:
 \begin{align*}
-\System &= \wp(\State) \times \Store \\
+%\System &= \wp(\State) \times \Store \\
 \mstate \in \State &= \co{\mkont, \mval} \alt
                      \ap[_\mlab^\mcntr]{\mval,\mval,\mkont} \alt
                      \ans{\mval} \\
@@ -438,7 +438,7 @@ Abstract compilation function:
 \text{ where }\maddr,\msdiff' = \push^\mcntr_\mlab(\msdiff,\mkont)
 \\
 \compile{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}} &= \lambda^\mcntr(\menv,\msto,\msdiff,\mkont) .
-\compile{\mexpi0}^\delta(\menv,\msto,\msdiff',\kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})
+\compile{\mexpi0}^\mcntr(\menv,\msto,\msdiff',\kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})
 \\
 &\text{ where }\maddr,\msdiff' = \push_\mlab^\mcntr(\msdiff,\mkont)
 \end{align*}
@@ -484,8 +484,9 @@ Reduction semantics helper (write $\mstate \machstep_\msto \mstate',\msdiff$ to 
 
 Reduction semantics:
 \begin{align*}
-\inject(\mexp) &= (\setof{\mstate}, \setof{\mstate}, \replay(\msdiff,\bot)) \\
+\inject(\mexp) &= (\setof{\ttuple{\mstate}{\msto}}, \setof{\mstate}, \msto) \\
  \text{ where } \mstate, \msdiff &= \compile{e}^{\mtcntr}(\bot,\bot,\bot,\kmt) \\
+                \msto &= \replay(\msdiff,\bot) \\
 \reachable{\mexp} &= \setof{\wn(\mstate,\msto') \mid
                              \inject(\mexp) \machstep^* (S,F,\msto),
                              \ttuple{\mstate}{\msto'} \in S} \\
@@ -536,7 +537,10 @@ Reduction semantics:
                          0 & \text{if } \mstate' = \mstate \\
                          \epsilon & \text{otherwise}
                         \end{array}\right. \\
-\mathit{reachable}(\mexp) &= \setof{\wn(\mstate,\Sigma(n)) \mid \inject(\mexp) \machstep^* (S,F,\Sigma,n'), \hd(S(\mstate)) = n} \\
+\mathit{reachable}(\mexp) &= \setof{\wn(\mstate,\Sigma(n)) \mid \inject(\mexp) \machstep^* (S,F,\Sigma,n'), \hd(S(\mstate)) = n}
+\end{align*}
+
+\begin{align*}
 \System &= (\State \to {\mathbb N}^*) \times \wp(\State) \times ({\mathbb N} \finto \Store) \times {\mathbb N} \\
 (S,F,\Sigma,n) &\machstep (S', F \cup F', \Sigma[n' \mapsto \msto'],n') \\
  \text{ where }
@@ -553,7 +557,10 @@ Reduction semantics:
   S' &= \lambda \mstate. \left\{\begin{array}{ll}
                                  n' S(\mstate) & \text{if } \mstate \in F' \\
                                  S(\mstate) & \text{otherwise}
-                                \end{array}\right. \\
+                                \end{array}\right.
+\end{align*}
+
+\begin{align*}
   \replaychangeall(\setof{\msdiff} \cup \Xi, \msto, \updatedp) &=
     \replaychangeall(\Xi, \msto', \updatedp \vee \joinp) \\
    \text{ where } \msto', \joinp &= \replaychange(\msdiff, \msto, \sfalse) \\
@@ -972,11 +979,118 @@ first case of WEB.}
 
 \subsection{Soundness of widened abstract compilation}
 
-...
+\begin{align*}
+\prep(S,F,\masto) = S \cup \setof{\ttuple{\mastate}{\masto} \mid \mastate \in F}
+\end{align*}
+
+\begin{mathpar}
+\inferrule{\masto \sqsubseteq \masto'}{(\mastate,\masto) \sqsubseteq (\mastate,\masto')} \qquad
+\inferrule{\prep(S,F,\masto) \sqsubseteq \prep(S',F',\masto')}
+          {(S,F,\masto) \sqsubseteq (S',F',\masto')}
+\end{mathpar}
+
+\begin{align*}
+\alpha(\mstate) &= (\setof{(\mastate,\masto)},\setof{\mastate},\masto) \\
+ \text{ where } \mastate,\masto &= \nw(\mstate) \\
+\gamma((S,F,\masto)) &=
+  \setof{\wn(\mastate,\msto) \mid
+         \ttuple{\mastate}{\masto} \in \prep(S,F,\masto),
+         \masto \in \gamma(\masto)} \\
+% set of all functions that for all \maddr \in \dom(\masto), map \maddr to a subset of \masto(\maddr)
+\gamma(\masto) &= \setof{R' \mid R' \subseteq R, R' \text{ functional}, \dom(R') = \dom(\masto)} \\
+ \text{ where } R &= \setof{\ttuple{\maddr}{\hat{\mstor}} \mid
+                            \maddr \in\dom(\masto),
+                            \hat{\mstor} \subseteq \masto(\maddr)} \\
+\alpha^*(C) &= \setof{\alpha(\mstate) \mid \mstate \in C} \\
+\gamma^*(A) &= \bigcup\limits_{\mastate \in A}{\gamma(\mastate)}
+\end{align*}
+
+\begin{lemma}
+$\gamma^* \circ \alpha^* \ge 1_C$
+\end{lemma}
+\begin{proof}
+This is immediate if $\masto \in \gamma(\masto)$, which is true, since
+$\masto(\maddr) \subseteq \masto(\maddr)$.
+\end{proof}
+
+\begin{lemma}
+$\alpha^* \circ \gamma^* \le 1_C$
+\end{lemma}
+\begin{proof}
+TODO
+\end{proof}
+
+\begin{theorem}
+If $\mstate \cmachstep \mstate'$ and $\alpha(\mstate) \sqsubseteq (S,F,\masto)$
+then there exist $S',F',\masto'$ such that
+$(S,F,\masto) \machstep (S',F',\masto')$ and
+$\alpha(\mstate') \sqsubseteq (S',F',\masto')$
+\end{theorem}
+\begin{proof}
+By definition of $\alpha, \sqsubseteq$, there exists a $\mastate \in F$
+such that, with $\mastate^*,\masto^* = \nw(\mstate)$,
+$\mastate = \mastate^*$ and $\masto^* \sqsubseteq \masto$.
+
+Thus, by definition of $\machstep, \nw, \wn,\prep,\sqsubseteq$ (call the result $(S',F',\masto')$),
+letting $\mastate^*_1,\masto^*_1 = \nw(\mstate')$,
+$\masto^*_1 \sqsubseteq \masto'$ and
+$\setof{\ttuple{\mastate^*_1}{\masto'}} \sqsubseteq \prep(S',F',\masto')$.
+Thus $\alpha(\mstate') \sqsubseteq(S', F', \masto')$.
+\end{proof}
 
 \subsection{Semantic equivalence with locally log-based store deltas}
 
-Here we show a simple lock-step bisimulation.
+Here we show extensional equality of the relations. We will use $\dmachstep$ for the store
+delta semantics and $\dcompile{\_}$ for its compilation function.
+
+Let $\equiv \subseteq \Expr$ be the reflexive, transitive,
+symmetric closure of $\equiv^*$ with structural lifting where non-$\Expr$ elements are compared with equality, and that lifted to functions $\Addr \to \wp(\Storeable)$.
+\begin{mathpar}
+\inferrule{ }{\dcompile{\mexp} \equiv^* \compile{\mexp}}
+\end{mathpar}
+
+\begin{lemma}
+For all $\mexp, \mcntr,\menv,\msto,\msdiff,\mkont,\msto^*,\mkont^*$,
+if $\msto \equiv \msto^*$ and $\mkont \equiv \mkont^*$, then
+$\dcompile{\mexp}^\mcntr(\menv,\msto,\msdiff,\mkont) = \ttuple{\mastate}{\msdiff'}$ iff
+$\compile{\mexp}^\mcntr(\menv,\msto^*,\mkont^*) = \mstate$ such that
+$\mastate,\replay(\msdiff',\msto) \equiv \nw(\mstate)$
+\end{lemma}
+\begin{proof}
+By induction on $\mexp$
+\begin{byCases}
+ \case{\text{Base } \svar{\mvar}}{By definitions of $\dcompile{\_},\compile{\_},\replay,\nw$.}
+ \case{\text{Base } \slit{\mlit}}{By definitions of $\dcompile{\_},\compile{\_},\replay,\nw$.}
+ \case{\text{Induction step } \slam{\mvar}{\mexp}}{By definitions of $\dcompile{\_},\compile{\_},\replay,\nw$.}
+ \case{\text{Induction step } \sapp{\mexpi0}{\mexpi1}}{
+  By IH and definitions of $\push, \equiv,\replay$,
+   $\dcompile{\mexpi0}^\mcntr(\menv,\msto,\msdiff',\kar[^\mcntr_\mlab]{\dcompile{\mexpi1},\menv,\maddr})$
+    where $\maddr,\msdiff' = \push_\mlab^\mcntr(\msdiff,\mkont)$ iff
+   $\compile{\mexpi0}^\mcntr(\menv,\msto^*_1,\kar[^\mcntr_\mlab]{\compile{\mexpi1},\menv,\maddr})$
+    where $\maddr,\msto^*_1 = \push_\mlab^\mcntr(\msto^*,\mkont^*)$.
+   Thus the conclusion holds by definitions of $\dcompile{\_}, \compile{\_}$.}
+ \case{\text{Induction step } \sif{\mexpi0}{\mexpi1}{\mexpi2}}{
+  By IH and definitions of $\push, \equiv,\replay$,
+   $\dcompile{\mexpi0}^\mcntr(\menv,\msto,\msdiff',\kif[^\mcntr_\mlab]{\dcompile{\mexpi1},\dcompile{\mexpi2},\menv,\maddr})$
+    where $\maddr,\msdiff' = \push_\mlab^\mcntr(\msdiff,\mkont)$ iff
+   $\compile{\mexpi0}^\mcntr(\menv,\msto^*_1,\kif[^\mcntr_\mlab]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})$
+    where $\maddr,\msto^*_1 = \push_\mlab^\mcntr(\msto^*,\mkont^*)$.
+   Thus the conclusion holds by definitions of $\dcompile{\_}, \compile{\_}, \nw$.}
+\end{byCases}
+\end{proof}
+
+\begin{theorem}
+%For all $S, F, \msto, S', F', \msto', S^*, F^*, \msto^*$,
+If $S \equiv S^*, F \equiv F^*, \msto \equiv \msto^*$, then
+$(S,F,\msto) \machstep (S',F',\msto')$ iff
+$\exists S^*_1, F^*_1, \msto^*_1.
+  S' \equiv S^*_1 \wedge F' \equiv F^*_1 \wedge \msto' \equiv \msto^*_1 \wedge
+  (S^*,F^*,\msto^*) \dmachstep (S^*_1,F^*_1,\msto^*_1)$
+\end{theorem}
+\begin{proof}
+By definitions of $\machstep, \dmachstep, \push, \stash, \replay,
+\replayall$, commutativity and associativity of $\sqcup$, and the previous lemma.
+\end{proof}
 
 \subsection{Semantic equivalence of log-based updates to a timestamped store}
 The original work of Shivers did not have bulk updates to the widened

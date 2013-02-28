@@ -100,8 +100,15 @@
 
 % Notations for proofs
 \newcommand{\maddrx}[1]{#1}
+\newcommand{\mastate}{\hat{\mstate}}
+\newcommand{\masto}{\hat{\msto}}
+\newcommand{\maenv}{\hat{\menv}}
+\newcommand{\makont}{\hat{\mkont}}
+\newcommand{\maval}{\hat{\mval}}
 \newcommand{\CompState}{\compile{\State}}
 \newcommand{\cmachstep}{\mathbin{\compile{\machstep}}}
+\newcommand{\dmachstep}{\mathbin{\machstep_\delta}}
+\newcommand{\dcompile}[1]{\Delta\compile{#1}}
 \newcommand{\mstor}{s}
 \newcommand{\updatedp}{\mathit{updated?}}
 \newcommand{\joinp}{\mathit{join?}}
@@ -112,6 +119,7 @@
 \newcommand{\nw}{\mathit{nw}}
 \newcommand{\commit}{\mathit{commit}}
 \newcommand{\commitev}{\mathit{commitev}}
+\newcommand{\prep}{\mathit{prep}}
 \newcommand{\replaychange}{\mathit{replay}\Delta}
 \newcommand{\replaychangeall}{\forall\mathit{replay}\Delta}
 \newcommand{\deceq}{\mathbin{\overset{?}{=}}}
