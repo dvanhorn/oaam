@@ -537,7 +537,9 @@ Reduction semantics:
                          0 & \text{if } \mstate' = \mstate \\
                          \epsilon & \text{otherwise}
                         \end{array}\right. \\
-\mathit{reachable}(\mexp) &= \setof{\wn(\mstate,\Sigma(n)) \mid \inject(\mexp) \machstep^* (S,F,\Sigma,n'), \hd(S(\mstate)) = n}
+\mathit{reachable}(\mexp) &=
+  \setof{\wn(\mstate,\Sigma(n)) \mid
+         \inject(\mexp) \machstep^* (S,F,\Sigma,n'), \hd(S(\mstate)) = n}
 \end{align*}
 
 \begin{align*}
@@ -564,10 +566,11 @@ Reduction semantics:
   \replaychangeall(\setof{\msdiff} \cup \Xi, \msto, \updatedp) &=
     \replaychangeall(\Xi, \msto', \updatedp \vee \joinp) \\
    \text{ where } \msto', \joinp &= \replaychange(\msdiff, \msto, \sfalse) \\
+  \replaychangeall(\varnothing, \msto, \updatedp) &= \msto, \updatedp \\
   \replaychange(\msdiff[\maddr \mapsto S], \msto, \joinp) &=
    \replaychange(\msdiff, \msto', \joinp \vee \joinp') \\
   \text{ where } S' &= S \sqcup \msto(\maddr) \\
-                 \joinp' &= S \deceq S' \\
+                 \joinp' &= \msto(\maddr) \deceq S' \\
                  \msto' &= \msto[\maddr \mapsto S'] \\
   \replaychange(\bot, \msto, \joinp) &= \msto, \joinp
 \end{align*}
@@ -1093,11 +1096,88 @@ By definitions of $\machstep, \dmachstep, \push, \stash, \replay,
 \end{proof}
 
 \subsection{Semantic equivalence of log-based updates to a timestamped store}
-The original work of Shivers did not have bulk updates to the widened
-store, and could thus leak precision through the additional side
-channel. Additionally, the store was destructively updated, which
-makes temporal reasoning much more imprecise. Here we show that our
-representational change to the monotonically increasing store in the
-present of log-based store updates maintains the semantics of the previous machine.
+
+Because the store is monotonically increasing, we know that
+$\sqsubseteq$ forms a total order on stores in the system. We use this
+information to sort and index the stores. Call the timestamped reduction relation $\nmachstep$.
+
+\begin{align*}
+\alpha((S,F,\msto)) &= (\alpha(S,\Sigma), F, \Sigma, |\Sigma|-1) \\
+\text{ where } \Sigma &= \lambda n. \sorted_n \\
+               \sorted &= \sort(\setof{\msto \mid \ttuple{\_}{\msto} \in \prep(S,F,\msto)},\sqsubseteq) \\
+\alpha(S,\Sigma) &=
+   \setof{\ttuple{\mstate}
+                 {\map(\Sigma,\sort(\setof{\msto \mid \ttuple{\mstate}{\msto} \in S}, \sqsupseteq))}
+           \mid \ttuple{\mstate,\_} \in S} \\
+\gamma((S,F,\Sigma,n)) &= (\gamma(S,\Sigma), F, \Sigma(n)) \\
+\gamma(S,\Sigma) &= \setof{\ttuple{\mstate}{\Sigma(\ell_i)} \mid S(\mstate) = \ell, 0 \le i < |\ell|}
+\end{align*}
+
+%% \begin{lemma}
+%% $\gamma \circ \alpha = 1_C$
+%% \end{lemma}
+%% \begin{proof}
+%% TODO
+%% \end{proof}
+
+%% \begin{lemma}
+%% $\alpha \circ \gamma \circ = 1_C$
+%% \end{lemma}
+%% \begin{proof}
+%% TODO
+%% \end{proof}
+
+\begin{lemma}
+For all $\msdiff \text{ finite},\msto,\joinp$, let $\replaychange(\msdiff,\msto,\joinp) = \msto',\joinp'$.
+$\joinp \vee (\joinp' \iff \msto \neq \msto')$
+\end{lemma}
+\begin{proof}
+By induction an $\msdiff$.
+\begin{byCases}
+ \case{\text{Base } \bot}{By definition of $\replaychange$, $\msto = \msto'$ and $\joinp = \joinp'$.}
+ \case{\text{Induction step } \msdiff'[\maddr \mapsto \hat{\mstor}]}{
+  Let $\replaychange(\msdiff, \msto^*, \joinp \vee \joinp^*) = \msto^*_1,\joinp^*_1$
+   where $\hat{\mstor}' = \hat{\mstor} \sqcup \msto(\maddr)$, $\msto^* = \msto[\maddr \mapsto \hat{\mstor}']$, $\joinp^* = \hat{\mstor}' \deceq \msto(\maddr)$.
+  If $\joinp^*$, then $\msto^*_1 \neq \msto$ and $\joinp^*_1$ because $\replaychange$ monotonically increases $\msto$ and $\joinp$.
+  Otherwise, by IH, if $\joinp$, then $\joinp^*_1$; otherwise, $\msto^*_1 \neq \msto^* \iff \joinp^*_1$}
+\end{byCases}
+\end{proof}
+
+\begin{lemma}
+For all $\Xi \text{ finite}, \msto, \updatedp$, let $\replaychangeall(\Xi,\msto,\updatedp) = \msto',\updatedp'$.
+$\updatedp \vee (\updatedp' \iff \msto = \msto')$
+\end{lemma}
+\begin{proof}
+By induction on $\Xi$.
+\begin{byCases}
+ \case{\text{Base } \varnothing}{By definition of $\replaychange$, $\msto = \msto'$ and $\updatedp = \updatedp'$.}
+ \case{\text{Induction step } \setof{\msdiff}\cup\Xi'}{
+  Let $\replaychangeall(\Xi, \msto^*, \updatedp \vee \updatedp^*) = \msto^*_1,\updatedp^*_1$
+   where $\replaychange(\msdiff,\msto,\updatedp) = \msto^*,\updatedp^*$.
+   By the previous lemma, $\updatedp \vee (\updatedp^* \iff \msto \neq \msto^*)$.
+   If $\updatedp^*$ then $\msto \neq msto^*_1$ and $\updatedp^*_1$ because $\replaychangeall$ monotonically increases $\msto$ and $\updatedp$.
+   Otherwise, by IH, if $\updatedp$, then $\updatedp^*_1$; otherwise $\msto^*_1 \neq \msto^* \iff \updatedp^*_1$}
+\end{byCases}
+\end{proof}
+
+\begin{theorem}
+If $(S,F,\msto) \machstep (S',F',\msto')$ and $\alpha((S,F,\msto))
+\sqsubseteq (S^*,F,\Sigma,n)$ then there exist $S^*_1,\Sigma',n'$ such
+that $(S^*,F,\Sigma,n) \nmachstep (S^*_1,F',\Sigma',n')$ and
+$\alpha((S',F',\msto')) \sqsubseteq (S^*_1,F',\Sigma',n')$.
+\end{theorem}
+\begin{proof}
+TODO
+\end{proof}
+
+\begin{theorem}
+If $(S,F,\Sigma,n) \machstep (S',F',\Sigma',n')$ and
+$\gamma((S,F,\Sigma,n)) \sqsubseteq (S^*,F,\msto)$ then there exist
+$S^*_1,\msto'$ such that $(S^*,F,\msto) \machstep (S^*_1,F',\msto')$
+and $\gamma((S',F',\Sigma',n')) \sqsubseteq (S^*_1,F',\msto')$.
+\end{theorem}
+\begin{proof}
+TODO
+\end{proof}
 
 \end{document}
