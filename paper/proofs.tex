@@ -1132,7 +1132,7 @@ For all $\msdiff \text{ finite},\msto,\joinp$, let $\replaychange(\msdiff,\msto,
 $\joinp \vee (\joinp' \iff \msto \neq \msto')$
 \end{lemma}
 \begin{proof}
-By induction an $\msdiff$.
+By induction on $\msdiff$.
 \begin{byCases}
  \case{\text{Base } \bot}{By definition of $\replaychange$, $\msto = \msto'$ and $\joinp = \joinp'$.}
  \case{\text{Induction step } \msdiff'[\maddr \mapsto \hat{\mstor}]}{
@@ -1145,7 +1145,7 @@ By induction an $\msdiff$.
 
 \begin{lemma}
 For all $\Xi \text{ finite}, \msto, \updatedp$, let $\replaychangeall(\Xi,\msto,\updatedp) = \msto',\updatedp'$.
-$\updatedp \vee (\updatedp' \iff \msto = \msto')$
+$\updatedp \vee (\updatedp' \iff \msto \neq \msto')$
 \end{lemma}
 \begin{proof}
 By induction on $\Xi$.
