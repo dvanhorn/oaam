@@ -363,7 +363,7 @@ Machine configuration space:
 \mstate \in \State &= \co{\mkont, \mval} \alt
                      \ap[_\mlab^\mcntr]{\mval,\mval,\mkont} \alt
                      \ans{\mval} \\
-\System &= \wp(\State) \times \Store
+\System &= (\wp(\State \times \Store) \setminus \setof{\varnothing}) \times \wp(\State) \times \Store
 \end{align*}
 
 \begin{align*}
@@ -997,8 +997,8 @@ first case of WEB.}
  \text{ where } \mastate,\masto &= \nw(\mstate) \\
 \gamma((S,F,\masto)) &=
   \setof{\wn(\mastate,\msto) \mid
-         \ttuple{\mastate}{\masto} \in \prep(S,F,\masto),
-         \masto \in \gamma(\masto)} \\
+         \ttuple{\mastate}{\masto'} \in \prep(S,F,\masto),
+         \msto \in \gamma(\masto')} \\
 % set of all functions that for all \maddr \in \dom(\masto), map \maddr to a subset of \masto(\maddr)
 \gamma(\masto) &= \setof{R' \mid R' \subseteq R, R' \text{ functional}, \dom(R') = \dom(\masto)} \\
  \text{ where } R &= \setof{\ttuple{\maddr}{\hat{\mstor}} \mid
@@ -1017,10 +1017,18 @@ $\masto(\maddr) \subseteq \masto(\maddr)$.
 \end{proof}
 
 \begin{lemma}
-$\alpha^* \circ \gamma^* \le 1_C$
+$\alpha^* \circ \gamma^* \le 1_A$
 \end{lemma}
 \begin{proof}
-TODO
+Let $A \subseteq \System$ be arbitrary.
+It suffices to show that $\alpha^*(\gamma^*(A)) \sqsubseteq A$.
+Let $(S,F,\masto) \in A$ be arbitary.
+Let $(\mastate,\masto) \in S$ be arbitrary.
+By definition of $\gamma$, $\masto \in \gamma(\masto)$.
+Thus $\wn(\mastate,\masto) \in \gamma^*(A)$.
+By definition of $\alpha^*,\alpha$, $(\setof{\ttuple{\mastate}{\masto}},\setof{\mastate},\masto) \in \alpha^*(\gamma^*(A))$.
+By definition of $\prep,\sqsubseteq$, $(\setof{\ttuple{\mastate}{\masto}},\setof{\mastate},\masto) \sqsubseteq (S,F,\masto)$.
+Thus since $(S,F,\masto)$ was arbitrary, $\alpha^*(\gamma^*(A)) \sqsubseteq A$.
 \end{proof}
 
 \begin{theorem}
@@ -1127,57 +1135,95 @@ information to sort and index the stores. Call the timestamped reduction relatio
 %% TODO
 %% \end{proof}
 
+\begin{align*}
+\prop(S,\msto) &= \mathit{totally\text{-}ordered}(\Sigma, \sqsubseteq) \wedge \msto \text{ an upper bound of } \Sigma \\
+ \text{ where } \Sigma &= \setof{\msto \mid (\_,\msto) \in S} \\
+\prop^*(S,\Sigma,n) &= (\forall \mstate, i. 0 \le i < |\Sigma(\mstate)| \implies 0 \le \Sigma(\mstate)_i < |\Sigma|) \wedge \\
+                  &(\forall i. 0 \le i < |\Sigma|-1 \implies \Sigma(i) \sqsubseteq \Sigma(i+1)) \wedge \\
+                  &n = |\Sigma| - 1
+\end{align*}
+
+\begin{lemma}[Monotone store collection]\label{monstore}
+If $\prop(S,\msto)$ and $(S,F,\msto) \machstep (S',F',msto')$ then $\prop(S',\msto')$
+\end{lemma}
+\begin{proof}
+Since $\forall \Xi,\msto.\replayall(\Xi,\msto) \sqsupseteq \msto$, this is trivial.
+\end{proof}
+
+\begin{lemma}[Monotone store timestamps]\label{montime}
+If $\prop^*(S,\Sigma,n)$ and $(S,F,\Sigma,n) \machstep (S',F',\Sigma',n')$ then $\prop^*(S',\Sigma',n')$
+\end{lemma}
+\begin{proof}
+Since $\forall \Xi,\msto. \text{let } \msto',\updatedp = \replaychangeall(\Xi,\msto) \text{ in } \msto' \sqsupseteq \msto$,
+this is trivial.
+\end{proof}
+
 \begin{lemma}
 For all $\msdiff \text{ finite},\msto,\joinp$, let $\replaychange(\msdiff,\msto,\joinp) = \msto',\joinp'$.
-$\joinp \vee (\joinp' \iff \msto \neq \msto')$
+$\joinp \vee (\joinp' \iff \msto \neq \msto')$ and $\msto' = \replay(\msdiff,\msto)$.
 \end{lemma}
 \begin{proof}
 By induction on $\msdiff$.
 \begin{byCases}
- \case{\text{Base } \bot}{By definition of $\replaychange$, $\msto = \msto'$ and $\joinp = \joinp'$.}
+ \case{\text{Base } \bot}{
+  By definition of $\replaychange,\replay$, $\msto = \msto' = \replay(\bot, \msto)$ and $\joinp = \joinp'$.}
  \case{\text{Induction step } \msdiff'[\maddr \mapsto \hat{\mstor}]}{
-  Let $\replaychange(\msdiff, \msto^*, \joinp \vee \joinp^*) = \msto^*_1,\joinp^*_1$
-   where $\hat{\mstor}' = \hat{\mstor} \sqcup \msto(\maddr)$, $\msto^* = \msto[\maddr \mapsto \hat{\mstor}']$, $\joinp^* = \hat{\mstor}' \deceq \msto(\maddr)$.
+  Let $\replaychange(\msdiff', \msto^*, \joinp \vee \joinp^*) = \msto^*_1,\joinp^*_1$
+   where $\hat{\mstor}' = \hat{\mstor} \sqcup \msto(\maddr)$,
+         $\msto^* = \msto[\maddr \mapsto \hat{\mstor}']$, $\joinp^* = \hat{\mstor}' \deceq \msto(\maddr)$.
   If $\joinp^*$, then $\msto^*_1 \neq \msto$ and $\joinp^*_1$ because $\replaychange$ monotonically increases $\msto$ and $\joinp$.
-  Otherwise, by IH, if $\joinp$, then $\joinp^*_1$; otherwise, $\msto^*_1 \neq \msto^* \iff \joinp^*_1$}
+  Otherwise, by IH, if $\joinp$, then $\joinp^*_1$; otherwise, $\msto^*_1 \neq \msto^* \iff \joinp^*_1$.
+  Also by IH, $\msto^*_1 = \replay(\msdiff',\msto^*)$.
+  Thus by definition of $\replay$, $\msto' = \replay(\msdiff,\msto)$.}
 \end{byCases}
 \end{proof}
 
 \begin{lemma}
 For all $\Xi \text{ finite}, \msto, \updatedp$, let $\replaychangeall(\Xi,\msto,\updatedp) = \msto',\updatedp'$.
-$\updatedp \vee (\updatedp' \iff \msto \neq \msto')$
+$\updatedp \vee (\updatedp' \iff \msto \neq \msto')$ and $\msto' = \replayall(\Xi,\msto)$
 \end{lemma}
 \begin{proof}
 By induction on $\Xi$.
 \begin{byCases}
- \case{\text{Base } \varnothing}{By definition of $\replaychange$, $\msto = \msto'$ and $\updatedp = \updatedp'$.}
+ \case{\text{Base } \varnothing}{
+   By definition of $\replaychange$, $\replay$,
+   $\msto = \msto' = \replay(\varnothing,\msto)$ and $\updatedp = \updatedp'$.}
  \case{\text{Induction step } \setof{\msdiff}\cup\Xi'}{
-  Let $\replaychangeall(\Xi, \msto^*, \updatedp \vee \updatedp^*) = \msto^*_1,\updatedp^*_1$
+  Let $\replaychangeall(\Xi', \msto^*, \updatedp \vee \updatedp^*) = \msto^*_1,\updatedp^*_1$
    where $\replaychange(\msdiff,\msto,\updatedp) = \msto^*,\updatedp^*$.
-   By the previous lemma, $\updatedp \vee (\updatedp^* \iff \msto \neq \msto^*)$.
+   By the previous lemma, $\updatedp \vee (\updatedp^* \iff \msto \neq \msto^*)$
+   and $\msto^* = \replay(\msdiff,\msto)$..
    If $\updatedp^*$ then $\msto \neq msto^*_1$ and $\updatedp^*_1$ because $\replaychangeall$ monotonically increases $\msto$ and $\updatedp$.
-   Otherwise, by IH, if $\updatedp$, then $\updatedp^*_1$; otherwise $\msto^*_1 \neq \msto^* \iff \updatedp^*_1$}
+   Otherwise, by IH, if $\updatedp$, then $\updatedp^*_1$; otherwise $\msto^*_1 \neq \msto^* \iff \updatedp^*_1$.
+   Also by IH, $\msto^*_1 = \replayall(\Xi',\msto^*)$.
+   Thus, by definition of $\replayall$, $\msto' = \replayall(\Xi,\msto)$.}
 \end{byCases}
 \end{proof}
 
 \begin{theorem}
-If $(S,F,\msto) \machstep (S',F',\msto')$ and $\alpha((S,F,\msto))
+If $(S,F,\msto) \machstep (S',F',\msto')$ and $\prop(S,\msto)$ and $\alpha((S,F,\msto))
 \sqsubseteq (S^*,F,\Sigma,n)$ then there exist $S^*_1,\Sigma',n'$ such
 that $(S^*,F,\Sigma,n) \nmachstep (S^*_1,F',\Sigma',n')$ and
 $\alpha((S',F',\msto')) \sqsubseteq (S^*_1,F',\Sigma',n')$.
 \end{theorem}
 \begin{proof}
-TODO
+By definition of $\alpha$, and lemma \ref{monstore}, $\Sigma(n) = \msto$.
+By definitions of $\nmachstep$, $\machstep$, $\alpha$ and the previous lemma, $\msto' = \Sigma'(n')$.
+By definitions of $\nmachstep$, $\machstep$, $\alpha$, and the previous statement, $\alpha(S') = S^*_1$.
+By definition of $\alpha$ and lemma \ref{monstore}, $(S^*,F,\Sigma,n) \nmachstep (S^*_1,F',\Sigma',n')$ and $\alpha((S',F',\msto')) \sqsubseteq (S^*_1,F',\Sigma',n')$.
 \end{proof}
 
 \begin{theorem}
-If $(S,F,\Sigma,n) \machstep (S',F',\Sigma',n')$ and
+If $(S,F,\Sigma,n) \nmachstep (S',F',\Sigma',n')$ and
 $\gamma((S,F,\Sigma,n)) \sqsubseteq (S^*,F,\msto)$ then there exist
 $S^*_1,\msto'$ such that $(S^*,F,\msto) \machstep (S^*_1,F',\msto')$
 and $\gamma((S',F',\Sigma',n')) \sqsubseteq (S^*_1,F',\msto')$.
 \end{theorem}
 \begin{proof}
-TODO
+By definition of $\gamma$, and lemma \ref{montime}, $\Sigma(n) = \msto$.
+By definitions of $\nmachstep$, $\machstep$, $\gamma$ and the previous lemma, $\msto' = \Sigma'(n')$.
+By definitions of $\nmachstep$, $\machstep$, $\gamma$, and the previous statement, $\gamma(S',\Sigma') = S^*_1$.
+By definition of $\gamma$ and lemma \ref{montime}, $(S^*,F,\msto) \machstep (S^*_1,F',\msto')$ and $\gamma((S',F',\Sigma',n')) \sqsubseteq (S^*_1,F',\msto')$.
 \end{proof}
 
 \end{document}
