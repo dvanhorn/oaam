@@ -1,0 +1,81 @@
+\documentclass{llncs}
+\usepackage{amsmath,amssymb,pfsteps,multicol,stmaryrd,mathpartir,centernot}
+\input{preamble}
+
+\begin{document}
+
+\section{Wide semantics decisions and precision differences}
+
+There are a few straightforward ways to widen the state space to use a
+single, monotonically increasing store. By far the most common way is
+with a worklist algorithm for computing a least fixed point of a
+``frontier-based'' collecting semantics. By dropping all the
+intermediate stores, we lose temporal information such as $x$ is never
+a number before $y$ is a string. This kind of information is
+interesting, e.g., for diagnosing possible errors that the analysis
+detects when $x$ is used in a call not defined for numbers. More
+usefully, this can help pinpoint what influenced execution that lead
+to a tainted value in an information flow analysis. Consider the
+following program:
+
+\begin{lstlisting}
+(define (f x y)
+  (if (bytes? y)
+      (f (string->number x) (string-append (bytes->string/utf-8 y) x))
+      (if (zero? x)
+          y
+          (f (sub1 x) (substring x)))))
+(f (read-numeric) (read-encoded/unencoded))
+\end{lstlisting}
+
+There's a faux recursion to get the input into the right
+format. Obviously this is contrived, but in a program that uses
+polymorphic functions at different stages of its execution, the
+temporal information helps pinpoint when and under what circumstances
+an abstract address was poisoned with a value that causes an error.
+
+\subsection{Precision on the frontier}
+There is also a precision difference between the frontier-based method
+and the state-space stepping semantics that is the initial model for a
+widened store. That is, instead of separating states that need
+stepping from seen states like the frontier-based method does, the
+entire known state space steps with the current store:
+
+\begin{align*}
+\System &= \wp(\State) \times \Store \\
+(S,\msto) &\machstep (S',\msto') \\
+ \text{ where } I &= \setof{\mstate \mid \mastate \in S, \exists \msto'. \wn(\mastate,\msto) \machstep \mstate} \\
+                S' &= \setof{\mastate \mid \exists \msto.\wn(\mastate,\msto) \in I} \\
+                \msto' &= \bigsqcup\limits_{\msto \mid \exists\mastate.\wn(\mastate,\msto) \in I}{\msto}
+\end{align*}
+Although simple, this formulation has serious performance implications
+and precision deficiencies compared to the frontier-based
+semantics. This means the frontier-based algorithm is not just a more
+efficient implementation strategy for a widened store semantics, its
+results are not equivalent (they are better).
+
+The reason for the difference is that store changes that would affect
+the execution of some function might not be exercised before that
+function may never be called after that change. The frontier semantics
+would not end up stepping the state with the store dependency, whereas
+the above semantics would.
+
+A contrived example:
+\begin{lstlisting}
+(define b (box #f))
+(define (foo x)
+  (if (unbox b)
+      (bar x)
+      (bar (- x))))
+(define (bar y) (/ (log y) (log 2))
+(foo 20)
+(set-box! b #t)
+<code that doesn't invoke foo>
+\end{lstlisting}
+
+The frontier semantics would never find that {\tt bar} could cause an
+exception for {\tt log} called on a non-positive number, whereas the
+above semantics would, unnecessarily. Notice that not only are
+bindings not poisoned, fewer paths are explored.
+
+\end{document}
