@@ -25,7 +25,7 @@
                     #:defaults ([ans (generate-temporary #'ans)]))
          (~optional (~seq #:touches touches:id)) ;; Touch relation specialized for clos
          (~optional (~seq #:clos clos:id) #:defaults ([clos (generate-temporary #'clos)]))
-         (~optional (~seq #:rlos clos:id) #:defaults ([rlos (generate-temporary #'rlos)]))
+         (~optional (~seq #:rlos rlos:id) #:defaults ([rlos (generate-temporary #'rlos)]))
          (~optional (~seq #:primop primop:id) #:defaults ([primop (generate-temporary #'primop)]))
          ;; Analysis strategies flags (requires the right parameters too)
          (~optional (~and #:compiled compiled?))
@@ -63,7 +63,8 @@
      (with-syntax ([((ρ-op ...) (δ-op ...) (l-op ...))
                     (if (zero? (attribute K)) #'(() () ()) #'((ρ) (δ) (l)))]
                    [ev: (format-id #'ev "~a:" #'ev)]
-                   [clos: (format-id #'clos "~a:" #'clos)]
+                   [clos? (format-id #'clos "~a?" #'clos)]
+                   [rlos? (format-id #'rlos "~a?" #'rlos)]
                    [primop: (format-id #'primop "~a:" #'primop)]
                    [ev #'ev]
                    ;; represent rσ explicitly in all states?

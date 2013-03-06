@@ -13,6 +13,35 @@
          "nonsparse.rkt"
          racket/splicing)
 
+#|
+
+Notes wrt. use:
+
+running baseline analysis on file
+
+Welcome to Racket v5.3.3.
+-> (require "kcfa-instantiations.rkt")
+-> (define (sch->sexp file)
+  (with-input-from-file file
+    (λ () (for/list ([form (in-port read)]) form))))
+-> (require "handle-limits.rkt")
+-> (define-values (state-count-msg point-count-msg heap anss)
+   (with-limit-handler (baseline (sch->sexp "../benchmarks/church.sch"))))
+-> state-count-msg
+"State count: 7140"
+-> point-count-msg
+"Point count: 893"
+-> heap #;(it's usually pretty long)
+;; => hash[symbol -> set[val]]
+;;    where val := atomic?
+;;               | clos-container
+;;               | rlos-container
+;;               | primop-container
+-> anss
+;; => set[ans-container]
+
+|#
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Concrete semantics
 
