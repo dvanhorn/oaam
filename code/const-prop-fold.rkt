@@ -509,8 +509,8 @@
 (define easy
   (map (λ (x) (string-append "../benchmarks/" x))
        '("church.sch" "earley.sch" "fact.sch" "flatten.sch"
-         "introspective.sch" "matt-gc.sch" "test.sch"
-         "sergey/blur.sch" "sergey/eta.sch" "sergey/kcfa2.sch"
+         "introspective.sch" "matt-gc.sch" "sergey/blur.sch"
+         "sergey/eta.sch" "sergey/kcfa2.sch"
          "sergey/kcfa3.sch" "sergey/sat.sch")))
 (define paper
   (map (λ (x) (string-append "../benchmarks/toplas98/"))
@@ -519,9 +519,7 @@
        #;(these don't seem to aval correctly: "handle.scm" "nucleic2.sch" "splay.scm"))))
 (provide easy paper)
 
-(define (run-prop-folders files . prop-folders)
-  (define apfers `(,baseline-prop-folder ,0cfa^-prop-folder ,lazy-0cfa^-prop-folder
-                   ,lazy-0cfa^/∆s!-prop-folder))
+(define (run-prop-folders prop-folders files)
   (define (run files)
     (map (λ (apf) (map (λ (file)
                           (displayln "")
@@ -532,15 +530,15 @@
                             (displayln (format " folded-ast:~n~a" ast))
                             (list it np nf ast)))
                        files))
-         apfers))
+         prop-folders))
   (run files))
 (provide run-prop-folders)
 
 #;
-(run-prop-folders (append easy paper)
-                  baseline-prop-folder
-                  0cfa^-prop-folder
-                  lazy-0cfa^-prop-folder
-                  lazy-0cfa^/∆s!-prop-folder)
+(run-prop-folders `(,baseline-prop-folder
+                    ,0cfa^-prop-folder
+                    ,lazy-0cfa^-prop-folder
+                    ,lazy-0cfa^/∆s!-prop-folder)
+                  (append easy paper))
 
 ;; todo?: integrate into run-benchmark
