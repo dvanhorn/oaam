@@ -33,10 +33,8 @@ Welcome to Racket v5.3.3.
 "Point count: 893"
 -> heap #;(it's usually pretty long)
 ;; => hash[symbol -> set[val]]
-;;    where val := atomic?
-;;               | clos-container
-;;               | rlos-container
-;;               | primop-container
+;;    where val is one of
+;;    - value-node?
 -> anss
 ;; => set[ans-container]
 
@@ -242,15 +240,7 @@ Welcome to Racket v5.3.3.
                    #:ans prealloc/∆s-ans/c
                    #:touches prealloc/∆s-touches-0/c
                    #:fixpoint prealloc/∆s-fixpoint/c
-                   #:global-σ #:compiled #:wide
-                   #:clos clos
-                   #:rlos rlos
-                   #:primop primop)
-      #;#;
-      (define-values (_0 _1 σ _3) (lazy-0cfa^/c/∆s/prealloc! test-program))
-      ;; constant-fold should be a macro that constructs the match expanders'
-      ;; identifiers from clos/rlos/primop to analyze e with output store σ.
-      (constant-fold (unbox e) σ clos rlos primop))))))
+                   #:global-σ #:compiled #:wide))))))
 (provide lazy-0cfa^/c/∆s/prealloc!)
 
 ;; "it"

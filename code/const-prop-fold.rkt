@@ -31,7 +31,12 @@
 (begin-for-syntax
  (define (value-node?-proc n . pred-apps)
    `(define (value-node? ,n)
-      (or (datum? ,n) (atomic? ,n) (primr? ,n) (lam? ,n) (rlm? ,n) ,@pred-apps)))
+      (or (datum? ,n)
+          (atomic? ,n)
+          (primr? ,n)
+          (lam? ,n)
+          (rlm? ,n)
+          ,@pred-apps)))
  (define (symbol-append . args)
    (string->symbol (apply string-append (map symbol->string args)))))
 
@@ -220,13 +225,14 @@
       (eq? . ,eq?)
       (vector . ,vector)
       (vector-immutable . ,vector-immutable)
-      (qvector^ . ,qvector^)
       (make-vector . ,make-vector)
       (vector-ref . ,vector-ref)
       (vector-set! . ,vector-set!)
       (vector-length . ,vector-length)
       (vector->list . ,vector->list)
       (list->vector . ,list->vector)
+      (list? . ,list?)
+      (length . ,length)
       (vector? . ,vector?)
       (string? . ,string?)
       (string->symbol . ,string->symbol)
@@ -264,16 +270,11 @@
       (symbol? . ,symbol?)
       (symbol->string . ,symbol->string)
       (procedure? . ,procedure?)
-      (void? . ,void?)
-      (void . ,void)
-      (error . ,error)
       (not . ,not)
       (boolean? . ,boolean?)
       (cons . ,cons)
       (pair? . ,pair?)
-      (null? . ,null?)
-      (car . ,car)
-      (cdr . ,cdr)))
+      (null? . ,null?)))
   (define foldable (map car foldable-sps))
   (define (full-def datum)
     (match datum
@@ -310,6 +311,7 @@
                 [(? ,clos?) node]
                 [(? ,rlos?) node]
                 [(? ,primop?) node]
+                [(? primr?) node]
                 [(var _ x)
                  (let ([bound? (hash-ref env x #f)])
                    (cond [bound? (bump-folded!) bound?]
@@ -323,27 +325,35 @@
                  (cond [(and (memv op foldable) (andmap value-node? args))
                         (define err (λ () (error 'fold-1 "unimplemented primop ~a" op)))
                         (define val (apply (dict-ref foldable-sps op err)
-                                           (map datum-val args)))
-                        ;; assumes all arguments are datum for primops, which is not
-                        ;; entirely true...
+                                           (map (λ (arg) (if (datum? arg)
+                                                             (datum-val arg)
+                                                             arg))
+                                                args)))
+                        ;; atoms or data, nothing else so far
                         (bump-folded!)
                         (datum -1 val)]
                        [else (app l p (fold-1s args))])]
                 [(app l (primr l1 op) args)
                  (cond [(and (memv op foldable) (andmap value-node? args))
-                        (define err (λ () (error 'fold-1 "unimplemented primop ~a" op)))
+                        (define err
+                          (λ () (error 'fold-1 "unimplemented primop ~a" op)))
                         (define val (apply (dict-ref foldable-sps op err)
-                                           (map datum-val args)))
+                                           (map (λ (arg) (if (datum? arg)
+                                                             (datum-val arg)
+                                                             arg))
+                                                args)))
                         (bump-folded!)
                         (datum -1 val)]
                        [else (app l (primr l1 op) (fold-1s args))])]
                 [(app l (? ,rlos? r) args)
+                 #;(app l r (fold-1s args))
                  (define xs (,(symbol-append rlos '-x) r))
                  (define r (,(symbol-append rlos '-r) r))
                  (define e (,(symbol-append rlos '-e) r))
-                 (define-values (rs-arg xs-args) (split-at-right (length r) args))
+                 (define-values (rs-arg xs-args)
+                   (split-at-right args (- (length args) (length xs))))
                  (define-values (all-val? env*)
-                   (llλ `(,r . ,xs) `(,rs-arg . ,xs-args) e))
+                   (llλ (cons r xs) (cons rs-arg xs-args) e))
                  (cond [all-val? (bump-folded!) (fold-1 e env*)]
                        [else (app l r (fold-1s args))])]
                 [(app l (? ,clos? c) args)
@@ -357,9 +367,11 @@
                  (cond [all-val? (bump-folded!) (fold-1 e env*)]
                        [else (app l (lam l1 xs (fold-1* e)) (fold-1s args))])]
                 [(app l (rlm l1 xs rs e) args)
-                 (define-values (rs-arg xs-args) (split-at-right (length rs) args))
+                 #;(app l (rlm l1 xs rs (fold-1* e)) (fold-1s args))
+                 (define-values (rs-arg xs-args)
+                   (split-at-right args (- (length args) (length xs))))
                  (define-values (all-val? env*)
-                   (llλ `(,rs . ,xs) `(,rs-arg . ,xs-args) e))
+                   (llλ (cons rs xs) (cons rs-arg xs-args) e))
                  (cond [all-val? (bump-folded!) (fold-1 e env*)]
                        [else (app l (rlm l1 xs rs (fold-1* e)) (fold-1s args))])]
                 [(app l left args) (app l (fold-1* left) (fold-1s args))]
@@ -371,6 +383,7 @@
                 [(rlm l xs rs e) (rlm l xs rs (fold-1* e))]
                 [(st! l x e) (st! l x (fold-1* e))]
                 [(lcc l x e) (lcc l x (fold-1* e))]
+                [null null]
                 [_ (displayln (format "unmatched node during folding: ~a" node))
                    node]))
             (let fold-until-fixpt ([result (fold-1 ,node (hash))])
@@ -513,21 +526,27 @@
          "sergey/eta.sch" "sergey/kcfa2.sch"
          "sergey/kcfa3.sch" "sergey/sat.sch")))
 (define paper
-  (map (λ (x) (string-append "../benchmarks/toplas98/"))
+  (map (λ (x) (string-append "../benchmarks/toplas98/" x))
        '("boyer.sch" "dynamic.sch" "graphs.sch" "lattice.scm" "maze.sch"
          "matrix.scm" "nbody.sch" "nucleic.sch"
-       #;(these don't seem to aval correctly: "handle.scm" "nucleic2.sch" "splay.scm"))))
+         ;;(these don't aval correctly: "handle.scm" "nucleic2.sch" "splay.scm")
+         )))
 (provide easy paper)
 
-(define (run-prop-folders prop-folders files)
+(define (run-prop-folders prop-folders files show-ast?)
   (define (run files)
     (map (λ (apf) (map (λ (file)
-                          (displayln "")
                           (let-values ([(it np nf ast) (time (apf file))])
+                            (if show-ast?
+                                (displayln (format "initial ast:~n~a~n" ast))
+                                (void))
                             (displayln (format "fixpoint at iteration ~a" it))
                             (displayln (format "num propped: ~a" np))
                             (displayln (format " num folded: ~a" nf))
-                            (displayln (format " folded-ast:~n~a" ast))
+                            (if show-ast?
+                                (displayln (format " folded-ast:~n~a" ast))
+                                (void))
+                            (displayln (format "done with ~a~n" file))
                             (list it np nf ast)))
                        files))
          prop-folders))
