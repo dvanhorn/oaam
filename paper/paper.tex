@@ -29,7 +29,7 @@
 % \titlebanner{banner above paper title}        % These are ignored unless
 % \preprintfooter{short description of paper}   % 'preprint' option specified.
 
-\title{Optimizing Abstract Abstract Machines}
+\title{Provably Correct, Low-Cost Optimizations for Abstract Abstract Machines}
 
 \authorinfo{J. Ian Johnson}
            {Northeastern University}
@@ -604,8 +604,25 @@ The refactored relation, $\widehat{\machstep}$, becomes:
 \wn(\ans{\mval}, \msto) &= \ans{\msto, \mval}
 \end{align*}
 %
-In effect, the new store is computed as the least upper bound of all stores after stepping.
+In effect, the new store is computed as the least upper bound of all
+stores after stepping. This definition is wasteful, however. It causes
+all states found so far to step each iteration, even if they are not
+revisited. This has negative performance and precision
+consequences. We instead use a frontier-based semantics that
+corresponds to the classic ``worklist'' algorithms for analysis.
 
+\begin{align*}
+(S, F, \msto) &\mathrel{\widehat{\machstep}} (S \cup S', F', \msto') \\
+\mbox{where } S' &= \{(c',\msto^c) \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto^c), c \in F\} \\
+              F' &= \{c \mid (c,\_) \in S' \setminus S\} \\
+              \msto' &= \bigsqcup\; \{\msto^c \mid (\_,\msto^c) \in S'\} \\
+\wn(\ev{\mexp, \menv, \mkont}, \msto) &= \ev{\mexp, \menv, \msto, \mkont} \\
+\wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \msto, \mkont} \\
+\wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont} \\
+\wn(\ans{\mval}, \msto) &= \ans{\msto, \mval} \\
+\inject(e) &= (\setof{\ttuple{c_0}{\bot}},\setof{c_0},\bot) \\
+\text{ where } c_0 &= \ev{e,\bot,\kmt}
+\end{align*}
 
 \subsection{Store-allocated results}
 \label{sec:baselineeval}
@@ -681,9 +698,8 @@ and (2) pragmatic improvement.
 The transition-elimination optimizations reduce the overall number of transitions
 made by the analyzer by performing:
 \begin{enumerate}
- \item lazy non-determinism;
- \item abstract compilation; and
- \item uniform literal approximation.
+ \item lazy non-determinism and
+ \item abstract compilation;
 \end{enumerate}
 The pragmatic improvements reduce overhead and trade space for time
 by utilizing:
@@ -693,10 +709,7 @@ by utilizing:
  \item preallocated data structures.
 \end{enumerate}
 
-Some techniques preserve the precision of the underlying analysis, and others
-do not.
-%
-For any technique that loses precision, we will discuss the design rationale
+All but the first technique are precision preserving. We will discuss the design rationale
 for the move.
 
 
@@ -746,10 +759,10 @@ changes to the semantics:
 \force(\msto,\saddr\maddralt) &= \msto(\maddralt)\\
 \force(\msto,\mval) &= \{\mval\} \\
 \ext(\msto, \maddr, \mval) &= \msto \sqcup[\maddr \mapsto \force(\msto, \mval)] \\
-\ev{\svar{\mvar},\menv,\mkont,\msto} &\machstep\;
+\ev{\svar{\mvar},\menv,\mkont,\msto} &\lmachstep\;
 \co{\mkont,\saddr{\menv(\mvar)},\msto} \\
 \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto}
-&\machstep\;
+&\lmachstep\;
 \ev[^\mcntr]{\mexp,\menv,\ext(\msto, \maddr^f,\mval),\kfn[^\mcntr_\mlab]{\maddr^f,\maddr}} \\
 \mathit{bind\,}^\mcntr_\mlab(\menv,\msto,\mvar,\mval) &= \menv[\mvar \mapsto
   \maddr], \ext(\msto,\maddr, \mval), \mcntr' \\
@@ -763,13 +776,14 @@ We have two choices for how to implement lazy non-determinism.
 \paragraph{Option 1: Lose precision; simplify implementation}
 This semantics introduces a subtle precision difference over the
 baseline. Consider a configuration where a reference to a variable and
-a binding of a variable will happen in one step. With laziness, the
-reference will mean the original binding(s) of the variable or the new
-one, because the actual store lookup is delayed one step
+a binding of a variable will happen in one step, since store widening
+leads to stepping several states in one big ``step.'' With laziness,
+the reference will mean the original binding(s) of the variable or the
+new binding, because the actual store lookup is delayed one step
 (i.e. laziness is administrative). Without laziness, the reference
 will fan out to all the bindings of the variable before the new
-binding happens and thus might have an observable precision
-difference.
+binding happens and thus theoretically has an observable precision
+difference. % All our benchmarks maintain their precision with lazy non-determinism, however.
 
 \paragraph{Option 2: Regain precision; complicate implementation}
 The administrative nature of laziness means that we could remove the
@@ -780,8 +794,8 @@ step. This is not the case for semantics that replicate the value
 component across reductions, say for popping off exception handler
 frames. Further convolution is needed to remove the administrative
 nature of laziness in these semantics. Due to the increase of
-conceptual complexity for negligible benefit, we decided against this
-approach.
+conceptual and implementation complexity for negligible benefit, we
+decided against this approach.
 
 \paragraph{Our choice: option 1}
 The configurations that lead to precision loss happen too rarely to
@@ -789,6 +803,16 @@ warrant the significant increase in time and memory needed for this
 eager non-determinism. Indeed, were the variable reference a step
 later and another binding not made in that step, the results of the
 two approaches are the same.
+
+\begin{theorem}[Soundness]
+  If $\mstate \machstep \mstate'$ and $\mstate \sqsubseteq
+  \mastate$ then there exists a $\mastate'$ such that $\mastate
+  \lmachstep \mastate'$ and $\mstate' \sqsubseteq \mastate'$
+\end{theorem}
+Here $\sqsubseteq$ is straightforward - the LHS store must be
+contained in the RHS store, and if values occur in the states, forcing
+the LHS value must be a subset of forcing the corresponding RHS value.
+The proof is by cases on $\mstate \machstep \mstate'$.
 
 % Lazy:  cpu time: 32481 real time: 32881 gc time: 547
 
@@ -872,30 +896,30 @@ the other components of the {\tt ev} state. Its definition in figure
 \\[2mm]
 \begin{align*}
 %% CONTINUE
-\co{\kmt,\mval,\msto} &\machstep
+\co{\kmt,\mval,\msto} &\cmachstep
 \ans{\msto,\mval}
 \\
-\co{\kar[^\mcntr_\mlab]{\mcomp,\menv,\maddr},\mval,\msto} & \machstep
+\co{\kar[^\mcntr_\mlab]{\mcomp,\menv,\maddr},\mval,\msto} & \cmachstep
 \mcomp^\mcntr(\menv,\msto,\kfn[^\mcntr_\mlab]{\mval,\maddr})
 \\
-\co{\kfn[^\mcntr_\mlab]{{\mvalx{u}},\maddr},\mval,\msto} & \machstep
+\co{\kfn[^\mcntr_\mlab]{{\mvalx{u}},\maddr},\mval,\msto} & \cmachstep
 \ap[^\mcntr_\mlab]{\mval,\mvalx{u},\mkont,\msto}
 \text{ where }\mkont \in \msto(\maddr)
 \\
-\co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\strue,\msto} & \machstep
+\co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\strue,\msto} & \cmachstep
 \mcompi0^\mcntr(\menv,\msto,\mkont)
 \text{ where }\mkont\in\msto(\maddr)
 \\
-\co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\sfalse,\msto} & \machstep
+\co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\sfalse,\msto} & \cmachstep
 \mcompi1^\mcntr(\menv,\msto,\mkont)
 \text{ where }\mkont\in\msto(\maddr)
 \\[2mm]
 %% APPLY
-\ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\msto,\mkont} & \machstep
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\msto,\mkont} & \cmachstep
 \mcomp^{\mcntr'}(\menv',\msto',\mkont) \\
 \text{ where }\menv',\msto',\mcntr' &= \mathit{bind\,}^{ \mcntr}_\mlab(\menv,\msto,\mvar,\mval)
 \\
-\ap{\mop,\mval,\msto,\mkont} & \machstep
+\ap{\mop,\mval,\msto,\mkont} & \cmachstep
 \co{\mkont,\mval',\msto} \\
 \text{ where }\mkont &\in\msto(\maddr)
 \text{ and } \mval'\in\interpdelta(\mop,\mval)
@@ -904,6 +928,63 @@ the other components of the {\tt ev} state. Its definition in figure
 \caption{Abstract abstract machine for compiled ISWIM}
 \label{fig:caam}
 \end{figure}
+
+\paragraph{Correctness}
+The correctness of abstract compilation seems obvious, but it has
+never before been rigorously proved. What constitutes correctness in
+the case of dropped states, anyway? Applying an abstract bytecode's
+function does many ``steps'' in one go, at the end of which, the two
+semantics line up again (modulo representation of expressions). This
+constitutes the use of a notion of stuttering. We therefore prove a
+stuttering bisimulation~\cite{clarke-stuttering} between this
+semantics and the previous section's to show precision preservation.
+
+The number of transitions that can occur in succession from an
+abstract bytecode is roughly bounded by the amount of expression
+nesting in the program. The partial order that defines subexpressions
+smaller than the expression in which they occur is well-founded, so we
+use this observation to drive our use of a well-founded equivalence
+bisimulation (WEB). WEBs are equivalent to the notion of a stuttering
+bisimulation, but are more amenable to mechanisation (and thus
+rigorous proof). They also only require reasoning over one step of the
+reduction relation, which makes the proof concise.
+
+We define a refinement from non-compiled to compiled states by
+``committing'' all the actions of an $\ev{}$ state (defined similarly to
+$\compile{\_}$, but immediately applies the functions), and
+subsequently changing all expressions with their compiled
+variants. Since WEBs are for single transition systems, a WEB
+refinement is over the disjoint union of our two semantics, and the
+equivalence relation we use is just that a state is related to its
+refined state (and itself). Call this relation $B$.
+
+Before we prove this setup is indeed a WEB, we need one lemma that
+applying an abstract bytecode's function is equal to refining the
+corresponding $\ev{}$ state:
+%
+\begin{lemma}[Compile/commit]
+For all $\mcntr,\mexp,\menv,\msto,\mkont$,
+$\compile{\mexp}^\mcntr(\menv,r(\msto),r(\mkont)) = r(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont})$.
+\end{lemma}
+The proof is by induction on $\mexp$.
+
+\begin{theorem}
+$B$ is a WEB on $\lmachstep \cup \cmachstep$
+\end{theorem}
+
+The full proof is in the appendix, but it follows by cases on
+$\lmachstep \cup \cmachstep$ with the WEB \emph{witness} being the
+well-order on expressions (with a $\bot$ element), and the following
+$\erankt$, $\erankl$ functions:
+
+\begin{align*}
+\erankt(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont}) &= \mexp \\
+\erankt(\mstate) &= \bot \quad \text{otherwise} \\
+\erankl(s,s') &= 0
+\end{align*}
+All cases are either simple steps or appeals to the well-order on $\erankt$'s range. The other rank function,
+$\erankl$ is unnecessary, so we just make it the constant 0
+function. The $\cmachstep$ cases are trivial.
 
 % Compile: cpu time: 255397 real time: 261532 gc time: 2947
 
@@ -915,7 +996,7 @@ the other components of the {\tt ev} state. Its definition in figure
 \subsection{Locally log-based store deltas}
 
 Every step the analysis makes for the above techniques requires
-joining large stores together. Not every step will modify all
+joining entire (large) stores together. Not every step will modify all
 addresses of the store, so joining entire stores is wasteful in terms
 of memory and time. We can instead log store changes and replay the
 change log on the full store after all steps have completed. This uses
@@ -930,16 +1011,17 @@ is straightforward:
 % TODO: Turn the recursion here into ...:
 \begin{align*}
 \replay &: \StoreDelta \times \Store \to \Store \\
-\replay(\mtlst, \msto) &= \msto \\
-\replay(\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}, \msto) &= \replay(\msdiff, \msto\sqcup[\maddr \mapsto \mval{s}])
+\replay(\left[ \ttuple{\maddr_i}{\mval{s_i}}, \ldots\right], \msto) &= \msto \sqcup [\maddr_i \mapsto \mval{s_i}] \sqcup \ldots
 \end{align*}
+%\replay(\mtlst, \msto) &= \msto \\
+%\replay(\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}, \msto) &= \replay(\msdiff, \msto\sqcup[\maddr \mapsto \mval{s}])
 
 The transition relation is identical except for the addition of this change log.
 %
 Lookups will never rely on the change log, and can use the originally supplied store unmodified:
 
 \begin{align*}
-(\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont},\msto,\msdiff) & \machstep
+(\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont},\msto,\msdiff) & \dmachstep
 (\ev[^{\mcntr'}]{\mexp,\menv',\mkont},\msdiff') \\
 \text{ where }\menv',\msdiff',\mcntr' &= \mathit{bind\,}^{ \mcntr}_\mlab(\menv,\msto,\msdiff,\mvar,\mval)
 \end{align*}
@@ -952,25 +1034,46 @@ Compilation changes to additionally take a $\msdiff$ component, so the
 above rule's right hand side would instead be $k^{\mcntr'}(\menv',
 \msto, \msdiff', \mkont)$ where $k = \compile{e}$ would be in the closure.
 
-We also lift $\machstep$ to accommodate for this asymmetry
+We also lift $\dmachstep$ to accommodate for this asymmetry
 in the input and output. For each state that is stepped, we feed the
 output changes to the next so that all changes get accumulated:
 
 \begin{align*}
-(\states, \msto) &\mathrel{\widehat{\machstep}} (\states\cup \states', \replay(\msdiff,\msto)) \\
-\mbox{ where } (\states', \msdiff) &= \step^*(\varnothing, \states, \mtlst) \\
-\step^*(S, \varnothing, \msdiff) &= (S, \msdiff) \\
-\step^*(S, \{c\}\cup \states, \msdiff &= \step^*(S\cup cs^*, \states, \msdiff^*) \\
-\states^* &= \{c' \mid (c,\msto,\msdiff) \machstep (c',\msdiff^c) \} \\
-\msdiff^* &= \concat\{\msdiff^c \mid (c, \msto,\msdiff) \machstep (c', \msdiff^c)\}
+(S, F, \msto) &\mathrel{\damachstep} (S \cup S', F', \msto') \\
+\mbox{ where } (F', \msto') &= \step^*(\varnothing, F, \msto) \\
+               S' &= \setof{(c,\msto') \mid c \in F'} \\
+\step^*(F', \varnothing, \msto) &= (S, \msdiff) \\
+\step^*(F', \{c\}\cup F, \msto) &= \step^*(F'\cup \states^*, F, \msto^*) \\
+\states^* &= \{c' \mid (c,\msto,\msdiff) \dmachstep (c',\msdiff^c) \} \\
+\msto^* &= \replayall(\{\msdiff^c \mid (c, \msto,\msdiff) \dmachstep (c', \msdiff^c)\}, \msto)
 \end{align*}
 
-Here $\concat : \Set(\StoreDelta) \to \StoreDelta$ flattens the lists
-of changes to one; the order in which it appends does not matter:
+Here $\replayall : \Set(\StoreDelta) \times \Store \to \Store$ replays all logs in a set on top of the given store. Since join is associative and commutative, the order does not matter:
 \begin{align*}
-\concat(\varnothing) &= \mtlst \\
-\concat(\{\msdiff\}\cup D) &= \append(\msdiff, \concat(D))
+  \replayall(\varnothing,\msto) &= \msto \\
+  \replayall(\setof{\msdiff} \cup \Xi, \msto) &= \replayall(\Xi, \replay(\msdiff, \msto))
 \end{align*}
+
+Correctness here requires a lemma that relates the differences in the compilation functions.
+\begin{lemma}
+For all $\mexp, \mcntr,\menv,\msto,\msdiff,\mkont,\msto^*,\mkont^*$,
+if $\msto \equiv \msto^*$ and $\mkont \equiv \mkont^*$, then
+$\dcompile{\mexp}^\mcntr(\menv,\msto,\msdiff,\mkont) = \ttuple{\mastate}{\msdiff'}$ iff
+$\compile{\mexp}^\mcntr(\menv,\msto^*,\mkont^*) = \mstate$ such that
+$\mastate,\replay(\msdiff',\msto) \equiv \nw(\mstate)$
+\end{lemma}
+Proof is by induction on $\mexp$.
+
+\begin{theorem}
+If $S \equiv S^*, F \equiv F^*, \msto \equiv \msto^*$, then
+$(S,F,\msto) \machstep (S',F',\msto')$ iff
+$\exists S^*_1, F^*_1, \msto^*_1.
+  S' \equiv S^*_1 \wedge F' \equiv F^*_1 \wedge \msto' \equiv \msto^*_1 \wedge
+  (S^*,F^*,\msto^*) \dmachstep (S^*_1,F^*_1,\msto^*_1)$
+\end{theorem}
+Here $\equiv$ means structurally the same, only compiled expressions
+are compiled with the updated compilation function that builds store
+deltas. The proof follows by equational reasoning and the previous lemma.
 
 %% Delta Store +k Compile + Lazy:
 %%    cpu time: 668 real time: 686 gc time: 41
@@ -1071,124 +1174,6 @@ index directly into the store without a hash or a collision.
 Even for polyvariant analyses, it is possible to compute the maximum
 number of addresses and similarly pre-allocate either the spine of the
 store or (if memory is no concern) the entire store.
-
-\subsection{Abstracting literal compound data}
-
-The abstraction of compound data structures like lists has deep implications 
-for precision and performance.
-%
-The classic list-heavy benchmark {\tt boyer}---a simplified implementation
-of the Boyer-Moore theorem-prover---drove our own considerations for
-abstractions for compound data structures.
-%
-Boyer's fluent use of literal list dooms the ``natural'' abstraction
-of lists to fail from over precision.
-%
-In short, if we interpret a literal list {\tt '(a b c)} as {\tt (cons 'a (cons 'b
-(cons 'c '())))}, even a monovariant allocation strategy for abstract
-cons cells will precisely and exactly create a 3-cell list.
-
-If code contains a length-300 literal list, then its analysis yields a length-300 abstract
-list as well.
-%
-In many cases, the specific contents of the list add little precision
-to the resulting analysis, and yet the analyzer will dutifully execute
-recursive functions over the entirety of these structures at every
-encounter.
-%
-An alternative in this case is to explicitly flatten literal lists
-into single abstract cells.
-
-We explore both options here.
-%
-We will first explain the natural abstraction of tuples, and then we
-will explain a less precise allocation strategy from uniform $k$-CFA
-that we use for large compound data literals that we modified from the
-implementation in \citep{dvanhorn:wright-jagannathan-toplas98}.
-
-\subsubsection{Option 1: The natural abstraction}
-
-The uniform way AAM approaches a simple abstraction strategy is to cut
-recursion out of the data definition by tying the recursive knot
-through the abstract store. For Scheme, the grammar for values looks
-like the following:
-
-\newcommand{\alt}{\;\mid\;}
-\begin{align*}
-\Value &::= \mbox{{\tt \#t}} \alt \mbox{{\tt \#f}} \alt \mbox{{\tt(cons $\Value$ $\Value$)}} \alt \mbox{{\tt '()}} \alt ...
-\end{align*}
-
-Upon evaluating a {\tt cons} application, we instead allocate two
-addresses $a$ and $d$, join them to the respective values in the
-store, and return the flattened {\tt (cons $a$ $d$)} value. Since
-these addresses are all distinguished at different syntactic call sites
-in the uniform $k$-CFA allocation strategy, and quoted lists are sugar
-for a sequence of calls to {\tt cons}, this abstraction explodes the
-value space. Analyzing a function that counts the number of atoms in a
-literal s-expression would actually interpret that function at least
-that number of times (more because of intermediate conses). Indeed,
-even in our fastest implementation, this abstraction causes the
-analysis of Boyer to be 430 times slower than the approach we will now
-describe.
-
-\subsubsection{Option 2: A precise yet compact abstraction}
-
-The number of syntactic uses of {\tt cons} versus implicit uses via
-literal lists is smaller in typical Scheme programs. We use the above
-abstraction for these syntactic uses, but choose to interpret literal
-lists as not always sugar for cascading {\tt cons}es. In particular,
-if a list literal is ``too big'' (in our case length $>$ 1), we
-interpret the list as a circular data structure; the right address
-points back to the {\tt cons} itself, and the left address points to
-all of the elements of the list. We take this farther and join the
-list elements together in with a coarse type-based abstraction. In
-effect, large lists or vectors of literal numbers become unbounded
-lists/vectors of ``number.'' Heterogeneous data is combined to just
-``data,'' rather than a union of ``number'', ``string'', etc. since
-primitives are interpreted on every combination of values that flow to
-them, and unions lead to more primitive interpretations.
-
-Quotation is special because it cannot introduce function values,
-which is important for a simple semantics. If we join two values of
-different type together, we don't get ``anything,'' which has complex
-meaning in higher-order languages (Shivers' escape semantics) and is
-overly approximate. We instead get ``any quotable value,'' which has
-much simpler semantics.
-
-There are a few steps to consider:
-\begin{itemize}
- \item{Define special value lattice elements for compound data domains that can be quoted
-       (e.g. {\tt QPair} for $\left\{ ({\tt cons}\ a_i\ d_i)\right\}_i$, {\tt QVector} for immutable vectors, etc.)}
- \item{Define a ``larger'' value lattice element for all quotable data, {\tt QData}}
- \item{Interpret {\tt (quote (a ...))} as {\tt (qlist a ...)}, a new primitive function defined in figure \ref{fig:qlist},
-       and similar definitions for immutable vectors.}
- \item{Extend the $\interpdelta$ axioms to include conservative
-   meaning for these new values (e.g. {\tt (car QData)} = {\tt QData},
-   {\tt (add1 QData)} = {\tt Number} and log ``possible type error'')
-   and allow them to allocate addresses and change the store}
-\end{itemize}
-
-\begin{figure}
-\begin{align*}
-\interpdelta(\msto,\ {\tt qlist}) &= (\mbox{{\tt '()}}, \msto) \\
-\interpdelta(\msto,\ {\tt qlist}, v ..._+) &= (({\tt cons}\ a\ d), \msto') \\
-\qquad \mbox{where } \msto' &= \msto\sqcup[a \mapsto \bigsqcup(v ...)] \\
-                            &\qquad \sqcup[d \mapsto \{ \mbox{{\tt '()}}, ({\tt cons}\ a\ d)\}] \\
-\bigsqcup(v) &= v \\
-\bigsqcup(v, vs ...) &= \fmerge(v, \bigsqcup(vs ...)) \\
-\fmerge(v, v) &= v \\
-\fmerge(n, m) &= {\tt Number} \\
-\fmerge(n, v) &= {\tt QData} \\
-\fmerge(({\tt cons}\ a\ d), ({\tt cons}\ a'\ d')) &= {\tt QPair} \\
-\fmerge({\tt QPair}, ({\tt cons}\ a\ d)) &= {\tt QPair} \\
-\fmerge({\tt QPair}, v) &= {\tt QData} \\
-\vdots
-\end{align*}
-\caption{Quoted list primitive}
-\label{fig:qlist}
-\end{figure}
-
-This abstraction was so critical to timely convergence that all of our evaluation uses it.
 
 \section{Evaluation}
 \label{sec:eval}
@@ -1368,9 +1353,6 @@ Although we would like to improve this to be more competitive, the
 optimized AAM approach still has many strengths to recommend it in
 terms of precision, ease of implementation and verification, and rapid
 design.
-
-
-
 
 \section{Related work}
 \label{sec:related}
