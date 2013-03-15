@@ -64,8 +64,8 @@
 \newcommand{\mnum}{z}
 \newcommand{\mbln}{b}
 \newcommand{\mvalx}[1]{#1}
-\newcommand\machstep{\longmapsto}
-\newcommand\multimachstep{\longmapsto\!\!\!\!\!\rightarrow}
+\newcommand{\machstep}{\mathbin{\longmapsto}}
+\newcommand{\multimachstep}{\longmapsto\!\!\!\!\!\rightarrow}
 \newcommand{\mlit}{l}
 \newcommand{\mstate}{\varsigma}
 \newcommand{\mcomp}{k}
@@ -97,6 +97,8 @@
 \newcommand{\bind}{\mathit{bind}}
 \newcommand{\push}{\mathit{push}}
 \newcommand{\stash}{\mathit{stash}}
+\newcommand{\inject}{\mathit{inject}}
+\newcommand{\setof}[1]{\{#1\}}
 
 % Notations for proofs
 \newcommand{\maddrx}[1]{#1}
@@ -107,8 +109,10 @@
 \newcommand{\maval}{\hat{\mval}}
 \newcommand{\CompState}{\compile{\State}}
 \newcommand{\cmachstep}{\mathbin{\compile{\machstep}}}
-\newcommand{\dmachstep}{\mathbin{\machstep_\delta}}
-\newcommand{\nmachstep}{\mathbin{\machstep_n}}
+\newcommand{\lmachstep}{\mathbin{\longmapsto_{{\mathcal L}}}}
+\newcommand{\dmachstep}{\mathbin{\longmapsto_{\mathit{\msto\msdiff}}}}
+\newcommand{\damachstep}{\mathbin{\widehat{\longmapsto}_{\mathit{\msto\msdiff}}}}
+\newcommand{\nmachstep}{\mathbin{\longmapsto_n}}
 \newcommand{\dcompile}[1]{\Delta\compile{#1}}
 \newcommand{\mstor}{s}
 \newcommand{\updatedp}{\mathit{updated?}}
