@@ -76,7 +76,7 @@
                 [else
                  (define todo-old todo)
                  (reset-todo!) ;; → '()
-                 (set-box! state-count* (+ (unbox state-count) (set-count todo-old)))
+                 (set-box! state-count* (+ (unbox state-count*) (set-count todo-old)))
                  (for ([c (in-set todo-old)])
                    (step c)) ;; → in-list
                  (loop)]))))))

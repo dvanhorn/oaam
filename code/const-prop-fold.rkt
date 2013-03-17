@@ -91,7 +91,10 @@
                              (match node
                                [(? value-node?) node]
                                [(var l x)
-                                (define sav (hash-ref heap x #f))
+                                (define sav
+                                  (if (hash? heap)
+                                      (hash-ref heap x #f)
+                                      (vector-ref heap x)))
                                 (or (sav->prop-node sav x) node)]
                                [(app l left rs) (app l (cprop left) (map cprop rs))]
                                [(datum l v) node]
@@ -116,7 +119,7 @@
       (+ . ,+)
       (- . ,-)
       (* . ,*)
-      (/ . ,/)
+;      (/ . ,/)
       (= . ,=)
       (< . ,<)
       (> . ,>)
@@ -444,63 +447,32 @@
    ([widen (make-rename-transformer #'flatten-value)])
    . body))
 
-(mk-set-fixpoint^ fix baseline-fixpoint baseline-ans?)
-(with-nonsparse
- (with-strict
-  (with-0-ctx
-   (with-whole-σ
-    (with-σ-passing-set-monad
-     (with-abstract
-      (mk-analysis #:aval baseline #:ans baseline-ans
-                   #:clos baseline-clos #:rlos baseline-rlos
-                   #:primop baseline-primop
-                   #:fixpoint baseline-fixpoint
-                   #:prepare (λ (sexp)
-                                (let ([e (prepare-prealloc parse-prog sexp)])
-                                  (begin (set-box! baseline-box e) e)))
-                   #:σ-passing #:wide #:set-monad)))))))
-(make-prop-folder baseline)
-(provide baseline-prop-folder)
-
-(mk-special-set-fixpoint^ fix 0cfa-set-fixpoint^ 0cfa-ans^?)
-(with-nonsparse
- (with-strict
-  (with-0-ctx
-   (with-whole-σ
-    (with-σ-passing-set-monad
-     (with-abstract
-      (mk-analysis #:aval 0cfa^ #:ans 0cfa-ans^
-                   #:clos 0cfa^-clos #:rlos 0cfa^-rlos
-                   #:primop 0cfa^-primop
-                   #:fixpoint 0cfa-set-fixpoint^
-                   #:prepare (λ (sexp)
-                                (let ([e (prepare-prealloc parse-prog sexp)])
-                                  (begin (set-box! 0cfa^-box e) e)))
-                   #:σ-passing #:wide #:set-monad)))))))
-(make-prop-folder 0cfa^)
-(provide 0cfa^-prop-folder)
-
-(mk-special-set-fixpoint^ fix lazy-0cfa-set-fixpoint^ lazy-0cfa-ans^?)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx
-   (with-whole-σ
-    (with-σ-passing-set-monad
-     (with-abstract
-      (mk-analysis #:aval lazy-0cfa^ #:ans lazy-0cfa-ans^
-                   #:clos lazy-0cfa^-clos #:rlos lazy-0cfa^-rlos
-                   #:primop lazy-0cfa^-primop
-                   #:prepare (λ (sexp)
-                                (let ([e (prepare-prealloc parse-prog sexp)])
-                                  (begin (set-box! lazy-0cfa^-box e) e)))
-                   #:fixpoint lazy-0cfa-set-fixpoint^
-                   #:σ-passing #:wide #:set-monad)))))))
-(make-prop-folder lazy-0cfa^)
-(provide lazy-0cfa^-prop-folder)
-
+;; strict pd
 (mk-imperative/∆s^-fixpoint
-                imperative/∆s-fixpoint/c imperative/∆s-ans/c?
-                imperative/∆s-ans/c-v imperative/∆s-touches-0/c)
+  imperative/∆s-fixpoint/c imperative/∆s-ans/c?
+  imperative/∆s-ans/c-v imperative/∆s-touches-0/c)(with-nonsparse
+ (with-strict
+  (with-0-ctx
+   (with-σ-∆s!
+    (with-abstract
+      (mk-analysis #:aval 0cfa^/∆s!
+                   #:clos 0cfa^/∆s!-clos #:rlos 0cfa^/∆s!-rlos
+                   #:primop 0cfa^/∆s!-primop
+                   #:prepare (λ (sexp)
+                                (let ([e (prepare-imperative parse-prog sexp)])
+                                  (begin (set-box! 0cfa^/∆s!-box e) e)))
+                   #:ans imperative/∆s-ans/c
+                   #:touches imperative/∆s-touches-0/c
+                   #:fixpoint imperative/∆s-fixpoint/c
+                   #:global-σ #:wide))))))
+(make-prop-folder 0cfa^/∆s!)
+(define strict-pd-apf 0cfa^/∆s!-prop-folder)
+(provide strict-pd-apf)
+
+;; pd
+(mk-imperative/∆s^-fixpoint
+  imperative-lazy/∆s-fixpoint/c imperative-lazy/∆s-ans/c?
+  imperative-lazy/∆s-ans/c-v imperative-lazy/∆s-touches-0/c)
 (with-nonsparse
  (with-lazy
   (with-0-ctx
@@ -512,31 +484,61 @@
                    #:prepare (λ (sexp)
                                 (let ([e (prepare-imperative parse-prog sexp)])
                                   (begin (set-box! lazy-0cfa^/∆s!-box e) e)))
-                   #:ans imperative/∆s-ans/c
-                   #:touches imperative/∆s-touches-0/c
-                   #:fixpoint imperative/∆s-fixpoint/c
+                   #:ans imperative-lazy/∆s-ans/c
+                   #:touches imperative-lazy/∆s-touches-0/c
+                   #:fixpoint imperative-lazy/∆s-fixpoint/c
                    #:global-σ #:wide))))))
 (make-prop-folder lazy-0cfa^/∆s!)
-(provide lazy-0cfa^/∆s!-prop-folder)
+(define pd-apf lazy-0cfa^/∆s!-prop-folder)
+(provide pd-apf)
+
+;; "pt"
+
+(mk-prealloc/timestamp^-fixpoint prealloc/imperative-fixpoint/c prealloc-ans/c?
+                                 prealloc-ans/c-v prealloc-touches-0/c)
+(with-nonsparse
+ (with-lazy
+  (with-0-ctx/prealloc
+   (with-prealloc/timestamp-store
+    (with-mutable-worklist
+     (with-abstract
+      (mk-analysis #:aval lazy-0cfa^/c/prealloc/timestamp!
+                   #:clos lazy-0cfa^/c/prealloc/timestamp!-clos
+                   #:rlos lazy-0cfa^/c/prealloc/timestamp!-rlos
+                   #:primop lazy-0cfa^/c/prealloc/timestamp!-primop
+                   #:prepare
+                   (λ (sexp)
+                      (let ([e (prepare-prealloc parse-prog sexp)])
+                        (set-box! lazy-0cfa^/c/prealloc/timestamp!-box e) e))
+                   #:ans prealloc-ans/c
+                   #:touches prealloc-touches-0/c
+                   #:fixpoint prealloc/imperative-fixpoint/c
+                   #:global-σ #:wide)))))))
+(make-prop-folder lazy-0cfa^/c/prealloc/timestamp!)
+(provide lazy-0cfa^/c/prealloc/timestamp!)
+(define pt-apf lazy-0cfa^/c/prealloc/timestamp!-prop-folder)
+(provide pt-apf)
+
+
+;Following up, yes, there is. After "pd" just change with-lazy to with-strict. If it finishes, turn off compilation and run constant folding. I proved compilation and store deltas precision-preserving, so we can use numbers from that as baseline. If that works, get the numbers, then get numbers using with-lazy, and finally timestamp approximation (pt). We just need you to run the benchmarks from the paper http://arxiv.org/abs/1211.3722
 
 (define easy
   (map (λ (x) (string-append "../benchmarks/" x))
-       '("church.sch" "earley.sch" "fact.sch" "flatten.sch"
-         "introspective.sch" "matt-gc.sch" "sergey/blur.sch"
-         "sergey/eta.sch" "sergey/kcfa2.sch"
-         "sergey/kcfa3.sch" "sergey/sat.sch")))
+       '("fact.sch" "flatten.sch" "introspective.sch" "matt-gc.sch"
+         "sergey/blur.sch" "sergey/kcfa2.sch" "sergey/kcfa3.sch" "sergey/sat.sch")))
 (define paper
   (map (λ (x) (string-append "../benchmarks/toplas98/" x))
-       '("boyer.sch" "dynamic.sch" "graphs.sch" "lattice.scm" "maze.sch"
-         "matrix.scm" "nbody.sch" "nucleic.sch"
-         ;;(these don't aval correctly: "handle.scm" "nucleic2.sch" "splay.scm")
-         )))
+       '("boyer.sch" "../church.sch" "../earley.sch" "graphs.sch"
+         "lattice.scm" "maze.sch" "matrix.scm" "../mbrotZ.sch" "nbody.sch"
+         "nucleic.sch")))
 (provide easy paper)
 
 (define (run-prop-folders prop-folders files show-ast?)
   (define (run files)
-    (map (λ (apf) (map (λ (file)
-                          (let-values ([(it np nf ast) (time (apf file))])
+    (map (λ (file)
+            (cons file
+                  (map (λ (name-apf)
+                          (let-values ([(it np nf ast) (time ((cdr name-apf) file))])
                             (if show-ast?
                                 (displayln (format "initial ast:~n~a~n" ast))
                                 (void))
@@ -547,17 +549,33 @@
                                 (displayln (format " folded-ast:~n~a" ast))
                                 (void))
                             (displayln (format "done with ~a~n" file))
-                            (list it np nf ast)))
-                       files))
-         prop-folders))
-  (run files))
+                            (list (car name-apf) it np nf ast)))
+                       prop-folders)))
+         files))
+  (define out (run files))
+  (define print
+    (map (λ (l)
+            (format "~a:~a"
+                    (car l)
+                    (foldr (λ (n a)
+                              (format "~a~n  ~a: ~a ~a ~a"
+                                      a
+                                      (car n)
+                                      (cadr n)
+                                      (caddr n)
+                                      (cadddr n)))
+                           ""
+                           (cdr l))))
+         out))
+  (for-each (λ (s) (displayln s)) print)
+  #t)
 (provide run-prop-folders)
 
-#;
-(run-prop-folders `(,baseline-prop-folder
-                    ,0cfa^-prop-folder
-                    ,lazy-0cfa^-prop-folder
-                    ,lazy-0cfa^/∆s!-prop-folder)
-                  (append easy paper))
+
+(run-prop-folders `(,(cons "strict-pd" strict-pd-apf)
+                    ,(cons "pd" pd-apf)
+                    ,(cons "pt" pt-apf))
+                  easy
+                  false)
 
 ;; todo?: integrate into run-benchmark
