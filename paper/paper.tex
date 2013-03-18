@@ -607,9 +607,13 @@ The refactored relation, $\widehat{\machstep}$, becomes:
 In effect, the new store is computed as the least upper bound of all
 stores after stepping. This definition is wasteful, however. It causes
 all states found so far to step each iteration, even if they are not
-revisited. This has negative performance and precision
+revisited. This has negative performance \emph{and} precision
 consequences. We instead use a frontier-based semantics that
-corresponds to the classic ``worklist'' algorithms for analysis.
+corresponds to the classic ``worklist'' algorithms for analysis. The
+difference is that the store is not modified in-place, but updated
+after all frontier states have been processed. This has implications
+for the analysis' precision and determinism. Specifically, higher
+precision, and is deterministic even if set iteration is not.
 
 \begin{align*}
 (S, F, \msto) &\mathrel{\widehat{\machstep}} (S \cup S', F', \msto') \\
@@ -936,7 +940,7 @@ the case of dropped states, anyway? Applying an abstract bytecode's
 function does many ``steps'' in one go, at the end of which, the two
 semantics line up again (modulo representation of expressions). This
 constitutes the use of a notion of stuttering. We therefore prove a
-stuttering bisimulation~\cite{clarke-stuttering} between this
+stuttering bisimulation~\cite{ianjohnson:BCG88} between this
 semantics and the previous section's to show precision preservation.
 
 The number of transitions that can occur in succession from an
@@ -944,7 +948,7 @@ abstract bytecode is roughly bounded by the amount of expression
 nesting in the program. The partial order that defines subexpressions
 smaller than the expression in which they occur is well-founded, so we
 use this observation to drive our use of a well-founded equivalence
-bisimulation (WEB). WEBs are equivalent to the notion of a stuttering
+bisimulation (WEB)~\cite{ianjohnson:manolios-diss}. WEBs are equivalent to the notion of a stuttering
 bisimulation, but are more amenable to mechanisation (and thus
 rigorous proof). They also only require reasoning over one step of the
 reduction relation, which makes the proof concise.
@@ -962,13 +966,12 @@ Before we prove this setup is indeed a WEB, we need one lemma that
 applying an abstract bytecode's function is equal to refining the
 corresponding $\ev{}$ state:
 %
-\begin{lemma}[Compile/commit]
-For all $\mcntr,\mexp,\menv,\msto,\mkont$,
+\begin{lemma}[Compile/commit]\hfill\\
 $\compile{\mexp}^\mcntr(\menv,r(\msto),r(\mkont)) = r(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont})$.
 \end{lemma}
 The proof is by induction on $\mexp$.
 
-\begin{theorem}
+\begin{theorem}[Precision preservation]
 $B$ is a WEB on $\lmachstep \cup \cmachstep$
 \end{theorem}
 
@@ -1055,7 +1058,7 @@ Here $\replayall : \Set(\StoreDelta) \times \Store \to \Store$ replays all logs 
 \end{align*}
 
 Correctness here requires a lemma that relates the differences in the compilation functions.
-\begin{lemma}
+\begin{lemma}[Compile coherence]
 For all $\mexp, \mcntr,\menv,\msto,\msdiff,\mkont,\msto^*,\mkont^*$,
 if $\msto \equiv \msto^*$ and $\mkont \equiv \mkont^*$, then
 $\dcompile{\mexp}^\mcntr(\menv,\msto,\msdiff,\mkont) = \ttuple{\mastate}{\msdiff'}$ iff
@@ -1064,7 +1067,7 @@ $\mastate,\replay(\msdiff',\msto) \equiv \nw(\mstate)$
 \end{lemma}
 Proof is by induction on $\mexp$.
 
-\begin{theorem}
+\begin{theorem}[Equivalence]
 If $S \equiv S^*, F \equiv F^*, \msto \equiv \msto^*$, then
 $(S,F,\msto) \machstep (S',F',\msto')$ iff
 $\exists S^*_1, F^*_1, \msto^*_1.
@@ -1100,59 +1103,144 @@ where previously there were stores. Given two states, the analysis can
 now compare their stores just by comparing their timestamps -- a
 constant-time operation.
 
-There is a subtle loss of precision in Shivers' original time-stamp
-technique that we can fix. For a given abstract state, all writes to
-the global store need to be delayed until the analysis considers all
-branches from that abstract state. This avoids cross-branch pollution
-which would not otherwise happen, e.g., when one branch writes to
-address $\maddr$ and another branch reads from address
-$\maddr$. Fortunately, given our conversion to log-based stores this
-change is straightforward.
+There is two subtle losses of precision in Shivers' original
+time-stamp technique that we can fix. Firstly, for a given abstract
+state, all writes to the global store need to be delayed until the
+analysis considers all branches from that abstract state. This avoids
+cross-branch pollution which would not otherwise happen, e.g., when
+one branch writes to address $\maddr$ and another branch reads from
+address $\maddr$. Fortunately, given our conversion to log-based
+stores this change is straightforward. Secondly, the common
+implementation strategy for timestamps destructively updates each
+state's timestamp. This loses \emph{temporal} information about the
+contexts a state is visited in, and in what order. Thus that semantics
+is not equivalent to the previous section's semantics.
 
-At this point, we can begin to think of the analysis as an imperative
-algorithm with six major components:
-%
-\begin{itemize}
- \item{$\msto$, the store;}
- \item{{\tt todo}, the workset;}
- \item{{\tt seen}, a map from states to the timestamps at which they were last seen;}
- \item{$\msdiff$, the store changes for the current step;}
- \item{$\changep$, a boolean tracking whether the stepped state contributed a store change; and}
- \item{{\tt T}, the timestamp of the store.}
-\end{itemize}
+A fix is to keep a stack of the timestamps seen at each state, and
+keep a list of stores corresponding with each timestamp. A more
+space-efficient representation that also allows an imperative store
+would be timestamping each update to the store in the same style as
+states. This changes the notion of store equality, but the new
+definition is straightforward. For analysis consumers that disregard
+temporal information, the space cost in unwarranted, but the
+realization that there is precision to be gained opens possibilities.
 
-The new $\eval$ calculation is defined in
-figure~\ref{fig:imperative}.  To ensure termination, we guard against adding
-$c$ to {\tt todo} by the following check:
-\begin{align*}\changep \vee {\tt seen}(c) \neq {\tt T}\end{align*}
-If it succeeds, {\tt todo} gets $c$ and we update {\tt seen} to map $c$ to {\tt T}.
+The following transfer function has several components that can be
+destructively updated, and intermediate sets can be elided by adding
+to global sets. In fact, the log of store deltas can be removed as
+well, by updating the store in-place, and on lookup, using the first
+value timestamped $\le$ the current timestamp. We start with the
+purely functional view.
 
-After all steps complete, we apply $\msdiff$ to $\msto$ imperatively
-(with {\tt replay!}) and increase {\tt T} as long as there was at
-least one change in $\msdiff$. This logic leads to termination if we
-know that each $\ttuple{\maddr}{\mval{s}}$ in $\msdiff$ would change
-the value of $\maddr$ in the current store. Thus, we also guard
-additions to $\msdiff$ so that only updates that would change the
-store are permitted. Each time $\msdiff$ is successfully extended, we
-set $\changep$ to true. Before each individual step, we set it
-to false.
+\subsubsection{Pure setup for imperative implementation}
 
-\begin{figure}
-\begin{alltt}
-eval(\(e\)) :=
-  \(\msto\), todo, seen, T := \(\varnothing\), \(\varnothing\), [], 0
-  \(\compile{e}\)(\(\mtcntr, \varnothing, \varnothing, \mtlst, \kmt\))
-  while(true):
-    if todo = \(\varnothing\): return (keys(seen), \(\msto\))
-    else:
-      let old := todo
-      todo, \(\msdiff\) := \(\varnothing\), \(\mtlst\)
-      foreach c \(\in\) old: \(\changep\) := false; c()
-      unless \(\msdiff\) = \(\mtlst\): T += 1; replay!(\(\msdiff, \msto\))
-\end{alltt}
-\caption{Imperative algorithm}
-\label{fig:imperative}
-\end{figure}
+The store maps to a stack of timestamped sets of abstract values.
+
+\begin{align*}
+\msto \in \Store &= \Addr \to \Valstack \\
+\mvalstack \in \Valstack &= (\Timestamp \times \wp(\Storeable))^*
+\end{align*}
+
+Here we formally define what lookup and update mean at a given
+timestamp.
+
+\begin{align*}
+\lookup(\mvalstack,t) &=
+  \left\{
+    \begin{array}{ll}
+      \mval{s} & \text{ if } \mvalstack = \cons{\ttuple{t'}{\mval{s}}}{\mvalstack'}, t' \le t \\
+      \mval{s'} & \text{ if } \mvalstack = \cons{\ttuple{t'}{\mval{s}}}{\cons{\ttuple{t''}{\mval{s'}}}{\mvalstack'}}, t' > t
+    \end{array}\right. \\
+\msto \sqcup_t [\maddr \mapsto \mval{s}] &= \msto[\maddr \mapsto \mvalstack],\changep \\
+ (\mvalstack,\changep) &= \msto(\maddr)\sqcup_t \mval{s} \\
+\epsilon \sqcup_t \mval{s} &= \ttuple{t}{\mval{s}} \\
+\cons{\ttuple{t'}{\mval{s}}}{\mvalstack} \sqcup_t \mval{s'} &= \cons{\ttuple{t'}{\mval{s}\sqcup\mval{s'}}}{\mvalstack},\strue \text{ if } t' > t \\
+\mvalstack \sqcup_t \mval{s} &= \cons{\ttuple{t+1}{\mval{s^*}}}{\mvalstack},\strue
+           \text{ if } \mval{s'} \neq \mval{s^*} \\
+ \mval{s'} &= \lookup(\msto(\maddr),t) \\
+ \mval{s^*} &= \mval{s} \sqcup \mval{s'} \\
+\mvalstack \sqcup_t \mval{s} &= \mvalstack,\sfalse \text{ otherwise}
+\end{align*}
+
+For the purposes of space, we reuse the $\dmachstep$ semantics and change the definition $\replay$ to track if the store has changed, in order to increment the global timestamp.
+\begin{align*}
+\replay_t(\epsilon,\msto,\changep) &= \msto,\changep \\
+\replay_t(\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff},\msto,\changep) &= \replay_t(\msdiff,\msto',\changep \vee \changep') \\
+\text{ where } (\msto',\changep') &= \msto\sqcup_t[\maddr \mapsto, \mval{s}] \\
+\replayall_t(\varnothing,\msto,\changep) &= \msto,\changep \\
+\replayall_t(\setof{\msdiff}\cup\Xi,\msto,\changep) &= \replayall_t(\Xi, \msto', \changep') \\
+\text{ where } (\msto',\changep') &= \replay_t(\msdiff,\msto,\changep)
+\end{align*}
+
+Because the store has all the temporal information baked into it, we
+rephrase the core semantics in terms of a transfer function. The least
+fixed-point of this function gives a more compact representation of
+the reduction relation of the previous section.
+
+\begin{align*}
+\System &= (\State \to {\Timestamp}^*) \times \wp(\State) \times \Store \times \Timestamp \\
+{\mathcal F} &: \System \to \System \\
+{\mathcal F}(S,F, \msto,t) &= (S',F',\msto', t') \\
+\text{ where }
+I &= \setof{(\mstate',\msdiff') \mid
+       \mstate \in F,
+       (\mstate,\msto^*,\epsilon) \dmachstep
+       (\mstate',\msdiff')} \\
+\msto^* &= \lambda \maddr.\lookup(\msto(\maddr),t) \\
+(\msto',\changep) &= \replayall_t(\setof{\msdiff \mid (\_,\msdiff) \in I},\msto,\sfalse) \\
+t' &= \left\{\begin{array}{ll} t+1 & \text{ if } \changep \\
+              t   & \text{ otherwise}
+             \end{array}\right. \\
+F' &= \setof{\mstate \mid (\mstate,\_) \in I, \changep \vee S(\mstate) \neq \cons{t}{\_}} \\
+S' &= \lambda \mstate. \left\{\begin{array}{ll}
+                               \cons{t'}{S(\mstate)} & \text{ if } \mstate \in F' \\
+                               S(\mstate) & \text{ otherwise}
+                             \end{array}\right.
+\end{align*}
+
+\subsubsection{Pure to imperative}
+
+The intermediate data structures of the above transfer function can all be streamlined into globals that are destructively updated. In particular, there are 5 globals:
+
+\begin{enumerate}
+\item{$S$: the \emph{seen} set, though made a map for faster membership tests and updates.}
+\item{$F$: the \emph{frontier} set, which must be persisent or copied for the iteration through the set to be correct.}
+\item{$\msto$: the store, which represents all stores that occur in the reduction semantics.}
+\item{$t$: the timestamp, or length of the store chain - all stores that occur in the semantics are totally ordered due to single-threading the store.}
+\item{$\changep$: whether there has been a store change stepping all states in $F$.}
+\end{enumerate}
+
+The reduction relation would then instead of building store deltas,
+update the global store. We would also not view it as a general
+relation, but a function that adds all next states to $F$ if they have
+not already been seen. At the end of iterating through $F$, $S$ is
+updated with the new states at the next timestamp.
+
+% \begin{figure}\label{fig:pure-timestamp}
+% \begin{align*}
+% t \in \Timestamp &= {\mathbb N} \\
+% \msto \in \Store &= \Addr \to (\Timestamp \times \wp(\Storeable))^* \\
+% (S,F,\msto,t) &\tmachstep (S \cup S', F', \msto', t') \\
+% \text{ where } I &= \{(\mstate,\msdiff) \mid \mstate \in F, \mstate \
+% \end{align*}
+% \end{figure}
+
+% \begin{figure}
+% \begin{alltt}
+% eval(\(e\)) :=
+%   \(\msto\), todo, seen, T := \(\varnothing\), \(\varnothing\), [], 0
+%   \(\compile{e}\)(\(\mtcntr, \varnothing, \varnothing, \mtlst, \kmt\))
+%   while(true):
+%     if todo = \(\varnothing\): return (keys(seen), \(\msto\))
+%     else:
+%       let old := todo
+%       todo, \(\msdiff\) := \(\varnothing\), \(\mtlst\)
+%       foreach c \(\in\) old: \(\changep\) := false; c()
+%       unless \(\msdiff\) = \(\mtlst\): T += 1; replay!(\(\msdiff, \msto\))
+% \end{alltt}
+% \caption{Imperative algorithm}
+% \label{fig:imperative}
+% \end{figure}
 
 \subsection{Pre-allocating the store}
 
@@ -1478,8 +1566,8 @@ analyzer~\cite{dvanhorn:Earl2012Introspective}.
 
 \balance
 \bibliographystyle{plain}
-\input{paper.bbl}
-%\bibliography{local,bibliography}
+%\input{paper.bbl}
+\bibliography{local,bibliography}
 
 % \include{appendix}
 

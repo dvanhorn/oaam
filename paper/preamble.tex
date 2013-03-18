@@ -61,6 +61,7 @@
 \newcommand{\msto}{\sigma}
 \newcommand{\mop}{o}
 \newcommand{\mval}{v}
+\newcommand{\mvalstack}{V}
 \newcommand{\mnum}{z}
 \newcommand{\mbln}{b}
 \newcommand{\mvalx}[1]{#1}
@@ -98,6 +99,8 @@
 \newcommand{\push}{\mathit{push}}
 \newcommand{\stash}{\mathit{stash}}
 \newcommand{\inject}{\mathit{inject}}
+\newcommand{\lookup}{\mathit{lookup}}
+\newcommand{\update}{\mathit{update}}
 \newcommand{\setof}[1]{\{#1\}}
 
 % Notations for proofs
@@ -111,6 +114,7 @@
 \newcommand{\cmachstep}{\mathbin{\compile{\machstep}}}
 \newcommand{\lmachstep}{\mathbin{\longmapsto_{{\mathcal L}}}}
 \newcommand{\dmachstep}{\mathbin{\longmapsto_{\mathit{\msto\msdiff}}}}
+\newcommand{\tmachstep}{\mathbin{\longmapsto_{T}}}
 \newcommand{\damachstep}{\mathbin{\widehat{\longmapsto}_{\mathit{\msto\msdiff}}}}
 \newcommand{\nmachstep}{\mathbin{\longmapsto_n}}
 \newcommand{\dcompile}[1]{\Delta\compile{#1}}
@@ -148,6 +152,8 @@
 \newcommand{\Kont}{\mathit{Kont}}
 \newcommand{\State}{\mathit{State}}
 \newcommand{\Storeable}{\mathit{Storeable}}
+\newcommand{\Timestamp}{{\mathbb N}} %{\mathit{Time}}
+\newcommand{\Valstack}{\mathit{ValStack}}
 
 \newcommand{\changep}{\Delta\mbox{{\tt ?}}}
 
