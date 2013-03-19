@@ -4,8 +4,9 @@
 Dominique Boucher and Marc Feeley.
 \newblock Abstract compilation: {A} new implementation paradigm for static
   analysis.
-\newblock In {\em Compiler Construction: 6th
-  International Conference}, pages 192--207, 1996.
+\newblock In Tibor Gyim\'{o}thy, editor, {\em Compiler Construction: 6th
+  International Conference, CC'96 Link{\"{o}}ping, Sweden, April 24–26, 1996
+  Proceedings}, pages 192--207, 1996.
 
 \bibitem{dvanhorn:bravenboer-smaragdakis-oopsla09}
 Martin Bravenboer and Yannis Smaragdakis.
@@ -15,12 +16,18 @@ Martin Bravenboer and Yannis Smaragdakis.
   Conference on Object-Oriented Programming, Systems, Languages, and
   Applications}, 2009.
 
+\bibitem{ianjohnson:BCG88}
+M.~C. Browne, E.~M. Clarke, and O.~Gr{\"{u}}mberg.
+\newblock Characterizing finite kripke structures in propositional temporal
+  logic.
+\newblock {\em Theor. Comput. Sci.}, 59(1-2):115--131, 1988.
+
 \bibitem{dvanhorn:Cousot:1977:AI}
 Patrick Cousot and Radhia Cousot.
 \newblock Abstract interpretation: a unified lattice model for static analysis
   of programs by construction or approximation of fixpoints.
-\newblock In {\em Proceedings of the 4th ACM SIGACT-SIGPLAN Symposium
-  on Principles of Programming Languages}, pages 238--252, 1977.
+\newblock In {\em POPL '77: Proceedings of the 4th ACM SIGACT-SIGPLAN Symposium
+  on Principles of Programming Languages}, pages 238--252. ACM, 1977.
 
 \bibitem{dvanhorn:Cousot1979Systematic}
 Patrick Cousot and Radhia Cousot.
@@ -31,7 +38,7 @@ Patrick Cousot and Radhia Cousot.
 \bibitem{dvanhorn:Danvy:DSc}
 Olivier Danvy.
 \newblock {\em An Analytical Approach to Program as Data Objects}.
-\newblock {DSc} thesis, Aarhus University,
+\newblock {DSc} thesis, Department of Computer Science, Aarhus University,
   2006.
 
 \bibitem{dvanhorn:Danvy-Nielsen:RS-04-26}
@@ -43,13 +50,13 @@ Olivier Danvy and Lasse~R. Nielsen.
 \bibitem{local:DOsualdo:12A}
 E.~D'Osualdo, J.~Kochems, and C.-H.~L. Ong.
 \newblock Automatic verification of {Erlang}-style concurrency.
-\newblock Technical report, University of Oxford, 2012.
+\newblock Technical report, University of Oxford DCS Technical Report, 2012.
 \newblock \url{http://mjolnir.cs.ox.ac.uk/soter/papers/erlang-verif.pdf}.
 
 \bibitem{local:DOsualdo:12B}
 E.~D'Osualdo, J.~Kochems, and C.-H.~L. Ong.
 \newblock Soter: An automatic safety verifier for {E}rlang.
-\newblock Technical report, University of Oxford, 2012.
+\newblock Technical report, University of Oxford DCS Technical Report, 2012.
 \newblock \url{http://mjolnir.cs.ox.ac.uk/soter/papers/soter-demo.pdf}.
 
 \bibitem{dvanhorn:Earl2012Introspective}
@@ -69,16 +76,21 @@ Matthias Felleisen, Robert~B. Findler, and Matthew Flatt.
 \newblock MIT Press, 2009.
 
 \bibitem{dvanhorn:Hartel1996Benchmarking}
-Pieter~H. Hartel, Marc Feeley, et al.
+Pieter~H. Hartel, Marc Feeley, Martin Alt, Lennart Augustsson, Peter Baumann,
+  Marcel Beemster, Emmanuel Chailloux, Christine~H. Flood, Wolfgang Grieskamp,
+  John H. G.~Van Groningen, Kevin Hammond, Bogumil Hausman, Melody~Y. Ivory,
+  Richard~E. Jones, Jasper Kamperman, Peter Lee, Xavier Leroy, Rafael~D. Lins,
+  Sandra Loosemore, Niklas R{\"{o}}jemo, Manuel Serrano, Jean~P. Talpin, Jon
+  Thackray, Stephen Thomas, Pum Walters, Pierre Weis, and Peter Wentworth.
 \newblock Benchmarking implementations of functional languages with
   ``pseudoknot'', a float-intensive benchmark.
-\newblock {\em J. Func. Prog.}, 6(04):621--655, 1996.
+\newblock {\em Journal of Functional Programming}, 6(04):621--655, 1996.
 
 \bibitem{dvanhorn:jagannathan-etal-popl98}
 Suresh Jagannathan, Peter Thiemann, Stephen Weeks, and Andrew Wright.
 \newblock Single and loving it: must-alias analysis for higher-order languages.
-\newblock In {\em Proceedings of the 25th ACM SIGPLAN-SIGACT
-  Symposium on Principles of Programming Languages}, pages 329--341, 1998.
+\newblock In {\em POPL '98: Proceedings of the 25th ACM SIGPLAN-SIGACT
+  Symposium on Principles of Programming Languages}, pages 329--341. ACM, 1998.
 
 \bibitem{dvanhorn:jagannathan-weeks-popl95}
 Suresh Jagannathan and Stephen Weeks.
@@ -97,6 +109,11 @@ Peter~J. Landin.
 \newblock The mechanical evaluation of expressions.
 \newblock {\em The Computer Journal}, 6(4):308--320, 1964.
 
+\bibitem{ianjohnson:manolios-diss}
+Panagiotis Manolios.
+\newblock {\em Mechanical Verification of Reactive Systems}.
+\newblock PhD thesis, University of Texas at Austin, 2001.
+
 \bibitem{dvanhorn:Meunier2006Modular}
 Philippe Meunier, Robert~B. Findler, and Matthias Felleisen.
 \newblock Modular set-based analysis from contracts.
@@ -112,15 +129,16 @@ Jan Midtgaard.
 Matthew Might and David~Van Horn.
 \newblock A family of abstract interpretations for static analysis of
   concurrent {Higher-Order} programs.
-\newblock In {\em Static Analysis}, vol. 6887 of {\em
-  LNCS}, pages 180--197, 2011.
+\newblock In Eran Yahav, editor, {\em Static Analysis}, volume 6887 of {\em
+  Lecture Notes in Computer Science}, pages 180--197. Springer Berlin /
+  Heidelberg, 2011.
 
 \bibitem{dvanhorn:Might2009Posteriori}
 Matthew Might and Panagiotis Manolios.
 \newblock A posteriori soundness for non-deterministic abstract
   interpretations.
 \newblock In {\em Proceedings of the 10th International Conference on
-  Verification, Model Checking, and Abstract Interpretation}, pages
+  Verification, Model Checking, and Abstract Interpretation}, VMCAI '09, pages
   260--274. Springer-Verlag, 2009.
 
 \bibitem{local:dalvik}
@@ -153,6 +171,11 @@ John~C. Reynolds.
 \newblock Definitional interpreters for {Higher-Order} programming languages.
 \newblock {\em Higher-Order and Symbolic Computation}, 11(4):363--397, 1998.
 
+\bibitem{dvanhorn:steckler-wand-toplas97}
+Paul~A. Steckler and Mitchell Wand.
+\newblock Lightweight closure conversion.
+\newblock {\em ACM Trans. Program. Lang. Syst.}, 19(1):48--86, 1997.
+
 \bibitem{dvanhorn:TobinHochstadt2012Higherorder}
 Sam Tobin-Hochstadt and David Van{ }Horn.
 \newblock Higher-order symbolic execution via contracts.
@@ -174,12 +197,13 @@ David Van{ }Horn and Matthew Might.
 \bibitem{dvanhorn:VanHorn2012Systematic}
 David Van{ }Horn and Matthew Might.
 \newblock Systematic abstraction of abstract machines.
-\newblock {\em J. Func Prog}, 22(4-5):705--746, 2012.
+\newblock {\em Journal of Functional Programming}, 22(Special Issue
+  4-5):705--746, 2012.
 
 \bibitem{dvanhorn:Vardoulakis2011CFA2}
 Dimitrios Vardoulakis and Olin Shivers.
 \newblock {CFA2}: a {Context-Free} approach to {Control-Flow} analysis.
-\newblock {\em LMCS}, 7(2), 2011.
+\newblock {\em Logical Methods in Computer Science}, 7(2), 2011.
 
 \bibitem{dvanhorn:Wright1997Practical}
 Andrew~K. Wright and Robert Cartwright.
@@ -190,5 +214,10 @@ Andrew~K. Wright and Robert Cartwright.
 Andrew~K. Wright and Suresh Jagannathan.
 \newblock Polymorphic splitting: an effective polyvariant flow analysis.
 \newblock {\em ACM Trans. Program. Lang. Syst.}, 20(1):166--207, 1998.
+
+\bibitem{ianjohnson:nbody87}
+Feng Zhao.
+\newblock An {O(N}) algorithm for {Three-Dimensional} {N-Body} simulations.
+\newblock Master's thesis, MIT, 1987.
 
 \end{thebibliography}
