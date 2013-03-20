@@ -66,12 +66,18 @@
                   [("--id")
                    "Benchmark compiled imperative store-diff lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s!)]
+                  [("--is")
+                   "Benchmark compiled imperative stacked store lazy non-determinism"
+                   (aval lazy-0cfa^/c/∆s/stacked!)]
                   [("--pa")
                    "Benchmark compiled preallocated accumulated store-diff lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/acc/prealloc!)]
                   [("--pd")
                    "Benchmark compiled preallocated store-diff lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/prealloc!)]
+                  [("--ps")
+                   "Benchmark compiled preallocated stacked store lazy non-determinism"
+                   (aval lazy-0cfa^/c/∆s/prealloc/stacked!)]
                   [("--it")
                    "Benchmark compiled imperative store lazy non-determinism timestap approx"
                    (aval lazy-0cfa^/c/timestamp!)]

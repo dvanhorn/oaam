@@ -13,7 +13,7 @@
 ;; and [paper/proctime.rkt] to be consistent with the number range.
 (define base-num 0)
 (define run-num 5)
-(define num-threads 11)
+(define num-threads 2)
 
 ;; In order to get consistent benchmarking numbers, each run is in a /fresh/
 ;; Racket VM, which we spin up with a shell command. The analysis statistics are
@@ -50,7 +50,9 @@
 (define compiled "lc")
 (define deltas "ld")
 (define deltasid "id")
+(define deltasis "is")
 (define deltaspd "pd")
+(define deltasps "ps")
 ;; Not in paper since insignificant or worse performance+precision
 (define deltasfd "fd")
 (define imperative "it")
@@ -67,8 +69,12 @@
    deltas
 ;; imperative   ;; timestamp approximation, not in paper.
 ;; preallocated ;; timestamp approximation, not in paper.
+#|
    deltasid
-   deltaspd))
+   deltaspd
+|#
+   deltasis
+   deltasps))
 
 (define (run which file)
   (for ([n (in-range run-num)])

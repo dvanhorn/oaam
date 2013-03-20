@@ -207,6 +207,23 @@ Welcome to Racket v5.3.3.
                    #:fixpoint imperative/∆s-fixpoint/c
                    #:global-σ #:compiled #:wide))))))
 (provide lazy-0cfa^/c/∆s!)
+;; "is"
+(mk-imperative/timestamp^-fixpoint/stacked
+                imperative/∆s-fixpoint/stacked/c imperative/∆s-ans/stacked/c?
+                imperative/∆s-ans/stacked/c-v imperative/∆s-touches-0/stacked/c)
+(with-nonsparse
+ (with-lazy
+  (with-0-ctx
+   (with-mutable-store/stacked
+    (with-mutable-worklist/stacked
+    (with-abstract
+      (mk-analysis #:aval lazy-0cfa^/c/∆s/stacked!
+                   #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
+                   #:ans imperative/∆s-ans/stacked/c
+                   #:touches imperative/∆s-touches-0/stacked/c
+                   #:fixpoint imperative/∆s-fixpoint/stacked/c
+                   #:global-σ #:compiled #:wide)))))))
+(provide lazy-0cfa^/c/∆s/stacked!)
 ;; "pa"
 (mk-prealloc/∆s/acc^-fixpoint prealloc/∆s/acc-fixpoint/c prealloc/∆s/acc-ans/c? 
               prealloc/∆s/acc-ans/c-v prealloc/∆s/acc-touches-0/c)
@@ -231,18 +248,37 @@ Welcome to Racket v5.3.3.
   (with-0-ctx/prealloc
    (with-σ-∆s/prealloc!
     (with-abstract
-     (define e (box #f))
+     (define pd-e (box #f))
       (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc!
                    #:prepare (λ (sexp)
                                 (define e* (prepare-prealloc parse-prog sexp))
-                                (set-box! e e*)
+                                (set-box! pd-e e*)
                                 e*)
                    #:ans prealloc/∆s-ans/c
                    #:touches prealloc/∆s-touches-0/c
                    #:fixpoint prealloc/∆s-fixpoint/c
                    #:global-σ #:compiled #:wide))))))
 (provide lazy-0cfa^/c/∆s/prealloc!)
-
+;; "ps"
+(mk-prealloc/timestamp^-fixpoint/stacked prealloc/∆s-fixpoint/stacked/c prealloc/∆s-ans/stacked/c?
+              prealloc/∆s-ans/stacked/c-v prealloc/∆s-touches-0/stacked/c)
+(with-nonsparse
+ (with-lazy
+  (with-0-ctx/prealloc
+   (with-prealloc/timestamp-store/stacked
+    (with-mutable-worklist/stacked
+    (with-abstract
+     (define ps-e (box #f))
+      (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc/stacked!
+                   #:prepare (λ (sexp)
+                                (define e* (prepare-prealloc/stacked parse-prog sexp))
+                                (set-box! ps-e e*)
+                                e*)
+                   #:ans prealloc/∆s-ans/stacked/c
+                   #:touches prealloc/∆s-touches-0/stacked/c
+                   #:fixpoint prealloc/∆s-fixpoint/stacked/c
+                   #:global-σ #:compiled #:wide)))))))
+(provide lazy-0cfa^/c/∆s/prealloc/stacked!)
 ;; "it"
 (mk-imperative/timestamp^-fixpoint imperative-fixpoint/c imperative-ans/c?
                                    imperative-ans/c-v imperative-touches-0/c)

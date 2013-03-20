@@ -2,25 +2,30 @@
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          "data.rkt" "imperative.rkt" "context.rkt" "add-lib.rkt"
          "deltas.rkt")
-(provide prepare-prealloc with-0-ctx/prealloc
+(provide prepare-prealloc
+         prepare-prealloc/stacked
+         with-0-ctx/prealloc
          mk-prealloc/timestamp^-fixpoint
+         mk-prealloc/timestamp^-fixpoint/stacked
          mk-prealloc/∆s/acc^-fixpoint
          mk-prealloc/∆s^-fixpoint
          with-σ-∆s/acc/prealloc!
          with-σ-∆s/prealloc!
          grow-vector ;; helper
          next-loc contour-table
-         with-prealloc/timestamp-store)
+         with-prealloc/timestamp-store
+         with-prealloc/timestamp-store/stacked)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mutable pre-allocated store
 (define next-loc #f)
 (define contour-table #f)
 
+(define nothing-proxy nothing)
 (define (inc-next-loc!) (set! next-loc (add1 next-loc)))
 
 (define (grow-vector σ old-size)
-  (for/vector #:length (* 2 old-size) #:fill ∅ ;; ∅ → '()
+  (for/vector #:length (* 2 old-size) #:fill nothing-proxy ;; ∅ → '()
                  ([v (in-vector σ)]
                   [i (in-naturals)]
                   #:when (< i old-size))
@@ -40,7 +45,7 @@
   (cond [(exact-nonnegative-integer? x) x]
         [else (get-contour-index!-0 x)]))
 
-(define (prepare-prealloc parser sexp)
+(define (prepare-prealloc-base parser sexp)
   (define nlabels 0)
   (define (fresh-label!) (begin0 nlabels (set! nlabels (add1 nlabels))))
   (define (fresh-variable! x) (begin0 nlabels (set! nlabels (add1 nlabels))))
@@ -51,11 +56,16 @@
   ;; right up front.
   (set! next-loc nlabels)
   (set! contour-table (make-hash))
-  (reset-globals! (make-vector (* 2 nlabels) ∅)) ;; ∅ → '()
+  (reset-globals! (make-vector (* 2 nlabels) nothing-proxy))
   e*)
+(define (prepare-prealloc parser sexp)
+  (set! nothing-proxy nothing)
+  (prepare-prealloc-base parser sexp))
+(define (prepare-prealloc/stacked parser sexp)
+  (set! nothing-proxy '())
+  (prepare-prealloc-base parser sexp))
 
-(define-syntax-rule (global-vector-getter σ* a)
-  (vector-ref global-σ a))
+(mk-global-store-getter global-vector-getter vector-ref-ignore-third)
 
 (define-syntax-rule (with-0-ctx/prealloc body)
   (splicing-syntax-parameterize
@@ -66,32 +76,46 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Timestamp approximation
-(define (join! a vs)
-  (define prev (vector-ref global-σ a))
-  (define upd (⊓ vs prev))
-  (unless (≡ prev upd)
-    (vector-set! global-σ a upd)
-    (inc-unions!)))
-
-(define (join*! as vss)
-  (for ([a (in-list as)]
-        [vs (in-list vss)])
-    (join! a vs)))
-
-(define-syntax-rule (bind-join! (σ* j!σ a vs) body)
-  (begin (join! a vs) body))
-(define-syntax-rule (bind-join*! (σ* j*!σ as vss) body)
-  (begin (join*! as vss) body))
+(mk-joiner join! vector-ref-ignore-third vector-set!)
+(mk-join* join*! join!)
+(mk-bind-joiner bind-join! join!)
+(mk-bind-joiner bind-join*! join*!)
 
 (mk-mk-imperative/timestamp^-fixpoint
- mk-prealloc/timestamp^-fixpoint restrict-to-reachable/vector)
+ mk-prealloc/timestamp^-fixpoint restrict-to-reachable/vector (void))
 
-(define-syntax-rule (with-prealloc/timestamp-store body)
-  (splicing-syntax-parameterize
-   ([bind-join (make-rename-transformer #'bind-join!)]
-    [bind-join* (make-rename-transformer #'bind-join*!)]
-    [getter (make-rename-transformer #'global-vector-getter)])
-   body))
+(mk-with-store with-prealloc/timestamp-store
+               bind-join!
+               bind-join*!
+               global-vector-getter)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Lossless timestamp approximation
+(mk-global-store-getter/stacked global-vector-getter/stacked vector-ref-ignore-third)
+(mk-joiner/stacked join/stacked! vector-ref-ignore-third vector-set!)
+(mk-join* join*/stacked! join/stacked!)
+(mk-bind-joiner bind-join/stacked! join/stacked!)
+(mk-bind-joiner bind-join*/stacked! join*/stacked!)
+
+(define (restrict-to-reachable/vector/stacked touches)
+  (define rtr (restrict-to-reachable touches))
+  (λ (σ v)
+     (rtr
+      (for/hash ([stack (in-vector σ)]
+                 [i (in-naturals)])
+        (match stack
+          [(cons (cons t vs) stack)
+           (values i vs)]
+          [_ (values i ∅)]))
+      v)))
+
+(mk-mk-imperative/timestamp^-fixpoint
+ mk-prealloc/timestamp^-fixpoint/stacked restrict-to-reachable/vector/stacked (reset-∆?!))
+
+(mk-with-store with-prealloc/timestamp-store/stacked
+               bind-join/stacked!
+               bind-join*/stacked!
+               global-vector-getter/stacked)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Accumulated deltas
