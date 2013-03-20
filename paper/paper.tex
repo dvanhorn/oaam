@@ -1059,8 +1059,7 @@ Here $\replayall : \Set(\StoreDelta) \times \Store \to \Store$ replays all logs 
 
 Correctness here requires a lemma that relates the differences in the compilation functions.
 \begin{lemma}[Compile coherence]
-For all $\mexp, \mcntr,\menv,\msto,\msdiff,\mkont,\msto^*,\mkont^*$,
-if $\msto \equiv \msto^*$ and $\mkont \equiv \mkont^*$, then
+If $\msto \equiv \msto^*$ and $\mkont \equiv \mkont^*$, then
 $\dcompile{\mexp}^\mcntr(\menv,\msto,\msdiff,\mkont) = \ttuple{\mastate}{\msdiff'}$ iff
 $\compile{\mexp}^\mcntr(\menv,\msto^*,\mkont^*) = \mstate$ such that
 $\mastate,\replay(\msdiff',\msto) \equiv \nw(\mstate)$
@@ -1543,7 +1542,7 @@ performant constraint-based analyses.
 
 Abstract machines are not only a good model for rapid analysis
 development, they can be systematically developed into efficient
-algorithms.
+algorithms that can be proved correct.
 
 %% \acks Sam Tobin-Hochstadt for encouragement and feedback -- he was
 %% the first to prompt us to look into how make effective
