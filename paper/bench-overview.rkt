@@ -54,10 +54,10 @@
 
 (with-output-to-file "bench-overview.tex" #:mode 'text #:exists 'replace
   (λ ()
-     (printf "\\begin{tabular}{@{}l|r|r|r|r|r|r|r@{}}~%")
+     (printf "\\begin{tabular}{@{}l||r||r|r||r|r||r|r@{}}~%")
      (printf "Program & LOC~%")
-     (printf "& \\multicolumn{2}{c|}{Time {\\small (s)}}~%")
-     (printf "& \\multicolumn{2}{c|}{Space {\\small (MB)}}~%")
+     (printf "& \\multicolumn{2}{c||}{Time {\\small (s)}}~%")
+     (printf "& \\multicolumn{2}{c||}{Space {\\small (MB)}}~%")
      (printf "& \\multicolumn{2}{c@{}}{Speed {\\small (state/s)}}~%")
      (printf "\\\\~%")
      (printf "\\hline\\hline~%")

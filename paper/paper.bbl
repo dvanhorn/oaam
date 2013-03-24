@@ -141,6 +141,13 @@ Matthew Might and Panagiotis Manolios.
   Verification, Model Checking, and Abstract Interpretation}, VMCAI '09, pages
   260--274. Springer-Verlag, 2009.
 
+\bibitem{dvanhorn:Might:2006:GammaCFA}
+Matthew Might and Olin Shivers.
+\newblock Improving flow analyses via \({\Gamma}\){CFA}: Abstract garbage
+  collection and counting.
+\newblock In {\em Proceedings of the 11th ACM International Conference on
+  Functional Programming (ICFP 2006)}, pages 13--25, 2006.
+
 \bibitem{local:dalvik}
 Matthew Might and David Van{ }Horn.
 \newblock Scalable and precise abstractions of programs for trustworthy

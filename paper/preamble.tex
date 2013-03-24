@@ -8,7 +8,7 @@
 
 % States
 \newcommand{\ev}[2][\ ]{\tuple[#1]{ev}{#2}}
-\newcommand{\co}[1]{\tuple{co}{#1}}
+\newcommand{\co}[2][\ ]{\tuple[#1]{co}{#2}}
 \newcommand{\ap}[2][\ ]{\tuple[#1]{ap}{#2}}
 \newcommand{\ans}[1]{\tuple{ans}{#1}}
 
@@ -33,7 +33,16 @@
 \newcommand{\svar}[2][\ ]{\tuple[#1]{var}{#2}}
 \newcommand{\snum}[2][\ ]{\tuple[#1]{num}{#2}}
 \newcommand{\sbln}[2][\ ]{\tuple[#1]{bool}{#2}}
-\newcommand{\saddr}[2][\ ]{\tuple[#1]{addr}{#2}}
+
+\newcommand{\saddr}[1]{\tuple{addr}{#1}}
+\newcommand{\superposition}[1]{\tuple{sp}{#1}}
+
+% Use delayed lookups or superposition, respectively. Paper has both
+% implementations using this macro, so we can switch between them
+% agilely if we need to.
+
+\newcommand{\spchoice}[2]{#2}
+
 \newcommand{\sif}[4][\ ]{\tuple[#1]{if}{#2,#3,#4}}
 \newcommand{\sop}[2][\ ]{\tuple[#1]{op}{#2}}
 \newcommand{\sopu}[3][\ ]{\tuple[#1]{op}{#2,#3}}
@@ -75,10 +84,11 @@
 \newcommand{\msdiff}{\xi}
 
 \newcommand{\compile}[1]{\llbracket#1\rrbracket}
+\newcommand{\kpush}[2][\ ]{\lfloor #2 \rfloor{#1}}
 
 \newcommand{\mlab}{{\ell}}
-\newcommand{\mcntr}{{\delta}}
-\newcommand{\mtcntr}{{\epsilon}}
+\newcommand{\mcntr}{{t}}
+\newcommand{\mtcntr}{{t_0}}
 
 \newcommand{\mtlst}{\epsilon}
 \newcommand{\cons}[2]{#1 {\tt :} #2}
@@ -87,6 +97,10 @@
 
 \newcommand{\lift}{\mathit{lift}}
 \newcommand{\eval}{\mathit{eval}}
+\newcommand{\traces}{\mathit{traces}}
+\newcommand{\alloc}{\mathit{alloc}}
+\newcommand{\allocsub}{\mathit{allocsub}}
+\newcommand{\tick}{\mathit{tick}}
 \newcommand{\replay}{\mathit{replay}}
 \newcommand{\states}{\mathit{cs}}
 \newcommand{\concat}{\mathit{concat}}
@@ -147,6 +161,7 @@
 \newcommand{\StoreDelta}{\mathit{Store\Delta}}
 \newcommand{\Addr}{\mathit{Addr}}
 \newcommand{\Value}{\mathit{Value}}
+\newcommand{\Var}{\mathit{Var}}
 \newcommand{\Env}{\mathit{Env}}
 \newcommand{\Expr}{\mathit{Expr}}
 \newcommand{\Kont}{\mathit{Kont}}
@@ -154,6 +169,7 @@
 \newcommand{\Storeable}{\mathit{Storeable}}
 \newcommand{\Timestamp}{{\mathbb N}} %{\mathit{Time}}
 \newcommand{\Valstack}{\mathit{ValStack}}
+\newcommand{\Traces}{\mathit{Traces}}
 
 \newcommand{\changep}{\Delta\mbox{{\tt ?}}}
 
