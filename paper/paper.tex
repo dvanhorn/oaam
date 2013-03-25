@@ -120,13 +120,18 @@ more than implementing an interpreter, (b) a single implementation can
 serve as both an interpreter and analyzer, and (c) verifying the
 correctness of the implementation is straightforward.
 
-However, there is a considerable weakness with the approach: an
+However, there is a considerable weakness to the approach: an
 analyzer designed and implemented by following the AAM recipe is
 prohibitively inefficient without both further approximation and
 further implementation effort.
 
 In this article, we develop a systematic approach to deriving a
-feasible implementation of an abstract-machine-based analyzer.
+practical implementation of an abstract-machine-based analyzer using
+mostly semantic means - not tricky engineering. Our goal is to empower
+programming language implementers and researchers to explore and
+convincingly exhibit their ideas with a low barrier to entry. The
+optimizations we describe are widely applicable and apparently
+effective to scale far beyond toy examples.
 
 \section{At a glance}
 
