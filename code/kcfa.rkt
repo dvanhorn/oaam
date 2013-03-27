@@ -29,6 +29,7 @@
          (~optional (~seq #:primop primop:id) #:defaults ([primop (generate-temporary #'primop)]))
          ;; Analysis strategies flags (requires the right parameters too)
          (~optional (~and #:compiled compiled?))
+         (~optional (~and #:collect-compiled collect-hash:id))
          (~optional (~and #:σ-∆s σ-∆s?))
          (~optional (~and #:sparse sparse?))
          ;; Continuation marks incur a representation overhead.
@@ -54,6 +55,8 @@
            (define c-passing? (given set-monad?))]
      #:fail-unless (implies (given global-σ?) (given wide?))
      "Cannot globalize narrow stores."
+     #:fail-when (and (given collect-hash) (not (given compiled?)))
+     "Cannot collect compiled expressions when not compiling."
      #:fail-unless (implies (given σ-∆s?) (given wide?))
      "Store deltas and narrow stores are antithetical."
      #:fail-unless (or (given fixpoint) (given set-monad?))
@@ -184,7 +187,13 @@
                                                 [target-σ (make-rename-transformer #'gσ)]
                                                 [top-σ? #t])
                             body (... ...))))
-                     (define (compile e) #,eval))))]
+                     #,(if (given collect-hash)
+                           (quasisyntax/loc stx
+                             (define (compile e)
+                               (define form #,eval)
+                               (hash-set! collect-hash form e)
+                               form))
+                           (quasisyntax/loc stx (define (compile e) #,eval))))))]
                [else
                 ;; brittle, since other identifiers must be the same in ev:
                 (syntax/loc stx
