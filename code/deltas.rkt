@@ -29,16 +29,14 @@
 
 (define-syntax-rule (∆-step step)
   (λ (state-count)
-     (λ (state)
-        (match state
-          [(cons σ cs)
-           (define-values (∆ cs*)
-             (for/fold ([∆ '()] [cs* ∅]) ([c (in-set cs)])
-               (define-values (∆* cs**) (step (cons σ c)))
-               (values (append ∆* ∆) (∪ cs** cs*))))
-           (set-box! state-count (+ (unbox state-count)
-                                    (set-count (cs* . ∖ . cs))))
-           (set (cons (update ∆ σ) cs*))]))))
+     (λ (σ cs)
+        (set-box! state-count (+ (unbox state-count) (set-count cs)))
+        (define-values (∆ cs*)
+          (for/fold ([∆ '()] [cs* ∅]) ([c (in-set cs)])
+            (define-values (∆* cs**) (step (cons σ c)))
+            (values (append ∆* ∆) (∪ cs** cs*))))
+        (define-values (σ* ∆?) (update/change ∆ σ))
+        (values σ* ∆? cs*))))
 
 (define-syntax-rule (mk-∆-fix^ name ans^?)
   (define-syntax-rule (name step fst)
@@ -47,20 +45,17 @@
       (set-box! state-count* 0)
       (define step^ ((∆-step step) state-count*))
       (set-box! (start-time) (current-milliseconds))
-      (define ss (fix step^ (set (cons (update ∆ (hash)) cs))))
+      (define-values (Σ ss) (fix-t2 step^ (update ∆ (hash)) cs))
       (state-rate)
-      (define-values (last-σ final-cs)
-        (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
+      (define final-cs
+        (for/fold ([final-cs ∅]) ([s ss])
           (match s
-            [(cons fsσ cs)
-             (values (join-store last-σ fsσ)
-                     (for/set #:initial final-cs ([c (in-set cs)]
-                                                  #:when (ans^? c))
-                              c))]
+            [(cons fsσ c)
+             (∪ final-cs (if (ans^? c) (set 0) ∅))]
             [_ (error 'name "bad output ~a~%" s)])))
       (values (format "State count: ~a" (unbox state-count*))
-              (format "Point count: ~a" (set-count (for/union ([p (in-set ss)]) (cdr p))))
-              last-σ final-cs))))
+              (format "Point count: ~a" (set-count (for/set ([p (in-set ss)]) (cdr p))))
+              (car Σ) final-cs))))
 
 ;; Uses counting and merges stores between stepping all states.
 (define-simple-macro* (mk-timestamp-∆-fix^ name ans^?)

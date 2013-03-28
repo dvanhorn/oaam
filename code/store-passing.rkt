@@ -19,26 +19,22 @@
   (λ (state-count #,@(if (syntax-parameter-value #'generate-graph?)
                          #'(graph)
                          #'()))
-     (λ (state)
-        (match state
-          [(cons wsσ cs)
-           (define-values (σ* cs*)
-             (for/fold ([σ* wsσ] [cs ∅]) ([c (in-set cs)])
-               (define-values (σ** cs*) (step (cons wsσ c)))
-               ;; Add new states to accumulator and construct graph
-               (define cs**
-                 #,(if (syntax-parameter-value #'generate-graph?)
-                       #'(for/set #:initial cs ([c* (in-set cs*)])
-                                  (add-edge! graph c c*)
-                                  c*)
-                       #'(∪ cs cs*)))
-               (values (join-store σ* σ**) cs**)))
-           ;; Stuck states are the same as input. Remove stuck states from the count
-           ;; XXX: Remove for performant version. This is just for statistics.
-           (set-box! state-count (+ (unbox state-count)
-                               (set-count (cs* . ∖ . cs))))
-           (set (cons σ* cs*))]
-          [_ (error 'wide-step "bad output ~a~%" state)]))))
+     (λ (wsσ cs)
+        (set-box! state-count (+ (unbox state-count) (set-count cs)))
+        (define-values (σ* cs*)
+          (for/fold ([σ* wsσ] [cs ∅]) ([c (in-set cs)])
+            (define-values (σ** cs*) (step (cons wsσ c)))
+            ;; Add new states to accumulator and construct graph
+            (define cs**
+              #,(if (syntax-parameter-value #'generate-graph?)
+                    #'(for/set #:initial cs ([c* (in-set cs*)])
+                               (add-edge! graph c c*)
+                               c*)
+                    #'(∪ cs cs*)))
+            (values (join-store σ* σ**) cs**)))
+        ;; Stuck states are the same as input. Remove stuck states from the count
+        ;; XXX: Remove for performant version. This is just for statistics.
+        (values σ* cs*))))
 
 (define-syntax-rule (wide-step step)
   (λ (state-count)
@@ -69,19 +65,19 @@
                            #'(graph)
                            #'())))
      (set-box! (start-time) (current-milliseconds))
-     (define ss (fix step^ (set (cons f^σ cs))))
+     (define-values (Σ ss) (fix-t step^ f^σ cs))
      (state-rate)
-     (define-values (σ final-cs)
-       (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
+     (define final-cs
+       (for/fold ([final-cs ∅]) ([s ss])
          (match s
-           [(cons fsσ cs)
+           [(cons fsσ c)
             #,@(if (syntax-parameter-value #'generate-graph?) #'((dump-dot graph)) #'())
-            (values (join-store last-σ fsσ) (∪ final-cs cs))]
+            (values (∪1 final-cs c))]
            [_ (error 'name "bad output ~a~%" s)])))
      ;; filter the final results
      (values (format "State count: ~a" (unbox state-count*))
              (format "Point count: ~a" (set-count final-cs))
-             σ
+             (car Σ)
              (for/set ([c (in-set final-cs)]
                        #:when (ans^? c))
                c)))))
