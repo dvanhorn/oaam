@@ -9,7 +9,7 @@
       +inf.0
       (/ (for/sum ([x (in-vector t)]) x)
          (vector-length t))))
-    
+
 (define (pick-min alg-pairs)
   (argmin (λ (p) (second p)) alg-pairs))
 
@@ -20,7 +20,7 @@
   (for/list ([(name report) (in-hash timings)])
     (define ls (for/list ([(alg ns) (in-hash report)])
                  (list alg (vector-avg (numbers-run ns)))))
-    (cons name 
+    (cons name
           (list (pick-min ls)
                 (pick-max ls)))))
 
@@ -37,10 +37,14 @@
 (define algo-name
   '(#;("bl" . "baseline")
     ("sp" . "baseline") ;; Specialized is the new baseline
-    ("ls" . "lazy")
-    ("lc" . "compiled")
-    ("ld" . "deltas")
-    ("is" . "imperative stacked values")
+    ("spt" . "frontier")
+    ("sdt" . "deltas")
+    ("lst" . "lazy")
+    ("lct" . "compiled")
+    #;("ls" . "lazy")
+    #;("lc" . "compiled")
+    #;("ld" . "deltas")
+    #;("is" . "imperative stacked values")
     ("ps" . "preallocated stacked values")
     #;("ia" . "imperative accumulated deltas")
     #;("id" . "imperative deltas")
@@ -74,16 +78,16 @@
 (define rel-time-data
   (for/list ([(key desc) (in-pairs algo-name)]
              [n (in-naturals)])
-    (vector n 
+    (vector n
             (->timeout
-             (/ baseline-time 
+             (/ baseline-time
                 (vector-avg (numbers-run (hash-ref bench-timing key))))))))
 (define rel-mem-data
   (for/list ([(key desc) (in-pairs algo-name)]
              [n (in-naturals)])
-    (vector n 
+    (vector n
             (->memout
-             (/ baseline-mem 
+             (/ baseline-mem
                 (vector-avg (numbers-peak-mem (hash-ref bench-timing key))))))))
 (define rel-states-per-sec-data
   (for/list ([(key desc) (in-pairs algo-name)]
@@ -92,7 +96,7 @@
             (->rateout
              (/ (vector-avg (numbers-state-rate (hash-ref bench-timing key)))
                 baseline-rate)))))
- 
+
 (define (sec->anchor l)
   (case l
     (("§4") 'bottom-left)
@@ -102,7 +106,7 @@
 (define (sec-mem->anchor l)
   (case l
     (("§4") 'bottom-left)
-    (else 'top)))    
+    (else 'top)))
 
 (define sections
   (list "§4"
@@ -121,19 +125,19 @@
                [plot-font-size 30]
                [plot-width (* (plot-width) 2)]
                [plot-height (quotient (plot-height) 2)])
-  (list 
+  (list
    (plot (list
-          (lines rel-time-data #:color 2 #:width 4 
+          (lines rel-time-data #:color 2 #:width 4
                  #:label "Total analysis time")
           (sec-labels sec->anchor rel-time-data))
-         #:y-min -25 
+         #:y-min -25
          #:y-max 270
          #:x-label ""
          #:x-min 0
          #:x-max 5.2
          #:y-label "" #;"Factor improvement over baseline"
          #:out-file (format "~a-relative-time.pdf" bench-name))
-   
+
    (plot (list
           (lines rel-states-per-sec-data #:color 6 #:width 4
                  #:label "Rate of state transitions")
@@ -145,20 +149,15 @@
          #:x-max 5.2
          #:y-label ""
          #:out-file (format "~a-relative-speed.pdf" bench-name))
-   
+
    (plot (list
           (lines rel-mem-data #:color 4 #:width 4
                  #:label "Peak memory")
           (sec-labels sec-mem->anchor rel-mem-data))
          #:y-min 1
-         #:y-max 1.49 
+         #:y-max 1.49
          #:x-label ""
          #:x-min 0
          #:x-max 5.2
          #:y-label ""
          #:out-file (format "~a-relative-space.pdf" bench-name))))
-
-  
-  
-  
-  

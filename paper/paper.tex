@@ -90,7 +90,7 @@ equally systematic way.
 
 %
 % Specifically, these policies tune precision for control,
-% the environment, the store, and base value domains.  
+% the environment, the store, and base value domains.
 
 By taking a
 machine-oriented view of computation, AAM makes it possible to design,
@@ -537,7 +537,7 @@ The uniform $k$-CFA allocation strategy would make $\traces$ in figure
 efficient one. This is not the strategy that AAM, nor we, recommend. Through
 this section, we will explain a succession of approximations
 to reach the baseline analysis.  We'll compare performance at each stage to
-identify the criticality of each choice. 
+identify the criticality of each choice.
 %
 We ground this journey by first formulating the analysis in terms of a classic
 fixed-point computation.
@@ -626,6 +626,7 @@ The transformed relation, $\widehat{\machstep}$, is
 (C, \msto) &\mathrel{\widehat{\machstep}} (C', \msto') \\
 \mbox{where } C' &= \{c' \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto^c), c \in C\} \\
               \msto' &= \bigsqcup\; \{\msto^c \mid \wn(c,\msto)\mathrel{\machstep} \wn(c', \msto^c), c \in C\} \\
+\wn &: \widehat{\State} \times \Store \to \State \\
 \wn(\ev{\mexp, \menv, \mkont}, \msto) &= \ev{\mexp, \menv, \msto, \mkont} \\
 \wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \mkont, \msto} \\
 \wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont} \\
@@ -633,34 +634,10 @@ The transformed relation, $\widehat{\machstep}$, is
 \end{align*}
 %
 In effect, the new store is computed as the least upper bound of all
-stores after stepping. This definition is wasteful, however. It causes
-all states found so far to step each iteration, even if they are not
-revisited. This has negative performance \emph{and} precision
-consequences. We instead use a frontier-based semantics that
-corresponds to the classic ``worklist'' algorithms for analysis. The
-difference is that the store is not modified in-place, but updated
-after all frontier states have been processed. This has implications
-for the analysis' precision and determinism. Specifically, higher
-precision, and it is deterministic even if set iteration is not.
-
-\begin{align*}
-(S, F, \msto) &\mathrel{\widehat{\machstep}} (S \cup S', F', \msto') \\
-\mbox{where } S' &= \{(c',\msto^c) \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto^c), c \in F\} \\
-              F' &= \{c \mid (c,\_) \in S' \setminus S\} \\
-              \msto' &= \bigsqcup\; \{\msto^c \mid (\_,\msto^c) \in S'\} \\
-\inject(e) &= (\setof{\ttuple{c_0}{\bot}},\setof{c_0},\bot) \\
-\text{ where } c_0 &= \ev{e,\bot,\kmt}
-\end{align*}
-
-% Notice that now $S$ has several copies of the abstract store in it. As
-% it is, this semantics is much less efficient (but still more precise)
-% than the previously proposed semantics because membership checks have
-% to compare entire stores. We return to this in section
-% \ref{sec:timestamping}.
-
-For clarity, we will exhibit non-widened semantics unless a technique
-specifically requires it. The final step to the baseline takes the
-complexity from quartic to cubic in the monovariant case.
+stores after stepping. For clarity, we will exhibit non-widened
+semantics unless a technique specifically requires it. The final step
+to the baseline takes the complexity from quartic to cubic in the
+monovariant case.
 
 \subsection{Store-allocate all values}
 \label{sec:baselineeval}
@@ -740,6 +717,7 @@ The transition-elimination optimizations reduce the overall number of transition
 made by the analyzer by performing:
 \begin{enumerate}
   \setcounter{enumi}{3}
+ \item frontier-based semantics
  \item lazy non-determinism and
  \item abstract compilation;
 \end{enumerate}
@@ -748,14 +726,40 @@ All pragmatic improvements are precision preserving (form complete
 abstractions), but the semantic changes are not in some cases, for reasons we
 will describe. We did not observe the precision differences in our evaluation.
 
-The move to the imperative will be made last in order to show the
-effectiveness of these techniques in the purely functional realm.
+We apply the frontier-based semantics combined with timestamped stores
+as our first step.  The move to the imperative will be made last in
+order to show the effectiveness of these techniques in the purely
+functional realm.
 
-\subsection{Timestamping monotonicity}
+\subsection{Timestamped frontier}
 
-The frontier-based semantics of the baseline has a severe bottleneck:
-checking if a state has been explored or not. Given two states,
-checking equality is expensive because the stores within each are
+The semantics given for store widening in section \ref{sec:storewiden},
+while simple, is wasteful. It also does not model what typical
+implementations do. It causes all states found so far to step each
+iteration, even if they are not revisited. This has negative
+performance \emph{and} precision consequences (changes to the store
+can travel back in time in straight-line code). We instead use a
+frontier-based semantics that corresponds to the classic ``worklist''
+algorithms for analysis. The difference is that the store is not
+modified in-place, but updated after all frontier states have been
+processed. This has implications for the analysis' precision and
+determinism. Specifically, higher precision, and it is deterministic
+even if set iteration is not.
+
+\begin{align*}
+(S, F, \msto) &\mathrel{\widehat{\machstep}} (S \cup S', F', \msto') \\
+\mbox{where } I &= \{(c',\msto^c) \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto^c), c \in F\} \\
+              \msto' &= \bigsqcup\; \{\msto^c \mid (\_,\msto^c) \in I\} \\
+              F' &= \{c \mid (c,\_) \in I, (c,\msto') \notin S\} \\
+              S' &= \setof{(c,\msto') \mid c \in F'} \\
+\inject(e) &= (\setof{\ttuple{c_0}{\bot}},\setof{c_0},\bot) \\
+\text{ where } c_0 &= \ev{e,\bot,\kmt}
+\end{align*}
+
+Notice that now $S$ has several copies of the abstract store in it. As
+it is, this semantics is much less efficient (but still more precise)
+than the previously proposed semantics because membership checks have
+to compare entire stores. Checking equality is expensive because the stores within each are
 large, and every entry must be checked against every other. Hashes can
 sometimes rule out inequality relatively quickly, but the incidence of
 collisions and actual equality is costly.
@@ -770,7 +774,7 @@ now compare their stores just by comparing their timestamps -- a
 constant-time operation.
 
 There are two subtle losses of precision in Shivers' original
-time-stamp technique that we can fix.
+timestamp technique that we can fix.
 
 \begin{enumerate}
 \item{In our semantics, the store does not change until the entire
@@ -787,6 +791,169 @@ time-stamp technique that we can fix.
     in the seen set ($S$), so we do not experience precision loss.}
 \end{enumerate}
 
+\begin{align*}
+\Sigma &\in \Store^* \\
+S &\subseteq {\mathbb N} \times \widehat{\State} \\
+F &\subseteq \widehat{\State} \\
+(S, F, \msto, \Sigma, t) &\mathrel{\widehat{\machstep}^T} (S \cup S', F', \msto', \Sigma', t') \\
+\mbox{where } I &= \setof{(c',\msto^c) \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto^c), c \in F} \\
+              \msto' &= \bigsqcup\; \{\msto^c \mid (\_,\msto^c) \in I\} \\
+              (t',\Sigma') &=\left\{\begin{array}{ll}
+                           (t+1,\msto'\Sigma') & \text{ if } \msto' \neq \msto \\
+                           (t,\Sigma)   & \text{ otherwise}
+                          \end{array}\right. \\
+              F' &= \setof{c \mid (c,\_) \in I, (c,t') \notin S} \\
+              S' &= \setof{(c,t') \mid c \in F'}\\
+\inject(e) &= (\setof{\ttuple{c_0}{0}},\setof{c_0},\bot,\cons{\bot}{\epsilon},0) \\
+\text{ where } c_0 &= \ev{e,\bot,\kmt}
+\end{align*}
+
+The observation Shivers made was that the store is increasing
+monotonically, so all stores throughout execution will be totally
+ordered (form a chain). This observation allows you to replace stores
+with pointers into this chain. We keep the stores around in $\Sigma$
+to acheive a complete abstraction. This corresponds to the temporal
+information about the execution's effect on the store.
+
+Note also that $F$ is only populated with states that have not been
+seen at the resulting store. This is what produces the more precise
+abstraction than the baseline widening.
+
+The general fixed-point combinator we showed above can be specialized
+to this semantics, as well. In fact, $\widehat{\machstep}^T$ is a functional
+relation, so we can get the least fixed-point of it directly.
+
+\begin{lemma}
+  $\widehat{\machstep}$ maintains the invariant that all stores in $S$ are
+  totally ordered and $\msto$ is an upper bound of the stores in $S$.
+\end{lemma}
+
+\begin{lemma}
+  $\widehat{\machstep}^T$ maintains the invariant that $\Sigma$ is in
+  order with respect to $\sqsupset$ and $\msto = \hd(\Sigma)$.
+\end{lemma}
+
+\begin{theorem}
+Timestamps are a complete abstraction
+\end{theorem}
+The proof follows from the galois connection that, in one direction,
+sorts all the stores in $S$ to form $\Sigma$, and translates stores in
+$S$ to their distance from the end of $\Sigma$. In the other
+direction, timestamps are replaced by the stores they point to.
+
+\subsection{Locally log-based store deltas}
+
+The above technique requires joining entire (large) stores
+together. Additionally, there is still a comparison of stores, which
+we established is expensive. Not every step will modify all addresses
+of the store, so joining entire stores is wasteful in terms of memory
+and time. We can instead log store changes and replay the change log
+on the full store after all steps have completed, noting when there is
+an actual change. This uses far fewer join and comparison operations,
+leading to less overhead, and is precision-preserving.
+
+We represent change logs as $\msdiff \in \StoreDelta = (\Addr \times
+  \Set(\Storeable))^*$. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$
+ becomes a log addition
+$\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$ begins
+empty ($\mtlst$) for each step. Applying the changes to the full store
+is straightforward:
+\begin{equation*}
+\replay : (\StoreDelta \times \Store) \to (\Store \times \Boolean)
+\end{equation*}
+\begin{align*}
+\replay(\left[ \ttuple{\maddr_i}{\mval{s_i}}, \ldots\right], \msto) &=
+\ttuple{\msto'}
+       {\mval{s_i} \overset{?}{=} \msto'(\maddr_i) \vee \ldots} \\
+\text{ where } \msto' &= {\msto \sqcup [\maddr_i \mapsto \mval{s_i}] \sqcup \ldots}
+\end{align*}
+
+We change the semantics slightly to add to the change log rather than
+produce an entire modified store.  The transition relation is
+identical except for the addition of this change log.  We maintain the
+invariant that lookups will never rely on the change log, so we can
+use the originally supplied store unmodified.
+
+A taste of the changes to the reduction relation is as follows:
+
+\begin{align*}
+\dmachstep &\subseteq (\widehat{\State}\times\Store) \times (\widehat{\State}\times\StoreDelta) \\
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont} & \dmachstep_\msto
+\ttuple{\ev[^{\mcntr'}]{\mexp,\menv',\mkont}}{\cons{\ttuple{\maddr}{\setof{\mval}}}{\epsilon}} \\
+\text{ where }\maddr &= \alloc(\mstate) \\
+              \menv' &= \menv[\mvar\mapsto\maddr]
+\end{align*}
+
+% Compilation changes to additionally take a $\msdiff$ component, so the
+% above rule's right hand side would instead be $k^{\mcntr'}(\menv',
+% \msto, \msdiff', \mkont)$ where $k = \compile{e}$ would be in the closure.
+
+We lift $\dmachstep$ to accommodate for the asymmetry
+in the input and output, and change the frontier-based semantics in the following way:
+
+\begin{align*}
+(S, F, \msto,\Sigma,t) &\mathrel{\damachstep} (S \cup S', F', \msto',\Sigma',t') \\
+\mbox{ where }
+ I &= \setof{(\mastate',\msdiff) \mid \mastate \dmachstep_\msto \ttuple{\mastate'}{\msdiff} } \\
+ \ttuple{\msto'}{\changep} &= \replay(\appendall(\setof{\msdiff \mid (\_,\msdiff) \in I}),\msto) \\
+ \ttuple{t'}{\Sigma'} &=
+     \left\{
+       \begin{array}{ll}
+         \ttuple{t+1}{\msto\Sigma} & \text{ if } \changep \\
+         \ttuple{t}{\Sigma} & \text{ otherwise}
+       \end{array}\right. \\
+ F' &= \setof{\mastate \mid (\mastate,\_) \in I, (\mastate,t') \notin S} \\
+ S' &= \setof{(\mastate,t') \mid c \in F'} \\
+\appendall(\varnothing) &= \epsilon \\
+\appendall(\setof{\msdiff}\cup\Xi) &= \append(\msdiff,\appendall(\Xi))
+\end{align*}
+
+Here $\appendall$ combines change logs across all non-deterministic
+steps for a state to later be replayed. The order the combination
+happens in doesn't matter, because join is associative and
+commutative.
+
+\begin{lemma}
+$\mastate \dmachstep_\msto \ttuple{\mastate'}{\msdiff}$ iff
+$\wn(\mastate,\msto) \machstep \wn(\mastate',\replay(\msdiff,\msto))$
+\end{lemma}
+By cases on $\dmachstep$ and $\machstep$.
+
+\begin{lemma}[$\changep$ means change]
+Let $\replay(\msdiff,\msto) = \ttuple{\msto'}{\changep}$. $\msto' \neq \msto$ iff $\changep$.
+\end{lemma}
+By induction on $\msdiff$.
+
+\begin{theorem}
+$\damachstep$ is a complete abstraction of $\widehat{\machstep}^T$.
+\end{theorem}
+Follows from previous lemma and that join is associative and commutative.
+
+% Correctness here requires a lemma that relates the differences in the compilation functions.
+
+% \begin{lemma}[Compile coherence]
+% Let $\dcompile{\mexp}^\mcntr(\menv,\msto,\msdiff,\mkont) = \ttuple{\mastate}{\msdiff'}$
+% and $\compile{\mexp}^\mcntr(\menv,\msto^*,\mkont^*) = \wn(\mastate',\msto^{*'})$.
+% If $\msto \equiv \msto^*$, $\msdiff \equiv \msdiff^*$, and $\mkont \equiv \mkont^*$, then
+% $\mastate' \equiv \mastate$
+% and there exists an $\msdiff''$ such that \\
+%    $\replay(\msdiff'',\replay(\msdiff^*,\msto^*)) \equiv \replay(\msdiff',\msto)$.
+% \end{lemma}
+% Here $\equiv$ means structurally the same, only compiled expressions
+% are compiled with the updated compilation function that builds store
+% deltas. Proof is by induction on $\mexp$.
+
+% \begin{theorem}[Equivalence with wide abstract compilation]
+% If $S \equiv S^*, F \equiv F^*, \msto \equiv \msto^*$, then
+% $(S,F,\msto) \machstep (S',F',\msto')$ iff
+% $\exists S^*_1, F^*_1, \msto^*_1.
+%   S' \equiv S^*_1 \wedge F' \equiv F^*_1 \wedge \msto' \equiv \msto^*_1 \wedge
+%   (S^*,F^*,\msto^*) \dmachstep (S^*_1,F^*_1,\msto^*_1)$
+% \end{theorem}
+% Proof by the above lemma and that replaying in any order is equivalent
+% (associativity and commutativity of $\sqcup$).
+
+
 \subsection{Lazy non-determinism}
 
 Tracing the execution of the analysis reveals an immediate shortcoming:
@@ -797,7 +964,7 @@ Surveying this branching has no benefit for precision.
 For example, in a function application, {\tt (f x y)},
 where {\tt f}, {\tt x} and {\tt y} each have several values
 each argument evaluation induces $n$-way branching, only to be ultimately joined back together in their respective
-application positions. 
+application positions.
 %
 Transition patterns of this shape litter the state-graph:
 %
@@ -806,7 +973,7 @@ Transition patterns of this shape litter the state-graph:
 \end{center}
 To avoid the spurious forking and joining, we {\it delay} the non-determinism
 until and unless it is needed in {\it strict contexts} (such as the guard for an
-{\tt if} a called procedure, or a numerical primitive application). 
+{\tt if}, a called procedure, or a numerical primitive application).
 %
 Doing so collapses these forks and joins into a linear sequence of states:
 \begin{center}
@@ -840,7 +1007,7 @@ The following rules highlight the changes to the semantics:
 \spchoice
 {\force &: \Store \times \Value \to \Set(\Value) \\
  \force(\msto,\saddr{\maddr}) &= \msto(\maddr) \\
- \force(\mval) &= \{\mval\}}
+ \force(\msto,\mval) &= \setof{\mval}}
 {\force &: \Value \to \Set(\Value) \\
  \force(\superposition{\mval{s}}) &= \mval{s} \\
  \force(\mval) &= \{\mval\}}
@@ -853,7 +1020,7 @@ The following rules highlight the changes to the semantics:
 %
 \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr_\mkont},\mval,\msto}
 &\lmachstep\;
-\ev[^\mcntr]{\mexp,\menv,\msto',\kfn[^\mcntr_\mlab]{\maddr_f,\maddr_\mkont}} \\
+\ev[^{\mcntr'}]{\mexp,\menv,\msto',\kfn[^\mcntr_\mlab]{\maddr_f,\maddr_\mkont}} \\
 \text{ where }
 \maddr_f &= \alloc(\mstate) \\
 \msto' &=
@@ -863,7 +1030,7 @@ The following rules highlight the changes to the semantics:
 %
 \co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr_\mkont},\mval,\msto}
 &\lmachstep\;
-\ev[^\mcntr]{\mexpi,\menv,\msto,\mkont} \\
+\ev[^{\mcntr'}]{\mexpi,\menv,\msto,\mkont} \\
 \text{ if } \mkont &\in \msto(\maddr_\mkont),
             \strue \in \spchoice{\force(\msto,\mval)}{\force(\mval)}
 \end{align*}
@@ -960,17 +1127,17 @@ makes the following transitions:
 \begin{align}
 & \ev[^\mcntr]{\sapp{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2}}{\mexp_3},\menv,\msto_0,\mkont}\\
 \machstep\; &
-\ev[^{\mcntr'}]{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2},\menv,\msto_1,\kar{\mexp_3,\menv,\maddr_{f1},\maddr_{a1},\maddr_1}}
+\ev[^{\mcntr'}]{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2},\menv,\msto_1,\kar{\mexp_3,\menv,\maddr_1}}
 \\
 \machstep\; &
-\ev[^{\mcntr''}]{\sapp\mvar{\mexp_1},\menv,\msto_2,\kar{\mexp_2,\menv,\maddr_{f2},\maddr_{a2},\maddr_2}}
+\ev[^{\mcntr''}]{\sapp\mvar{\mexp_1},\menv,\msto_2,\kar{\mexp_2,\menv,\maddr_2}}
 \\
 \machstep\; &
-\ev[^{\mcntr'''}]{\mvar, \menv,\msto_3,\kar{\mexp_1,\menv,\maddr_{f3},\maddr_{a3},\maddr_3}} % {\mexp_2}
+\ev[^{\mcntr'''}]{\mvar, \menv,\msto_3,\kar{\mexp_1,\menv,\maddr_3}} % {\mexp_2}
 \\
 \machstep\; &
 \spchoice
-{\co{\kar{\mexp_1,\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\saddr{\menv(\mvar)},\msto_4}}
+{\co{\kar{\mexp_1,\menv,\maddr_3},\saddr{\menv(\mvar)},\msto_4}}
 {\co{\kar{\mexp_1,\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\superposition{\msto_4(\menv(\mvar))},\msto_4}}
 \end{align}
 where \(
@@ -980,15 +1147,17 @@ where \(
 
 Whereas abstract compilation gives us in one step:
 \begin{align*}
-\compile{\mexp}^\mcntr(\menv,\msto_0,\mkont) = 
+\compile{\mexp}^\mcntr(\msto_0)(\menv,\epsilon,\mkont) =
 \spchoice
-{\co{\kar{\compile{\mexp_1},\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\saddr{\menv(\mvar)},\msto'_4}}
+{\co{\kar{\compile{\mexp_1},\menv,\maddr_3},\saddr{\menv(\mvar)}},\msdiff_4}
 {\co{\kar{\compile{\mexp_1},\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\superposition{\msto'_4(\menv(\mvar))},\msto'_4}}
 \end{align*}
-where \(
-\msto'_4 = \msto_0 \sqcup \{ [\maddr_1 \mapsto \{ \mkont \}],
-[\maddr_2 \mapsto \kar{\compile{\mexp_3},\menv,\maddr_1}],
-[\maddr_3 \mapsto \kar{\compile{\mexp_2},\menv,\maddr_2}]\).
+where
+\begin{equation*}
+\msdiff_4 = [\ttuple{\maddr_1}{\setof{\mkont}},
+             \ttuple{\maddr_2}{\setof{\kar{\compile{\mexp_3},\menv,\maddr_1}}},
+             \ttuple{\maddr_3}{\setof{\kar{\compile{\mexp_2},\menv,\maddr_2}}}]\text.
+\end{equation*}
 
 The compilation step converts expressions into functions that expect
 the other components of the {\tt ev} state. Its definition in figure
@@ -1005,34 +1174,36 @@ $\mcomp^\mcntr(\mathit{args}\ldots)$ for $\mcomp(\mathit{args}\ldots,
 
 \begin{figure}
 \begin{align*}
-\compile{\_} &: (\Expr \to \Env \times \Store \times \Kont \times \Counter) \to \State \\
+\compile{\_} &: \Expr \to \Store \\
+             &\phantom{: \Expr } \to \Env  \times \StoreDelta \times \Kont \times \Counter \\
+             &\phantom{: \Expr } \to \State \\
 \mcntr' &= \tick(\mlab,\menv,\msto,\mcntr) \\
-\compile{\svar\mvar} &=
- \lambda^\mcntr(\menv,\msto,\mkont) .
+\compile{\svar\mvar}_\msto &=
+ \lambda^\mcntr(\menv,\msdiff,\mkont) .
 \spchoice
-{\co{\mkont,\saddr{\menv(\mvar)},\msto}}
-{\co{\mkont,\superposition{\msto(\menv(\mvar))},\msto}}
+{\co{\mkont,\saddr{\menv(\mvar)}},\msdiff}
+{\co{\mkont,\superposition{\msto(\menv(\mvar))}},\msdiff}
 \\
-\compile{\slit\mlit} &= \lambda^\mcntr(\menv,\msto,\mkont) .
-\co{\mkont,\mlit,\msto}
+\compile{\slit\mlit}_\msto &= \lambda^\mcntr(\menv,\msdiff,\mkont) .
+\co{\mkont,\mlit},\msdiff
 \\
-\compile{\slam\mvar\mexp} &= \lambda^\mcntr(\menv,\msto,\mkont) .
-\co{\mkont,\clos{\mvar,\compile{\mexp},\menv},\msto}
+\compile{\slam\mvar\mexp}_\msto &= \lambda^\mcntr(\menv,\msdiff,\mkont) .
+\co{\mkont,\clos{\mvar,\compile{\mexp},\menv}},\msdiff
 \\
-\compile{\sapp[^\mlab]{\mexpi0}{\mexpi1}} &= \lambda^\mcntr(\menv,\msto,\mkont) .
-\compile{\mexpi0}^{\mcntr'}(\menv,\msto',\kar[_\mlab^\mcntr]{\compile{\mexpi1},\menv,\maddr_\mkont})
+\compile{\sapp[^\mlab]{\mexpi0}{\mexpi1}}_\msto &= \lambda^\mcntr(\menv,\msdiff,\mkont) .
+\compile{\mexpi0}^{\mcntr'}(\menv,\msdiff',\kar[_\mlab^\mcntr]{\compile{\mexpi1},\menv,\maddr_\mkont})
 \\
 &\setlength\arraycolsep{5pt}
 \begin{array}{lrl}
 \text{ where } & \maddr_\mkont = \allockont^\mcntr_\mlab(\msto,\mkont) \\
-               & \msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]
+               & \msdiff' = \cons{\ttuple{\maddr_\mkont}{\setof{\mkont}}}{\msdiff}
 \end{array}
 \\
-\compile{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}} &= \lambda^\mcntr(\menv,\msto,\mkont) .
-\compile{\mexpi0}^{\mcntr'}(\menv,\msto',\kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})
+\compile{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}}_\msto &= \lambda^\mcntr(\menv,\msdiff,\mkont) .
+\compile{\mexpi0}^{\mcntr'}(\menv,\msdiff',\kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})
 \\
 &\text{ where }\maddr_\mkont = \allockont^\mcntr_\mlab(\msto,\mkont) \\
-&\phantom{\text{ where }} \msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]
+&\phantom{\text{ where }} \msdiff' = \cons{\ttuple{\maddr_\mkont}{\setof{\mkont}}}{\msdiff}
 \end{align*}
 \caption{Abstract compilation}
 \label{fig:compile}
@@ -1041,40 +1212,43 @@ $\mcomp^\mcntr(\mathit{args}\ldots)$ for $\mcomp(\mathit{args}\ldots,
 \begin{figure}
 \begin{gather*}
 \begin{align*}
-\traces(\mexp) &= \{ \compile{\mexp}^\mtcntr(\epsilon,\varnothing,\varnothing,\kmt) \multimachstep \mstate \} \text{ where }
+\traces(\mexp) &= \setof{ \inject(\compile{\mexp}^\mtcntr_\bot(\bot,\epsilon,\kmt)) \multimachstep \mstate}
+                    \text{ where } \\
+\inject(\mastate,\msdiff) &= \wn(\mastate,\replay(\msdiff,\bot)) \\
+\wn(\mastate,\msto) \machstep \wn(\mastate',\msto') &\iff \mastate \cmachstep_\msto \mastate',\msdiff \\
+\msdiff \text{ is such that } &\replay(\msdiff,\msto) = \msto'
 \end{align*}
 \\[2mm]
 \begin{align*}
 %% CONTINUE
-\co{\kmt,\mval,\msto} &\cmachstep
-\ans{\msto,\mval'} \text{ if } \mval' \in \spchoice{\force(\msto,\mval)}{\force(\mval)}
+\co{\kmt,\mval} &\cmachstep_\msto
+\ans{\mval'},\epsilon \text{ if } \mval' \in \spchoice{\force(\msto,\mval)}{\force(\mval)}
 \\
-\co{\kar[^\mcntr_\mlab]{\mcomp,\menv,\maddr_\mkont},\mval,\msto} & \cmachstep
-\mcomp^\mcntr(\menv,\msto',\kfn[^\mcntr_\mlab]{\maddr_f,\maddr_\mkont}) \\
+\co{\kar[^\mcntr_\mlab]{\mcomp,\menv,\maddr_\mkont},\mval} & \cmachstep_\msto
+\mcomp^\mcntr(\msto)(\menv,\msdiff,\kfn[^\mcntr_\mlab]{\maddr_f,\maddr_\mkont}) \\
 \text{ where } \maddr_f &= \alloc(\mstate) \\
-               \msto' &= \msto\sqcup[\maddr_f \mapsto \spchoice{\force(\msto,\mval)}
-                                                               {\force(\mval)}]
+               \msdiff &= \cons{\ttuple{\maddr_f}{\force(\msto,\mval)}}{\epsilon}
 \\
-\co{\kfn[^\mcntr_\mlab]{\maddr_f,\maddr_\mkont},\mval,\msto} & \cmachstep
-\ap[^\mcntr_\mlab]{\mval,\mval\mkont,\msto} \\
-\text{ if }\mval &\in \msto(\maddr_f), \mkont \in \msto(\maddr_\mkont) \\
+\co{\kfn[^\mcntr_\mlab]{\maddr_f,\maddr_\mkont},\mval} & \cmachstep_\msto
+\ap[^\mcntr_\mlab]{\mval,\mval\mkont},\epsilon \\
+\text{ if }\mval &\in \msto(\maddr_f), \mkont \in \msto(\maddr_\mkont)
 \\
-\co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\strue,\msto} & \cmachstep
-\mcompi0^\mcntr(\menv,\msto,\mkont)
+\co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\strue} & \cmachstep_\msto
+\mcompi{0}^\mcntr(\msto)(\menv,\epsilon,\mkont)
 \text{ if }\mkont\in\msto(\maddr)
 \\
-\co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\sfalse,\msto} & \cmachstep
-\mcompi1^\mcntr(\menv,\msto,\mkont)
+\co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\sfalse} & \cmachstep_\msto
+\mcompi{1}^\mcntr(\msto)(\menv,\epsilon,\mkont)
 \text{ if }\mkont\in\msto(\maddr)
 \\[2mm]
 %% APPLY
-\ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\msto,\mkont} & \cmachstep
-\mcomp^{\mcntr'}(\menv',\msto',\mkont) \\
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\mkont} & \cmachstep_\msto
+\mcomp^{\mcntr'}(\msto)(\menv',\msdiff,\mkont) \\
 \text{ where }\menv' &= \menv[\mvar\mapsto\maddr] \\
-              \msto' &= \msto\sqcup[\maddr\mapsto \spchoice{\force(\msto,\mval)}{\force(\mval)}]
+              \msdiff &= \cons{\ttuple{\maddr}{\force(\msto,\mval)}}{\epsilon}
 \\
-\ap{\mop,\mval,\msto,\mkont} & \cmachstep
-\co{\mkont,\mval',\msto} \\
+\ap{\mop,\mval,\mkont} & \cmachstep_\msto
+\co{\mkont,\mval'},\epsilon \\
 \text{ where } \mvalx{u} &\in \spchoice{\force(\msto,\mval)}{\force(\mval)}, \mval'\in\interpdelta(\mop,\mvalx{u})
 \end{align*}
 \end{gather*}
@@ -1088,9 +1262,11 @@ never before been rigorously proved. What constitutes correctness in
 the case of dropped states, anyway? Applying an abstract bytecode's
 function does many ``steps'' in one go, at the end of which, the two
 semantics line up again (modulo representation of expressions). This
-constitutes the use of a notion of stuttering. We therefore prove a
-stuttering bisimulation~\cite{ianjohnson:BCG88} between this
-semantics and the previous section's to show precision preservation.
+constitutes the use of a notion of stuttering. We provide a formal
+analysis of abstract compilation \emph{without} store widening with a proof
+of a stuttering bisimulation~\cite{ianjohnson:BCG88} between this
+semantics and lazy non-determinism without widening to show precision
+preservation. We revisit store widening at the end of the section.
 
 The number of transitions that can occur in succession from an
 abstract bytecode is roughly bounded by the amount of expression
@@ -1115,19 +1291,20 @@ Before we prove this setup is indeed a WEB, we need one lemma that
 applying an abstract bytecode's function is equal to refining the
 corresponding $\ev{}$ state:
 %
-\begin{lemma}[Compile/commit]\hfill\\
-$\compile{\mexp}^\mcntr(\menv,r(\msto),r(\mkont)) = r(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont})$.
+\begin{lemma}[Compile/commit]
+Let $\mastate,\msdiff' = \compile{\mexp}^\mcntr_{r(\msto)}(\menv,\msdiff,r(\mkont))$.
+Let $\wn(\mastate',\msto') = r(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont})$.
+$\wn(\mastate,\replay(\msdiff',\msto)) = \wn(\mastate',\replay(\msdiff,\msto'))$.
 \end{lemma}
 The proof is by induction on $\mexp$.
 
 \begin{theorem}[Precision preservation]
-$B$ is a WEB on $\lmachstep \cup \cmachstep$
+$B$ is a WEB on $\lmachstep \cup \machstep$
 \end{theorem}
 
-The full proof is in the appendix, but it follows by cases on
-$\lmachstep \cup \cmachstep$ with the WEB \emph{witness} being the
-well-order on expressions (with a $\bot$ element), and the following
-$\erankt$, $\erankl$ functions:
+The proof follows by cases on $\lmachstep \uplus \machstep$ with the
+WEB \emph{witness} being the well-order on expressions (with a $\bot$
+element), and the following $\erankt$, $\erankl$ functions:
 
 \begin{align*}
 \erankt(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont}) &= \mexp \\
@@ -1147,10 +1324,11 @@ changed. Consider the case where before we might call the same
 function from two different places in 3 and 2 steps respectively,
 compilation can make that 2 and 1, reversing the order that we bind
 values in the store, leading to a mismatch from the previous
-semantics. This kind of cross-step store poisoning is inevitable when a
-store is shared between several traces. The binding could have just as
-easily been observed the other way around in the non-compiled
-semantics.
+semantics. This kind of cross-step store poisoning is inevitable when
+a store is shared between several traces. The binding could have just
+as easily been observed the other way around in the non-compiled
+semantics. Call $\camachstep$ the result of the widening operator from
+the previous section on $\cmachstep$.
 
 % Compile: cpu time: 255397 real time: 261532 gc time: 2947
 
@@ -1158,120 +1336,6 @@ semantics.
 % Compile + Lazy: cpu time: 31173 real time: 31642 gc time: 739
 
 %\newpage
-
-\subsection{Locally log-based store deltas}
-
-Every step the analysis makes for the above techniques requires
-joining entire (large) stores together. Not every step will modify all
-addresses of the store, so joining entire stores is wasteful in terms
-of memory and time. We can instead log store changes and replay the
-change log on the full store after all steps have completed. This uses
-far fewer join operations, leading to less overhead, and is precision-preserving.
-
-We represent change logs as $\msdiff \in \StoreDelta = (\Addr \times
-  \Set(\Storeable))^*$. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$
- becomes a log addition
-$\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$ begins
-empty ($\mtlst$) for each step. Applying the changes to the full store
-is straightforward:
-\begin{align*}
-\replay &: \StoreDelta \times \Store \to \Store \\
-\replay(\left[ \ttuple{\maddr_i}{\mval{s_i}}, \ldots\right], \msto) &= \msto \sqcup [\maddr_i \mapsto \mval{s_i}] \sqcup \ldots
-\end{align*}
-%\replay(\mtlst, \msto) &= \msto \\
-%\replay(\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}, \msto) &= \replay(\msdiff, \msto\sqcup[\maddr \mapsto \mval{s}])
-
-The transition relation is identical except for the addition of this change log.
-%
-We maintain the invariant that lookups will never rely on the change log, so we can use the originally supplied store unmodified:
-
-\begin{align*}
-(\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont},\msto,\msdiff) & \dmachstep
-(\ev[^{\mcntr'}]{\mexp,\menv',\mkont},\msdiff') \\
-\text{ where }\menv' &= \menv[\mvar\mapsto\maddr] \\
-              \msdiff' &= 
-\spchoice
-{\cons{\ttuple{\maddr}{\force(\msto,\mval)}}{\msdiff}}
-{\cons{\ttuple{\maddr}{\force(\mval)}}{\msdiff}}
-\end{align*}
-
-Compilation changes to additionally take a $\msdiff$ component, so the
-above rule's right hand side would instead be $k^{\mcntr'}(\menv',
-\msto, \msdiff', \mkont)$ where $k = \compile{e}$ would be in the closure.
-
-\spchoice{ }{
-\paragraph{Caveat:} With abstract compilation, in one step, we can
-both bind a variable and reference it. This breaks the invariant of
-not relying on the change log. The problem is that the store does not
-change until all steps are done, so the reference unsoundly returns
-the previous binding (or nothing at all)! There are a couple ways to
-address this. One way is to make all compiled forms that reference the
-store into a new kind of state that has to be stepped in order to
-reference the store and continue. Another way is to make function
-application take one extra step after binding, so that running the
-body of the function sees the changed store. The latter is the more
-enticing of the two, since programs have more variable references than
-function calls - we don't want to slow them down if we don't have
-to. This change is also minutely different in precision, so we don't
-have complete abstraction. If the lazy semantics delayed the lookup of
-a variable's address to put in superposition (i.e., produced
-$\saddr{\menv(\mvar)}$ instead of
-$\superposition{\msto(\menv(\mvar))}$, and $\force$ additionally takes
-a $\msto$), then the lazy semantics loses its complete abstraction,
-but this current caveat disappears.
-}
-
-We lift $\dmachstep$ to accommodate for the asymmetry
-in the input and output. For each state that is stepped, we feed the
-output changes to the next so that all changes get accumulated:
-
-\begin{align*}
-(S, F, \msto) &\mathrel{\damachstep} (S \cup S', F', \msto') \\
-\mbox{ where }
- (F', \msdiff') &= \step^*(\varnothing, F, \msto, \epsilon) \\
- \msto' &= \replay(\msdiff',\msto) \\
-               S' &= \setof{(c,\msto') \mid c \in F'} \\
-\step^*(F', \varnothing, \msdiff) &= (F', \msdiff) \\
-\step^*(F', \{c\}\cup F, \msdiff) &= \step^*(F'\cup \states^*, F, \msdiff^*) \\
-\states^* &= \{c' \mid (c,\msto,\msdiff) \dmachstep (c',\msdiff^c) \} \\
-\msdiff^* &= \appendall(\setof{\msdiff^c \mid (c, \msto,\msdiff) \dmachstep (c', \msdiff^c)}) \\
-\appendall(\varnothing) &= \epsilon \\
-\appendall(\setof{\msdiff}\cup\Xi) &= \append(\msdiff,\appendall(\Xi))
-\end{align*}
-
-Here $\appendall$ combines change logs across all non-deterministic
-steps for a state to later be replayed. The order the combination
-happens in doesn't matter, because join is associative and
-commutative.
-
-% Here $\replayall : \Set(\StoreDelta) \times \Store \to \Store$ replays all logs in a set on top of the given store. Since join is associative and commutative, the order does not matter:
-% \begin{align*}
-%   \replayall(\varnothing,\msto) &= \msto \\
-%   \replayall(\setof{\msdiff} \cup \Xi, \msto) &= \replayall(\Xi, \replay(\msdiff, \msto))
-% \end{align*}
-
-Correctness here requires a lemma that relates the differences in the compilation functions.
-\begin{lemma}[Compile coherence]
-Let $\dcompile{\mexp}^\mcntr(\menv,\msto,\msdiff,\mkont) = \ttuple{\mastate}{\msdiff'}$
-and $\compile{\mexp}^\mcntr(\menv,\msto^*,\mkont^*) = \wn(\mastate',\msto^{*'})$.
-If $\msto \equiv \msto^*$, $\msdiff \equiv \msdiff^*$, and $\mkont \equiv \mkont^*$, then
-$\mastate' \equiv \mastate$
-and there exists an $\msdiff''$ such that \\
-   $\replay(\msdiff'',\replay(\msdiff^*,\msto^*)) \equiv \replay(\msdiff',\msto)$.
-\end{lemma}
-Here $\equiv$ means structurally the same, only compiled expressions
-are compiled with the updated compilation function that builds store
-deltas. Proof is by induction on $\mexp$.
-
-\begin{theorem}[Equivalence with wide abstract compilation]
-If $S \equiv S^*, F \equiv F^*, \msto \equiv \msto^*$, then
-$(S,F,\msto) \machstep (S',F',\msto')$ iff
-$\exists S^*_1, F^*_1, \msto^*_1.
-  S' \equiv S^*_1 \wedge F' \equiv F^*_1 \wedge \msto' \equiv \msto^*_1 \wedge
-  (S^*,F^*,\msto^*) \dmachstep (S^*_1,F^*_1,\msto^*_1)$
-\end{theorem}
-Proof by the above lemma and that replaying in any order is equivalent
-(associativity and commutativity of $\sqcup$).
 
 %% Delta Store +k Compile + Lazy:
 %%    cpu time: 668 real time: 686 gc time: 41
@@ -1321,62 +1385,52 @@ timestamp.
 \mvalstack \sqcup_t \mval{s} &= \mvalstack,\sfalse \text{ otherwise}
 \end{align*}
 
-For the purposes of space, we reuse the $\dmachstep$ semantics and change the definition $\replay$ to track if the store has changed, in order to increment the global timestamp.
-\begin{align*}
-\replay_t(\epsilon,\msto,\changep) &= \msto,\changep \\
-\replay_t(\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff},\msto,\changep) &= \replay_t(\msdiff,\msto',\changep \vee \changep') \\
-\text{ where } (\msto',\changep') &= \msto\sqcup_t[\maddr \mapsto, \mval{s}] \\
-\replayall_t(\varnothing,\msto,\changep) &= \msto,\changep \\
-\replayall_t(\setof{\msdiff}\cup\Xi,\msto,\changep) &= \replayall_t(\Xi, \msto', \changep') \\
-\text{ where } (\msto',\changep') &= \replay_t(\msdiff,\msto,\changep)
-\end{align*}
-
-Because the store has all the temporal information baked into it, we
-rephrase the core semantics in terms of a transfer function. The least
-fixed-point of this function gives a more compact representation of
-the reduction relation of the previous section.
+For the purposes of space, we reuse the $\cmachstep$ semantics,
+although the $\replay$ of the produced $\msdiff$ objects should be
+in-place, and the $\lookup$ function should be using this
+single-threaded store.  Because the store has all the temporal
+information baked into it, we rephrase the core semantics in terms of
+a transfer function. The least fixed-point of this function gives a
+more compact representation of the reduction relation of the previous
+section.
 
 \begin{align*}
-\System &= (\State \to {\Timestamp}^*) \times \wp(\State) \times \Store \times \Timestamp \\
+\System &= (\widehat{\State} \to {\Timestamp}^*) \times \wp(\widehat{\State}) \times \Store \times \Timestamp \\
 {\mathcal F} &: \System \to \System \\
 {\mathcal F}(S,F, \msto,t) &= (S',F',\msto', t') \\
 \text{ where }
-I &= \setof{(\mstate',\msdiff') \mid
-       \mstate \in F,
-       (\mstate,\msto^*,\epsilon) \dmachstep
-       (\mstate',\msdiff')} \\
+I &= \setof{(\mastate',\msdiff) \mid
+       \mastate \in F,
+       \mastate \cmachstep_{\msto^*} \mastate',\msdiff} \\
 \msto^* &= \lambda \maddr.\lookup(\msto(\maddr),t) \\
-(\msto',\changep) &= \replayall_t(\setof{\msdiff \mid (\_,\msdiff) \in I},\msto,\sfalse) \\
+\ttuple{\msto'}{\changep} &= \replay(\appendall(\setof{\msdiff \mid (\_,\msdiff) \in I}),\msto) \\
 t' &= \left\{\begin{array}{ll} t+1 & \text{ if } \changep \\
               t   & \text{ otherwise}
              \end{array}\right. \\
-F' &= \setof{\mstate \mid (\mstate,\_) \in I, \changep \vee S(\mstate) \neq \cons{t}{\_}} \\
-S' &= \lambda \mstate. \left\{\begin{array}{ll}
-                               \cons{t'}{S(\mstate)} & \text{ if } \mstate \in F' \\
-                               S(\mstate) & \text{ otherwise}
+F' &= \setof{\mastate \mid (\mastate,\_) \in I, \changep \vee S(\mastate) \neq \cons{t}{\_}} \\
+S' &= \lambda \mastate. \left\{\begin{array}{ll}
+                               \cons{t'}{S(\mastate)} & \text{ if } \mastate \in F' \\
+                               S(\mastate) & \text{ otherwise}
                              \end{array}\right.
 \end{align*}
 
-We increase the timestamp only if we find that the store has changed
-from any join operation. The frontier set only gets states that we
-haven't seen at the next timestamp. The states we've seen gets updated
-with the frontier states at the next timestamp. We prove semantic
-equivalence with the previous semantics with a lock-step bisimulation with the stack of stores abstraction,
-which follow from equational reasoning from the following lemmas:
+We prove semantic equivalence with the previous semantics with a
+lock-step bisimulation with the stack of stores abstraction, which
+follow from equational reasoning from the following lemmas:
 
-\begin{lemma}[Store of value stacks completely abstracts stack of stores]
-TODO
+\begin{lemma}
+Stores of value stacks completely abstract stacks of stores.
 \end{lemma}
+This depends on some wellformedness conditions about the order of the
+stacks. The store of value stacks can be translated to a stack of
+stores by taking successive ``snapshots'' of the store at different
+timestamps from the max timestamp it holds down to 0. Vice versa, we
+replay the changes across adjacent stores in the stack.
 
-\begin{lemma}[$\changep$ means change]
-  If $\replayall_t(\Xi,\msto,\changep) = \msto',\changep'$ then
-  $\msto' = \replay(\appendall(\Xi),\msto)$ and $\changep \vee
-  (\changep' \iff \msto \neq msto')$.
-\end{lemma}
-By induction on the size of $\Xi$.
+We apply a similar construction to the different representation of seen states in order to get the final result:
 
-\begin{theorem}[Timestamped system with stack of stores completely abstracts wide store deltas]
-TODO
+\begin{theorem}
+${\mathcal F}$ is a complete abstraction of $\camachstep$.
 \end{theorem}
 
 \subsubsection{Pure to imperative}
