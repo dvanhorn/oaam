@@ -50,10 +50,18 @@
                    (aval baseline)] ;; least optimized
                   [("--sp") "Benchmark specialized fixpoint"
                    (aval 0cfa^)]
+                  [("--spt") "Benchmark specialized fixpoint with timestamps"
+                   (aval 0cfa^/t)]
+                  [("--sdt") "Benchmark specialized fixpoint with timestamps and store deltas"
+                   (aval 0cfa^-∆s/t)]
                   [("--ls") "Benchmark specialized lazy non-determinism"
                    (aval lazy-0cfa^)]
+                  [("--lst") "Benchmark specialized lazy non-determinism with timestamps"
+                   (aval lazy-0cfa^-∆s/t)]
                   [("--lc") "Benchmark compiled specialized lazy non-determinism"
                    (aval lazy-0cfa^/c)]
+                  [("--lct") "Benchmark compiled specialized lazy non-determinism with timestamps"
+                   (aval lazy-0cfa^-∆s/t/c)]
                   [("--ld")
                    "Benchmark compiled store-diff lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s)]

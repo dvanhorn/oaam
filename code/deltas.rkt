@@ -3,7 +3,7 @@
          "store-passing.rkt" "context.rkt" "fix.rkt"
          "handle-limits.rkt"
          "graph.rkt" racket/stxparam)
-(provide bind-join-∆s bind-join*-∆s mk-∆-fix^ mk-timestamp-∆-fix^ with-σ-∆s)
+(provide bind-join-∆s bind-join*-∆s mk-∆-fix^ mk-∆-fix2^ mk-timestamp-∆-fix^ with-σ-∆s)
 
 ;; Utility function for combining multiple σ-∆s
 (define (map2-append f acc ls0 ls1)
@@ -38,6 +38,18 @@
         (define-values (σ* ∆?) (update/change ∆ σ))
         (values σ* ∆? cs*))))
 
+(define-syntax-rule (∆-step2 step)
+  (λ (state-count)
+     (λ (state)
+        (match state
+          [(cons σ cs)
+           (set-box! state-count (+ (unbox state-count) (set-count cs)))
+           (define-values (∆ cs*)
+             (for/fold ([∆ '()] [cs* ∅]) ([c (in-set cs)])
+               (define-values (∆* cs**) (step (cons σ c)))
+               (values (append ∆* ∆) (∪ cs** cs*))))
+           (set (cons (update ∆ σ) cs*))]))))
+
 (define-syntax-rule (mk-∆-fix^ name ans^?)
   (define-syntax-rule (name step fst)
     (let-values ([(∆ cs) fst])
@@ -55,6 +67,29 @@
             [_ (error 'name "bad output ~a~%" s)])))
       (values (format "State count: ~a" (unbox state-count*))
               (format "Point count: ~a" (set-count (for/set ([p (in-set ss)]) (cdr p))))
+              (car Σ) final-cs))))
+
+
+(define-syntax-rule (mk-∆-fix2^ name ans^?)
+  (define-syntax-rule (name step fst)
+    (let-values ([(∆ cs) fst])
+      (define state-count* (state-count))
+      (set-box! state-count* 0)
+      (define step^ ((∆-step2 step) state-count*))
+      (set-box! (start-time) (current-milliseconds))
+      (define ss (fix step^ (set (cons (update ∆ (hash)) cs))))
+      (state-rate)
+      (define final-cs
+        (for/fold ([last-σ #hash()] [final-cs ∅]) ([s ss])
+          (match s
+            [(cons fsσ cs)
+             (values (join-store last-σ fsσ)
+                     (for/fold ([final-cs final-cs]) ([c (in-set cs)]
+                                                      #:when (ans^? c))
+                       (∪1 final-cs c)))]
+            [_ (error 'name "bad output ~a~%" s)])))
+      (values (format "State count: ~a" (unbox state-count*))
+              (format "Point count: ~a" (set-count (for/union ([p (in-set ss)]) (cdr p))))
               (car Σ) final-cs))))
 
 ;; Uses counting and merges stores between stepping all states.

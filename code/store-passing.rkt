@@ -36,6 +36,27 @@
         ;; XXX: Remove for performant version. This is just for statistics.
         (values σ* cs*))))
 
+(define-simple-macro* (wide-step-specialized2 step)
+  (λ (state-count #,@(if (syntax-parameter-value #'generate-graph?)
+                         #'(graph)
+                         #'()))
+     (λ (state)
+        (match state
+          [(cons wsσ cs)
+           (set-box! state-count (+ (unbox state-count) (set-count cs)))
+           (define-values (σ* cs*)
+             (for/fold ([σ* wsσ] [cs ∅]) ([c (in-set cs)])
+               (define-values (σ** cs*) (step (cons wsσ c)))
+               ;; Add new states to accumulator and construct graph
+               (define cs**
+                 #,(if (syntax-parameter-value #'generate-graph?)
+                       #'(for/set #:initial cs ([c* (in-set cs*)])
+                                  (add-edge! graph c c*)
+                                  c*)
+                       #'(∪ cs cs*)))
+               (values (join-store σ* σ**) cs**)))
+           (set (cons σ* cs*))]))))
+
 (define-syntax-rule (wide-step step)
   (λ (state-count)
      (λ (state)
@@ -82,33 +103,32 @@
                        #:when (ans^? c))
                c)))))
 
-;; stores the last seen heap for each state
-(define-syntax-rule (mk-special2-set-fixpoint^ name ans^?)
+(define-simple-macro* (mk-special2-set-fixpoint^ fix name ans^?)
  (define-syntax-rule (name step fst)
    (let ()
      (define-values (f^σ cs) fst)
+     #,@(if (syntax-parameter-value #'generate-graph?)
+            #'((define graph (make-hash)))
+            #'())
      (define state-count* (state-count))
      (set-box! state-count* 0)
+     (define step^ ((wide-step-specialized2 step) state-count*
+                    #,@(if (syntax-parameter-value #'generate-graph?)
+                           #'(graph)
+                           #'())))
      (set-box! (start-time) (current-milliseconds))
-     (define-values (σ final-cs)
-       (let loop ([accum (hash)] [front cs] [σ f^σ])
-         (match (for/first ([c (in-set front)]) c)
-           [#f 
-            (state-rate)
-            (values σ (for/set ([(c _) (in-hash accum)]) c))]
-           [c
-            (set-box! state-count* (add1 (unbox state-count)))
-            (define-values (σ* cs*) (step (cons σ c)))
-            (define-values (accum* front*)
-              (for/fold ([accum* accum] [front* (front . ∖1 . c)])
-                  ([c* (in-set cs*)]
-                   #:unless (equal? σ* (hash-ref accum c* (hash))))                
-                (values (hash-set accum* c* σ*) (∪1 front* c*))))
-            (loop accum* front* σ*)])))
+     (define ss (fix step^ (set (cons f^σ cs))))
+     (define-values (last-σ final-cs)
+       (for/fold ([last-σ f^σ] [final-cs ∅])
+           ([s (in-set ss)])
+         (match s
+           [(cons σ cs) (values (join-store last-σ σ) (∪ final-cs cs))])))
+     (state-rate)
+     #,@(if (syntax-parameter-value #'generate-graph?) #'((dump-dot graph)) #'())
      ;; filter the final results
      (values (format "State count: ~a" (unbox state-count*))
              (format "Point count: ~a" (set-count final-cs))
-             σ
+             last-σ
              (for/set ([c (in-set final-cs)]
                        #:when (ans^? c))
                c)))))

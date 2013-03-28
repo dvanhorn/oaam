@@ -109,8 +109,21 @@ Welcome to Racket v5.3.3.
                    #:fixpoint baseline-fixpoint
                    #:σ-passing #:wide #:set-monad)))))))
 (provide baseline)
+
+;; "spt"
+(mk-special-set-fixpoint^ fix 0cfa-set-fixpoint^/t 0cfa-ans^/t?)
+(with-nonsparse
+ (with-strict
+  (with-0-ctx
+   (with-whole-σ
+    (with-σ-passing-set-monad
+     (with-abstract
+      (mk-analysis #:aval 0cfa^/t #:ans 0cfa-ans^/t
+                   #:fixpoint 0cfa-set-fixpoint^/t
+                   #:σ-passing #:wide #:set-monad)))))))
+(provide 0cfa^/t)
 ;; "sp"
-(mk-special-set-fixpoint^ fix 0cfa-set-fixpoint^ 0cfa-ans^?)
+(mk-special2-set-fixpoint^ fix 0cfa-set-fixpoint^ 0cfa-ans^?)
 (with-nonsparse
  (with-strict
   (with-0-ctx
@@ -121,8 +134,23 @@ Welcome to Racket v5.3.3.
                    #:fixpoint 0cfa-set-fixpoint^
                    #:σ-passing #:wide #:set-monad)))))))
 (provide 0cfa^)
+
+;; timestamp strict deltas
+;; "sdt"
+(mk-∆-fix^ 0cfa-∆s-fixpoint^/t 0cfa-∆s-ans^/t?)
+(with-nonsparse
+ (with-strict
+  (with-0-ctx
+   (with-σ-∆s
+    (with-σ-passing-set-monad
+     (with-abstract
+      (mk-analysis #:aval 0cfa^-∆s/t #:ans 0cfa-∆s-ans^/t
+                   #:fixpoint 0cfa-∆s-fixpoint^/t
+                   #:σ-passing #:wide #:set-monad)))))))
+(provide 0cfa^-∆s/t)
+
 ;; "ls"
-(mk-special-set-fixpoint^ fix lazy-0cfa-set-fixpoint^ lazy-0cfa-ans^?)
+(mk-special2-set-fixpoint^ fix lazy-0cfa-set-fixpoint^ lazy-0cfa-ans^?)
 (with-nonsparse
  (with-lazy
   (with-0-ctx
@@ -133,8 +161,22 @@ Welcome to Racket v5.3.3.
                    #:fixpoint lazy-0cfa-set-fixpoint^
                    #:σ-passing #:wide #:set-monad)))))))
 (provide lazy-0cfa^)
+
+;; "lst"
+(mk-∆-fix^ lazy-0cfa-∆s-fixpoint^/t lazy-0cfa-∆s-ans^/t?)
+(with-nonsparse
+ (with-lazy
+  (with-0-ctx
+   (with-σ-∆s
+    (with-σ-passing-set-monad
+     (with-abstract
+      (mk-analysis #:aval lazy-0cfa^-∆s/t #:ans lazy-0cfa-∆s-ans^/t
+                   #:fixpoint lazy-0cfa-∆s-fixpoint^/t
+                   #:σ-passing #:wide #:set-monad)))))))
+(provide lazy-0cfa^-∆s/t)
+
 ;; "lc"
-(mk-special-set-fixpoint^ fix 0cfa-set-fixpoint^/c 0cfa-ans^/c?)
+(mk-special2-set-fixpoint^ fix 0cfa-set-fixpoint^/c 0cfa-ans^/c?)
 (with-nonsparse
  (with-lazy
   (with-0-ctx
@@ -146,6 +188,22 @@ Welcome to Racket v5.3.3.
                    #:σ-passing
                    #:compiled #:wide #:set-monad)))))))
  (provide lazy-0cfa^/c)
+
+
+;; "lct"
+(mk-∆-fix^ lazy-0cfa-∆s-fixpoint^/t/c lazy-0cfa-∆s-ans^/t/c?)
+(with-nonsparse
+ (with-lazy
+  (with-0-ctx
+   (with-σ-∆s
+    (with-σ-passing-set-monad
+     (with-abstract
+      (mk-analysis #:aval lazy-0cfa^-∆s/t/c #:ans lazy-0cfa-∆s-ans^/t/c
+                   #:fixpoint lazy-0cfa-∆s-fixpoint^/t/c
+                   #:σ-passing #:wide #:set-monad #:compiled)))))))
+(provide lazy-0cfa^-∆s/t/c)
+
+
 ;; "ld"
 (mk-∆-fix^ lazy-0cfa∆^-fixpoint 0cfa∆-ans^?)
 (with-nonsparse
