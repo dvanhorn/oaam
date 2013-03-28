@@ -107,13 +107,15 @@ Reduction semantics:
 \ev[^\mcntr]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr_\mkont}}
 \\
 &&
-\text{ where }\maddr_\mkont,\msto' = \push^\mcntr_\mlab(\msto,\mkont)
+\text{ where }\maddr_\mkont = \allockont^\mcntr\mlab(\msto,\mkont) \\
+&&\phantom{\text{ where }}\msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]
 \\
 \ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} &\machstep&
 \ev[^\mcntr]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}
 \\
 &&
-\text{ where }\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)
+\text{ where }\maddr_\mkont = \allockont^\mcntr\mlab(\msto,\mkont) \\
+&&\phantom{\text{ where }}\msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]
 \\[2mm]
 %% CONTINUE
 \co{\kmt,\mval,\msto} &\machstep&
@@ -160,11 +162,6 @@ Reduction semantics:
 \end{gather*}
 
 \begin{align*}
-\push_\mlab^\mcntr(\msto,\mstor) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
-\mbox{ where }\maddr \notin\msto
-\end{align*}
-
-\begin{align*}
 \inject(\mexp) &= \ev[^\mtcntr]{\mexp,\bot,\bot,\kmt} \\
 \reachable{\mexp} &= \setof{\mstate \mid \inject(\mexp) \machstep^* \mstate}
 \end{align*}
@@ -200,13 +197,15 @@ Reduction semantics:
 \ev[^{\mcntr'}]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}
 \\
 &&
-\text{ where }\maddr,\msto' = \push^\mcntr_\mlab(\msto,\mkont)
+\text{ where }\maddr_\mkont = \allockont^\mcntr\mlab(\msto,\mkont) \\
+&&\phantom{\text{ where }}\msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]
 \\
 \ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} &\machstep&
 \ev[^{\mcntr'}]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}
 \\
 &&
-\text{ where }\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)
+\text{ where }\maddr_\mkont = \allockont^\mcntr\mlab(\msto,\mkont) \\
+&&\phantom{\text{ where }}\msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]
 \\[2mm]
 %% CONTINUE
 \co{\kmt,\mval,\msto} &\machstep&
@@ -259,9 +258,6 @@ Reduction semantics:
  \force(\msto,\mval) &= \{ \mval \}}
 {\force(\superposition{\mval{s}}) &= \mval{s} \\
  \force(\mval) &= \{ \mval \}}
-\\
-\push_\mlab^\mcntr(\msto,\mstor) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
-\mbox{ where }\maddr \notin\msto
 \end{align*}
 
 \begin{align*}
@@ -310,15 +306,17 @@ Abstract compilation function:
 \co{\mkont,\clos{\mvar,\compile\mexp,\menv},\msto}
 \\
 \compile{\sapp[^\mlab]{\mexpi0}{\mexpi1}} &= \lambda^\mcntr (\menv,\msto,\mkont) .
-\compile{\mexpi0}^\mcntr(\menv,\msto',\kar[_\mlab^\mcntr]{\compile{\mexpi1},\menv,\maddr})
+\compile{\mexpi0}^{\mcntr'}(\menv,\msto',\kar[_\mlab^\mcntr]{\compile{\mexpi1},\menv,\maddr})
 \\
 &
-\text{ where }\maddr,\msto' = \push^\mcntr_\mlab(\msto,\mkont)
+\text{ where }\maddr_\mkont = \allockont^\mcntr\mlab(\msto,\mkont) \\
+&\phantom{\text{ where }}\msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]
 \\
 \compile{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}} &= \lambda^\mcntr(\menv,\msto,\mkont) .
-\compile{\mexpi0}^\delta(\menv,\msto',\kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})
+\compile{\mexpi0}^{\mcntr'}(\menv,\msto',\kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})
 \\
-&\text{ where }\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)
+\text{ where }\maddr_\mkont = \allockont^\mcntr\mlab(\msto,\mkont) \\
+&\phantom{\text{ where }}\msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]
 \end{align*}
 
 Reduction semantics:
@@ -508,26 +506,27 @@ $\Storeable$, $\Store$, $\Env$ and $\Value$ are defined the same as previously.
 Abstract compilation function:
 
 \begin{align*}
-\compile{\_} &: \Expr \to \Compiled \\
-\compile{\svar\mvar} &= \lambda(\menv,\msto,\msdiff, \mkont) .
+\dcompile{\_} &: \Expr \to \Compiled \\
+\dcompile{\svar\mvar} &= \lambda(\menv,\msto,\msdiff, \mkont) .
                           \ttuple{\co{\mkont, \spchoice{\saddr{\menv(\mvar)}}{\superposition{\msto(\menv(\mvar))}},\msto}}{\bot}
 \\
-\compile{\slit\mlit} &= \lambda(\menv,\msto,\msdiff,\mkont) .
+\dcompile{\slit\mlit} &= \lambda(\menv,\msto,\msdiff,\mkont) .
 \ttuple{\co{\mkont,\mlit,\msto}}{\bot}
 \\
-\compile{\slam\mvar\mexp} &= \lambda(\menv,\msto,\msdiff,\mkont) .
-\ttuple{\co{\mkont,\clos{\mvar,\compile\mexp,\menv},\msto}}{\bot}
+\dcompile{\slam\mvar\mexp} &= \lambda(\menv,\msto,\msdiff,\mkont) .
+\ttuple{\co{\mkont,\clos{\mvar,\dcompile\mexp,\menv},\msto}}{\bot}
 \\
-\compile{\sapp[^\mlab]{\mexpi0}{\mexpi1}} &= \lambda^\mcntr (\menv,\msto,\msdiff,\mkont) .
-\compile{\mexpi0}^{\mcntr'}(\menv,\msto,\msdiff',\kar[_\mlab^\mcntr]{\compile{\mexpi1},\menv,\maddr})
+\dcompile{\sapp[^\mlab]{\mexpi0}{\mexpi1}} &= \lambda^\mcntr (\menv,\msto,\msdiff,\mkont) .
+\dcompile{\mexpi0}^{\mcntr'}(\menv,\msto,\msdiff',\kar[_\mlab^\mcntr]{\dcompile{\mexpi1},\menv,\maddr})
 \\
-&
-\text{ where }\maddr,\msdiff' = \push^\mcntr_\mlab(\msdiff,\mkont)
+&\text{ where }\maddr_\mkont = \allockont^\mcntr\mlab(\msto,\mkont) \\
+&\phantom{\text{ where }}\msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]
 \\
-\compile{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}} &= \lambda^\mcntr(\menv,\msto,\msdiff,\mkont) .
-\compile{\mexpi0}^{\mcntr'}(\menv,\msto,\msdiff',\kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})
+\dcompile{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}} &= \lambda^\mcntr(\menv,\msto,\msdiff,\mkont) .
+\dcompile{\mexpi0}^{\mcntr'}(\menv,\msto,\msdiff',\kif[^\mcntr]{\dcompile{\mexpi1},\dcompile{\mexpi2},\menv,\maddr})
 \\
-&\text{ where }\maddr,\msdiff' = \push_\mlab^\mcntr(\msdiff,\mkont)
+&\text{ where }\maddr_\mkont = \allockont^\mcntr\mlab(\msto,\mkont) \\
+&\phantom{\text{ where }}\msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]
 \end{align*}
 
 Reduction semantics helper (write $\mstate \machstep_\msto \mstate',\msdiff$ to mean $((\mstate,\msto),(\mstate',\msdiff)) \in \machstep$):
@@ -580,20 +579,29 @@ Reduction semantics helper (write $\mstate \machstep_\msto \mstate',\msdiff$ to 
 Reduction semantics:
 \begin{align*}
 \inject(\mexp) &= (\setof{\ttuple{\mstate}{\msto}}, \setof{\mstate}, \msto) \\
- \text{ where } \mstate, \msdiff &= \compile{e}^{\mtcntr}(\bot,\bot,\bot,\kmt) \\
+ \text{ where } \mstate, \msdiff &= \dcompile{e}^{\mtcntr}(\bot,\bot,\bot,\kmt) \\
                 \msto &= \replay(\msdiff,\bot) \\
 \reachable{\mexp} &= \setof{\wn(\mstate,\msto') \mid
                              \inject(\mexp) \machstep^* (S,F,\msto),
                              \ttuple{\mstate}{\msto'} \in S} \\
 (S,F,\msto) &\machstep (S \cup S', F', \msto') \\
- \text{ where } I &=
-   \setof{ \ttuple{\mstate'}{\msdiff} \mid \mstate \in F, \mstate \machstep_\msto \mstate', \msdiff} \\
-   F' &= \setof{\mstate \mid \exists \msdiff. \ttuple{\mstate}{\msdiff} \in I} \\
-   \Xi &= \setof{\msdiff \mid \exists \mstate. \ttuple{\mstate}{\msdiff} \in I} \\
-   \msto' &= \replayall(\Xi,\msto) \\
-   S' &= \setof{\ttuple{\mstate}{\msto'} \mid \mstate \in F'} \\
-   \replayall(\varnothing,\msto) &= \msto \\
-   \replayall(\setof{\msdiff} \cup \Xi, \msto) &= \replayall(\Xi, \replay(\msdiff, \msto))
+ \text{ where }
+ (F', \msdiff') &= \step^*(\varnothing, F, \msto, \epsilon) \\
+ \msto' &= \replay(\msdiff',\msto) \\
+               S' &= \setof{(c,\msto') \mid c \in F'} \\
+\step^*(F', \varnothing, \msdiff) &= (F', \msdiff) \\
+\step^*(F', \{c\}\cup F, \msdiff) &= \step^*(F'\cup \states^*, F, \msdiff^*) \\
+\states^* &= \{c' \mid (c,\msto,\msdiff) \dmachstep (c',\msdiff^c) \} \\
+\msdiff^* &= \appendall(\setof{\msdiff^c \mid (c, \msto,\msdiff) \dmachstep (c', \msdiff^c)}) \\
+\appendall(\varnothing) &= \epsilon \\
+\appendall(\setof{\msdiff}\cup\Xi) &= \append(\msdiff,\appendall(\Xi))
+   % I &= \setof{ \ttuple{\mstate'}{\msdiff} \mid \mstate \in F, \mstate \machstep_\msto \mstate', \msdiff} \\
+   % F' &= \setof{\mstate \mid \exists \msdiff. \ttuple{\mstate}{\msdiff} \in I} \\
+   % \Xi &= \setof{\msdiff \mid \exists \mstate. \ttuple{\mstate}{\msdiff} \in I} \\
+   % \msto' &= \replayall(\Xi,\msto) \\
+   % S' &= \setof{\ttuple{\mstate}{\msto'} \mid \mstate \in F'} \\
+   % \replayall(\varnothing,\msto) &= \msto \\
+   % \replayall(\setof{\msdiff} \cup \Xi, \msto) &= \replayall(\Xi, \replay(\msdiff, \msto))
 \end{align*}
 
 %% This reduction semantics has an expensive fixed point computation
@@ -626,7 +634,7 @@ Reduction semantics:
 \inject(\mexp) &=
  (S_0, \setof{\mstate},
   \replay(\msdiff,\bot), 0) \\
- \text{ where } \mstate, \msdiff &= \compile{e}^\mcntr(\bot,\bot,\bot,\kmt) \\
+ \text{ where } \mstate, \msdiff &= \dcompile{e}^\mcntr(\bot,\bot,\bot,\kmt) \\
                 S_0 &= \lambda\mstate'.
                         \left\{\begin{array}{ll}
                          0 & \text{if } \mstate' = \mstate \\
@@ -638,10 +646,10 @@ Reduction semantics:
 \end{align*}
 
 \begin{align*}
-\System &= (\State \to {\mathbb N}^*) \times \wp(\State) \times ({\mathbb N} \finto \Store) \times {\mathbb N} \\
-(S,F,\Sigma,n) &\machstep (S', F \cup F', \Sigma[n' \mapsto \msto'],n') \\
+\System &= (\State \to {\mathbb N}^*) \times \wp(\State) \times \Store^* \times {\mathbb N} \\
+(S,F,\Sigma,n) &\machstep (S', F \cup F', \cons{\msto'}{\Sigma},n') \\
  \text{ where }
- \msto &= \Sigma(n) \\
+ \msto &= \hd(\Sigma) \\
   I &= \setof{ \ttuple{\mstate'}{\msdiff} \mid \mstate \in F, \mstate \machstep_\msto \mstate', \msdiff} \\
   \msto',\updatedp &=
      \replaychangeall(\setof{\msdiff \mid \exists \mstate. (\mstate, \msdiff) \in I}, \msto,\sfalse) \\
@@ -757,22 +765,24 @@ $\alpha, \sqsubseteq, \machstep$.}
 \case{
 \ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} \machstep
 \ev[^\mcntr]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}}{
- where $\maddr,\msto' = \push^\mcntr_\mlab(\msto,\mkont)$
+ where $\maddr_\mkont = \allockont^\mcntr\mlab(\msto,\mkont)$
+       $\msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]$
 
 By assumption, $\hat{\mstate} \equiv \ev{\svar\mvar, \menv, \msto^*, \mkont}$ such that $\msto \sqsubseteq \msto^*$.
 Let $\hat{\mstate}' = \ev[^\mcntr]{\mexpi{0},\menv,\msto^*_1,\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}$ where
-$\maddr, \msto^*_1 = \push^\mcntr_\mlab(\msto^*,\mkont)$. Conclusion holds by definition of
-$\alpha, \sqsubseteq, \machstep, \push$.}
+$\msto^*_1 = \msto^*[\maddr_\mkont \mapsto \setof{\mkont}]$. Conclusion holds by definition of
+$\alpha, \sqsubseteq, \machstep$.}
 
 \case{
 \ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} \machstep
 \ev[^\mcntr]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}}{
- where $\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)$
+ where $\maddr_\mkont = \allockont^\mcntr\mlab(\msto,\mkont)$
+       $\msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]$
 
 By assumption, $\hat{\mstate} \equiv \ev{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto^*,\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}$ such that $\msto \sqsubseteq \msto^*$.
 Let $\hat{\mstate}' = \ev[^\mcntr]{\mexpi0,\menv,\msto^*_1,\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}$
-where $\maddr,\msto^*_1 = \push_\mlab^\mcntr(\msto^*,\mkont)$.
-Conclusion holds by definition of $\alpha, \sqsubseteq, \machstep, \push$.}
+where $\msto^*_1 = \msto^*[\maddr_\mkont \mapsto \setof{\mkont}]$.
+Conclusion holds by definition of $\alpha, \sqsubseteq, \machstep$.}
 
 %% CONTINUE
 \case{\co{\kmt,\mval,\msto} \machstep \ans{\msto,\mval}}{
@@ -988,13 +998,15 @@ Let $\mastate\ldots \in T$ be arbitrary. By induction on $\mastate\ldots$:
 
     \case{\ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} \lmachstep
       \ev[^{\mcntr'}]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}}{
-       where $\maddr,\msto' = \push^\mcntr_\mlab(\msto,\mkont)$
+ where $\maddr_\mkont = \allockont^\mcntr\mlab(\msto,\mkont)$
+       $\msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]$
       
        By definitions of $\machstep, \gamma$ and IH.}
 
     \case{\ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} \lmachstep
       \ev[^{\mcntr'}]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}}{
-        where $\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)$
+ where $\maddr_\mkont = \allockont^\mcntr\mlab(\msto,\mkont)$
+       $\msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]$
 
         By definitions of $\machstep, \gamma$ and IH.}
 
@@ -1147,10 +1159,12 @@ $\CompState$. We additionally denote the reduction relation as $\cmachstep$.
 \commitev(\mcntr,\menv,\msto,\mkont,\slam{\mvar,\mexp,\menv}) &= \co{\mkont,\clos{\mvar,\mexp,\menv},\msto} \\
 \commitev(\mcntr,\menv,\msto,\mkont,\sapp[^\mlab]{\mexpi0}{\mexpi1}) &=
   \commitev(\mcntr,\menv,\msto',\kar[^\mcntr_\mlab]{\mexpi1, \menv, \maddr},\mexpi0) \\
- \text{ where } \maddr, \msto' &= \push_\mlab^\mcntr(\msto,\mkont) \\
+ \text{ where }\maddr &= \allockont^\mcntr\mlab(\msto,\mkont) \\
+       \msto' &= \msto\sqcup[\maddr \mapsto \setof{\mkont}]
 \commitev(\mcntr,\menv,\msto,\mkont,\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}) &=
   \commitev(\mcntr,\menv,\msto',\kif[^\mcntr_\mlab]{\mexpi1, \mexpi2, \menv, \maddr},\mexpi0) \\
- \text{ where } \maddr, \msto' &= \push_\mlab^\mcntr(\msto,\mkont)
+ \text{ where }\maddr &= \allockont^\mcntr\mlab(\msto,\mkont) \\
+       \msto' &= \msto\sqcup[\maddr \mapsto \setof{\mkont}]
 \end{align*}
 
 Next, the refinement map from non-compiled to compiled states.
@@ -1213,13 +1227,15 @@ By induction on $\mexp$.
    By IH, $\compile{\mexpi0}^\mcntr(\menv,r(\msto'),r(\mkont')) =
            r(\ev[^\mcntr]{\mexpi0}{\menv,\msto',\mkont'})$
    where $\mkont' = \kar[^\mcntr_\mlab]{\mexpi1,\menv,\maddr}$
-     and $\maddr, \msto' = \push_\mlab^\mcntr(\msto,\mkont')$.
+ and $\maddr_\mkont = \allockont^\mcntr\mlab(\msto,\mkont)$
+       $\msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]$
   Thus holds by definitions of $r, \commit, \compile{\_}$.}
  \case{\text{Induction step: } \sif{\mexpi0}{\mexpi1}{\mexpi2}}{
    By IH, $\compile{\mexpi0}^\mcntr(\menv,r(\msto'),r(\mkont')) =
            r(\ev[^\mcntr]{\mexpi0}{\menv,\msto',\mkont'})$
    where $\mkont' = \kif[^\mcntr_\mlab]{\mexpi1,\mexpi2,\menv,\maddr}$
-     and $\maddr, \msto' = \push_\mlab^\mcntr(\msto,\mkont')$.
+ and $\maddr_\mkont = \allockont^\mcntr\mlab(\msto,\mkont)$
+       $\msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]$
   Thus holds by definitions of $r, \commit, \compile{\_}$.}
 \end{byCases}
 \end{proof}
@@ -1261,7 +1277,8 @@ $w$.}
 \case{
  \ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} \machstep
  \ev[^\mcntr]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}}{
-  where $\maddr,\msto' = \push^\mcntr_\mlab(\msto,\mkont)$
+ where $\maddr = \allockont^\mcntr\mlab(\msto,\mkont)$
+       $\msto' = \msto\sqcup[\maddr \mapsto \setof{\mkont}]$
 
 By definition of $\commit$, $r(u) = w$, thus $u B w$.  By definition
 of $\lessdot$, $erankt(u) < erankt(s)$.  Thus the second case of WEB
@@ -1270,7 +1287,8 @@ holds.}
 \case{
  \ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} \machstep
  \ev[^\mcntr]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}}{
-  where $\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)$
+ where $\maddr = \allockont^\mcntr\mlab(\msto,\mkont)$
+       $\msto' = \msto\sqcup[\maddr \mapsto \setof{\mkont}]$
 
 By definition of $\commit$, $r(u) = r(s) = w$. By definition of
 $\lessdot$, $\erankt(u) \lessdot \erankt(s)$. Thus the second case of
@@ -1429,39 +1447,102 @@ TODO
 Here we show extensional equality of the relations. We will use $\dmachstep$ for the store
 delta semantics and $\dcompile{\_}$ for its compilation function.
 
-Let $\equiv \subseteq \Expr$ be the reflexive, transitive,
-symmetric closure of $\equiv^*$ with structural lifting where non-$\Expr$ elements are compared with equality, and that lifted to functions $\Addr \to \wp(\Storeable)$.
+Let $\equiv \subseteq \Expr$ be the reflexive, transitive, symmetric
+closure of $\equiv^*$ with structural lifting where non-$\Expr$
+elements are compared with equality, and that lifted to functions
+$\Addr \to \wp(\Storeable)$.
 \begin{mathpar}
 \inferrule{ }{\dcompile{\mexp} \equiv^* \compile{\mexp}}
 \end{mathpar}
 
-\begin{lemma}
-For all $\mexp, \mcntr,\menv,\msto,\msdiff,\mkont,\msto^*,\mkont^*$,
-if $\msto \equiv \msto^*$ and $\mkont \equiv \mkont^*$, then
-$\dcompile{\mexp}^\mcntr(\menv,\msto,\msdiff,\mkont) = \ttuple{\mastate}{\msdiff'}$ iff
-$\compile{\mexp}^\mcntr(\menv,\msto^*,\mkont^*) = \mstate$ such that
-$\mastate,\replay(\msdiff',\msto) \equiv \nw(\mstate)$
+\begin{lemma}[Compile store independence]\label{lemma:compile-independence}
+Let $\compile{\mexp}^\mcntr(\menv,\msto,\mkont) = \wn(\mastate,\msto')$.
+$\exists \msdiff. \msto' = \replay(\msdiff,\msto)$.
 \end{lemma}
 \begin{proof}
 By induction on $\mexp$
 \begin{byCases}
- \case{\text{Base } \svar{\mvar}}{By definitions of $\dcompile{\_},\compile{\_},\replay,\nw$.}
- \case{\text{Base } \slit{\mlit}}{By definitions of $\dcompile{\_},\compile{\_},\replay,\nw$.}
- \case{\text{Induction step } \slam{\mvar}{\mexp}}{By definitions of $\dcompile{\_},\compile{\_},\replay,\nw$.}
+ \case{\text{Base } \svar{\mvar}}{Witness $\epsilon$}
+ \case{\text{Base } \slit{\mlit}}{Witness $\epsilon$}
+ \case{\text{Induction step } \slam{\mvar}{\mexp}}{Witness $\epsilon$}
  \case{\text{Induction step } \sapp{\mexpi0}{\mexpi1}}{
-  By IH and definitions of $\push, \equiv,\replay$,
-   $\dcompile{\mexpi0}^\mcntr(\menv,\msto,\msdiff',\kar[^\mcntr_\mlab]{\dcompile{\mexpi1},\menv,\maddr})$
-    where $\maddr,\msdiff' = \push_\mlab^\mcntr(\msdiff,\mkont)$ iff
-   $\compile{\mexpi0}^\mcntr(\menv,\msto^*_1,\kar[^\mcntr_\mlab]{\compile{\mexpi1},\menv,\maddr})$
-    where $\maddr,\msto^*_1 = \push_\mlab^\mcntr(\msto^*,\mkont^*)$.
-   Thus the conclusion holds by definitions of $\dcompile{\_}, \compile{\_}$.}
+  Let $\maddr = \allockont^\mcntr_\mlab(\msto,\mkont)$.
+  Let $\msto'' = \msto\sqcup[\maddr \mapsto \setof{\mkont}]$.
+  Let $\mkont' = \kar[_\mlab^{\mcntr}]{\compile{\mexpi1},\menv,\maddr}$.
+  By IH with $\mexpi0,\mcntr',\msto'',\mkont'$,
+   $\exists \msdiff. \msto' = \replay(\msdiff,\msto'')$.
+  Thus the witness is $\cons{\ttuple{\maddr}{\setof{\mkont}}}{\msdiff}$
+   by definitions of $\compile{\_}$, $\replay$.}
  \case{\text{Induction step } \sif{\mexpi0}{\mexpi1}{\mexpi2}}{
-  By IH and definitions of $\push, \equiv,\replay$,
-   $\dcompile{\mexpi0}^\mcntr(\menv,\msto,\msdiff',\kif[^\mcntr_\mlab]{\dcompile{\mexpi1},\dcompile{\mexpi2},\menv,\maddr})$
-    where $\maddr,\msdiff' = \push_\mlab^\mcntr(\msdiff,\mkont)$ iff
-   $\compile{\mexpi0}^\mcntr(\menv,\msto^*_1,\kif[^\mcntr_\mlab]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})$
-    where $\maddr,\msto^*_1 = \push_\mlab^\mcntr(\msto^*,\mkont^*)$.
-   Thus the conclusion holds by definitions of $\dcompile{\_}, \compile{\_}, \nw$.}
+  Let $\maddr = \allockont^\mcntr_\mlab(\msto,\mkont)$.
+  Let $\msto'' = \msto\sqcup[\maddr \mapsto \setof{\mkont}]$.
+  Let $\mkont' = \kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr}$.
+  By IH with $\mexpi0,\mcntr',\msto'',\mkont'$,
+   $\exists \msdiff. \msto' = \replay(\msdiff,\msto'')$.
+  Thus the witness is $\cons{\ttuple{\maddr}{\setof{\mkont}}}{\msdiff}$
+   by definitions of $\compile{\_}$, $\replay$.}
+\end{byCases}
+\end{proof}
+
+We need an additional property on $\allockont$ such that if $\msto
+\equiv \msto'$ and $\mkont \equiv \mkont'$, then
+$\allockont^\mcntr_\mlab(\msto,\mkont) =
+\allockont^\mcntr_\mlab(\msto',\mkont')$, which is a very reasonable
+assumption.
+
+\begin{lemma}[$\replay$ and $\append$]\label{lemma:replay-append}
+$\replay(\msdiff,\replay(\msdiff',\msto)) =
+ \replay(\append(\msdiff,\msdiff'),\msto)$
+\end{lemma}
+\begin{proof}
+By induction on $\msdiff$.
+\end{proof}
+
+\begin{lemma}[Compile coherence]\label{lemma:compile-coherence}
+For all $\mexp, \mcntr,\menv,\msto,\msdiff,\mkont,\msto^*,\mkont^*,\msdiff^*$,
+let $\dcompile{\mexp}^\mcntr(\menv,\msto,\msdiff,\mkont) = \ttuple{\mastate}{\msdiff'}$
+and $\compile{\mexp}^\mcntr(\menv,\msto^*,\mkont^*) = \nw(\mastate',\msto^{*'})$.
+If $\msto \equiv \msto^*$, $\msdiff \equiv \msdiff^*$, and $\mkont \equiv \mkont^*$ then
+$\mastate' \equiv \mastate$
+and there exists an $\msdiff''$ such that
+   $\replay(\msdiff'',\replay(\msdiff^*,\msto^*)) \equiv \replay(\msdiff',\msto)$.
+\end{lemma}
+\begin{proof}
+By induction on $\mexp$
+\begin{byCases}
+ \case{\text{Base } \svar{\mvar}}
+  {By definitions of $\dcompile{\_},\compile{\_},\replay,\nw$, witness is $\epsilon$.}
+ \case{\text{Base } \slit{\mlit}}
+  {By definitions of $\dcompile{\_},\compile{\_},\replay,\nw$, witness is $\epsilon$.}
+ \case{\text{Induction step } \slam{\mvar}{\mexp}}
+  {By definitions of $\dcompile{\_},\compile{\_},\replay,\nw$, witness is $\epsilon$.}
+ 
+ \case{\text{Induction step } \sapp{\mexpi0}{\mexpi1}}{
+  Let $\mkont' = \kar[^\mcntr_\mlab]{\dcompile{\mexpi1},\menv,\maddr}$
+  By definition of $\dcompile{\_}$,
+  Let $\dcompile{\mexpi0}^{\mcntr'}(\menv,\msto,\msdiff'_1, \mkont')
+       = \ttuple{\mastate}{\msdiff'}$
+ where $\maddr = \allockont^\mcntr\mlab(\msto,\mkont)$
+       $\msdiff'_1 = \cons{\ttuple{\maddr}{\setof{\mkont}}}{\msdiff}$
+  Let $\mkont^{*'} = \kar[^\mcntr_\mlab]{\compile{\mexpi1},\menv,\maddr}$.
+  By definition of $\compile{\_}$,
+   $\compile{\mexpi0}^{\mcntr'}(\menv,\msto^*_1,\mkont^{*'}) =
+         \wn(\mastate',\msto^{*'})$
+    where $\msto^*_1 = \msto^*\sqcup[\maddr \mapsto \setof{\mkont^*}]$.
+
+  By lemma \ref{lemma:compile-independence}, there exists a $\msdiff^*_1$
+   such that $\msto^{*'} = \replay(\msdiff^*_1, \msto^*_1)$
+
+ Let $\msdiff^{*'} = \cons{\ttuple{\maddr}{\setof{\mkont^*}}}{\msdiff^*_1}$.
+  By definition of $\replay$, $\msto^{*'} = \replay(\msdiff^{*'},\msto^*)$.
+
+  By IH, with $\mexpi0,\mcntr',\menv,\msto,\msdiff'_1,\mkont',\msto^*,\mkont^{*'},\msdiff^{*'}$,
+   $\mastate \equiv \mastate'$ and there exists an $\msdiff''_1$ such that
+    $\replay(\msdiff'',\replay(\msdiff^{*'},\msto^*)) \equiv \replay(\msdiff',\msto)$.
+  Thus the witness is $\append(\msdiff''_1, \cons{\ttuple{\maddr}{\setof{\mkont^*}}}{\epsilon})$
+    by lemma \ref{lemma:replay-append} and associativity of $\append$.}
+
+ \case{\text{Induction step } \sif{\mexpi0}{\mexpi1}{\mexpi2}}{Similar to above case.}
 \end{byCases}
 \end{proof}
 
@@ -1474,8 +1555,8 @@ $\exists S^*_1, F^*_1, \msto^*_1.
   (S^*,F^*,\msto^*) \dmachstep (S^*_1,F^*_1,\msto^*_1)$
 \end{theorem}
 \begin{proof}
-By definitions of $\machstep, \dmachstep, \push, \replay,
-\replayall$, commutativity and associativity of $\sqcup$, and the previous lemma.
+By definitions of $\machstep, \dmachstep, \replay,
+\appendall$, commutativity and associativity of $\sqcup$, and the previous lemma.
 \end{proof}
 
 \subsection{Semantic equivalence of log-based updates to a timestamped store}
@@ -1490,9 +1571,9 @@ information to sort and index the stores. Call the timestamped reduction relatio
                \sorted &= \sort(\setof{\msto \mid \ttuple{\_}{\msto} \in \prep(S,F,\msto)},\sqsubseteq) \\
 \alpha(S,\Sigma) &=
    \setof{\ttuple{\mstate}
-                 {\map(\Sigma,\sort(\setof{\msto \mid \ttuple{\mstate}{\msto} \in S}, \sqsupseteq))}
+                 {\map((\lambda\msto.|\Sigma|-\mathit{indexof}(\Sigma,\msto)-1),\sort(\setof{\msto \mid \ttuple{\mstate}{\msto} \in S}, \sqsupseteq))}
            \mid \ttuple{\mstate,\_} \in S} \\
-\gamma((S,F,\Sigma,n)) &= (\gamma(S,\Sigma), F, \Sigma(n)) \\
+\gamma((S,F,\Sigma,n)) &= (\gamma(S,\Sigma), F, \hd(\Sigma)) \\
 \gamma(S,\Sigma) &= \setof{\ttuple{\mstate}{\Sigma(\ell_i)} \mid S(\mstate) = \ell, 0 \le i < |\ell|}
 \end{align*}
 
@@ -1509,11 +1590,148 @@ information to sort and index the stores. Call the timestamped reduction relatio
 %% \begin{proof}
 %% TODO
 %% \end{proof}
+\newcommand{\fnmerge}{\mathit{merge}}
+\newcommand{\last}{\mathit{last}}
+\newcommand{\snapshot}{\mathit{snapshot}}
+\newcommand{\firstunder}{\mathit{firstunder}}
+\newcommand{\size}{\mathit{size}}
+\begin{align*}
+\msto_{\Xi} \in \Store_{\Xi} &= \Addr to \Valstack \\
+\mvalstack \in \Valstack &= (\Timestamp \times \wp(\Storeable))^* \\
+\alpha_\msto(\epsilon) &= \alpha_\msto(\lambda\maddr.\varnothing) = \lambda\maddr. \epsilon \\
+\alpha_\msto(\msto) &= \lambda\maddr. \ttuple{0}{\msto(\maddr)} \\
+\alpha_\msto(\msto\msto'\ldots) &= \fnmerge(\msto,\alpha_\msto(\msto'\ldots)) \\
+\fnmerge(\msto,\msto_{\Xi}) &=
+  \lambda\maddr.
+    \left\{
+      \begin{array}{ll}
+        \cons{\ttuple{t+1}{\mval{s} \sqcup \msto(\maddr)}}{\msto_{\Xi}(\maddr)} & \text{ if } \mval{s} \neq \msto(\maddr) \\
+        \msto_{\Xi}(\maddr) & \text{ otherwise}
+      \end{array}
+    \right.
+\\
+\text{ where } t &= \size(\msto_{\Xi}) \\
+\mval{s} &= \pi_1(\hd(\msto_{\Xi}(\maddr))) \\              
+\size(\bot) &= -1 \\
+\size(\msto_{\Xi}) &= \max\setof{t \mid \msto_{\Xi}(\maddr) \equiv \cons{\ttuple{t}{\mval{s}}}{\mvalstack}} \\
+\gamma_\msto(\msto_{\Xi}) &= \snapshot(\msto_{\Xi},n)\ldots_n \text{ where } n = \size(\msto_{\Xi}) \text{ down to } 0 \\
+\snapshot(\msto_{\Xi},n) &= \lambda \maddr. \firstunder(\msto_{\Xi}(\maddr),n) \\
+\firstunder(\epsilon,n) &= \varnothing \\
+\firstunder(\cons{\ttuple{t}{\mval{s}}}{\mvalstack},n) &= 
+  \left\{\begin{array}{ll}\mval{s} & \text{ if }t \le n \\
+                          \firstunder(\mvalstack,n) & \text{ otherwise}
+         \end{array}\right.
+\end{align*}
+
+Of course we rely on the timestamps being sequential from 0 to $n$ (including each number in the range), so
+we add a well-formedness condition on $\Store_{\Xi}$:
+\newcommand{\wf}{\mathit{wf}}
+\newcommand{\ordered}{\mathit{ordered}}
+\begin{align*}
+\wf_{\Xi}(\msto_{\Xi}) &= (\forall \maddr. \ordered(\msto_{\Xi}(\maddr))) \wedge \forall 0 \le i \le \size(\msto_{\Xi}). \exists \maddr,j. \pi_0(\msto_{\Xi}(\maddr)_j) = i
+\end{align*}
+\begin{mathpar}
+\inferrule{ }{\ordered(\epsilon)} \qquad \inferrule{\mval{s} \neq \varnothing}{\ordered(\ttuple{t}{\mval{s}})} \\
+\inferrule{\ordered(\cons{\ttuple{t}{\mval{s}}}{\mvalstack}) \\
+           t' > t \\
+           \mval{s}' \sqsupset \mval{s}}
+          {\ordered(\cons{\ttuple{t'}{\mval{s}'}}{\cons{\ttuple{t}{\mval{s}}}{\mvalstack}})}
+\end{mathpar}
+
+Additionally, the stack of stores we deal with must be in order, different, and greatest to least.
+\begin{mathpar}
+\inferrule{ }{\wf(\epsilon)} \qquad
+\inferrule{ }{\wf(\msto)} \qquad
+\inferrule{\wf(\cons{\msto}{\Sigma}) \\ \msto' \sqsupset \msto}
+          {\wf(\cons{\msto'}{\cons{\msto}{\Sigma}})}
+\end{mathpar}
+
+\begin{lemma}[Snapshot order]\label{lemma:snapshot-order}
+If $\wf_{\Xi}(\msto_{\Xi})$ then
+for all $1 \le n \le \size(\msto_{\Xi})$,
+  $\snapshot(\msto_{\Xi},n) \sqsupset \snapshot(\msto_{\Xi},n-1)$.
+\end{lemma}
+\begin{proof}
+By cases on $n$.
+\begin{byCases}
+ \case{0}{Vacuously true}
+ \case{n + 1}
+  {Let $\maddr,j$ be the witnesses of the second well-formedness condition with $i = n$.
+   By definition of $\ordered$, either $j = |\msto_{\Xi}(\maddr)|-1$ and thus
+    $\pi_1(\msto_{\Xi}(\maddr)_0) \sqsupset \snapshot(\msto_{\Xi},n-1)(\maddr) = \varnothing$,
+   or the third rule of $\ordered$ applies and $\sqsupset$ holds outright.
+\end{byCases}
+\end{proof}
+
+\begin{lemma}
+If $\wf_{\Xi}(\msto_{\Xi})$ and $\msto \sqsupseteq \snapshot(\msto_{\Xi},\size(\msto_{\Xi}))$
+then $wf_{\Xi}(\fnmerge(\msto,\msto_{\Xi}))$
+\end{lemma}
+
+\begin{lemma}[Wellformedness (a)]
+$\gamma_\msto : \setof{\msto_{\Xi} \mid \msto_{\Xi} \in \Store_{\Xi}, \wf_{\Xi}(\msto_{\Xi})} \to 
+               \setof{\Sigma \mid \Sigma \in \Store^*, \wf(\Sigma)}$
+\end{lemma}
+\begin{proof}
+Let $\msto_{\Xi}$ be arbitrary such that $\wf_{\Xi}(\msto_{\Xi})$.
+By lemma \ref{lemma:snapshot-order}, and straightforward induction on $\size(\msto_{\Xi})$.
+\end{proof}
+
+\begin{lemma}[Wellformedness (b)]
+$\alpha_\msto : \setof{\Sigma \mid \Sigma \in \Store^*, \wf(\Sigma)} \to 
+               \setof{\msto_{\Xi} \mid \msto_{\Xi} \in \Store_{\Xi}, \wf_{\Xi}(\msto_{\Xi})}$
+\end{lemma}
+\begin{proof}
+Let $\Sigma$ be arbitrary such that $\wf(\Sigma)$.
+By induction on $\Sigma$:
+\begin{byCases}
+ \case{\text{Base } \epsilon \text{ or } \lambda\maddr.\varnothing}
+   {Vacuously true by definitions of $\alpha_\msto$, $\ordered$, $\size$ and $\wf_{\Xi}$.}
+ \case{\text{Base } \msto \sqsupset \lambda\maddr.\varnothing}
+   {By definitons of $\alpha_\msto$, $\ordered$, $\size$ for first condition.
+    Second condition witnesses are $\maddr$ such that
+     $\msto(\maddr) \neq \varnothing$ (exists by assumption) and 0.}
+ \case{\text{Induction step } \cons{\msto}{\cons{\msto'}{\Sigma'}} \text{ such that } \msto \sqsupset \msto'}
+  {By IH, $\wf_{\Xi}(\alpha_\msto(\cons{\msto'}{\Sigma'}))$.
+   Let $\maddr$ be arbitrary.
+   \begin{byCases}
+     \case{\maddr \text{ is such that } \msto(\maddr) \sqsupset \msto'(\maddr)}{
+       Let $\msto_{\Xi}' = \alpha_\msto(\cons{\msto'}{\Sigma})$.
+       By definitions of $\alpha_\msto$, $\fnmerge$,
+       $\alpha_\msto(\Sigma)(\maddr) = \cons{\ttuple{t+1}{\msto(\maddr)}}{\msto_{\Xi}'}$,
+       where $t = \size(\msto_{\Xi}')$.
+       By definition of $\ordered$ and $\wf_{Xi}$, $\ordered(\alpha_\msto(\Sigma)(\maddr))$.
+     For the second condition, $i \le t$ is handled by IH.
+     Otherwise, the witnesses are $\maddr$ and 0 (and $\maddr$ must exist by assumption).}
+     \otherwise{First condition holds by IH. Second by previous reasoning.}
+   \end{byCases}}
+\end{byCases}
+\end{proof}
+
+
+\begin{lemma}[Well-formed store of value stacks completely abstracts well-formed stack of stores]
+  $\alpha_\msto \circ \gamma_\msto = 1_{\Store_{\Xi}}$ and
+  $\gamma_\msto \circ \alpha_\msto = 1_{\Store^*}$ with associated
+  well-formedness conditions on the spaces.
+\end{lemma}
+\begin{proof}
+First claim:
+
+Let $\msto_{\Xi}$ be arbitrary such that $\wf_{\Xi}(\msto_{\Xi})$. Let $\maddr$ be arbitrary.
+We show that $\alpha_\msto(\gamma_\msto(\msto_{\Xi}))(\maddr) = \msto_{\Xi}(\maddr)$.
+TODO
+
+Second claim:
+
+Let $\Sigma$ be arbitrary such that $\wf(\Sigma)$. Let $\maddr$ be arbitrary.
+We show that $\gamma_\msto(\alpha_\msto(\Sigma)) = \Sigma$.
+TODO
+\end{proof}
 
 \begin{align*}
 \prop(S,\msto) &= \mathit{totally\text{-}ordered}(\Sigma, \sqsubseteq) \wedge \msto \text{ an upper bound of } \Sigma \\
  \text{ where } \Sigma &= \setof{\msto \mid (\_,\msto) \in S} \\
-\prop^*(S,\Sigma,n) &= (\forall \mstate, i. 0 \le i < |\Sigma(\mstate)| \implies 0 \le \Sigma(\mstate)_i < |\Sigma|) \wedge \\
+\prop^*(S,\Sigma,n) &= (\forall \mstate, i. 0 \le i < |S(\mstate)| \implies 0 \le \Sigma(\mstate)_i < |\Sigma|) \wedge \\
                   &(\forall i. 0 \le i < |\Sigma|-1 \implies \Sigma(i) \sqsubseteq \Sigma(i+1)) \wedge \\
                   &n = |\Sigma| - 1
 \end{align*}

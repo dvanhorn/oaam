@@ -39,11 +39,13 @@
     ("sp" . "baseline") ;; Specialized is the new baseline
     ("ls" . "lazy")
     ("lc" . "compiled")
-    ("ld" . "functional deltas")
+    ("ld" . "deltas")
+    ("is" . "imperative stacked values")
+    ("ps" . "preallocated stacked values")
     #;("ia" . "imperative accumulated deltas")
-    ("id" . "imperative deltas")
+    #;("id" . "imperative deltas")
     #;("pa" . "preallocated accumulated deltas")
-    ("pd" . "preallocated deltas")
+    #;("pd" . "preallocated deltas")
     #;("it" . "imperative timestamp")
     #;("pt" . "preallocated timestamp")))
 
@@ -52,31 +54,44 @@
 ;; likely that you have to tweak the max/min parameters below.
 (define bench-name "church")
 
+(define timeout (* 30 60))
+(define memout (* 1024 1024 1024))
+(define rateout 0)
+(define (->timeout n) (if (eq? n +inf.0) timeout n))
+(define (->memout n) (if (eq? n +inf.0) memout n))
+(define (->rateout n) (if (eq? n +inf.0) rateout n))
+
 (define bench-timing (hash-ref timings bench-name))
 (define baseline-time
-  (vector-avg (numbers-run (hash-ref (hash-ref timings bench-name) "sp"))))
+  (->timeout (vector-avg (numbers-run (hash-ref (hash-ref timings bench-name) "sp")))))
 (define baseline-mem
-  (vector-avg (numbers-peak-mem (hash-ref (hash-ref timings bench-name) "sp"))))
+  (->memout
+   (vector-avg (numbers-peak-mem (hash-ref (hash-ref timings bench-name) "sp")))))
 (define baseline-rate
-  (vector-avg (numbers-state-rate (hash-ref (hash-ref timings bench-name) "sp"))))
+  (->rateout
+   (vector-avg (numbers-state-rate (hash-ref (hash-ref timings bench-name) "sp")))))
+
 (define rel-time-data
   (for/list ([(key desc) (in-pairs algo-name)]
              [n (in-naturals)])
     (vector n 
-            (/ baseline-time 
-               (vector-avg (numbers-run (hash-ref bench-timing key)))))))
+            (->timeout
+             (/ baseline-time 
+                (vector-avg (numbers-run (hash-ref bench-timing key))))))))
 (define rel-mem-data
   (for/list ([(key desc) (in-pairs algo-name)]
              [n (in-naturals)])
     (vector n 
-            (/ baseline-mem 
-               (vector-avg (numbers-peak-mem (hash-ref bench-timing key)))))))
+            (->memout
+             (/ baseline-mem 
+                (vector-avg (numbers-peak-mem (hash-ref bench-timing key))))))))
 (define rel-states-per-sec-data
   (for/list ([(key desc) (in-pairs algo-name)]
              [n (in-naturals)])
-    (vector n 
-            (/ (vector-avg (numbers-state-rate (hash-ref bench-timing key)))
-               baseline-rate))))
+    (vector n
+            (->rateout
+             (/ (vector-avg (numbers-state-rate (hash-ref bench-timing key)))
+                baseline-rate)))))
  
 (define (sec->anchor l)
   (case l

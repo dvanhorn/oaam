@@ -47,7 +47,7 @@
 (define conversions (list (compose (suffixed-number 1)  (λ (x) (/ x 1000)))
                           (compose (nfigs 0) byte->mib)
                           (suffixed-number 0)))
-(define algos (list "sp" "pd"))
+(define algos (list "sp" "ps"))
 
 (define-syntax-rule (for/append guards body ...)
   (for/fold ([acc '()]) guards (let ([r (let () body ...)]) (append acc r))))

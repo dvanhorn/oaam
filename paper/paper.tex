@@ -370,8 +370,7 @@ program analyzer:
 \item there are ``timestamps'' ($\mcntr \in \Counter$) and syntax
   labels ($\mlab$) threaded through the computation, and
 \item the machine is implicitly parameterized by the functions
-  $\mathit{alloc}$, $\mathit{tick}$,
-  $\mathit{push}$, $\interpdelta$, and spaces
+  $\alloc$, $\allockont$, $\tick$, $\interpdelta$, and spaces
   $\Addr$, $\Counter$ (and initial $\mcntr_0 \in \Counter$).
 \end{itemize}
 
@@ -405,13 +404,15 @@ simpler exposition.
 \ev[^{\mcntr'}]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}
 \\
 &&
-\text{ where }\maddr,\msto' = \mathit{push}^\mcntr_\mlab(\msto,\mkont)
+\text{ where }\maddr = \allockont^\mcntr_\mlab(\msto,\mkont) \\
+&&\phantom{\text{ where }}\msto' = \msto\sqcup[\maddr \mapsto \setof{\mkont}]
 \\
 \ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} &\machstep&
 \ev[^{\mcntr'}]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}
 \\
 &&
-\text{ where }\maddr,\msto' = \mathit{push}_\mlab^\mcntr(\msto,\mkont)
+\text{ where }\maddr = \allockont^\mcntr_\mlab(\msto,\mkont) \\
+&&\phantom{\text{ where }}\msto' = \msto\sqcup[\maddr \mapsto \setof{\mkont}]
 \\[2mm]
 %% CONTINUE
 \co{\kmt,\mval,\msto} &\machstep&
@@ -453,10 +454,8 @@ simpler exposition.
 \paragraph{Concrete interpretation} To characterize concrete interpretation, set the implicit
 parameters of the relation given in figure~\ref{fig:aam} as follows:
 \begin{align*}
-\push_\mlab^\mcntr(\msto,\mkont) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
-\mbox{ where }\maddr \notin\msto
-\\
-\alloc(\mstate) &= \maddr \mbox{ where } \maddr \notin \mstate.\msto
+\alloc(\mstate) &= \maddr \mbox{ where } \maddr \notin \mstate.\msto \\
+\allockont^\mcntr_\mlab(\msto,\mkont) \mbox{ where } \maddr \notin \msto
 \end{align*}
 where $\sqcup$ on stores is a point-wise lifting of $\sqcup$: $\msto
 \sqcup \msto' = \lambda \maddr. \msto(\maddr) \sqcup
@@ -511,8 +510,7 @@ strategy as follows, for a fixed constant \(k\):
 \mtcntr &= \epsilon \\
 \alloc(\ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &= \mlab\mcntr \\
 \alloc(\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont}) &= \mvar\kpush[_k]{\mlab\mcntr} \\
-\push_\mlab^\mcntr(\msto,\mkont) &=
-  \mlab\mcntr,\msto\sqcup[\mlab\mcntr\mapsto\{\mkont\}] \\
+\allockont^\mcntr_\mlab(\msto,\mkont) &= \mlab\mcntr \\
 \tick(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont}) &= \mcntr \\
 \tick(\co{\kar[^\mcntr]{\mexp,\menv,\maddr},\mval,\msto}) &= \mcntr \\
 \tick(\ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont}) &= \kpush[_k]{\mlab\mcntr} \\
@@ -654,6 +652,12 @@ precision, and it is deterministic even if set iteration is not.
 \text{ where } c_0 &= \ev{e,\bot,\kmt}
 \end{align*}
 
+% Notice that now $S$ has several copies of the abstract store in it. As
+% it is, this semantics is much less efficient (but still more precise)
+% than the previously proposed semantics because membership checks have
+% to compare entire stores. We return to this in section
+% \ref{sec:timestamping}.
+
 For clarity, we will exhibit non-widened semantics unless a technique
 specifically requires it. The final step to the baseline takes the
 complexity from quartic to cubic in the monovariant case.
@@ -722,27 +726,66 @@ original function position, because applied functions are in
 In this section, we discuss the optimizations for abstract interpreters that
 yield our ultimate performance gains.
 %
-We have two broad categories of these optimizations: (1) transition elimination
-and (2) pragmatic improvement.
+We have two broad categories of these optimizations: (1) pragmatic
+improvement, (2) transition elimination.
 %
-The transition-elimination optimizations reduce the overall number of transitions
-made by the analyzer by performing:
-\begin{enumerate}
- \item lazy non-determinism and
- \item abstract compilation;
-\end{enumerate}
 The pragmatic improvements reduce overhead and trade space for time
 by utilizing:
 \begin{enumerate}
-  \setcounter{enumi}{2}
- \item store deltas;
- \item timestamped stores; and
- \item preallocated data structures.
+ \item timestamped stores;
+ \item store deltas; and
+ \item imperative, preallocated data structures.
+\end{enumerate}
+The transition-elimination optimizations reduce the overall number of transitions
+made by the analyzer by performing:
+\begin{enumerate}
+  \setcounter{enumi}{3}
+ \item lazy non-determinism and
+ \item abstract compilation;
 \end{enumerate}
 
-All pragmatic improvments are precision preserving (form complete
+All pragmatic improvements are precision preserving (form complete
 abstractions), but the semantic changes are not in some cases, for reasons we
 will describe. We did not observe the precision differences in our evaluation.
+
+The move to the imperative will be made last in order to show the
+effectiveness of these techniques in the purely functional realm.
+
+\subsection{Timestamping monotonicity}
+
+The frontier-based semantics of the baseline has a severe bottleneck:
+checking if a state has been explored or not. Given two states,
+checking equality is expensive because the stores within each are
+large, and every entry must be checked against every other. Hashes can
+sometimes rule out inequality relatively quickly, but the incidence of
+collisions and actual equality is costly.
+
+And, there is a better way. Shivers' original work on $k$-CFA was
+susceptible to the same problem, and he suggested three complementary
+optimizations: (1) make the store global; (2) update the store
+imperatively; and (3) associate every change in the store with a
+version number -- its timestamp. Then, put timestamps in states
+where previously there were stores. Given two states, the analysis can
+now compare their stores just by comparing their timestamps -- a
+constant-time operation.
+
+There are two subtle losses of precision in Shivers' original
+time-stamp technique that we can fix.
+
+\begin{enumerate}
+\item{In our semantics, the store does not change until the entire
+    frontier has been explored. This avoids cross-branch pollution
+    which would not otherwise happen, e.g., when one branch writes to
+    address $\maddr$ and another branch reads from address
+    $\maddr$.}
+\item{The common implementation strategy for timestamps destructively
+    updates each state's timestamp. This loses \emph{temporal}
+    information about the contexts a state is visited in, and in what
+    order. The semantics is different - we can't precisely answer
+    questions about the traces of the reduction relation we defined.
+    Our semantics has a drop-in replacement of timestamps for stores
+    in the seen set ($S$), so we do not experience precision loss.}
+\end{enumerate}
 
 \subsection{Lazy non-determinism}
 
@@ -862,8 +905,13 @@ The configurations that lead to precision loss happen too rarely to
 warrant the significant increase in time and memory needed for this
 eager non-determinism. Indeed, were the variable reference a step
 later and another binding not made in that step, the results of the
-two approaches are the same.
-}{}
+two approaches are the same. Without a widened store, lazy
+non-determinism is not a complete abstraction with either approach,
+but the precision gains are not immediately apparent due to fake
+rebinding (a second reference to the same variable chooses a different
+value from the first) and other problems. The performance and memory
+gains are apparent, so we favor the simplicity over invisible
+gains.}{}
 
 \spchoice
 {
@@ -975,12 +1023,16 @@ $\mcomp^\mcntr(\mathit{args}\ldots)$ for $\mcomp(\mathit{args}\ldots,
 \compile{\mexpi0}^{\mcntr'}(\menv,\msto',\kar[_\mlab^\mcntr]{\compile{\mexpi1},\menv,\maddr_\mkont})
 \\
 &\setlength\arraycolsep{5pt}
-\begin{array}{lrl}\text{ where } & \maddr_\mkont,\msto' &= \push^\mcntr_\mlab(\msto,\mkont)\end{array}
+\begin{array}{lrl}
+\text{ where } & \maddr_\mkont = \allockont^\mcntr_\mlab(\msto,\mkont) \\
+               & \msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]
+\end{array}
 \\
 \compile{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}} &= \lambda^\mcntr(\menv,\msto,\mkont) .
 \compile{\mexpi0}^{\mcntr'}(\menv,\msto',\kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})
 \\
-&\text{ where }\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)
+&\text{ where }\maddr_\mkont = \allockont^\mcntr_\mlab(\msto,\mkont) \\
+&\phantom{\text{ where }} \msto' = \msto\sqcup[\maddr_\mkont \mapsto \setof{\mkont}]
 \end{align*}
 \caption{Abstract compilation}
 \label{fig:compile}
@@ -1175,31 +1227,41 @@ output changes to the next so that all changes get accumulated:
 
 \begin{align*}
 (S, F, \msto) &\mathrel{\damachstep} (S \cup S', F', \msto') \\
-\mbox{ where } (F', \msto') &= \step^*(\varnothing, F, \msto) \\
+\mbox{ where }
+ (F', \msdiff') &= \step^*(\varnothing, F, \msto, \epsilon) \\
+ \msto' &= \replay(\msdiff',\msto) \\
                S' &= \setof{(c,\msto') \mid c \in F'} \\
-\step^*(F', \varnothing, \msto) &= (S, \msdiff) \\
-\step^*(F', \{c\}\cup F, \msto) &= \step^*(F'\cup \states^*, F, \msto^*) \\
+\step^*(F', \varnothing, \msdiff) &= (F', \msdiff) \\
+\step^*(F', \{c\}\cup F, \msdiff) &= \step^*(F'\cup \states^*, F, \msdiff^*) \\
 \states^* &= \{c' \mid (c,\msto,\msdiff) \dmachstep (c',\msdiff^c) \} \\
-\msto^* &= \replayall(\{\msdiff^c \mid (c, \msto,\msdiff) \dmachstep (c', \msdiff^c)\}, \msto)
+\msdiff^* &= \appendall(\setof{\msdiff^c \mid (c, \msto,\msdiff) \dmachstep (c', \msdiff^c)}) \\
+\appendall(\varnothing) &= \epsilon \\
+\appendall(\setof{\msdiff}\cup\Xi) &= \append(\msdiff,\appendall(\Xi))
 \end{align*}
 
-Here $\replayall : \Set(\StoreDelta) \times \Store \to \Store$ replays all logs in a set on top of the given store. Since join is associative and commutative, the order does not matter:
-\begin{align*}
-  \replayall(\varnothing,\msto) &= \msto \\
-  \replayall(\setof{\msdiff} \cup \Xi, \msto) &= \replayall(\Xi, \replay(\msdiff, \msto))
-\end{align*}
+Here $\appendall$ combines change logs across all non-deterministic
+steps for a state to later be replayed. The order the combination
+happens in doesn't matter, because join is associative and
+commutative.
+
+% Here $\replayall : \Set(\StoreDelta) \times \Store \to \Store$ replays all logs in a set on top of the given store. Since join is associative and commutative, the order does not matter:
+% \begin{align*}
+%   \replayall(\varnothing,\msto) &= \msto \\
+%   \replayall(\setof{\msdiff} \cup \Xi, \msto) &= \replayall(\Xi, \replay(\msdiff, \msto))
+% \end{align*}
 
 Correctness here requires a lemma that relates the differences in the compilation functions.
 \begin{lemma}[Compile coherence]
-If $\msto \equiv \msto^*$ and $\mkont \equiv \mkont^*$, then
-$\dcompile{\mexp}^\mcntr(\menv,\msto,\msdiff,\mkont) = \ttuple{\mastate}{\msdiff'}$ iff
-$\compile{\mexp}^\mcntr(\menv,\msto^*,\mkont^*) = \mstate$ such that
-$\mastate,\replay(\msdiff',\msto) \equiv \nw(\mstate)$
+Let $\dcompile{\mexp}^\mcntr(\menv,\msto,\msdiff,\mkont) = \ttuple{\mastate}{\msdiff'}$
+and $\compile{\mexp}^\mcntr(\menv,\msto^*,\mkont^*) = \wn(\mastate',\msto^{*'})$.
+If $\msto \equiv \msto^*$, $\msdiff \equiv \msdiff^*$, and $\mkont \equiv \mkont^*$, then
+$\mastate' \equiv \mastate$
+and there exists an $\msdiff''$ such that \\
+   $\replay(\msdiff'',\replay(\msdiff^*,\msto^*)) \equiv \replay(\msdiff',\msto)$.
 \end{lemma}
 Here $\equiv$ means structurally the same, only compiled expressions
 are compiled with the updated compilation function that builds store
-deltas. The proof follows by equational reasoning and the previous lemma.
-Proof is by induction on $\mexp$.
+deltas. Proof is by induction on $\mexp$.
 
 \begin{theorem}[Equivalence with wide abstract compilation]
 If $S \equiv S^*, F \equiv F^*, \msto \equiv \msto^*$, then
@@ -1208,59 +1270,19 @@ $\exists S^*_1, F^*_1, \msto^*_1.
   S' \equiv S^*_1 \wedge F' \equiv F^*_1 \wedge \msto' \equiv \msto^*_1 \wedge
   (S^*,F^*,\msto^*) \dmachstep (S^*_1,F^*_1,\msto^*_1)$
 \end{theorem}
-Proof by {\bf TODO}
+Proof by the above lemma and that replaying in any order is equivalent
+(associativity and commutativity of $\sqcup$).
 
 %% Delta Store +k Compile + Lazy:
 %%    cpu time: 668 real time: 686 gc time: 41
 
-\subsection{Timestamping an imperative store}
+\subsection{Imperative, preallocated data structures}
 
 Thus far, we have made our optimizations in a purely functional
-manner. For the next series of optimizations, we need to dip into the
-imperative. We can motivate this entire sequence of optimizations by
-focusing on the largest bottleneck in the current state-space
-exploration algorithm: checking to see if a state has already been
-seen. Given two states, checking equality is expensive because the
-stores within each are large, and every entry must be checked against
-every other. Hashes can sometimes rule out inequality relatively
-quickly, but the incidence of collisions and actual equality is
-costly.
-
-And, there is a better way. Shivers' original work on $k$-CFA was
-susceptible to the same problem, and he suggested three complementary
-optimizations: (1) make the store global; (2) update the store
-imperatively; and (3) associate every change in the store with a
-version number -- its timestamp. Then, put timestamps in states
-where previously there were stores. Given two states, the analysis can
-now compare their stores just by comparing their timestamps -- a
-constant-time operation.
-
-There are two subtle losses of precision in Shivers' original
-time-stamp technique that we can fix.
-
-\begin{enumerate}
- \item{For a given abstract
-state, all writes to the global store should be delayed until the
-analysis considers all current work. This avoids
-cross-branch pollution which would not otherwise happen, e.g., when
-one branch writes to address $\maddr$ and another branch reads from
-address $\maddr$. Fortunately, given our conversion to log-based
-stores this change is straightforward.}
-\item{The common implementation strategy for timestamps destructively
-    updates each state's timestamp. This loses \emph{temporal}
-    information about the contexts a state is visited in, and in what
-    order. The semantics is different - we can't precisely answer
-    questions about the traces of the reduction relation we defined. A
-    simple fix is to keep a stack of the timestamps seen at each
-    state, and keep a list of stores corresponding with each
-    timestamp. A more space-efficient representation that also allows
-    an imperative store would be timestamping each update to the store
-    in the same style as states. This changes the notion of store
-    equality, but the new definition is straightforward. For analysis
-    consumers that disregard temporal information, the space cost in
-    unwarranted, but the realization that there is precision to be
-    gained opens possibilities.}
-\end{enumerate}
+manner. For the final push for performance, we need to dip into the
+imperative. In this section, we show an alternative representation of
+the store and seen set that are more space-efficient and are amenable
+to destructive updates.
 
 The following transfer function has several components that can be
 destructively updated, and intermediate sets can be elided by adding
@@ -1339,20 +1361,19 @@ We increase the timestamp only if we find that the store has changed
 from any join operation. The frontier set only gets states that we
 haven't seen at the next timestamp. The states we've seen gets updated
 with the frontier states at the next timestamp. We prove semantic
-equivalence with the previous semantics with a lock-step bisimulation,
+equivalence with the previous semantics with a lock-step bisimulation with the stack of stores abstraction,
 which follow from equational reasoning from the following lemmas:
 
 \begin{lemma}[Store of value stacks completely abstracts stack of stores]
 TODO
 \end{lemma}
 
-\begin{lemma}[$\changep$ means change (a)]
-TODO
+\begin{lemma}[$\changep$ means change]
+  If $\replayall_t(\Xi,\msto,\changep) = \msto',\changep'$ then
+  $\msto' = \replay(\appendall(\Xi),\msto)$ and $\changep \vee
+  (\changep' \iff \msto \neq msto')$.
 \end{lemma}
-
-\begin{lemma}[$\changep$ means change (b)]
-TODO
-\end{lemma}
+By induction on the size of $\Xi$.
 
 \begin{theorem}[Timestamped system with stack of stores completely abstracts wide store deltas]
 TODO
@@ -1376,7 +1397,7 @@ relation, but a function that adds all next states to $F$ if they have
 not already been seen. At the end of iterating through $F$, $S$ is
 updated with the new states at the next timestamp.
 
-\subsection{Pre-allocating the store}
+\subsubsection{Pre-allocating the store}
 
 Internally, the algorithm at this stage uses hash tables to model the store.
 %
