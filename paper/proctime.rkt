@@ -10,7 +10,7 @@
   ;; These numbers change if the base-num and run-num change in [code/drive-benchmarks.rkt]
   (define start-run 0)
   (define end-run 4)
-  (define algos '("bl" "sp" "ls" "lc" "li" "ld" "fd" "ia" "id" "pa" "pd" "it" "pt" "is" "ps" "lp"))
+  (define algos '("bl" "sp" "spt" "sdt" "ls" "lst" "lct" "lc" "li" "ld" "fd" "ia" "id" "pa" "pd" "it" "pt" "is" "ps" "lp"))
   (define names '("church" "mbrotZ" "earley" "boyer" "graphs"
                   "lattice" "matrix" "maze" "nbody" "nucleic")))
 (require 'data (for-syntax 'data))
