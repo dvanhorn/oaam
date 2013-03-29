@@ -647,11 +647,9 @@ The transformed relation, $\widehat{\machstep}$, is
 \wn(\ans{\mval}, \msto) &= \ans{\msto, \mval}
 \end{align*}}
 %
-In effect, the new store is computed as the least upper bound of all
-stores after stepping. For clarity, we will exhibit non-widened
-semantics unless a technique specifically requires it. The final step
-to the baseline takes the complexity from quartic to cubic in the
-monovariant case.
+The new store is computed as the least upper bound of all
+stores after stepping in order to have only one, and keep the
+semantics sound.
 
 \subsection{Store-allocate all values}
 \label{sec:baselineeval}
@@ -773,10 +771,9 @@ of stepping all the contexts in $F$ paired with the current store (call it $I$ f
 \begin{equation*}
 I = \setof{(c',\msto') \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto'), c \in F}
 \end{equation*}
-%
-The next store is the least upper bound of all the stores in $I$ (in
-order to have only one, and keep the semantics sound):
-%
+
+The next store is the least upper bound of all the stores in $I$:
+
 \begin{equation*}
 \msto' = \bigsqcup\; \setof{\msto \mid (\_,\msto) \in I}
 \end{equation*}
@@ -1618,12 +1615,14 @@ Figure~\ref{fig:bench-overview} gives an overview of the benchmark
 results in terms of absolute time, space, and speed between the
 baseline and most optimized analyzer.  Figure~\ref{fig:bench-all}
 plots the factors of improvement over the baseline for each
-optimization step. The dip we see in transition rate even though time
-taken decreases is to be expected - fewer ``easy'' states are added by
-abstract compilation. It increases again with the introduced
-algorithmic improvements. Accumulating store changes in addition to
-maintaining the store accounts for the higher memory usage when using
-the store delta technique without further improvements.
+optimization step.
+
+% The dip we see in transition rate even though time
+% taken decreases is to be expected - fewer ``easy'' states are added by
+% abstract compilation. It increases again with the introduced
+% algorithmic improvements. Accumulating store changes in addition to
+% maintaining the store accounts for the higher memory usage when using
+% the store delta technique without further improvements.
 
 \begin{figure*}
 \begin{center}
