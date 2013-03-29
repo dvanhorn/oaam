@@ -724,7 +724,7 @@ by utilizing:
 \begin{enumerate}
  \item timestamped stores;
  \item store deltas; and
- \item imperative, preallocated data structures.
+ \item imperative, pre-allocated data structures.
 \end{enumerate}
 The transition-elimination optimizations reduce the overall number of transitions
 made by the analyzer by performing:
@@ -1257,8 +1257,8 @@ $\mcomp^\mcntr(\mathit{args}\ldots)$ for $\mcomp(\mathit{args}\ldots,
 \begin{align*}
 \traces(\mexp) &= \setof{ \inject(\compile{\mexp}^\mtcntr_\bot(\bot,\epsilon,\kmt)) \multimachstep \mstate}
                     \text{ where } \\
-\inject(\mastate,\msdiff) &= \wn(\mastate,\replay(\msdiff,\bot)) \\
-\wn(\mastate,\msto) \machstep \wn(\mastate',\msto') &\iff \mastate \cmachstep_\msto \mastate',\msdiff \\
+\inject(c,\msdiff) &= \wn(c,\replay(\msdiff,\bot)) \\
+\wn(c,\msto) \machstep \wn(c',\msto') &\iff c \cmachstep_\msto c',\msdiff \\
 \msdiff \text{ is such that } &\replay(\msdiff,\msto) = \msto'
 \end{align*}
 \\[2mm]
@@ -1335,9 +1335,9 @@ applying an abstract bytecode's function is equal to refining the
 corresponding $\ev{}$ state:
 %
 \begin{lemma}[Compile/commit]
-Let $\mastate,\msdiff' = \compile{\mexp}^\mcntr_{r(\msto)}(\menv,\msdiff,r(\mkont))$.
-Let $\wn(\mastate',\msto') = r(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont})$.
-$\wn(\mastate,\replay(\msdiff',\msto)) = \wn(\mastate',\replay(\msdiff,\msto'))$.
+Let $c,\msdiff' = \compile{\mexp}^\mcntr_{r(\msto)}(\menv,\msdiff,r(\mkont))$.
+Let $\wn(c',\msto') = r(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont})$.
+$\wn(c,\replay(\msdiff',\msto)) = \wn(c',\replay(\msdiff,\msto'))$.
 \end{lemma}
 The proof is by induction on $\mexp$.
 
@@ -1383,7 +1383,7 @@ the previous section on $\cmachstep$.
 %% Delta Store +k Compile + Lazy:
 %%    cpu time: 668 real time: 686 gc time: 41
 
-\subsection{Imperative, preallocated data structures}
+\subsection{Imperative, pre-allocated data structures}
 
 Thus far, we have made our optimizations in a purely functional
 manner. For the final push for performance, we need to dip into the
@@ -1444,18 +1444,18 @@ section.
 {\mathcal F} &: \System \to \System \\
 {\mathcal F}(S,F, \msto,t) &= (S',F',\msto', t') \\
 \text{ where }
-I &= \setof{(\mastate',\msdiff) \mid
-       \mastate \in F,
-       \mastate \cmachstep_{\msto^*} \mastate',\msdiff} \\
+I &= \setof{(c',\msdiff) \mid
+       c \in F,
+       c \cmachstep_{\msto^*} c',\msdiff} \\
 \msto^* &= \lambda \maddr.\lookup(\msto(\maddr),t) \\
 \ttuple{\msto'}{\changep} &= \replay(\appendall(\setof{\msdiff \mid (\_,\msdiff) \in I}),\msto) \\
 t' &= \left\{\begin{array}{ll} t+1 & \text{ if } \changep \\
               t   & \text{ otherwise}
              \end{array}\right. \\
-F' &= \setof{\mastate \mid (\mastate,\_) \in I, \changep \vee S(\mastate) \neq \cons{t}{\_}} \\
-S' &= \lambda \mastate. \left\{\begin{array}{ll}
-                               \cons{t'}{S(\mastate)} & \text{ if } \mastate \in F' \\
-                               S(\mastate) & \text{ otherwise}
+F' &= \setof{c \mid (c,\_) \in I, \changep \vee S(c) \neq \cons{t}{\_}} \\
+S' &= \lambda c. \left\{\begin{array}{ll}
+                               \cons{t'}{S(c)} & \text{ if } c \in F' \\
+                               S(c) & \text{ otherwise}
                              \end{array}\right.
 \end{align*}}
 
@@ -1498,16 +1498,13 @@ updated with the new states at the next timestamp.
 
 \subsubsection{Pre-allocating the store}
 
-Internally, the algorithm at this stage uses hash tables to model the store.
-%
-This is because stores used to be distributed to all states, which
-required a compact, dynamic representation.
+Internally, the algorithm at this stage uses hash tables to model the store to allow arbitrary address representations.
 %
 But, such a dynamic structure isn't necessary when we know the
 structure of the store in advance: we know all possible entries, and
 we know its maximum size.
-
-In a monovariant analysis, the domain of the store is
+%
+In a monovariant allocation strategy, the domain of the store is
 exactly the set of expressions in the program.
 %
 If we label each expression with a unique natural, the analysis can
