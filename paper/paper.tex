@@ -1105,22 +1105,15 @@ difference. % All our benchmarks maintain their precision with lazy non-determin
 
 \paragraph{Option 2: Regain precision; complicate implementation}
 The administrative nature of laziness means that we could remove the
-loss in precision by duplicating the reduction relation to specialize
-variable lookup. This works since in the semantics of ISWIM with
-store-allocated results consumes the value component of states in one
-step. This is not the case for semantics that replicate the value
-component across reductions, say for popping off exception handler
-frames. Further convolution is needed to remove the administrative
-nature of laziness in these semantics. Due to the increase of
-conceptual and implementation complexity for negligible benefit, we
-decided against this approach.
+loss in precision by storing the result of the lookup in a value
+representing a delayed nondeterministic choice. This has problems with
+the next optimization, leading to unsoundness. Regaining soundness
+would involve artificial complications to the semantics.
 
 \paragraph{Our choice: option 1}
 The configurations that lead to precision loss happen too rarely to
 warrant the significant increase in time and memory needed for this
-eager non-determinism. Indeed, were the variable reference a step
-later and another binding not made in that step, the results of the
-two approaches are the same. Without a widened store, lazy
+eager non-determinism. Without a widened store, lazy
 non-determinism is not a complete abstraction with either approach,
 but the precision gains are not immediately apparent due to fake
 rebinding (a second reference to the same variable chooses a different
