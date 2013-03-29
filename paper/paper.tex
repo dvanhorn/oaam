@@ -464,12 +464,13 @@ abstractions). We use sets of values for a simpler exposition.
 parameters of the relation given in figure~\ref{fig:aam} as follows:
 \begin{align*}
 \alloc(\mstate) &= \maddr \mbox{ where } \maddr \notin \mstate.\msto \\
-\allockont^\mcntr_\mlab(\msto,\mkont) \mbox{ where } \maddr \notin \msto
+\allockont^\mcntr_\mlab(\msto,\mkont) &= \maddr \mbox{ where } \maddr \notin \msto
 \end{align*}
-where $\sqcup$ on stores is a point-wise lifting of $\sqcup$, \ie, $\msto
-\sqcup \msto' = \lambda \maddr. \msto(\maddr) \sqcup
-\msto'(\maddr)$. These functions appear to ignore $\mlab$ and
-$\mcntr$, but they can be used to determinize the choice of fresh
+where $\sqcup$ on stores is a point-wise lifting of $\sqcup$, \ie,
+$\msto \sqcup \msto' = \lambda \maddr. \msto(\maddr) \sqcup
+\msto'(\maddr)$ and $\mstate.\msto$ is notation for projecting out the
+store component of a state. These functions appear to ignore $\mlab$
+and $\mcntr$, but they can be used to determinize the choice of fresh
 addresses.  The resulting relation is non-deterministic in its choice
 of addresses, however it must always choose a fresh address when
 allocating a continuation or variable binding.  If we consider machine
@@ -542,14 +543,13 @@ basis of a sound, computable program analyzer for ISWIM.
 \label{sec:baseline}
 
 The uniform $k$-CFA allocation strategy would make $\traces$ in figure
-\ref{fig:aam} a computable abstraction of possible executions, but not an
-efficient one.  Through
-this section, we explain a succession of approximations
-to reach the baseline analysis.  At each stage, we measure performance to
-identify the importance of each choice.
+\ref{fig:aam} a computable abstraction of possible executions, but one
+that is too inefficient to run, even on small examples.  Through this
+section, we explain a succession of approximations to reach a more
+appropriate baseline analysis.
 %
-We ground this path by first formulating the analysis in terms of a classic
-fixed-point computation.
+We ground this path by first formulating the analysis in terms of a
+classic fixed-point computation.
 
 
 \subsection{Static analysis as fixed-point computation}
@@ -589,7 +589,7 @@ considerable time.  Even though the state space is finite, it is exponential in
 the size of the program.  Even with $k = 0$, there are exponentially many
 stores in the AAM framework.
 
-In the next subsection, we fix this with store widening and reach a polynomial
+In the next subsection, we fix this with store widening to reach polynomial
 (albeit of high degree) complexity.
 %
 This widening effectively lifts the store out of individual states to create
@@ -610,7 +610,7 @@ application of a widening operator during the fixed-point iteration.
 In the ISWIM language, such a widening makes 0-CFA quartic in the size of the
 program.
 %
-Thus, in one step, complexity drops from intractable exponentiality to a merely
+Thus, complexity drops from intractable exponentiality to a merely
 daunting polynomial.
 
 Since we can cast this optimization as a widening, there is no need to change
@@ -669,9 +669,8 @@ complexity drops to cubic.  This is a critical abstraction in
 languages with $n$-ary functions, since otherwise the continuation
 space grows super-exponentially. We extend the semantics to
 additionally allocate an address for the function value when creating
-the $\kfn{}$ continuation. The continuation has to store this address
-to remember where to retreive values from in the store, though some allocation
-strategies allow this representation to be ellided.
+the $\kfn{}$ continuation. The continuation has to contain this address
+to remember where to retreive values from in the store.
 
 The new evaluation rules follow, where $\mcntr' = \tick(\mstate)$:
 % In theory, this aggressive distinction between continuations might buy
