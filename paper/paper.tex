@@ -879,9 +879,9 @@ relation, so we can get the least fixed-point of it directly.
 \end{lemma}
 
 \begin{theorem}
-Timestamps are a complete abstraction
+Timestamps are a complete abstraction.
 \end{theorem}
-The proof follows from the galois connection that, in one direction,
+The proof follows from the Galois connection that, in one direction,
 sorts all the stores in $S$ to form $\Sigma$, and translates stores in
 $S$ to their distance from the end of $\Sigma$. In the other
 direction, timestamps are replaced by the stores they point to.
@@ -920,9 +920,10 @@ invariant that lookups will never rely on the change log, so we can
 use the originally supplied store unmodified.
 
 A taste of the changes to the reduction relation is as follows:
-
+\begin{equation*}
+\dmachstep \subseteq (\Context\times\Store) \times (\Context\times\StoreDelta) 
+\end{equation*}
 \begin{align*}
-\dmachstep &\subseteq (\Context\times\Store) \times (\Context\times\StoreDelta) \\
 \ttuple{\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont}}{\msto} & \dmachstep
 \ttuple{\ev[^{\mcntr'}]{\mexp,\menv',\mkont}}{\cons{\ttuple{\maddr}{\setof{\mval}}}{\epsilon}} \\
 \text{ where }\maddr &= \alloc(\mstate) \\
@@ -1126,9 +1127,9 @@ gains.}{}
   \mastate$ then there exists a $\mastate'$ such that $\mastate
   \lmachstep \mastate'$ and $\mstate' \sqsubseteq \mastate'$
 \end{theorem}
-Here $\sqsubseteq$ is straightforward - the LHS store must be
-contained in the RHS store, and if values occur in the states, forcing
-the LHS value must be a subset of forcing the corresponding RHS value.
+Here $\sqsubseteq$ is straightforward - the left-hand side store must be
+contained in the right-hand-side store, and if values occur in the states, forcing
+the left-hand-side value must be a subset of forcing the corresponding right-hand-side value.
 The proof is by cases on $\mstate \machstep \mstate'$.}
 {
 \begin{theorem}[Completeness]For all $\mexp$,
