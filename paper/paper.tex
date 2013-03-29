@@ -1654,6 +1654,18 @@ across all implementations, including Shivers' timestamp
 approximation---from an empirical point of view, these techniques are
 precision preserving despite the theoterical loss of precision.
 
+Our step-wise optimizations strictly produce better analysis times
+with no observed loss of precision.  The final result is a
+systematically derived and verified implementation that operates
+within a small factor performance loss compared to a hand-optimized,
+unverified implementation.  Moreover, much of the performance gains
+are achieved with purely functional methods, which suggest potential
+further gains from parellelization.  Peak memory usage is often
+considerably improved by the end of the optimization steps, but the
+effect of mutation has unexpected consequence on the analyzers memory
+consumption.
+
+
 Source code of the implementation and benchmark suite is at:
 
 \begin{center}
