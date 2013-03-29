@@ -46,7 +46,7 @@
   (require racket/cmdline)
   (define test-file
     (command-line #:once-any
-                  [("--bl") "Benchmark baseline"
+#;                  [("--bl") "Benchmark baseline"
                    (aval baseline)] ;; least optimized
                   [("--sp") "Benchmark specialized fixpoint"
                    (aval 0cfa^)]
@@ -65,35 +65,35 @@
                   [("--ld")
                    "Benchmark compiled store-diff lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s)]
-                  [("--fd")
+#;                  [("--fd")
                    "Benchmark compiled store-diff lazy non-determinism functional timestamp nonapprox"
                    (aval lazy-0cfa^/c/∆s/t)]
-                  [("--ia")
+#;                  [("--ia")
                    "Benchmark compiled imperative accumulated store-diff lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/acc!)]
-                  [("--id")
+#;                  [("--id")
                    "Benchmark compiled imperative store-diff lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s!)]
-                  [("--is")
+#;                  [("--is")
                    "Benchmark compiled imperative stacked store lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/stacked!)]
-                  [("--pa")
+#;                  [("--pa")
                    "Benchmark compiled preallocated accumulated store-diff lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/acc/prealloc!)]
-                  [("--pd")
+#;                  [("--pd")
                    "Benchmark compiled preallocated store-diff lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/prealloc!)]
                   [("--ps")
                    "Benchmark compiled preallocated stacked store lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/prealloc/stacked!)]
-                  [("--it")
+#;                  [("--it")
                    "Benchmark compiled imperative store lazy non-determinism timestap approx"
                    (aval lazy-0cfa^/c/timestamp!)]
-                  [("--pt")
+#;                  [("--pt")
                    "Benchmark compiled preallocated store lazy non-determinism timestamp approx"
                    (aval lazy-0cfa^/c/prealloc/timestamp!)] ;; most optimized
                   ;; Continuation-mark enabled analyses
-                  [("--cb")
+#;                  [("--cb")
                    "Benchmark baseline continuation marks"
                    (aval baseline/cm)]
                   ;; Lazy language analysis

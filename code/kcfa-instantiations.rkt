@@ -95,20 +95,20 @@ Welcome to Racket v5.3.3.
 (provide 0cfa^/c/∆s/prealloc!)
 |#
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Potpourris of evaluators
-;; "bl"
-(mk-set-fixpoint^ fix baseline-fixpoint baseline-ans?)
-(with-nonsparse
- (with-strict
-  (with-0-ctx
-   (with-whole-σ
-    (with-σ-passing-set-monad
-     (with-abstract
-      (mk-analysis #:aval baseline #:ans baseline-ans
-                   #:fixpoint baseline-fixpoint
-                   #:σ-passing #:wide #:set-monad)))))))
-(provide baseline)
+;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ;; Potpourris of evaluators
+;; ;; "bl"
+;; (mk-set-fixpoint^ fix baseline-fixpoint baseline-ans?)
+;; (with-nonsparse
+;;  (with-strict
+;;   (with-0-ctx
+;;    (with-whole-σ
+;;     (with-σ-passing-set-monad
+;;      (with-abstract
+;;       (mk-analysis #:aval baseline #:ans baseline-ans
+;;                    #:fixpoint baseline-fixpoint
+;;                    #:σ-passing #:wide #:set-monad)))))))
+;; (provide baseline)
 
 ;; "spt"
 (mk-special-set-fixpoint^ fix 0cfa-set-fixpoint^/t 0cfa-ans^/t?)
@@ -146,7 +146,7 @@ Welcome to Racket v5.3.3.
      (with-abstract
       (mk-analysis #:aval 0cfa^-∆s/t #:ans 0cfa-∆s-ans^/t
                    #:fixpoint 0cfa-∆s-fixpoint^/t
-                   #:σ-passing #:wide #:set-monad)))))))
+                   #:σ-passing #:σ-∆s #:wide #:set-monad)))))))
 (provide 0cfa^-∆s/t)
 
 ;; "ls"
@@ -172,7 +172,7 @@ Welcome to Racket v5.3.3.
      (with-abstract
       (mk-analysis #:aval lazy-0cfa^-∆s/t #:ans lazy-0cfa-∆s-ans^/t
                    #:fixpoint lazy-0cfa-∆s-fixpoint^/t
-                   #:σ-passing #:wide #:set-monad)))))))
+                   #:σ-passing #:σ-∆s #:wide #:set-monad)))))))
 (provide lazy-0cfa^-∆s/t)
 
 ;; "lc"
@@ -200,123 +200,123 @@ Welcome to Racket v5.3.3.
      (with-abstract
       (mk-analysis #:aval lazy-0cfa^-∆s/t/c #:ans lazy-0cfa-∆s-ans^/t/c
                    #:fixpoint lazy-0cfa-∆s-fixpoint^/t/c
-                   #:σ-passing #:wide #:set-monad #:compiled)))))))
+                   #:σ-passing #:wide #:σ-∆s #:set-monad #:compiled)))))))
 (provide lazy-0cfa^-∆s/t/c)
 
 
 ;; "ld"
-(mk-∆-fix^ lazy-0cfa∆^-fixpoint 0cfa∆-ans^?)
+(mk-∆-fix2^ lazy-0cfa∆^-fixpoint 0cfa∆-ans^?)
 (with-nonsparse
  (with-lazy
   (with-0-ctx
    (with-σ-∆s
-            (with-σ-passing-set-monad
-             (with-abstract
-              (mk-analysis #:aval lazy-0cfa^/c/∆s #:ans 0cfa∆-ans^
-                           #:fixpoint lazy-0cfa∆^-fixpoint
-                           #:wide #:σ-∆s #:set-monad
-                           #:compiled)))))))
+    (with-σ-passing-set-monad
+     (with-abstract
+      (mk-analysis #:aval lazy-0cfa^/c/∆s #:ans 0cfa∆-ans^
+                   #:fixpoint lazy-0cfa∆^-fixpoint
+                   #:wide #:σ-∆s #:set-monad #:σ-passing
+                   #:compiled)))))))
 (provide lazy-0cfa^/c/∆s)
 
-;; "fd"
-(mk-timestamp-∆-fix^ lazy-0cfa∆^-fixpoint/t lazy-0cfa∆/t-ans^?)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx
-   (with-σ-∆s
-            (with-σ-passing-set-monad
-             (with-abstract
-              (mk-analysis #:aval lazy-0cfa^/c/∆s/t #:ans lazy-0cfa∆/t-ans^
-                           #:fixpoint lazy-0cfa∆^-fixpoint/t
-                           #:wide #:σ-∆s #:set-monad
-                           #:compiled)))))))
-(provide lazy-0cfa^/c/∆s/t)
+;; ;; "fd"
+;; (mk-timestamp-∆-fix^ lazy-0cfa∆^-fixpoint/t lazy-0cfa∆/t-ans^?)
+;; (with-nonsparse
+;;  (with-lazy
+;;   (with-0-ctx
+;;    (with-σ-∆s
+;;             (with-σ-passing-set-monad
+;;              (with-abstract
+;;               (mk-analysis #:aval lazy-0cfa^/c/∆s/t #:ans lazy-0cfa∆/t-ans^
+;;                            #:fixpoint lazy-0cfa∆^-fixpoint/t
+;;                            #:wide #:σ-∆s #:set-monad
+;;                            #:compiled)))))))
+;; (provide lazy-0cfa^/c/∆s/t)
 
-;; "ia"
-(mk-imperative/∆s/acc^-fixpoint
-                imperative/∆s/acc-fixpoint/c imperative/∆s/acc-ans/c?
-                imperative/∆s/acc-ans/c-v imperative/∆s/acc-touches-0/c)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx
-   (with-σ-∆s/acc!
-    (with-abstract
-      (mk-analysis #:aval lazy-0cfa^/c/∆s/acc!
-                   #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
-                   #:ans imperative/∆s/acc-ans/c
-                   #:touches imperative/∆s/acc-touches-0/c
-                   #:fixpoint imperative/∆s/acc-fixpoint/c
-                   #:σ-∆s
-                   #:global-σ #:compiled #:wide))))))
-(provide lazy-0cfa^/c/∆s/acc!)
-;; "id"
-(mk-imperative/∆s^-fixpoint
-                imperative/∆s-fixpoint/c imperative/∆s-ans/c?
-                imperative/∆s-ans/c-v imperative/∆s-touches-0/c)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx
-   (with-σ-∆s!
-    (with-abstract
-      (mk-analysis #:aval lazy-0cfa^/c/∆s!
-                   #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
-                   #:ans imperative/∆s-ans/c
-                   #:touches imperative/∆s-touches-0/c
-                   #:fixpoint imperative/∆s-fixpoint/c
-                   #:global-σ #:compiled #:wide))))))
-(provide lazy-0cfa^/c/∆s!)
-;; "is"
-(mk-imperative/timestamp^-fixpoint/stacked
-                imperative/∆s-fixpoint/stacked/c imperative/∆s-ans/stacked/c?
-                imperative/∆s-ans/stacked/c-v imperative/∆s-touches-0/stacked/c)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx
-   (with-mutable-store/stacked
-    (with-mutable-worklist/stacked
-    (with-abstract
-      (mk-analysis #:aval lazy-0cfa^/c/∆s/stacked!
-                   #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
-                   #:ans imperative/∆s-ans/stacked/c
-                   #:touches imperative/∆s-touches-0/stacked/c
-                   #:fixpoint imperative/∆s-fixpoint/stacked/c
-                   #:global-σ #:compiled #:wide)))))))
-(provide lazy-0cfa^/c/∆s/stacked!)
-;; "pa"
-(mk-prealloc/∆s/acc^-fixpoint prealloc/∆s/acc-fixpoint/c prealloc/∆s/acc-ans/c? 
-              prealloc/∆s/acc-ans/c-v prealloc/∆s/acc-touches-0/c)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx/prealloc
-   (with-σ-∆s/acc/prealloc!
-    (with-abstract
-      (mk-analysis #:aval lazy-0cfa^/c/∆s/acc/prealloc!
-                   #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
-                   #:ans prealloc/∆s/acc-ans/c
-                   #:touches prealloc/∆s/acc-touches-0/c
-                   #:fixpoint prealloc/∆s/acc-fixpoint/c
-                   #:σ-∆s
-                   #:global-σ #:compiled #:wide))))))
-(provide lazy-0cfa^/c/∆s/acc/prealloc!)
-;; "pd"
-(mk-prealloc/∆s^-fixpoint prealloc/∆s-fixpoint/c prealloc/∆s-ans/c?
-              prealloc/∆s-ans/c-v prealloc/∆s-touches-0/c)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx/prealloc
-   (with-σ-∆s/prealloc!
-    (with-abstract
-     (define pd-e (box #f))
-      (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc!
-                   #:prepare (λ (sexp)
-                                (define e* (prepare-prealloc parse-prog sexp))
-                                (set-box! pd-e e*)
-                                e*)
-                   #:ans prealloc/∆s-ans/c
-                   #:touches prealloc/∆s-touches-0/c
-                   #:fixpoint prealloc/∆s-fixpoint/c
-                   #:global-σ #:compiled #:wide))))))
-(provide lazy-0cfa^/c/∆s/prealloc!)
+;; ;; "ia"
+;; (mk-imperative/∆s/acc^-fixpoint
+;;                 imperative/∆s/acc-fixpoint/c imperative/∆s/acc-ans/c?
+;;                 imperative/∆s/acc-ans/c-v imperative/∆s/acc-touches-0/c)
+;; (with-nonsparse
+;;  (with-lazy
+;;   (with-0-ctx
+;;    (with-σ-∆s/acc!
+;;     (with-abstract
+;;       (mk-analysis #:aval lazy-0cfa^/c/∆s/acc!
+;;                    #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
+;;                    #:ans imperative/∆s/acc-ans/c
+;;                    #:touches imperative/∆s/acc-touches-0/c
+;;                    #:fixpoint imperative/∆s/acc-fixpoint/c
+;;                    #:σ-∆s
+;;                    #:global-σ #:compiled #:wide))))))
+;; (provide lazy-0cfa^/c/∆s/acc!)
+;; ;; "id"
+;; (mk-imperative/∆s^-fixpoint
+;;                 imperative/∆s-fixpoint/c imperative/∆s-ans/c?
+;;                 imperative/∆s-ans/c-v imperative/∆s-touches-0/c)
+;; (with-nonsparse
+;;  (with-lazy
+;;   (with-0-ctx
+;;    (with-σ-∆s!
+;;     (with-abstract
+;;       (mk-analysis #:aval lazy-0cfa^/c/∆s!
+;;                    #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
+;;                    #:ans imperative/∆s-ans/c
+;;                    #:touches imperative/∆s-touches-0/c
+;;                    #:fixpoint imperative/∆s-fixpoint/c
+;;                    #:global-σ #:compiled #:wide))))))
+;; (provide lazy-0cfa^/c/∆s!)
+;; ;; "is"
+;; (mk-imperative/timestamp^-fixpoint/stacked
+;;                 imperative/∆s-fixpoint/stacked/c imperative/∆s-ans/stacked/c?
+;;                 imperative/∆s-ans/stacked/c-v imperative/∆s-touches-0/stacked/c)
+;; (with-nonsparse
+;;  (with-lazy
+;;   (with-0-ctx
+;;    (with-mutable-store/stacked
+;;     (with-mutable-worklist/stacked
+;;     (with-abstract
+;;       (mk-analysis #:aval lazy-0cfa^/c/∆s/stacked!
+;;                    #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
+;;                    #:ans imperative/∆s-ans/stacked/c
+;;                    #:touches imperative/∆s-touches-0/stacked/c
+;;                    #:fixpoint imperative/∆s-fixpoint/stacked/c
+;;                    #:global-σ #:compiled #:wide)))))))
+;; (provide lazy-0cfa^/c/∆s/stacked!)
+;; ;; "pa"
+;; (mk-prealloc/∆s/acc^-fixpoint prealloc/∆s/acc-fixpoint/c prealloc/∆s/acc-ans/c? 
+;;               prealloc/∆s/acc-ans/c-v prealloc/∆s/acc-touches-0/c)
+;; (with-nonsparse
+;;  (with-lazy
+;;   (with-0-ctx/prealloc
+;;    (with-σ-∆s/acc/prealloc!
+;;     (with-abstract
+;;       (mk-analysis #:aval lazy-0cfa^/c/∆s/acc/prealloc!
+;;                    #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
+;;                    #:ans prealloc/∆s/acc-ans/c
+;;                    #:touches prealloc/∆s/acc-touches-0/c
+;;                    #:fixpoint prealloc/∆s/acc-fixpoint/c
+;;                    #:σ-∆s
+;;                    #:global-σ #:compiled #:wide))))))
+;; (provide lazy-0cfa^/c/∆s/acc/prealloc!)
+;; ;; "pd"
+;; (mk-prealloc/∆s^-fixpoint prealloc/∆s-fixpoint/c prealloc/∆s-ans/c?
+;;               prealloc/∆s-ans/c-v prealloc/∆s-touches-0/c)
+;; (with-nonsparse
+;;  (with-lazy
+;;   (with-0-ctx/prealloc
+;;    (with-σ-∆s/prealloc!
+;;     (with-abstract
+;;      (define pd-e (box #f))
+;;       (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc!
+;;                    #:prepare (λ (sexp)
+;;                                 (define e* (prepare-prealloc parse-prog sexp))
+;;                                 (set-box! pd-e e*)
+;;                                 e*)
+;;                    #:ans prealloc/∆s-ans/c
+;;                    #:touches prealloc/∆s-touches-0/c
+;;                    #:fixpoint prealloc/∆s-fixpoint/c
+;;                    #:global-σ #:compiled #:wide))))))
+;; (provide lazy-0cfa^/c/∆s/prealloc!)
 ;; "ps"
 (mk-prealloc/timestamp^-fixpoint/stacked prealloc/∆s-fixpoint/stacked/c prealloc/∆s-ans/stacked/c?
               prealloc/∆s-ans/stacked/c-v prealloc/∆s-touches-0/stacked/c)
@@ -337,38 +337,38 @@ Welcome to Racket v5.3.3.
                    #:fixpoint prealloc/∆s-fixpoint/stacked/c
                    #:global-σ #:compiled #:wide)))))))
 (provide lazy-0cfa^/c/∆s/prealloc/stacked!)
-;; "it"
-(mk-imperative/timestamp^-fixpoint imperative-fixpoint/c imperative-ans/c?
-                                   imperative-ans/c-v imperative-touches-0/c)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx
-   (with-mutable-store
-    (with-mutable-worklist
-     (with-abstract
-      (mk-analysis #:aval lazy-0cfa^/c/timestamp!
-                   #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
-                   #:ans imperative-ans/c
-                   #:touches imperative-touches-0/c
-                   #:fixpoint imperative-fixpoint/c
-                   #:global-σ #:compiled #:wide)))))))
-(provide lazy-0cfa^/c/timestamp!)
-;; "pt"
-(mk-prealloc/timestamp^-fixpoint prealloc/imperative-fixpoint/c prealloc-ans/c?
-                                 prealloc-ans/c-v prealloc-touches-0/c)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx/prealloc
-   (with-prealloc/timestamp-store
-    (with-mutable-worklist
-     (with-abstract
-      (mk-analysis #:aval lazy-0cfa^/c/prealloc/timestamp!
-                   #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
-                   #:ans prealloc-ans/c
-                   #:touches prealloc-touches-0/c
-                   #:fixpoint prealloc/imperative-fixpoint/c
-                   #:global-σ #:compiled #:wide)))))))
-(provide lazy-0cfa^/c/prealloc/timestamp!)
+;; ;; "it"
+;; (mk-imperative/timestamp^-fixpoint imperative-fixpoint/c imperative-ans/c?
+;;                                    imperative-ans/c-v imperative-touches-0/c)
+;; (wioth-nonsparse
+;;  (with-lazy
+;;   (with-0-ctx
+;;    (with-mutable-store
+;;     (with-mutable-worklist
+;;      (with-abstract
+;;       (mk-analysis #:aval lazy-0cfa^/c/timestamp!
+;;                    #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
+;;                    #:ans imperative-ans/c
+;;                    #:touches imperative-touches-0/c
+;;                    #:fixpoint imperative-fixpoint/c
+;;                    #:global-σ #:compiled #:wide)))))))
+;; (provide lazy-0cfa^/c/timestamp!)
+;; ;; "pt"
+;; (mk-prealloc/timestamp^-fixpoint prealloc/imperative-fixpoint/c prealloc-ans/c?
+;;                                  prealloc-ans/c-v prealloc-touches-0/c)
+;; (with-nonsparse
+;;  (with-lazy
+;;   (with-0-ctx/prealloc
+;;    (with-prealloc/timestamp-store
+;;     (with-mutable-worklist
+;;      (with-abstract
+;;       (mk-analysis #:aval lazy-0cfa^/c/prealloc/timestamp!
+;;                    #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
+;;                    #:ans prealloc-ans/c
+;;                    #:touches prealloc-touches-0/c
+;;                    #:fixpoint prealloc/imperative-fixpoint/c
+;;                    #:global-σ #:compiled #:wide)))))))
+;; (provide lazy-0cfa^/c/prealloc/timestamp!)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
