@@ -147,14 +147,14 @@ in the recent literature on flow analysis for functional languages.
 \begin{figure}[t]
 \small
 \begin{center}
-\includegraphics[width=3.2in]{church-relative-space}
+%\includegraphics[width=3.2in]{church-relative-space}
 \includegraphics[width=3.2in]{church-relative-speed}
 \includegraphics[width=3.2in]{church-relative-time}
 \vspace{-1.5em}
 \end{center}
 \caption{Factor improvements over the baseline analyzer for the
-  \Church{} benchmark in terms of peak memory usage, the rate of state
-  transitions, and total analysis time. (Bigger is better.) Each point
+  \Church{} benchmark in terms of the rate of state
+  transitions and total analysis time. (Bigger is better.) Each point
   is marked with the section that introduces the optimization.}
 \label{fig:churchtime}
 \end{figure}
@@ -1647,10 +1647,12 @@ optimization step.
 \label{fig:bench-all}
 \end{figure*}
 
-We evaluated the precision of these techniques with a singleton
-variable analysis to find opportunities to inline constants and closed
-functions. We found no change in the results across all
-implementations, including Shivers' timestamp approximation.
+To determine the impact of these techniques on precision, we evaluated
+the a singleton variable analysis to find opportunities to inline
+constants and closed functions.  We found no change in the results
+across all implementations, including Shivers' timestamp
+approximation---from an empirical point of view, these techniques are
+precision preserving despite the theoterical loss of precision.
 
 Source code of the implementation and benchmark suite is at:
 
