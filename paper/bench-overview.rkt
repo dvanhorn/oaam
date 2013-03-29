@@ -56,9 +56,9 @@
   (λ ()
      (printf "\\begin{tabular}{@{}l||r||r|r||r|r||r|r@{}}~%")
      (printf "Program & LOC~%")
-     (printf "& \\multicolumn{2}{c||}{Time {\\small (s)}}~%")
+     (printf "& \\multicolumn{2}{c||}{Time {\\small (sec)}}~%")
      (printf "& \\multicolumn{2}{c||}{Space {\\small (MB)}}~%")
-     (printf "& \\multicolumn{2}{c@{}}{Speed {\\small (state/s)}}~%")
+     (printf "& \\multicolumn{2}{c@{}}{Speed {\\small $\\frac{state}{sec}$}}~%")
      (printf "\\\\~%")
      (printf "\\hline\\hline~%")
      (printf
