@@ -879,12 +879,12 @@ relation, so we can get the least fixed-point of it directly.
 \end{lemma}
 
 \begin{theorem}
-Timestamps are a complete abstraction.
+$\widehat{\machstep}^T$ is a complete abstraction of $\widehat{\machstep}$.
 \end{theorem}
 The proof follows from the Galois connection that, in one direction,
 sorts all the stores in $S$ to form $\Sigma$, and translates stores in
-$S$ to their distance from the end of $\Sigma$. In the other
-direction, timestamps are replaced by the stores they point to.
+$S$ to their distance from the end of $\Sigma$ (their timestamp). In the other
+direction, timestamps in $S$ are replaced by the stores they point to in $\Sigma$.
 
 \subsection{Locally log-based store deltas}
 
