@@ -207,38 +207,6 @@ nearly a factor of 500, dropping the analysis time to a fraction of a
 second.  Figure~\ref{fig:churchtime} shows the step-wise improvement
 of the analysis time for this example.
 
-\begin{figure}[t]
-\small
-\begin{center}
-\begin{tabular}{ccc}
-\raisebox{1ex-\height}{
-\includegraphics[height=3.5in]{introspective-base.pdf}}
-&
-\raisebox{1ex-\height}{
-\includegraphics[height=3.5in]{introspective-lazy.pdf}}
-&
-\raisebox{1ex-\height}{
-\includegraphics[height=3in]{introspective-lazyc.pdf}}
-\\
-(a) Baseline
-&
-(b) Lazy
-&
-(c) Compiled (\& lazy)
-\end{tabular}
-\end{center}
-\caption{Example state graphs for the program above.  Part (a) shows
-  the result of the baseline analyzer.  It has long ``corridor''
-  transitions and ``diamond'' subgraphs that fan-out from
-  nondeterminism and fan-in from joins.  Part (b) shows the result of
-  performing nondeterminism lazily and thus avoids many of the diamond
-  subgraphs.  Part (c) shows the result of abstract compilation that
-  removes interpretive overhead in the form of intermediate states,
-  thus minimizing the corridor transitions.  The end result is a more
-  compact abstraction of the program that can be generated faster.}
-\label{fig:state-graphs}
-\end{figure}
-
 The AAM approach, in essence, does the following: it takes a
 machine-based view of computation and turns it into a \emph{finitary
   approximation} by bounding the size of the store.  With a limited
@@ -290,6 +258,39 @@ three orders of magnitude.
 
 Section~\ref{sec:related} relates this work to the literature and
 section~\ref{sec:conclusion} concludes.
+
+
+\begin{figure}[t]
+\small
+\begin{center}
+\begin{tabular}{ccc}
+\raisebox{1ex-\height}{
+\includegraphics[height=3.5in]{introspective-base.pdf}}
+&
+\raisebox{1ex-\height}{
+\includegraphics[height=3.5in]{introspective-lazy.pdf}}
+&
+\raisebox{1ex-\height}{
+\includegraphics[height=3in]{introspective-lazyc.pdf}}
+\\
+(a) Baseline
+&
+(b) Lazy
+&
+(c) Compiled (\& lazy)
+\end{tabular}
+\end{center}
+\caption{Example state graphs for the program above.  Part (a) shows
+  the result of the baseline analyzer.  It has long ``corridor''
+  transitions and ``diamond'' subgraphs that fan-out from
+  nondeterminism and fan-in from joins.  Part (b) shows the result of
+  performing nondeterminism lazily and thus avoids many of the diamond
+  subgraphs.  Part (c) shows the result of abstract compilation that
+  removes interpretive overhead in the form of intermediate states,
+  thus minimizing the corridor transitions.  The end result is a more
+  compact abstraction of the program that can be generated faster.}
+\label{fig:state-graphs}
+\end{figure}
 
 %\newpage
 \section{Abstract interpretation of ISWIM}
