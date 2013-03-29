@@ -47,17 +47,17 @@ Olivier Danvy and Lasse~R. Nielsen.
 \newblock Research Report BRICS RS-04-26, Department of Computer Science,
   Aarhus University, 2004.
 
-\bibitem{local:DOsualdo:12B}
-E.~D'Osualdo, J.~Kochems, and C.-H.~L. Ong.
-\newblock Soter: An automatic safety verifier for {E}rlang.
-\newblock In {\em Proceedings of the 2nd edition on Programming systems,
-  languages and applications based on actors, agents, and decentralized control
-  abstractions}, AGERE! '12, pages 137--140. ACM, 2012.
-
 \bibitem{local:DOsualdo:12A}
 E.~D'Osualdo, J.~Kochems, and C.-H.~L. Ong.
 \newblock Automatic verification of {Erlang}-style concurrency.
-\newblock In {\em Proceedings of the 20th Static Analysis Symposium}, 2013.
+\newblock Technical report, University of Oxford DCS Technical Report, 2012.
+\newblock \url{http://mjolnir.cs.ox.ac.uk/soter/papers/erlang-verif.pdf}.
+
+\bibitem{local:DOsualdo:12B}
+E.~D'Osualdo, J.~Kochems, and C.-H.~L. Ong.
+\newblock Soter: An automatic safety verifier for {E}rlang.
+\newblock Technical report, University of Oxford DCS Technical Report, 2012.
+\newblock \url{http://mjolnir.cs.ox.ac.uk/soter/papers/soter-demo.pdf}.
 
 \bibitem{dvanhorn:Earl2012Introspective}
 Christopher Earl, Ilya Sergey, Matthew Might, and David~Van Horn.
