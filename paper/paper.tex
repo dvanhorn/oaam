@@ -145,6 +145,7 @@ in the recent literature on flow analysis for functional languages.
 \section{At a glance}
 
 \begin{figure}[t]
+\small
 \begin{center}
 \includegraphics[width=3.2in]{church-relative-space}
 \includegraphics[width=3.2in]{church-relative-speed}
@@ -207,6 +208,7 @@ second.  Figure~\ref{fig:churchtime} shows the step-wise improvement
 of the analysis time for this example.
 
 \begin{figure}[t]
+\small
 \begin{center}
 \begin{tabular}{ccc}
 \raisebox{1ex-\height}{
@@ -316,6 +318,7 @@ syntactically identical pieces of syntax.  We omit the label
 annotation in contexts where it is irrelevant.
 
 \begin{figure}
+\small
 \[
 \begin{array}{l@{\qquad}rcl}
 \text{Expressions} & \mexp &=& \svar[^\mlab]\mvar\\
@@ -335,6 +338,7 @@ annotation in contexts where it is irrelevant.
 \end{figure}
 
 \begin{figure}
+\small
 \[
 \begin{array}{l@{\qquad}rcl}
 \text{Values} & \mval,\mvalx{u} &=& \clos{\mvar,\mexp,\menv}\ |\ \mlit\ |\ \mkont\\
@@ -345,7 +349,7 @@ annotation in contexts where it is irrelevant.
 &&|& \kfn{\mval,\mkaddr}\\
 &&|& \kar{\mexp,\menv,\mkaddr}\\
 &&|& \kif{\mexp,\mexp,\menv,\mkaddr}\\
-\text{Addresses} &\maddr&\in&\Addr \\
+\text{Addresses} &\maddr,\mkaddr&\in&\Addr \\
 \text{Environments} &\menv&\in& \Var \rightharpoonup \Addr\\
 \text{Stores} &\msto&\in& \Addr \rightharpoonup \mathcal{P}(\Value)
 \end{array}
@@ -390,6 +394,7 @@ abstractions). We use sets of values for a simpler exposition.
 
 
 \begin{figure}
+\small
 \begin{gather*}
 \begin{align*}
 \traces(\mexp) &= \{ \ev[^{\mtcntr}]{\mexp,\varnothing,\varnothing,\kmt} \multimachstep \mstate \} \text{ where }
@@ -513,6 +518,7 @@ choice of address representation and allocation strategy.  Uniform
 \paragraph{Uniform \(k\)-CFA} To characterize uniform \(k\)-CFA, set the allocation
 strategy as follows, for a fixed constant \(k\):
 
+{\small
 \begin{align*}
 \Counter &= \Label^* \\
 \mtcntr &= \epsilon \\
@@ -524,7 +530,7 @@ strategy as follows, for a fixed constant \(k\):
 \tick(\ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont}) &= \kpush[_k]{\mlab\mcntr} \\
   \kpush[_0]{\mcntr} &= \kpush[_k]{\mtcntr} = \mtcntr \\
   \kpush[_{k+1}]{\mlab\mcntr} &= \mlab\kpush[_k]{\mcntr} \\
-\end{align*}
+\end{align*}}
 The \(\lfloor\cdot\rfloor_k\) notation denotes the truncation of a list
 of symbols to the leftmost \(k\) symbols.
 
@@ -573,9 +579,9 @@ Internally, this global transfer function computes the successors of all supplie
     V' &= \setof{ \mstate' \mid (\mstate,\mstate') \in E'}
 \end{align*}
 Then, the evaluator for the analysis computes the least fixed-point of the global transfer function:
-\begin{equation*}
- \eval(\mexp) = \mathrm{lfp}(F_{\mstate_0})\text{,}
-\end{equation*}
+% \begin{equation*}
+ $\eval(\mexp) = \mathrm{lfp}(F_{\mstate_0})\text{,}$
+%\end{equation*}
 where $\mstate_0 = \ev[^\mtcntr]{\mexp, \varnothing, \varnothing, \kmt}$.
 
 The possible traces of execution tell us the most about a program, so
@@ -619,7 +625,7 @@ Rather, what changes is the structure of the fixed-point iteration.
 In each pass, the algorithm will collect all newly produced stores and join
 them together.
 %
-Then, before each transition, it will install this joined store into current
+Then, before each transition, it installs this joined store into current
 state.
 
 To describe this process, AAM defined a transformation of the reduction relation so that it operates on
@@ -629,6 +635,7 @@ A context includes all non-store components, \emph{e.g.}, the expression, the en
 %
 The transformed relation, $\widehat{\machstep}$, is
 %
+{\small
 \begin{align*}
 (C, \msto) &\mathrel{\widehat{\machstep}} (C', \msto'), \\
 \mbox{where } C' &= \{c' \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto^c), c \in C\} \\
@@ -638,7 +645,7 @@ The transformed relation, $\widehat{\machstep}$, is
 \wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \mkont, \msto} \\
 \wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont} \\
 \wn(\ans{\mval}, \msto) &= \ans{\msto, \mval}
-\end{align*}
+\end{align*}}
 %
 In effect, the new store is computed as the least upper bound of all
 stores after stepping. For clarity, we will exhibit non-widened
@@ -673,28 +680,21 @@ to remember where to retreive values from in the store.
 The new evaluation rules follow, where $\mcntr' = \tick(\mstate)$:
 % In theory, this aggressive distinction between continuations might buy
 % additional precision, but in practice, it does not.
-
-\newcommand{\ext}[3]{#1\sqcup[#2\mapsto#3]}
-%\newcommand{\ext}[3]{ext(#1,#2,#3)}
-
-HERE
-
 \begin{align*}
 \co[^\mcntr]{\kar{\mexp,\menv,\mkaddr},\mval,\msto} & \machstep
-\ev[^{\mcntr'}]{\mexp,\menv,\msto',\kfn{\maddr_f,\mkaddr}} \\
+\ev[^{\mcntr'}]{\mexp,\menv,\msto',\kfn{\maddr,\mkaddr}} \\
 \text{ where }
-  \maddr_f &= \alloc(\mstate) \\
-  \msto' &= \ext{\msto}{\maddr_f}{\{\mval\}}
+  \maddr &= \alloc(\mstate) \\
+  \msto' &= \ext{\msto}{\maddr}{\{\mval\}}
 \end{align*}
 Now instead of storing the evaluated function in the continuation
 frame itself, we indirect it through the store for further control on
-complexity and precision.
-
+complexity and precision:
 \begin{align*}
-\co[^\mcntr]{\kfn{\maddr_f,\mkaddr},\mval,\msto} & \machstep
+\co[^\mcntr]{\kfn{\maddr,\mkaddr},\mval,\msto} & \machstep
 \ap[^{\mcntr'}_\mlab]{\mvalx{u},\mval,\mkont,\msto'}
 \\
-\text{ if } \mkont &\in \msto(\mkaddr), \mvalx{u} \in \msto(\maddr_f)
+\text{ if } \mkont &\in \msto(\mkaddr), \mvalx{u} \in \msto(\maddr)
 \end{align*}
 Associated with this indirection, we now apply all functions stored in
 the address. This nondeterminism is demanded in order to continue with
@@ -759,10 +759,9 @@ processed. This has implications for the analysis' precision and
 determinism. Specifically, higher precision, and it is deterministic
 even if set iteration is not.
 
-The state space changes from one store plus a set of contexts to a set
+The state space changes from a store and set of contexts to a set
 of seen abstract states (context plus store), $S$, a set of contexts to
-step (the frontier), $F$, and the store to step those contexts with, $\msto$.
-
+step (the frontier), $F$, and a store to step those contexts with, $\msto$:
 \begin{equation*}
 (S, F, \msto) \mathrel{\widehat{\machstep}} (S \cup S', F', \msto')
 \end{equation*}
@@ -770,30 +769,31 @@ step (the frontier), $F$, and the store to step those contexts with, $\msto$.
 We constantly see more states, so $S$ is always growing. The frontier,
 which is what remains to be done, changes. Let's start with the result
 of stepping all the contexts in $F$ paired with the current store (call it $I$ for intermediate):
-
+%
 \begin{equation*}
 I = \setof{(c',\msto') \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto'), c \in F}
 \end{equation*}
-
+%
 The next store is the least upper bound of all the stores in $I$ (in
 order to have only one, and keep the semantics sound):
-
+%
 \begin{equation*}
 \msto' = \bigsqcup\; \setof{\msto \mid (\_,\msto) \in I}
 \end{equation*}
-
-The next frontier is exactly the states that we found from stepping the last frontier, but have not seen before. They must be \emph{states}, so we pair the contexts with the next store:
-
+%
+The next frontier is exactly the states that we found from stepping
+the last frontier, but have not seen before. They must be
+\emph{states}, so we pair the contexts with the next store:
+%
 \begin{equation*}
 F' = \setof{c \mid (c,\_) \in I, (c,\msto') \notin S}
 \end{equation*}
-
+%
 Finally, we add what we know we had not yet seen to the seen set:
-
 \begin{equation*}
   S' = \setof{(c,\msto') \mid c \in F'}
 \end{equation*}
-
+%
 To inject a program $e$ into this machine, we start off knowing we
 have seen the first state, and that we need to process the first
 state:
@@ -837,6 +837,7 @@ timestamp technique that we can fix.
     in the seen set ($S$), so we do not experience precision loss.}
 \end{enumerate}
 
+{\small
 \begin{align*}
 \Sigma \in \Store^* \qquad S \subseteq {\mathbb N} \times \Context \qquad F \subseteq \Context
 \end{align*}
@@ -852,7 +853,7 @@ timestamp technique that we can fix.
               S' &= \setof{(c,t') \mid c \in F'}\\
 \inject(e) &= (\setof{\ttuple{c_0}{0}},\setof{c_0},\bot,\cons{\bot}{\epsilon},0) \\
 \text{ where } c_0 &= \ev{e,\bot,\kmt}
-\end{align*}
+\end{align*}}
 
 The observation Shivers made was that the store is increasing
 monotonically, so all stores throughout execution will be totally
@@ -935,8 +936,9 @@ A taste of the changes to the reduction relation is as follows:
 % \msto, \msdiff', \mkont)$ where $k = \compile{e}$ would be in the closure.
 
 We lift $\dmachstep$ to accommodate for the asymmetry
-in the input and output, and change the frontier-based semantics in the following way:
-
+in the input and output, and change the frontier-based semantics in
+the following way:
+{\small
 \begin{align*}
 (S, F, \msto,\Sigma,t) &\mathrel{\damachstep} (S \cup S', F', \msto',\Sigma',t') \\
 \mbox{ where }
@@ -952,7 +954,7 @@ in the input and output, and change the frontier-based semantics in the followin
  S' &= \setof{(c,t') \mid c \in F'} \\
 \appendall(\varnothing) &= \epsilon \\
 \appendall(\setof{\msdiff}\cup\Xi) &= \append(\msdiff,\appendall(\Xi))
-\end{align*}
+\end{align*}}
 
 Here $\appendall$ combines change logs across all non-deterministic
 steps for a state to later be replayed. The order the combination
@@ -1048,7 +1050,7 @@ that represents a delayed non-deterministic choice of a value from
 The following rules highlight the changes to the semantics:
 
 \renewcommand{\ext}{\mathit{ext}}
-
+{\small
 \begin{align*}
 \spchoice
 {\force &: \Store \times \Value \to \Set(\Value) \\
@@ -1079,7 +1081,7 @@ The following rules highlight the changes to the semantics:
 \ev[^{\mcntr'}]{\mexpi,\menv,\msto,\mkont} \\
 \text{ if } \mkont &\in \msto(\mkaddr),
             \strue \in \spchoice{\force(\msto,\mval)}{\force(\mval)}
-\end{align*}
+\end{align*}}
 Since {\tt if} guards are in strict position, we must force the value
 to determine which branch to to take. The middle rule uses $\force$
 only to combine with values in the store - it does not introduce
@@ -1219,6 +1221,7 @@ $\mcomp^\mcntr(\mathit{args}\ldots)$ for $\mcomp(\mathit{args}\ldots,
 \mcntr)$.
 
 \begin{figure}
+\small
 \begin{align*}
 \compile{\_} &: \Expr \to \Store \\
              &\phantom{: \Expr } \to \Env  \times \StoreDelta \times \Kont \times \Counter \\
@@ -1256,6 +1259,7 @@ $\mcomp^\mcntr(\mathit{args}\ldots)$ for $\mcomp(\mathit{args}\ldots,
 \end{figure}
 
 \begin{figure}
+\small
 \begin{gather*}
 \begin{align*}
 \traces(\mexp) &= \setof{ \inject(\compile{\mexp}^\mtcntr_\bot(\bot,\epsilon,\kmt)) \multimachstep \mstate}
@@ -1413,6 +1417,7 @@ The store maps to a stack of timestamped sets of abstract values.
 Here we formally define what lookup and update mean at a given
 timestamp.
 
+{\small
 \begin{align*}
 \lookup(\mvalstack,t) &=
   \left\{
@@ -1429,7 +1434,7 @@ timestamp.
  \mval{s'} &= \lookup(\msto(\maddr),t) \\
  \mval{s^*} &= \mval{s} \sqcup \mval{s'} \\
 \mvalstack \sqcup_t \mval{s} &= \mvalstack,\sfalse \text{ otherwise}
-\end{align*}
+\end{align*}}
 
 For the purposes of space, we reuse the $\cmachstep$ semantics,
 although the $\replay$ of the produced $\msdiff$ objects should be
@@ -1440,6 +1445,7 @@ a transfer function. The least fixed-point of this function gives a
 more compact representation of the reduction relation of the previous
 section.
 
+{\small
 \begin{align*}
 \System &= (\widehat{\State} \to {\Timestamp}^*) \times \wp(\widehat{\State}) \times \Store \times \Timestamp \\
 {\mathcal F} &: \System \to \System \\
@@ -1458,7 +1464,7 @@ S' &= \lambda \mastate. \left\{\begin{array}{ll}
                                \cons{t'}{S(\mastate)} & \text{ if } \mastate \in F' \\
                                S(\mastate) & \text{ otherwise}
                              \end{array}\right.
-\end{align*}
+\end{align*}}
 
 We prove semantic equivalence with the previous semantics with a
 lock-step bisimulation with the stack of stores abstraction, which
@@ -1488,7 +1494,7 @@ The intermediate data structures of the above transfer function can all be strea
 \item{$F$: the \emph{frontier} set, which must be persisent or copied for the iteration through the set to be correct.}
 \item{$\msto$: the store, which represents all stores that occur in the machine semantics.}
 \item{$t$: the timestamp, or length of the store chain - all stores that occur in the semantics are totally ordered due to single-threading the store.}
-\item{$\changep$: whether there has been a store change stepping all states in $F$.}
+\item{$\changep$: whether a store change stepped all states in $F$.}
 \end{enumerate}
 
 The reduction relation would then instead of building store deltas,
@@ -1602,7 +1608,7 @@ We use the following set of benchmarks:
 \item {\bf boyer}: a term-rewriting theorem prover (used in
   \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 
-\item {\bf mbrotZ}: generates Mandelbrot set fractal using complex
+\item {\bf mbrotZ}: generates Mandelbrot fractal using complex
   numbers.
 
 \item {\bf graphs}: counts the number of directed graphs with a
@@ -1833,6 +1839,7 @@ analyzer~\cite{dvanhorn:Earl2012Introspective}.
 \balance
 \bibliographystyle{plain}
 %\input{paper.bbl}
+
 \bibliography{local,bibliography}
 
 % \include{appendix}
