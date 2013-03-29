@@ -131,7 +131,7 @@
                  #:label "Total analysis time")
           (sec-labels sec->anchor rel-time-data))
          #:y-min -25
-         #:y-max 270
+         #:y-max 400
          #:x-label ""
          #:x-min 0
          #:x-max 5.2
@@ -143,7 +143,7 @@
                  #:label "Rate of state transitions")
           (sec-labels sec->anchor rel-states-per-sec-data))
          #:y-min -9
-         #:y-max 65
+         #:y-max 85
          #:x-min 0
          #:x-label ""
          #:x-max 5.2
@@ -154,8 +154,8 @@
           (lines rel-mem-data #:color 4 #:width 4
                  #:label "Peak memory")
           (sec-labels sec-mem->anchor rel-mem-data))
-         #:y-min 1
-         #:y-max 1.49
+         #:y-min 0
+         #:y-max 3
          #:x-label ""
          #:x-min 0
          #:x-max 5.2
