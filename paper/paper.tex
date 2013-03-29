@@ -461,19 +461,18 @@ simpler exposition.
 \paragraph{Concrete interpretation} To characterize concrete interpretation, set the implicit
 parameters of the relation given in figure~\ref{fig:aam} as follows:
 \begin{align*}
-\alloc(\mstate) &= \maddr \mbox{ where } \maddr \notin \mstate.\msto \\
-\allockont^\mcntr_\mlab(\msto,\mkont) \mbox{ where } \maddr \notin \msto
+\alloc(\mstate) &= \maddr \mbox{ where } \maddr \notin \text{ the } \msto \text{ within } \mstate \\
+\allockont^\mcntr_\mlab(\msto,\mkont) &=\maddr \mbox{ where } \maddr \notin \msto
 \end{align*}
-where $\sqcup$ on stores is a point-wise lifting of $\sqcup$: $\msto
-\sqcup \msto' = \lambda \maddr. \msto(\maddr) \sqcup
-\msto'(\maddr)$. These functions appear to ignore $\mlab$ and
-$\mcntr$, but they can be used to determinize the choice of fresh
-addresses.  The resulting relation is non-deterministic in its choice
-of addresses, however it must always choose a fresh address when
-allocating a continuation or variable binding.  If we consider machine
-states equivalent up to consistent renaming and fix an allocation
-scheme, this relation defines a deterministic machine (the relation is
-really a function).
+These functions appear to ignore $\mlab$ and $\mcntr$, but they can be
+used to determinize the choice of fresh addresses. The $\sqcup$ on
+stores in the figure is a point-wise lifting of $\cup$: $\msto \sqcup \msto' =
+\lambda \maddr. \msto(\maddr) \cup \msto'(\maddr)$. The resulting
+relation is non-deterministic in its choice of addresses, however it
+must always choose a fresh address when allocating a continuation or
+variable binding.  If we consider machine states equivalent up to
+consistent renaming and fix an allocation scheme, this relation
+defines a deterministic machine (the relation is really a function).
 
 The interpretation of primitive operations is defined by setting
 $\interpdelta$ as follows:
@@ -536,7 +535,7 @@ At this point, we have abstracted the original machine to one which
 has a finite state space for any given program, and thus forms the
 basis of a sound, computable program analyzer for ISWIM.
 
-\section{Reduction semantics to baseline analyzer}
+\section{Machine semantics to baseline analyzer}
 \label{sec:baseline}
 
 The uniform $k$-CFA allocation strategy would make $\traces$ in figure
@@ -684,15 +683,20 @@ The new evaluation rules follow (where $\mcntr' = \tick(\mstate)$).
 \text{ where }
   \maddr_f &= \alloc(\mstate) \\
   \msto' &= \ext{\msto}{\maddr_f}{\{\mval\}}
-\\
+\end{align*}
+Now instead of storing the evaluated function in the continuation
+frame itself, we indirect it through the store for further control on
+complexity and precision.
+
+\begin{align*}
 \co[^\mcntr]{\kfn{\maddr_f,\maddr_\mkont},\mval,\msto} & \machstep
 \ap[^{\mcntr'}_\mlab]{\mvalx{u},\mval,\mkont,\msto'}
 \\
 \text{ if } \mkont &\in \msto(\maddr_\mkont), \mvalx{u} \in \msto(\maddr_f)
 \end{align*}
-We associate the value in hand with the expression that produced
-it. Also, we fan out to all functions that are associated with the
-original function position, because applied functions are in
+Associated with this indirection, we now apply all functions stored in
+the address. This nondeterminism is demanded in order to continue with
+evaluation. More generally, this is because applied functions are in
 \emph{strict position} (more about that later).
 
 % This extra store-allocation is effectively naming all intermediate
@@ -885,7 +889,7 @@ A taste of the changes to the reduction relation is as follows:
 
 \begin{align*}
 \dmachstep &\subseteq (\widehat{\State}\times\Store) \times (\widehat{\State}\times\StoreDelta) \\
-\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont} & \dmachstep_\msto
+\ttuple{\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont}}{\msto} & \dmachstep
 \ttuple{\ev[^{\mcntr'}]{\mexp,\menv',\mkont}}{\cons{\ttuple{\maddr}{\setof{\mval}}}{\epsilon}} \\
 \text{ where }\maddr &= \alloc(\mstate) \\
               \menv' &= \menv[\mvar\mapsto\maddr]
@@ -901,7 +905,7 @@ in the input and output, and change the frontier-based semantics in the followin
 \begin{align*}
 (S, F, \msto,\Sigma,t) &\mathrel{\damachstep} (S \cup S', F', \msto',\Sigma',t') \\
 \mbox{ where }
- I &= \setof{(\mastate',\msdiff) \mid \mastate \dmachstep_\msto \ttuple{\mastate'}{\msdiff} } \\
+ I &= \setof{(\mastate',\msdiff) \mid \ttuple{\mastate}{\msto} \dmachstep \ttuple{\mastate'}{\msdiff} } \\
  \ttuple{\msto'}{\changep} &= \replay(\appendall(\setof{\msdiff \mid (\_,\msdiff) \in I}),\msto) \\
  \ttuple{t'}{\Sigma'} &=
      \left\{
@@ -921,7 +925,7 @@ happens in doesn't matter, because join is associative and
 commutative.
 
 \begin{lemma}
-$\mastate \dmachstep_\msto \ttuple{\mastate'}{\msdiff}$ iff
+$\ttuple{\mastate}{\msto} \dmachstep \ttuple{\mastate'}{\msdiff}$ iff
 $\wn(\mastate,\msto) \machstep \wn(\mastate',\replay(\msdiff,\msto))$
 \end{lemma}
 By cases on $\dmachstep$ and $\machstep$.
@@ -1273,7 +1277,7 @@ constitutes the use of a notion of stuttering. We provide a formal
 analysis of abstract compilation \emph{without} store widening with a proof
 of a stuttering bisimulation~\cite{ianjohnson:BCG88} between this
 semantics and lazy non-determinism without widening to show precision
-preservation. We revisit store widening at the end of the section.
+preservation. %We revisit store widening at the end of the section.
 
 The number of transitions that can occur in succession from an
 abstract bytecode is roughly bounded by the amount of expression
@@ -1306,7 +1310,7 @@ $\wn(\mastate,\replay(\msdiff',\msto)) = \wn(\mastate',\replay(\msdiff,\msto'))$
 The proof is by induction on $\mexp$.
 
 \begin{theorem}[Precision preservation]
-$B$ is a WEB on $\lmachstep \cup \machstep$
+$B$ is a WEB on $\lmachstep \uplus \machstep$
 \end{theorem}
 
 The proof follows by cases on $\lmachstep \uplus \machstep$ with the
@@ -1447,7 +1451,7 @@ The intermediate data structures of the above transfer function can all be strea
 \begin{enumerate}
 \item{$S$: the \emph{seen} set, though made a map for faster membership tests and updates.}
 \item{$F$: the \emph{frontier} set, which must be persisent or copied for the iteration through the set to be correct.}
-\item{$\msto$: the store, which represents all stores that occur in the reduction semantics.}
+\item{$\msto$: the store, which represents all stores that occur in the machine semantics.}
 \item{$t$: the timestamp, or length of the store chain - all stores that occur in the semantics are totally ordered due to single-threading the store.}
 \item{$\changep$: whether there has been a store change stepping all states in $F$.}
 \end{enumerate}
