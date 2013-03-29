@@ -633,7 +633,7 @@ The transformed relation, $\widehat{\machstep}$, is
 (C, \msto) &\mathrel{\widehat{\machstep}} (C', \msto'), \\
 \mbox{where } C' &= \{c' \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto^c), c \in C\} \\
               \msto' &= \bigsqcup\; \{\msto^c \mid \wn(c,\msto)\mathrel{\machstep} \wn(c', \msto^c), c \in C\} \\
-\wn &: \widehat{\State} \times \Store \to \State \\
+\wn &: \Context \times \Store \to \State \\
 \wn(\ev{\mexp, \menv, \mkont}, \msto) &= \ev{\mexp, \menv, \msto, \mkont} \\
 \wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \mkont, \msto} \\
 \wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont} \\
@@ -752,19 +752,52 @@ implementations do. It causes all states found so far to step each
 iteration, even if they are not revisited. This has negative
 performance \emph{and} precision consequences (changes to the store
 can travel back in time in straight-line code). We instead use a
-frontier-based semantics that corresponds to the classic ``worklist''
+frontier-based semantics that corresponds to the classic worklist
 algorithms for analysis. The difference is that the store is not
 modified in-place, but updated after all frontier states have been
 processed. This has implications for the analysis' precision and
 determinism. Specifically, higher precision, and it is deterministic
 even if set iteration is not.
 
+The state space changes from one store plus a set of contexts to a set
+of seen abstract states (context plus store), $S$, a set of contexts to
+step (the frontier), $F$, and the store to step those contexts with, $\msto$.
+
+\begin{equation*}
+(S, F, \msto) \mathrel{\widehat{\machstep}} (S \cup S', F', \msto')
+\end{equation*}
+
+We constantly see more states, so $S$ is always growing. The frontier,
+which is what remains to be done, changes. Let's start with the result
+of stepping all the contexts in $F$ paired with the current store (call it $I$ for intermediate):
+
+\begin{equation*}
+I = \setof{(c',\msto') \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto'), c \in F}
+\end{equation*}
+
+The next store is the least upper bound of all the stores in $I$ (in
+order to have only one, and keep the semantics sound):
+
+\begin{equation*}
+\msto' = \bigsqcup\; \setof{\msto \mid (\_,\msto) \in I}
+\end{equation*}
+
+The next frontier is exactly the states that we found from stepping the last frontier, but have not seen before. They must be \emph{states}, so we pair the contexts with the next store:
+
+\begin{equation*}
+F' = \setof{c \mid (c,\_) \in I, (c,\msto') \notin S}
+\end{equation*}
+
+Finally, we add what we know we had not yet seen to the seen set:
+
+\begin{equation*}
+  S' = \setof{(c,\msto') \mid c \in F'}
+\end{equation*}
+
+To inject a program $e$ into this machine, we start off knowing we
+have seen the first state, and that we need to process the first
+state:
 \begin{align*}
-(S, F, \msto) &\mathrel{\widehat{\machstep}} (S \cup S', F', \msto') \\
-\mbox{where } I &= \{(c',\msto^c) \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto^c), c \in F\} \\
-              \msto' &= \bigsqcup\; \{\msto^c \mid (\_,\msto^c) \in I\} \\
-              F' &= \{c \mid (c,\_) \in I, (c,\msto') \notin S\} \\
-              S' &= \setof{(c,\msto') \mid c \in F'} \\
 \inject(e) &= (\setof{\ttuple{c_0}{\bot}},\setof{c_0},\bot) \\
 \text{ where } c_0 &= \ev{e,\bot,\kmt}
 \end{align*}
@@ -805,9 +838,9 @@ timestamp technique that we can fix.
 \end{enumerate}
 
 \begin{align*}
-\Sigma &\in \Store^* \\
-S &\subseteq {\mathbb N} \times \widehat{\State} \\
-F &\subseteq \widehat{\State} \\
+\Sigma \in \Store^* \qquad S \subseteq {\mathbb N} \times \Context \qquad F \subseteq \Context
+\end{align*}
+\begin{align*}
 (S, F, \msto, \Sigma, t) &\mathrel{\widehat{\machstep}^T} (S \cup S', F', \msto', \Sigma', t') \\
 \mbox{where } I &= \setof{(c',\msto^c) \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto^c), c \in F} \\
               \msto' &= \bigsqcup\; \{\msto^c \mid (\_,\msto^c) \in I\} \\
@@ -890,7 +923,7 @@ use the originally supplied store unmodified.
 A taste of the changes to the reduction relation is as follows:
 
 \begin{align*}
-\dmachstep &\subseteq (\widehat{\State}\times\Store) \times (\widehat{\State}\times\StoreDelta) \\
+\dmachstep &\subseteq (\Context\times\Store) \times (\Context\times\StoreDelta) \\
 \ttuple{\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont}}{\msto} & \dmachstep
 \ttuple{\ev[^{\mcntr'}]{\mexp,\menv',\mkont}}{\cons{\ttuple{\maddr}{\setof{\mval}}}{\epsilon}} \\
 \text{ where }\maddr &= \alloc(\mstate) \\
@@ -907,7 +940,7 @@ in the input and output, and change the frontier-based semantics in the followin
 \begin{align*}
 (S, F, \msto,\Sigma,t) &\mathrel{\damachstep} (S \cup S', F', \msto',\Sigma',t') \\
 \mbox{ where }
- I &= \setof{(\mastate',\msdiff) \mid \ttuple{\mastate}{\msto} \dmachstep \ttuple{\mastate'}{\msdiff} } \\
+ I &= \setof{(c',\msdiff) \mid \ttuple{c}{\msto} \dmachstep \ttuple{c'}{\msdiff} } \\
  \ttuple{\msto'}{\changep} &= \replay(\appendall(\setof{\msdiff \mid (\_,\msdiff) \in I}),\msto) \\
  \ttuple{t'}{\Sigma'} &=
      \left\{
@@ -915,8 +948,8 @@ in the input and output, and change the frontier-based semantics in the followin
          \ttuple{t+1}{\msto\Sigma} & \text{ if } \changep \\
          \ttuple{t}{\Sigma} & \text{ otherwise}
        \end{array}\right. \\
- F' &= \setof{\mastate \mid (\mastate,\_) \in I, (\mastate,t') \notin S} \\
- S' &= \setof{(\mastate,t') \mid c \in F'} \\
+ F' &= \setof{c \mid (c,\_) \in I, (c,t') \notin S} \\
+ S' &= \setof{(c,t') \mid c \in F'} \\
 \appendall(\varnothing) &= \epsilon \\
 \appendall(\setof{\msdiff}\cup\Xi) &= \append(\msdiff,\appendall(\Xi))
 \end{align*}
@@ -927,8 +960,8 @@ happens in doesn't matter, because join is associative and
 commutative.
 
 \begin{lemma}
-$\ttuple{\mastate}{\msto} \dmachstep \ttuple{\mastate'}{\msdiff}$ iff
-$\wn(\mastate,\msto) \machstep \wn(\mastate',\replay(\msdiff,\msto))$
+$\ttuple{c}{\msto} \dmachstep \ttuple{c'}{\msdiff}$ iff
+$\wn(c,\msto) \machstep \wn(c',\replay(\msdiff,\msto))$
 \end{lemma}
 By cases on $\dmachstep$ and $\machstep$.
 
