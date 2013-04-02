@@ -167,9 +167,10 @@ step-by-step development, this benchmark is particularly informative:
   complicated environment and control structure arising from the use
   of higher-order functions to encode arithmetic, and
 %
-\item its improvement is about median in the benchmark suite
-  considered in section~\ref{sec:eval}, and thus it serves as a good
-  sanity check for each of the optimization techniques considered.
+\item it proves to be the \emph{least} improved benchmark of the
+  complete suite considered in section~\ref{sec:eval}, and thus it
+  serves as a good sanity check and lower-bound for each of the
+  optimization techniques considered.
 \end{enumerate}
 
 We start, in section~\ref{sec:aam}, by developing an abstract
@@ -540,35 +541,29 @@ fixed-point computation.
 \subsection{Static analysis as fixed-point computation}
 \label{sec:fixpoint}
 
-Conceptually, the AAM approach calls for computing an analysis as a
-graph exploration: (1) start with an initial state, and (2) compute
-the transitive closure of the transition relation from that state. All
-visited states are potentially reachable in the concrete, and all
-paths through the graph are possible traces of execution.
+Conceptually, the AAM approach calls for computing an analysis as a graph
+exploration: (1) start with an initial state, and (2) compute the transitive
+closure of the transition relation from that state.
 
 We can cast this exploration process in terms of a fixed-point calculation.
 %
-Given the initial state $\mstate_0$ and the transition relation $\machstep$,
+Given the initial state $\varsigma_0$ and the transition relation $\machstep$,
 we define the global transfer function:
 \begin{equation*}
- F_{\mstate_0} : \mathcal{P}(\State) \to \mathcal{P}(\State)
+ F_{\varsigma_0} : \mathcal{P}(\State) \to \mathcal{P}(\State)
  \text.
 \end{equation*}
 Internally, this global transfer function computes the successors of all supplied states, and then includes the initial state:
-\begin{align*}
-  F_{\mstate_0}(V,E) &= (\{ \mstate_0 \} \cup V', E') \\
-    E' &= \setof{ (\mstate,\mstate') \mid \mstate \in V \text{ and } \mstate \machstep \mstate'} \\
-    V' &= \setof{ \mstate' \mid (\mstate,\mstate') \in E'}
-\end{align*}
+\begin{equation*}
+  F_{\varsigma_0}(S) = \{ \varsigma_0 \} \cup \{ \varsigma' \mathrel{|} \varsigma \in S \text{ and } \varsigma \machstep \varsigma' \}\text. 
+\end{equation*}
 Then, the evaluator for the analysis computes the least fixed-point of the global transfer function:
 \begin{equation*}
- \eval(\mexp) = \mathrm{lfp}(F_{\mstate_0})\text{,}
+ \eval(e) = \mathrm{lfp}(F_{\varsigma_0})\text{,}
 \end{equation*}
-where $\mstate_0 = \ev[^\mtcntr]{\mexp, \varnothing, \varnothing, \kmt}$.
+where $\varsigma_0 = \ev[^\mtcntr]{e, \varnothing, \varnothing, \kmt}$.
 
-The possible traces of execution tell us the most about a program, so
-we take $\traces(\mexp)$ to be the (regular) set of paths through the
-computed graph.
+{\bf FIXME} use $\traces$
 
 To conduct this \naive{} exploration on the \Church{} example would require
 considerable time.  Even though the state space is finite, it is exponential in
@@ -596,7 +591,7 @@ application of a widening operator during the fixed-point iteration.
 In the ISWIM language, such a widening makes 0-CFA quartic in the size of the
 program.
 %
-Thus, in one step, complexity drops from intractable exponentiality to a merely
+Thus, in one step, complexity drops from intractable exponentially to a merely
 daunting polynomial.
 
 Since we can cast this optimization as a widening, there is no need to change
@@ -1583,7 +1578,7 @@ Jagannathan~\cite{dvanhorn:wright-jagannathan-toplas98}.\footnote{This
   evaluation, which we consciously aimed to approach.}  Unfortunately,
 these analyses compute an inherently different and incomparable form
 of analysis.  Consequently, we have omitted a complete comparison with
-these implementations.  The AAM approach provides more precision in
+these implementations,.  The AAM approach provides more precision in
 terms of temporal-ordering of program states, which comes at a cost
 that can be avoided in constraint-based approaches.  Consequently
 implementation techniques cannot be ``ported'' between these two
@@ -1636,10 +1631,10 @@ model.
 \paragraph{Abstract compilation}
 
 Boucher and Feeley \cite{dvanhorn:Boucher1996Abstract} introduced the
-idea of abstract compilation, which used closure generation
+idea of \emph{abstract compilation}, which used closure generation
 \cite{dvanhorn:Feeley1987Using} to improve the performance of control
 flow analysis.  We have adapted the closure generation technique from
-compositional evaluators to abstract machines and applied it to similar
+composition evaluators to abstract machines and applied it to similar
 effect.
 
 \paragraph{Constraint-based program analysis for higher-order languages}
