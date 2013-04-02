@@ -10,6 +10,7 @@
 \newcommand{\ev}[2][\ ]{\tuple[#1]{ev}{#2}}
 \newcommand{\co}[2][\ ]{\tuple[#1]{co}{#2}}
 \newcommand{\ap}[2][\ ]{\tuple[#1]{ap}{#2}}
+\newcommand{\call}[2][\ ]{\tuple[#1]{call}{#2}}
 \newcommand{\ans}[1]{\tuple{ans}{#1}}
 
 % Continuations
@@ -41,7 +42,7 @@
 % implementations using this macro, so we can switch between them
 % agilely if we need to.
 
-\newcommand{\spchoice}[2]{#2}
+\newcommand{\spchoice}[2]{#1}
 
 \newcommand{\sif}[4][\ ]{\tuple[#1]{if}{#2,#3,#4}}
 \newcommand{\sop}[2][\ ]{\tuple[#1]{op}{#2}}

@@ -174,10 +174,9 @@ step-by-step development, this benchmark is particularly informative:
   complicated environment and control structure arising from the use
   of higher-order functions to encode arithmetic, and
 %
-\item it proves to be the \emph{least} improved benchmark of the
-  complete suite considered in section~\ref{sec:eval}, and thus it
-  serves as a good sanity check and lower-bound for each of the
-  optimization techniques considered.
+\item its improvement is about median in the benchmark suite
+  considered in section~\ref{sec:eval}, and thus it serves as a good
+  sanity check for each of the optimization techniques considered.
 \end{enumerate}
 
 We start, in section~\ref{sec:aam}, by developing an abstract
@@ -368,7 +367,7 @@ program analyzer:
 \item the store maps addresses to \emph{sets} of values, not
   single values,
 \item continuations are heap-allocated, not stack-allocated,
-\item there are ``timestamps'' (written $\mcntr$) and syntax
+\item there are ``timestamps'' ($\mcntr \in \Counter$) and syntax
   labels ($\mlab$) threaded through the computation, and
 \item the machine is implicitly parameterized by the functions
   $\mathit{alloc}$, $\mathit{tick}$,
@@ -389,8 +388,8 @@ simpler exposition.
 \end{align*}
 \\[2mm]
 \begin{array}{@{}r@{\ }c@{\ }l@{}}
-&&\mcntr' =\tick(\mcntr) \\
-&&\maddr  =\alloc(\mstate) \\
+\mstate &\machstep&\mstate' \text{ defined to be the following} \\
+&&\text{let } \mcntr' =\tick(\mstate) \\
 %% EVAL
 \ev{\svar\mvar,\menv,\msto,\mkont} &\machstep&
 \co{\mkont,\mval,\msto}
@@ -437,7 +436,8 @@ simpler exposition.
 \ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont} & \machstep&
 \ev[^{\mcntr'}\!]{\mexp,\menv',\msto',\mkont}
 \\
-&&\text{ where } \menv' = \menv[\mvar\mapsto\maddr] \\
+&&\text{ where } \maddr  =\alloc(\mstate) \\
+&&\phantom{\text{ where }} \menv' = \menv[\mvar\mapsto\maddr] \\
 &&\phantom{\text{ where }} \msto' = \msto\sqcup[\maddr\mapsto\{\mval\}] \\
 \\
 \ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont} & \machstep&
@@ -483,12 +483,12 @@ $\interpdelta$ as follows:
 interpretation, set the implicit parameters just as above, but drop
 the $\maddr \not\in \msto$ condition. $\interpdelta$ takes some care
 to not make the analysis run forever; a simple instantiation is a flat
-abstraction that returns an abstract top element $\mathit{Integer}$ as
-the result of arithmetic operations.  This family of interpreters is
-also non-deterministic in choices of addresses, but it is free to
-choose addresses that are already in use.  Consequently, the machines
-may be non-deterministic when multiple values reside in a store
-location.
+abstraction where arithmetic operations return an abstract top element
+$\sNum$, and $\szerohuh$ returns both $\strue$ and $\sfalse$ on
+$\sNum$.  This family of interpreters is also non-deterministic in
+choices of addresses, but it is free to choose addresses that are
+already in use.  Consequently, the machines may be non-deterministic
+when multiple values reside in a store location.
 
 It is important to recognize from this definition that \emph{any}
 allocation strategy is an abstract
@@ -514,7 +514,7 @@ strategy as follows, for a fixed constant \(k\):
 \push_\mlab^\mcntr(\msto,\mkont) &=
   \mlab\mcntr,\msto\sqcup[\mlab\mcntr\mapsto\{\mkont\}] \\
 \tick(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont}) &= \mcntr \\
-\tick(\co{\kar[^\mcntr]{\mexp,\menv,\maddr},\msto,\mval}) &= \mcntr \\
+\tick(\co{\kar[^\mcntr]{\mexp,\menv,\maddr},\mval,\msto}) &= \mcntr \\
 \tick(\ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont}) &= \kpush[_k]{\mlab\mcntr} \\
   \kpush[_0]{\mcntr} &= \kpush[_k]{\mtcntr} = \mtcntr \\
   \kpush[_{k+1}]{\mlab\mcntr} &= \mlab\kpush[_k]{\mcntr} \\
@@ -548,29 +548,34 @@ fixed-point computation.
 \subsection{Static analysis as fixed-point computation}
 \label{sec:fixpoint}
 
-Conceptually, the AAM approach calls for computing an analysis as a graph
-exploration: (1) start with an initial state, and (2) compute the transitive
-closure of the transition relation from that state.
+Conceptually, the AAM approach calls for computing an analysis as a
+graph exploration: (1) start with an initial state, and (2) compute
+the transitive closure of the transition relation from that state. All
+visited states are potentially reachable in the concrete, and all
+paths through the graph are possible traces of execution.
 
 We can cast this exploration process in terms of a fixed-point calculation.
 %
-Given the initial state $\varsigma_0$ and the transition relation $\machstep$,
+Given the initial state $\mstate_0$ and the transition relation $\machstep$,
 we define the global transfer function:
 \begin{equation*}
- F_{\varsigma_0} : \mathcal{P}(\State) \to \mathcal{P}(\State)
- \text.
+ F_{\mstate_0} : \wp(\State) \times \wp(\State\times\State) \to \wp(\State) \times \wp(\State\times\State)\text.
 \end{equation*}
 Internally, this global transfer function computes the successors of all supplied states, and then includes the initial state:
-\begin{equation*}
-  F_{\varsigma_0}(S) = \{ \varsigma_0 \} \cup \{ \varsigma' \mathrel{|} \varsigma \in S \text{ and } \varsigma \machstep \varsigma' \}\text. 
-\end{equation*}
+\begin{align*}
+  F_{\mstate_0}(V,E) &= (\{ \mstate_0 \} \cup V', E') \\
+    E' &= \setof{ (\mstate,\mstate') \mid \mstate \in V \text{ and } \mstate \machstep \mstate'} \\
+    V' &= \setof{ \mstate' \mid (\mstate,\mstate') \in E'}
+\end{align*}
 Then, the evaluator for the analysis computes the least fixed-point of the global transfer function:
 \begin{equation*}
- \eval(e) = \mathrm{lfp}(F_{\varsigma_0})\text{,}
+ \eval(\mexp) = \mathrm{lfp}(F_{\mstate_0})\text{,}
 \end{equation*}
-where $\varsigma_0 = \ev[^\mtcntr]{e, \varnothing, \varnothing, \kmt}$.
+where $\mstate_0 = \ev[^\mtcntr]{\mexp, \varnothing, \varnothing, \kmt}$.
 
-{\bf FIXME} use $\traces$
+The possible traces of execution tell us the most about a program, so
+we take $\traces(\mexp)$ to be the (regular) set of paths through the
+computed graph. We elide the construction of the set of edges in this paper.
 
 To conduct this \naive{} exploration on the \Church{} example would require
 considerable time.  Even though the state space is finite, it is exponential in
@@ -598,7 +603,7 @@ application of a widening operator during the fixed-point iteration.
 In the ISWIM language, such a widening makes 0-CFA quartic in the size of the
 program.
 %
-Thus, in one step, complexity drops from intractable exponentially to a merely
+Thus, in one step, complexity drops from intractable exponentiality to a merely
 daunting polynomial.
 
 Since we can cast this optimization as a widening, there is no need to change
@@ -612,19 +617,19 @@ them together.
 Then, before each transition, it will install this joined store into current
 state.
 
-To describe this process, we'll refactor the transition relation so that it operates on
+To describe this process, AAM defined a transformation of the reduction relation so that it operates on
 a pair of a set of contexts ($C$) and a store ($\sigma$).
 %
 A context includes all non-store components, \emph{e.g.}, the expression, the environment and the stack.
 %
-The refactored relation, $\widehat{\machstep}$, becomes:
+The transformed relation, $\widehat{\machstep}$, is
 %
 \begin{align*}
 (C, \msto) &\mathrel{\widehat{\machstep}} (C', \msto') \\
 \mbox{where } C' &= \{c' \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto^c), c \in C\} \\
               \msto' &= \bigsqcup\; \{\msto^c \mid \wn(c,\msto)\mathrel{\machstep} \wn(c', \msto^c), c \in C\} \\
 \wn(\ev{\mexp, \menv, \mkont}, \msto) &= \ev{\mexp, \menv, \msto, \mkont} \\
-\wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \msto, \mkont} \\
+\wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \mkont, \msto} \\
 \wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont} \\
 \wn(\ans{\mval}, \msto) &= \ans{\msto, \mval}
 \end{align*}
@@ -645,27 +650,26 @@ precision, and it is deterministic even if set iteration is not.
 \mbox{where } S' &= \{(c',\msto^c) \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto^c), c \in F\} \\
               F' &= \{c \mid (c,\_) \in S' \setminus S\} \\
               \msto' &= \bigsqcup\; \{\msto^c \mid (\_,\msto^c) \in S'\} \\
-\wn(\ev{\mexp, \menv, \mkont}, \msto) &= \ev{\mexp, \menv, \msto, \mkont} \\
-\wn(\co{\mval, \mkont}, \msto) &= \co{\mval, \msto, \mkont} \\
-\wn(\ap{\mvalx{u}, \mval, \mkont}, \msto) &= \ap{\mvalx{u}, \mval, \msto, \mkont} \\
-\wn(\ans{\mval}, \msto) &= \ans{\msto, \mval} \\
 \inject(e) &= (\setof{\ttuple{c_0}{\bot}},\setof{c_0},\bot) \\
 \text{ where } c_0 &= \ev{e,\bot,\kmt}
 \end{align*}
 
 For clarity, we will exhibit non-widened semantics unless a technique
-specifically requires it.
+specifically requires it. The final step to the baseline takes the
+complexity from quartic to cubic in the monovariant case.
 
-\subsection{Store-allocated results}
+\subsection{Store-allocate all values}
 \label{sec:baselineeval}
 
-The final approximation we make to get to our point of departure is
-store-allocating results of application sub-expressions. 
-The AAM approach stops at the previous optimization. 
-However, the {\tt fn} continuation stores a value, and this makes the space of
-continuations quadratic rather than linear in the size of the program---even for a monovariant analysis like 0-CFA.
-Having the space of continuations grow linearly with the size of the program 
-will drop the overall complexity to cubic (as expected).
+The final approximation we make to get to our point of departure is to
+store-allocate all values that appear, so that any non-machine state
+that contains a value instead contains an address to a value.  The AAM
+approach stops at the previous optimization.  However, the {\tt fn}
+continuation stores a value, and this makes the space of continuations
+quadratic rather than linear in the size of the program, for a
+monovariant analysis like 0-CFA.  Having the space of continuations
+grow linearly with the size of the program will drop the overall
+complexity to cubic (as expected).
 
 To achieve this linearity for continuations, we allocate an address
 for the value position when we create the continuation.  This address
@@ -674,13 +678,12 @@ application point, so the space becomes linear and the overall
 complexity drops to cubic.  This is a critical abstraction in
 languages with $n$-ary functions, since otherwise the continuation
 space grows super-exponentially. We extend the semantics to
-additionally allocate addresses to store the values of each
-subexpression of an application. The continuations have to store these
-addresses to remember where to get argument values from, though
-sometimes your allocation strategy may allow you to elide that
-representation.
+additionally allocate an address for the function value when creating
+the $\kfn{}$ continuation. The continuation has to store this address
+to remember where to get values from, though sometimes your allocation
+strategy may allow you to elide that representation.
 
-The new evaluation rules follow (where $\mcntr' = \tick(\mlab,\mcntr)$).
+The new evaluation rules follow (where $\mcntr' = \tick(\mstate)$).
 % In theory, this aggressive distinction between continuations might buy
 % additional precision, but in practice, it does not.
 
@@ -688,55 +691,21 @@ The new evaluation rules follow (where $\mcntr' = \tick(\mlab,\mcntr)$).
 %\newcommand{\ext}[3]{ext(#1,#2,#3)}
 
 \begin{align*}
-\ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &\machstep
-\ev[^{\mcntr'}]{\mexpi{0},\menv,\msto',\kar{\mexpi{1},\menv,\maddr_f,\maddr_a,\maddr_\mkont}} \\
+\co[^\mcntr]{\kar{\mexp,\menv,\maddr_\mkont},\mval,\msto} & \machstep
+\ev[^{\mcntr'}]{\mexp,\menv,\msto',\kfn{\maddr_f,\maddr_\mkont}} \\
 \text{ where }
-  \maddr_\mkont,\msto' &= \push^\mcntr_\mlab(\msto,\mkont) \\
-  \maddr_f,\maddr_a &= \allocsub^\mcntr_\mlab(\menv,\msto,\mkont)
-\end{align*}
-This rule describes how we allocate addresses for subexpressions of an
-application up front. This adds another parameter to the machine, but
-it is very much like $\alloc$. We use $f$ and $a$ subscripts to denote
-function and argument positions, respectively. Whereas ANF names all
-intermediate values in the syntax, we allocate addresses for
-intermediate values. This representational leap is not a big one, but
-is notably important for analyzing direct style terms.
-
-\begin{align*}
-\co[^\mcntr]{\kar{\mexp,\menv,\maddr_f,\maddr_a,\maddr_\mkont},\mval,\msto} & \machstep
-\ev[^{\mcntr'}]{\mexp,\menv,\msto',\kfn{\maddr_f,\maddr_a,\maddr_\mkont}} \\
-\text{ where }
+  \maddr_f &= \alloc(\mstate) \\
   \msto' &= \ext{\msto}{\maddr_f}{\{\mval\}}
 \\
-\co[^\mcntr]{\kfn{\maddr_f,\maddr_a,\maddr_\mkont},\mval,\msto} & \machstep
-\ap[^{\mcntr'}_\mlab]{\mvalx{u},\maddr_a,\mkont,\msto'}
+\co[^\mcntr]{\kfn{\maddr_f,\maddr_\mkont},\mval,\msto} & \machstep
+\ap[^{\mcntr'}_\mlab]{\mvalx{u},\mval,\mkont,\msto'}
 \\
-\text{ if } \mkont &\in \msto(\maddr_\mkont), \mvalx{u} \in \msto(\maddr_f) \\
-\text{ where }
- \msto' &= \ext{\msto}{\maddr_a}{\{\mval\}}
+\text{ if } \mkont &\in \msto(\maddr_\mkont), \mvalx{u} \in \msto(\maddr_f)
 \end{align*}
 We associate the value in hand with the expression that produced
 it. Also, we fan out to all functions that are associated with the
 original function position, because applied functions are in
 \emph{strict position} (more about that later).
-
-\begin{align*}
-\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\maddr_a, \msto,\mkont} & \machstep
-\ev[^{\mcntr'}]{\mexp,\menv',\msto',\mkont} \\
-\text{ where }
-\maddr &= \alloc(\mstate) \\
-\menv' &= \menv[\mvar\mapsto\maddr] \\
-\msto' &= \msto\sqcup[\maddr \mapsto \msto(\maddr_a)]
-\end{align*}
-Arguments are not passed as values, but as addresses to their values.
-
-\begin{align*}
-\ap[^\mcntr_\mlab]{\mop,\maddr_a,\msto,\mkont} & \machstep
-\co[^{\mcntr'}]{\mkont,\mval',\msto}
-\\
-\text{ where }& \mval'\in \{\interpdelta(\mop,\mval) \mid \mval \in \msto(\maddr_a)\}
-\end{align*}
-Primitive application still nondeterministically produces all possible values.
 
 % This extra store-allocation is effectively naming all intermediate
 % results, and thus the precision aligns with an analysis specialized to
@@ -771,8 +740,9 @@ by utilizing:
  \item preallocated data structures.
 \end{enumerate}
 
-All techniques are precision preserving under reasonable
-assumptions. We will discuss these assumptions as the caveats arise.
+All pragmatic improvments are precision preserving (form complete
+abstractions), but the semantic changes are not in some cases, for reasons we
+will describe. We did not observe the precision differences in our evaluation.
 
 \subsection{Lazy non-determinism}
 
@@ -838,10 +808,11 @@ The following rules highlight the changes to the semantics:
 {\co{\mkont,\saddr{\menv(\mvar)},\msto}}
 {\co{\mkont,\superposition{\msto(\menv(\mvar))},\msto}} \\
 %
-\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr_f,\maddr_a,\maddr_\mkont},\mval,\msto}
+\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr_\mkont},\mval,\msto}
 &\lmachstep\;
-\ev[^\mcntr]{\mexp,\menv,\msto',\kfn[^\mcntr_\mlab]{\maddr_f,\maddr_a,\maddr_\mkont}} \\
+\ev[^\mcntr]{\mexp,\menv,\msto',\kfn[^\mcntr_\mlab]{\maddr_f,\maddr_\mkont}} \\
 \text{ where }
+\maddr_f &= \alloc(\mstate) \\
 \msto' &=
 \spchoice
 {\msto \sqcup[\maddr \mapsto \force(\msto,\mval)]}
@@ -951,8 +922,8 @@ makes the following transitions:
 \\
 \machstep\; &
 \spchoice
-{\co{\kar{\mexp_1,\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\msto_4,\saddr{\menv(\mvar)}}}
-{\co{\kar{\mexp_1,\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\msto_4,\superposition{\msto_4(\menv(\mvar))}}}
+{\co{\kar{\mexp_1,\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\saddr{\menv(\mvar)},\msto_4}}
+{\co{\kar{\mexp_1,\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\superposition{\msto_4(\menv(\mvar))},\msto_4}}
 \end{align}
 where \(
 \msto_4 = \msto_0 \sqcup [\maddr_1 \mapsto \setof{\mkont},
@@ -963,8 +934,8 @@ Whereas abstract compilation gives us in one step:
 \begin{align*}
 \compile{\mexp}^\mcntr(\menv,\msto_0,\mkont) = 
 \spchoice
-{\co{\kar{\compile{\mexp_1},\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\msto'_4,\saddr{\menv(\mvar)}}}
-{\co{\kar{\compile{\mexp_1},\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\msto'_4,\superposition{\msto'_4(\menv(\mvar))}}}
+{\co{\kar{\compile{\mexp_1},\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\saddr{\menv(\mvar)},\msto'_4}}
+{\co{\kar{\compile{\mexp_1},\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\superposition{\msto'_4(\menv(\mvar))},\msto'_4}}
 \end{align*}
 where \(
 \msto'_4 = \msto_0 \sqcup \{ [\maddr_1 \mapsto \{ \mkont \}],
@@ -978,33 +949,36 @@ the other components of the {\tt ev} state. Its definition in figure
 create {\tt ev} states to instead call these functions. Figure
 \ref{fig:caam} shows the modified reduction relation. The only change
 from the previous semantics is that $\ev{}$ state construction is
-replaced by calling the compiled expression.
+replaced by calling the compiled expression. For notational coherence,
+we write $\lambda^\mcntr(\mathit{args} \ldots)$ for
+$\lambda(\mathit{args} \ldots, \mcntr)$ and
+$\mcomp^\mcntr(\mathit{args}\ldots)$ for $\mcomp(\mathit{args}\ldots,
+\mcntr)$.
 
 \begin{figure}
 \begin{align*}
-\compile{\_} &: \Expr \to \Env \times \Store \times \Kont \to \State \\
+\compile{\_} &: (\Expr \to \Env \times \Store \times \Kont \times \Counter) \to \State \\
+\mcntr' &= \tick(\mlab,\menv,\msto,\mcntr) \\
 \compile{\svar\mvar} &=
- \lambda(\menv,\msto,\mkont) .
+ \lambda^\mcntr(\menv,\msto,\mkont) .
 \spchoice
 {\co{\mkont,\saddr{\menv(\mvar)},\msto}}
 {\co{\mkont,\superposition{\msto(\menv(\mvar))},\msto}}
 \\
-\compile{\slit\mlit} &= \lambda(\menv,\msto,\mkont) .
+\compile{\slit\mlit} &= \lambda^\mcntr(\menv,\msto,\mkont) .
 \co{\mkont,\mlit,\msto}
 \\
-\compile{\slam\mvar\mexp} &= \lambda(\menv,\msto,\mkont) .
-\co{\mkont,\clos{\mvar,\compile\mexp,\menv},\msto}
+\compile{\slam\mvar\mexp} &= \lambda^\mcntr(\menv,\msto,\mkont) .
+\co{\mkont,\clos{\mvar,\compile{\mexp},\menv},\msto}
 \\
 \compile{\sapp[^\mlab]{\mexpi0}{\mexpi1}} &= \lambda^\mcntr(\menv,\msto,\mkont) .
-\compile{\mexpi0}^\mcntr(\menv,\msto',\kar[_\mlab^\mcntr]{\compile{\mexpi1},\menv,\maddr_f,\maddr_a,\maddr_\mkont})
+\compile{\mexpi0}^{\mcntr'}(\menv,\msto',\kar[_\mlab^\mcntr]{\compile{\mexpi1},\menv,\maddr_\mkont})
 \\
-&\setlength\arraycolsep{5pt}\begin{array}{lrl}\text{ where } & \maddr_\mkont,\msto' &= \push^\mcntr_\mlab(\msto,\mkont) 
-\\&
-\maddr_f,\maddr_a &= \allocsub^\mcntr_\mlab(\menv,\msto,\mkont)
-\end{array}
+&\setlength\arraycolsep{5pt}
+\begin{array}{lrl}\text{ where } & \maddr_\mkont,\msto' &= \push^\mcntr_\mlab(\msto,\mkont)\end{array}
 \\
 \compile{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}} &= \lambda^\mcntr(\menv,\msto,\mkont) .
-\compile{\mexpi0}^\delta(\menv,\msto',\kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})
+\compile{\mexpi0}^{\mcntr'}(\menv,\msto',\kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})
 \\
 &\text{ where }\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)
 \end{align*}
@@ -1023,16 +997,15 @@ replaced by calling the compiled expression.
 \co{\kmt,\mval,\msto} &\cmachstep
 \ans{\msto,\mval'} \text{ if } \mval' \in \spchoice{\force(\msto,\mval)}{\force(\mval)}
 \\
-\co{\kar[^\mcntr_\mlab]{\mcomp,\menv,\maddr_f,\maddr_a,\maddr_\mkont},\mval,\msto} & \cmachstep
-\mcomp^\mcntr(\menv,\msto',\kfn[^\mcntr_\mlab]{\maddr_f,\maddr_a,\maddr_\mkont}) \\
-\text{ where } \msto' &= \msto\sqcup[\maddr_f \mapsto \spchoice{\force(\msto,\mval)}
-                                                              {\force(\mval)}]
-\\
-\co{\kfn[^\mcntr_\mlab]{\maddr_f,\maddr_a,\maddr_\mkont},\mval,\msto} & \cmachstep
-\ap[^\mcntr_\mlab]{\mval,\maddr_a,\mkont,\msto'} \\
-\text{ if }\mval &\in \msto(\maddr_f), \mkont \in \msto(\maddr_\mkont) \\
-\text{ where } \msto' &= \msto\sqcup[\maddr_f \mapsto \spchoice{\force(\msto,\mval)}
+\co{\kar[^\mcntr_\mlab]{\mcomp,\menv,\maddr_\mkont},\mval,\msto} & \cmachstep
+\mcomp^\mcntr(\menv,\msto',\kfn[^\mcntr_\mlab]{\maddr_f,\maddr_\mkont}) \\
+\text{ where } \maddr_f &= \alloc(\mstate) \\
+               \msto' &= \msto\sqcup[\maddr_f \mapsto \spchoice{\force(\msto,\mval)}
                                                                {\force(\mval)}]
+\\
+\co{\kfn[^\mcntr_\mlab]{\maddr_f,\maddr_\mkont},\mval,\msto} & \cmachstep
+\ap[^\mcntr_\mlab]{\mval,\mval\mkont,\msto} \\
+\text{ if }\mval &\in \msto(\maddr_f), \mkont \in \msto(\maddr_\mkont) \\
 \\
 \co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\strue,\msto} & \cmachstep
 \mcompi0^\mcntr(\menv,\msto,\mkont)
@@ -1043,10 +1016,10 @@ replaced by calling the compiled expression.
 \text{ if }\mkont\in\msto(\maddr)
 \\[2mm]
 %% APPLY
-\ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\maddr_a,\msto,\mkont} & \cmachstep
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\msto,\mkont} & \cmachstep
 \mcomp^{\mcntr'}(\menv',\msto',\mkont) \\
 \text{ where }\menv' &= \menv[\mvar\mapsto\maddr] \\
-              \msto' &= \msto\sqcup[\maddr\mapsto\msto(\maddr_a)]
+              \msto' &= \msto\sqcup[\maddr\mapsto \spchoice{\force(\msto,\mval)}{\force(\mval)}]
 \\
 \ap{\mop,\mval,\msto,\mkont} & \cmachstep
 \co{\mkont,\mval',\msto} \\
@@ -1114,19 +1087,6 @@ $\erankl$ is unnecessary, so we just make it the constant 0
 function. The $\cmachstep$ cases are trivial.
 
 \paragraph{Wide store and abstract compilation}
-A small problem arises if we try to widen the store as in section
-\ref{sec:storewiden}. In one step, we can both bind a variable and
-reference it. The problem is that the store does not change until all
-steps are done, so the reference unsoundly returns the previous
-binding (or nothing at all)! There are a couple ways to address
-this. One way is to make all compiled forms that reference the store
-into a new kind of state that has to be stepped in order to reference
-the store and continue. Another way is to make function application
-take one extra step after binding, so that running the body of the
-function sees the changed store. The latter is the more enticing of
-the two, since programs have more variable references than function
-calls - we don't want to slow them down if we don't have to.
-
 The fact that many changes happen in one step also makes the
 comparison with the widened lazy semantics more subtle. It is possible
 for different stores to occur between the different semantics because
@@ -1162,7 +1122,6 @@ We represent change logs as $\msdiff \in \StoreDelta = (\Addr \times
 $\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$ begins
 empty ($\mtlst$) for each step. Applying the changes to the full store
 is straightforward:
-% TODO: Turn the recursion here into ...:
 \begin{align*}
 \replay &: \StoreDelta \times \Store \to \Store \\
 \replay(\left[ \ttuple{\maddr_i}{\mval{s_i}}, \ldots\right], \msto) &= \msto \sqcup [\maddr_i \mapsto \mval{s_i}] \sqcup \ldots
@@ -1172,7 +1131,7 @@ is straightforward:
 
 The transition relation is identical except for the addition of this change log.
 %
-Lookups will never rely on the change log, and can use the originally supplied store unmodified:
+We maintain the invariant that lookups will never rely on the change log, so we can use the originally supplied store unmodified:
 
 \begin{align*}
 (\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont},\msto,\msdiff) & \dmachstep
@@ -1183,11 +1142,34 @@ Lookups will never rely on the change log, and can use the originally supplied s
 {\cons{\ttuple{\maddr}{\force(\msto,\mval)}}{\msdiff}}
 {\cons{\ttuple{\maddr}{\force(\mval)}}{\msdiff}}
 \end{align*}
+
 Compilation changes to additionally take a $\msdiff$ component, so the
 above rule's right hand side would instead be $k^{\mcntr'}(\menv',
 \msto, \msdiff', \mkont)$ where $k = \compile{e}$ would be in the closure.
 
-We also lift $\dmachstep$ to accommodate for this asymmetry
+\spchoice{ }{
+\paragraph{Caveat:} With abstract compilation, in one step, we can
+both bind a variable and reference it. This breaks the invariant of
+not relying on the change log. The problem is that the store does not
+change until all steps are done, so the reference unsoundly returns
+the previous binding (or nothing at all)! There are a couple ways to
+address this. One way is to make all compiled forms that reference the
+store into a new kind of state that has to be stepped in order to
+reference the store and continue. Another way is to make function
+application take one extra step after binding, so that running the
+body of the function sees the changed store. The latter is the more
+enticing of the two, since programs have more variable references than
+function calls - we don't want to slow them down if we don't have
+to. This change is also minutely different in precision, so we don't
+have complete abstraction. If the lazy semantics delayed the lookup of
+a variable's address to put in superposition (i.e., produced
+$\saddr{\menv(\mvar)}$ instead of
+$\superposition{\msto(\menv(\mvar))}$, and $\force$ additionally takes
+a $\msto$), then the lazy semantics loses its complete abstraction,
+but this current caveat disappears.
+}
+
+We lift $\dmachstep$ to accommodate for the asymmetry
 in the input and output. For each state that is stepped, we feed the
 output changes to the next so that all changes get accumulated:
 
@@ -1214,18 +1196,19 @@ $\dcompile{\mexp}^\mcntr(\menv,\msto,\msdiff,\mkont) = \ttuple{\mastate}{\msdiff
 $\compile{\mexp}^\mcntr(\menv,\msto^*,\mkont^*) = \mstate$ such that
 $\mastate,\replay(\msdiff',\msto) \equiv \nw(\mstate)$
 \end{lemma}
+Here $\equiv$ means structurally the same, only compiled expressions
+are compiled with the updated compilation function that builds store
+deltas. The proof follows by equational reasoning and the previous lemma.
 Proof is by induction on $\mexp$.
 
-\begin{theorem}[Equivalence]
+\begin{theorem}[Equivalence with wide abstract compilation]
 If $S \equiv S^*, F \equiv F^*, \msto \equiv \msto^*$, then
 $(S,F,\msto) \machstep (S',F',\msto')$ iff
 $\exists S^*_1, F^*_1, \msto^*_1.
   S' \equiv S^*_1 \wedge F' \equiv F^*_1 \wedge \msto' \equiv \msto^*_1 \wedge
   (S^*,F^*,\msto^*) \dmachstep (S^*_1,F^*_1,\msto^*_1)$
 \end{theorem}
-Here $\equiv$ means structurally the same, only compiled expressions
-are compiled with the updated compilation function that builds store
-deltas. The proof follows by equational reasoning and the previous lemma.
+Proof by {\bf TODO}
 
 %% Delta Store +k Compile + Lazy:
 %%    cpu time: 668 real time: 686 gc time: 41
@@ -1352,6 +1335,29 @@ S' &= \lambda \mstate. \left\{\begin{array}{ll}
                              \end{array}\right.
 \end{align*}
 
+We increase the timestamp only if we find that the store has changed
+from any join operation. The frontier set only gets states that we
+haven't seen at the next timestamp. The states we've seen gets updated
+with the frontier states at the next timestamp. We prove semantic
+equivalence with the previous semantics with a lock-step bisimulation,
+which follow from equational reasoning from the following lemmas:
+
+\begin{lemma}[Store of value stacks completely abstracts stack of stores]
+TODO
+\end{lemma}
+
+\begin{lemma}[$\changep$ means change (a)]
+TODO
+\end{lemma}
+
+\begin{lemma}[$\changep$ means change (b)]
+TODO
+\end{lemma}
+
+\begin{theorem}[Timestamped system with stack of stores completely abstracts wide store deltas]
+TODO
+\end{theorem}
+
 \subsubsection{Pure to imperative}
 
 The intermediate data structures of the above transfer function can all be streamlined into globals that are destructively updated. In particular, there are 5 globals:
@@ -1369,32 +1375,6 @@ update the global store. We would also not view it as a general
 relation, but a function that adds all next states to $F$ if they have
 not already been seen. At the end of iterating through $F$, $S$ is
 updated with the new states at the next timestamp.
-
-% \begin{figure}\label{fig:pure-timestamp}
-% \begin{align*}
-% t \in \Timestamp &= {\mathbb N} \\
-% \msto \in \Store &= \Addr \to (\Timestamp \times \wp(\Storeable))^* \\
-% (S,F,\msto,t) &\tmachstep (S \cup S', F', \msto', t') \\
-% \text{ where } I &= \{(\mstate,\msdiff) \mid \mstate \in F, \mstate \
-% \end{align*}
-% \end{figure}
-
-% \begin{figure}
-% \begin{alltt}
-% eval(\(e\)) :=
-%   \(\msto\), todo, seen, T := \(\varnothing\), \(\varnothing\), [], 0
-%   \(\compile{e}\)(\(\mtcntr, \varnothing, \varnothing, \mtlst, \kmt\))
-%   while(true):
-%     if todo = \(\varnothing\): return (keys(seen), \(\msto\))
-%     else:
-%       let old := todo
-%       todo, \(\msdiff\) := \(\varnothing\), \(\mtlst\)
-%       foreach c \(\in\) old: \(\changep\) := false; c()
-%       unless \(\msdiff\) = \(\mtlst\): T += 1; replay!(\(\msdiff, \msto\))
-% \end{alltt}
-% \caption{Imperative algorithm}
-% \label{fig:imperative}
-% \end{figure}
 
 \subsection{Pre-allocating the store}
 
@@ -1549,6 +1529,11 @@ the store delta technique without further improvements.
 \label{fig:bench-all}
 \end{figure*}
 
+We evaluated the precision of these techniques with a singleton
+variable analysis to find opportunities to inline constants and closed
+functions. We found no change in the results across all
+implementations, including Shivers' timestamp approximation.
+
 Source code of the implementation and benchmark suite is at:
 
 \begin{center}
@@ -1585,7 +1570,7 @@ Jagannathan~\cite{dvanhorn:wright-jagannathan-toplas98}.\footnote{This
   evaluation, which we consciously aimed to approach.}  Unfortunately,
 these analyses compute an inherently different and incomparable form
 of analysis.  Consequently, we have omitted a complete comparison with
-these implementations,.  The AAM approach provides more precision in
+these implementations.  The AAM approach provides more precision in
 terms of temporal-ordering of program states, which comes at a cost
 that can be avoided in constraint-based approaches.  Consequently
 implementation techniques cannot be ``ported'' between these two
@@ -1638,10 +1623,10 @@ model.
 \paragraph{Abstract compilation}
 
 Boucher and Feeley \cite{dvanhorn:Boucher1996Abstract} introduced the
-idea of \emph{abstract compilation}, which used closure generation
+idea of abstract compilation, which used closure generation
 \cite{dvanhorn:Feeley1987Using} to improve the performance of control
 flow analysis.  We have adapted the closure generation technique from
-composition evaluators to abstract machines and applied it to similar
+compositional evaluators to abstract machines and applied it to similar
 effect.
 
 \paragraph{Constraint-based program analysis for higher-order languages}
