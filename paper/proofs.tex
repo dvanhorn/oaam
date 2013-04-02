@@ -1,0 +1,964 @@
+\documentclass{llncs}
+\usepackage{amsmath,amssymb,pfsteps,multicol,stmaryrd,mathpartir,centernot}
+\input{preamble}
+
+\newcommand{\nequiv}{\centernot\equiv}
+\newcommand{\finto}{\mathbin{\overset{\text{fin}}{\rightharpoonup}}}
+
+\newcommand{\alloc}{\mathit{alloc}}
+\newcommand{\dom}{\mathbf{dom}}
+\newcommand{\inject}{\mathit{inject}}
+\newcommand{\length}{\mathit{length}}
+\newcommand{\cyclefree}{\mathit{cycle\text{-}free}}
+\newcommand{\prop}{\mathit{prop}}
+\newcommand{\lengthF}{{\mathcal F}}
+\newcommand{\klength}{\mathit{klength}}
+\newcommand{\possibletrace}{\mathit{possible\text{-}trace}}
+\newcommand{\buildtable}{\mathit{build\text{-}table}}
+\newcommand{\buildtablefrom}{\mathit{bt}}
+\newcommand{\buildkont}{\mathit{build\text{-}kont}}
+\newcommand{\reverse}{\mathit{reverse}}
+
+\newcommand{\absN}{\hat{{\mathbb N}}}
+\newcommand{\absn}{\hat{n}}
+\newcommand{\squish}{\mathbin{\otimes}}
+
+\newcommand{\many}[1]{\overline{#1}}
+
+\newcommand{\var}{x}
+\newcommand{\app}[2]{(#1\ #2)}
+\newcommand{\lam}[2]{\lambda\ #1.\ #2}
+\newcommand{\closure}[3]{(\lambda #1. #2,\ #3)}
+\newcommand{\Var}{\mathit{Var}}
+
+\newcommand{\expr}{e}
+
+\newcommand{\addr}{a}
+
+\newcommand{\ktab}{\Xi}
+\newcommand{\ktabof}{\mathit{KTable\text{-}of}}
+\newcommand{\Ktab}{\mathit{KTable}}
+\newcommand{\Kkey}{\mathit{KTableKey}}
+\newcommand{\ktabkey}[3]{(#1,\ #2,\ #3)}
+\newcommand{\ktabentry}[2]{(#1,\ #2)}
+
+\newcommand{\val}{v}
+
+\newcommand{\kont}{\kappa}
+
+\newcommand{\env}{\rho}
+
+\newcommand{\sto}{\sigma}
+
+\newcommand{\conf}{\varsigma}
+\newcommand{\Conf}{\mathit{Conf}}
+
+\newcommand{\setof}[1]{\{ #1 \}}
+
+\newcommand{\redto}{\mathbin{\longmapsto}}
+\newcommand{\redtraceto}[1][\ ]{\mathbin{\longmapsto^{TR}_{#1}}}
+
+\newcommand{\alt}{\mid}
+\newcommand{\mt}{\mathbf{mt}}
+\newcommand{\ar}[3]{\mathbf{ar}(#1,\ #2,\ #3)}
+\newcommand{\fn}[2]{\mathbf{fn}(#1,\ #2)}
+\newcommand{\rt}[2]{\texttt{[]}^{(#1,\ #2)}}
+
+\begin{document}
+
+For reasons of space, the entire definitions of each intermediate
+semantics were not shown (just the original and lazy, abstractly
+compiled). We thus give a reference here to the complete semantics of
+each other machine to use as a basis for the following proofs.
+
+\section{Semantics}
+
+\subsection{ISWIM with store-allocated results}
+
+Machine configuration space:
+\begin{align*}
+\mstate \in \State &= \ev[^\mcntr]{\mexp, \menv, \msto, \mkont} \alt
+                     \co{\mkont, \mval, \msto} \alt
+                     \ap[_\mlab^\mcntr]{\mval,\mval,\msto,\mkont} \alt
+                     \ans{\msto,\mval} \\
+\mkont \in \Kont &::= \kmt \alt
+                      \kar[_\mlab^\mcntr]{\mexp, \menv, \maddr} \alt
+                      \kfn[_\mlab^\mcntr]{\maddr, \maddr} \alt
+                      \kif[_\mlab^\mcntr]{\mexp, \mexp, \menv, \mkont} \\
+\mlab \in \Label &\text{ an infinite set} \\
+\mcntr \in \Counter &= \Label^* \\
+\mval \in \Value &::= \mlit \alt \mop \alt
+                      \clos{\mvar,\mexp,\menv} \\
+\mstor \in \Storeable &::= \mlit \alt \mop \alt
+                           \clos{\mvar,\mexp,\menv} \alt
+                           \mkont \\
+\menv \in \Env &= \Var \finto \Addr \\
+\msto \in \Store &= \Addr \finto \wp(\Storeable)
+\end{align*}
+
+Reduction semantics:
+\begin{gather*}
+\begin{array}{@{}r@{\ }c@{\ }l@{}}
+%% EVAL
+\ev{\svar\mvar,\menv,\msto,\mkont} &\machstep&
+\co{\mkont,\saddr{\menv(\mvar)},\msto}
+\\
+\ev{\slit\mlit,\menv,\msto,\mkont} &\machstep&
+\co{\mkont,\mlit,\msto}
+\\
+\ev{\slam\mvar\mexp,\menv,\msto,\mkont} &\machstep&
+\co{\mkont,\clos{\mvar,\mexp,\menv},\msto}
+\\
+\ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &\machstep&
+\ev[^\mcntr]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}
+\\
+&&
+\text{ where }\maddr,\msto' = \push^\mcntr_\mlab(\msto,\mkont)
+\\
+\ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} &\machstep&
+\ev[^\mcntr]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}
+\\
+&&
+\text{ where }\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)
+\\[2mm]
+%% CONTINUE
+\co{\kmt,\mval,\msto} &\machstep&
+\ans{\msto,\mval}
+\\
+\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto} & \machstep&
+\ev[^\mcntr]{\mexp,\menv,\msto',\kfn[^\mcntr_\mlab]{\maddralt,\maddr}}
+\\
+&&
+\text{ where }\maddralt,\msto' = \stash_\mlab^\mcntr(\msto,\mval)
+\\
+\co{\kfn[^\mcntr_\mlab]{\maddralt,\maddr},\mval,\msto} & \machstep&
+\ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont,\msto}
+\text{ where } \mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddralt)
+\\
+\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto} & \machstep&
+\ev[^\mcntr]{\mexpi0,\menv,\msto,\mkont}
+\text{ where }\mkont\in\msto(\maddr)
+\\
+\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\sfalse,\msto} & \machstep&
+\ev[^\mcntr]{\mexpi1,\menv,\msto,\mkont}
+\text{ where }\mkont\in\msto(\maddr)
+\\[2mm]
+%% APPLY
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont} & \machstep&
+\ev[^{\mcntr'}\!]{\mexp,\menv',\msto',\mkont}
+\\
+\multicolumn{3}{r@{}}{
+\text{ where }\menv',\msto',\mcntr' = \bind^{ \mcntr}_\mlab(\menv,\msto,\mvar,\mval)}
+\\
+\ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont} & \machstep&
+\co{\mkont,\mval',\msto}
+\text{ where } \mval'\in\interpdelta(\mop,\mval)
+\end{array}
+\end{gather*}
+
+\begin{align*}
+\push_\mlab^\mcntr(\msto,\mstor) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
+\mbox{ where }\maddr \notin\msto
+\\
+\stash_\mlab^\mcntr(\msto,\mval) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mval\}]
+\mbox{ where }\maddr \notin\msto
+\\
+\bind_\mlab^\mcntr(\menv,\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\msto\sqcup[\maddr\mapsto\{\mval\}],\lfloor \mlab\mcntr \rfloor_k
+\mbox{ where }\maddr \notin\msto
+\end{align*}
+
+\begin{align*}
+\inject(\mexp) &= \ev[^\mtcntr]{\mexp,\bot,\bot,\kmt} \\
+\reachable{\mexp} &= \setof{\mstate \mid \inject(\mexp) \machstep^* \mstate}
+\end{align*}
+
+\subsection{Store-allocated results with lazy nondeterminism}
+
+Machine configuration space:
+\begin{align*}
+\mstate \in \State &= \ev[^\mcntr]{\mexp, \menv, \msto, \mkont} \alt
+                     \co{\mkont, \mval, \msto} \alt
+                     \ap[_\mlab^\mcntr]{\mval,\mval,\msto,\mkont} \alt
+                     \ans{\msto,\mval}\\
+\mval \in \Value &::= \mlit \alt \mop \alt
+                      \clos{\mvar,\mexp,\menv} \alt
+                      \saddr\maddr
+\end{align*}
+$\Kont$, $\Storeable$, $\Env$ and $\Store$ are defined the same as previously.
+
+Reduction semantics:
+\begin{gather*}
+\begin{array}{@{}r@{\ }c@{\ }l@{}}
+%% EVAL
+\ev{\svar\mvar,\menv,\msto,\mkont} &\machstep&
+\co{\mkont,\saddr{\menv(\mvar)},\msto}
+\\
+\ev{\slit\mlit,\menv,\msto,\mkont} &\machstep&
+\co{\mkont,\mlit,\msto}
+\\
+\ev{\slam\mvar\mexp,\menv,\msto,\mkont} &\machstep&
+\co{\mkont,\clos{\mvar,\mexp,\menv},\msto}
+\\
+\ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} &\machstep&
+\ev[^\mcntr]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}
+\\
+&&
+\text{ where }\maddr,\msto' = \push^\mcntr_\mlab(\msto,\mkont)
+\\
+\ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} &\machstep&
+\ev[^\mcntr]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}
+\\
+&&
+\text{ where }\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)
+\\[2mm]
+%% CONTINUE
+\co{\kmt,\mval,\msto} &\machstep&
+\ans{\msto,\mvalx{u}}
+\text{ where } \mvalx{u} \in \force(\msto, \mval)
+\\
+\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto} & \machstep&
+\ev[^\mcntr]{\mexp,\menv,\msto',\kfn[^\mcntr_\mlab]{\maddralt,\maddr}}
+\\
+&&
+\text{ where }\maddralt,\msto' = \stash_\mlab^\mcntr(\msto,\mval)
+\\
+\co{\kfn[^\mcntr_\mlab]{\maddralt,\maddr},\mval,\msto} & \machstep&
+\ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont,\msto}
+\text{ where } \mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddralt)
+\\
+\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto} & \machstep&
+\ev[^\mcntr]{\mexpi0,\menv,\msto,\mkont}
+\text{ where }\mkont\in\msto(\maddr)
+\\
+\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\sfalse,\msto} & \machstep&
+\ev[^\mcntr]{\mexpi1,\menv,\msto,\mkont}
+\text{ where }\mkont\in\msto(\maddr)
+\\[2mm]
+%% APPLY
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont} & \machstep&
+\ev[^{\mcntr'}\!]{\mexp,\menv',\msto',\mkont}
+\\
+\multicolumn{3}{r@{}}{
+\text{ where }\menv',\msto',\mcntr' = \bind^{ \mcntr}_\mlab(\menv,\msto,\mvar,\mval)}
+\\
+\ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont} & \machstep&
+\co{\mkont,\mval',\msto}
+\text{ where } \mvalx{u} \in \force(\msto, \mval), \mval'\in\interpdelta(\mop,\mvalx{u})
+\end{array}
+\end{gather*}
+
+\begin{align*}
+\force(\msto,\saddr\maddr) &= \msto(\maddr) \\
+\force(\msto,\mval) &= \{ \mval \} \\
+\stash(\msto,\mval) &= \maddralt, \msto\sqcup[\maddralt \mapsto \force(\msto, \mval)]
+\mbox{ where }\maddr \notin\msto \\
+\bind_\mlab^\mcntr(\menv,\msto,\mvar,\mval) &= \menv[\mvar\mapsto\maddr],\msto\sqcup[\maddr\mapsto\force(\msto,\mval)],\lfloor \mlab\mcntr \rfloor_k
+\mbox{ where }\maddr \notin\msto \\
+\push_\mlab^\mcntr(\msto,\mstor) &= \maddr,\msto\sqcup[\maddr\mapsto\{\mkont\}]
+\mbox{ where }\maddr \notin\msto
+\end{align*}
+
+\begin{align*}
+\inject(\mexp) &= \ev[^\mtcntr]{\mexp,\bot,\bot,\kmt} \\
+\reachable{\mexp} &= \setof{\mstate \mid \inject(\mexp) \machstep^* \mstate}
+\end{align*}
+
+\subsection{Lazy nondeterminism with abstract compilation}
+
+Machine configuration space:
+\begin{align*}
+\mstate \in \State &= \co{\mkont, \mval, \msto} \alt
+                     \ap[_\mlab^\mcntr]{\mval,\mval,\msto,\mkont} \alt
+                     \ans{\msto, \mval}\\
+\mcomp \in \Compiled &= (\Env \times \Store \times \Kont \times \Counter) \to \State \\
+\mkont \in \Kont &::= \kmt \alt
+                      \kar[_\mlab^\mcntr]{\mcomp, \menv, \maddr} \alt
+                      \kfn[_\mlab^\mcntr]{\maddr, \maddr} \alt
+                      \kif[_\mlab^\mcntr]{\mcomp, \mcomp, \menv, \maddr} \\
+\mval \in \Value &::= \mlit \alt \mop \alt
+                      \clos{\mvar,\mcomp,\menv} \alt
+                      \saddr\maddr \\
+\Storeable &::= \mlit \alt \mop \alt
+                \clos{\mvar,\mcomp,\menv} \alt
+                \mkont \\
+\end{align*}
+$\Store$ and $\Env$ are defined the same as previously.
+
+We write $\lambda^\mcntr(\mathit{args}\ldots). \mathit{body}$ (and without superscript) to mean
+$\lambda(\mathit{args}\ldots \mcntr). \mathit{body}$ and
+$\mcomp^\mcntr(\menv, \msto, \mkont)$ to mean $\mcomp(\menv, \msto,
+\mkont, \mcntr)$ for notational consistency.
+
+Abstract compilation function:
+
+\begin{align*}
+\compile{\_} &: \Expr \to \Compiled \\
+\compile{\svar\mvar} &= \lambda(\menv,\msto,\mkont) .\co{\mkont,\saddr{\menv(\mvar)},\msto}
+\\
+\compile{\slit\mlit} &= \lambda(\menv,\msto,\mkont) .
+\co{\mkont,\mlit,\msto}
+\\
+\compile{\slam\mvar\mexp} &= \lambda(\menv,\msto,\mkont) .
+\co{\mkont,\clos{\mvar,\compile\mexp,\menv},\msto}
+\\
+\compile{\sapp[^\mlab]{\mexpi0}{\mexpi1}} &= \lambda^\mcntr (\menv,\msto,\mkont) .
+\compile{\mexpi0}^\mcntr(\menv,\msto',\kar[_\mlab^\mcntr]{\compile{\mexpi1},\menv,\maddr})
+\\
+&
+\text{ where }\maddr,\msto' = \push^\mcntr_\mlab(\msto,\mkont)
+\\
+\compile{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}} &= \lambda^\mcntr(\menv,\msto,\mkont) .
+\compile{\mexpi0}^\delta(\menv,\msto',\kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})
+\\
+&\text{ where }\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)
+\end{align*}
+
+Reduction semantics:
+
+\begin{gather*}
+\begin{align*}
+%% CONTINUE
+\co{\kmt,\mval,\msto} &\machstep
+\ans{\msto,\mvalx{u}}
+\text{ where } \mvalx{u} \in \force(\msto,\mval)
+\\
+\co{\kar[^\mcntr_\mlab]{\mcomp,\menv,\maddr},\mval,\msto} & \machstep
+\mcomp^\mcntr(\menv,\msto',\kfn[^\mcntr_\mlab]{\maddralt,\maddr})
+\\
+\text{ where }\maddralt,\msto' &= \stash_\mlab^\mcntr(\msto,\mval)
+\\
+\co{\kfn[^\mcntr_\mlab]{\maddralt,\maddr},\mval,\msto} & \machstep
+\ap[^\mcntr_\mlab]{\mvalx{u},\mval,\msto,\mkont}
+\text{ where } \mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddralt)
+\\
+\co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\strue,\msto} & \machstep
+\mcompi0^\mcntr(\menv,\msto,\mkont)
+\text{ where }\mkont\in\msto(\maddr)
+\\
+\co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\sfalse,\msto} & \machstep
+\mcompi1^\mcntr(\menv,\msto,\mkont)
+\text{ where }\mkont\in\msto(\maddr)
+\\[2mm]
+%% APPLY
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\msto,\mkont} & \machstep
+\mcomp^{\mcntr'}(\menv',\msto',\mkont) \\
+\text{ where }\menv',\msto',\mcntr' &= \bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval)
+\\
+\ap{\mop,\mval,\msto,\mkont} & \machstep
+\co{\mkont,\mval',\msto} \\
+\text{ where }\mkont &\in\msto(\maddr)
+\text{ and } \mvalx{u} \in \force(\msto,\mval), \mval'\in\interpdelta(\mop,\mvalx{u})
+\end{align*}
+\end{gather*}
+
+\begin{align*}
+\inject(\mexp) &= \compile{\mexp}^{\mtcntr}(\bot,\bot,\kmt) \\
+\reachable{\mexp} &= \setof{\mstate \mid \inject(\mexp) \machstep^* \mstate}
+\end{align*}
+
+\subsection{Widened abstract compilation}
+
+Machine configuration space:
+\begin{align*}
+\mstate \in \State &= \co{\mkont, \mval} \alt
+                     \ap[_\mlab^\mcntr]{\mval,\mval,\mkont} \alt
+                     \ans{\mval} \\
+\System &= \wp(\State) \times \Store
+\end{align*}
+
+\begin{align*}
+\nw(\co{\mkont,\mval,\msto}) &= \co{\mkont, \mval}, \msto \\
+\nw(\ap[^\mcntr_\mlab]{\mvalx{u},\mval,\msto,\mkont}) &= \ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont}, \msto \\
+\nw(\ans{\msto,\mval}) &= \ans{\mval}, \msto \\
+\wn(\co{\mkont,\mval},\msto) &= \co{\mkont,\mval,\msto} \\
+\wn(\ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont},\msto) &= \ap[^\mcntr_\mlab]{\mvalx{u},\mval,\msto,\mkont} \\
+\wn(\ans{\mval},\msto) &= \ans{\msto,\mval}
+\end{align*}
+
+Reduction semantics:
+\begin{align*}
+\inject(\mexp) &= (\setof{\mstate'},\setof{\mstate'},\msto) \\
+ \text{ where } \mstate &= \compile{\mexp}^{\mtcntr}(\bot,\bot,\kmt) \\
+                \mstate', \msto &= \nw(\mstate) \\
+\reachable{\mexp} &= \setof{\wn(\mstate,\msto') \mid
+                             \inject(\mexp) \machstep^* (S,F,\msto),
+                             \ttuple{\mstate}{\msto'} \in S} \\
+(S,F,\msto) &\machstep (S \cup S', F', \msto') \\
+ \text{ where }
+  I &= \setof{ \nw(\mstate^*) \mid \mstate \in F, \wn(\mstate,\msto) \machstep \mstate^*, \nw(\mstate^*)\notin S} \\
+  F' &= \setof{\mstate \mid \exists \msto. \ttuple{\mstate}{\msto} \in S'} \\
+  \Sigma &= \setof{\msto \mid \exists \mstate. \ttuple{\mstate}{\msto} \in S'} \\
+  \msto' &= \bigsqcup\limits_{\msto\in\Sigma}{\msto} \\
+  S' &= \setof{\ttuple{\mstate}{\msto'} \mid \mstate \in F'}
+\end{align*}
+
+\subsection{Abstract compilation with store deltas}
+
+All previous machines had a trivial widening operator for the store
+that would expand states without stores to states with stores, reduce
+with the written semantics, and then remove the resulting stores and
+join them again so that there is one store shared amongst all
+states. Here we have a different widening that accumulates store
+changes so that entire stores need not be joined each step - just
+their changes.
+\\
+Machine configuration space:
+\begin{align*}
+\System &= \wp(\State) \times \Store \\
+\mstate \in \State &= \co{\mkont, \mval} \alt
+                     \ap[_\mlab^\mcntr]{\mval,\mval,\mkont} \alt
+                     \ans{\mval} \\
+\mcomp \in \Compiled &=
+  (\Env \times \Store \times \StoreDelta \times \Kont \times \Counter) \to
+   (\State \times \StoreDelta) \\
+\mkont \in \Kont &::= \kmt \alt
+                      \kar[_\mlab^\mcntr]{\mcomp, \menv, \maddr} \alt
+                      \kfn[_\mlab^\mcntr]{\maddr, \maddr} \alt
+                      \kif[_\mlab^\mcntr]{\mcomp, \mcomp, \menv, \maddr} \\
+\msdiff \in \StoreDelta &= \Addr \finto \wp(\Storeable) \\
+\end{align*}
+$\Storeable$, $\Store$, $\Env$ and $\Value$ are defined the same as previously.
+
+Abstract compilation function:
+
+\begin{align*}
+\compile{\_} &: \Expr \to \Compiled \\
+\compile{\svar\mvar} &= \lambda(\menv,\msto,\msdiff, \mkont) .\ttuple{\co{\mkont,\saddr{\menv(\mvar)},\msto}}{\bot}
+\\
+\compile{\slit\mlit} &= \lambda(\menv,\msto,\msdiff,\mkont) .
+\ttuple{\co{\mkont,\mlit,\msto}}{\bot}
+\\
+\compile{\slam\mvar\mexp} &= \lambda(\menv,\msto,\msdiff,\mkont) .
+\ttuple{\co{\mkont,\clos{\mvar,\compile\mexp,\menv},\msto}}{\bot}
+\\
+\compile{\sapp[^\mlab]{\mexpi0}{\mexpi1}} &= \lambda^\mcntr (\menv,\msto,\msdiff,\mkont) .
+\compile{\mexpi0}^\mcntr(\menv,\msto,\msdiff',\kar[_\mlab^\mcntr]{\compile{\mexpi1},\menv,\maddr})
+\\
+&
+\text{ where }\maddr,\msdiff' = \push^\mcntr_\mlab(\msdiff,\mkont)
+\\
+\compile{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}} &= \lambda^\mcntr(\menv,\msto,\msdiff,\mkont) .
+\compile{\mexpi0}^\delta(\menv,\msto,\msdiff',\kif[^\mcntr]{\compile{\mexpi1},\compile{\mexpi2},\menv,\maddr})
+\\
+&\text{ where }\maddr,\msdiff' = \push_\mlab^\mcntr(\msdiff,\mkont)
+\end{align*}
+
+Reduction semantics helper (write $\mstate \machstep_\msto \mstate',\msdiff$ to mean $((\mstate,\msto),(\mstate',\msdiff)) \in \machstep$):
+
+\begin{gather*}
+\begin{align*}
+\machstep &\subseteq (\State \times \Store) \times (\State \times \StoreDelta) \\
+%% CONTINUE
+\co{\kmt,\mval} &\machstep_\msto
+\ans{\mvalx{u}},\bot
+\text{ where } \mvalx{u} \in \force(\msto,\mval)
+\\
+\co{\kar[^\mcntr_\mlab]{\mcomp,\menv,\maddr},\mval} & \machstep_\msto
+\mcomp^\mcntr(\menv,\kfn[^\mcntr_\mlab]{\maddralt,\maddr}), \msdiff
+\\
+\text{ where }\maddralt,\msdiff &= \stash_\mlab^\mcntr(\msto,\mval)
+\\
+\co{\kfn[^\mcntr_\mlab]{\maddralt,\maddr},\mval} & \machstep_\msto
+\ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont}, \bot
+\text{ where } \mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddralt)
+\\
+\co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\strue} & \machstep_\msto
+\mcompi0^\mcntr(\menv,\msto,\bot,\mkont), \bot
+\text{ where }\mkont\in\msto(\maddr)
+\\
+\co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\sfalse} & \machstep_\msto
+\mcompi1^\mcntr(\menv,\msto,\bot,\mkont), \bot
+\text{ where }\mkont\in\msto(\maddr)
+\\[2mm]
+%% APPLY
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\mkont} & \machstep_\msto
+\mcomp^{\mcntr'}(\menv',\msto,\msdiff,\mkont), \msdiff \\
+\text{ where }\menv',\msdiff,\mcntr' &= \bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval)
+\\
+\ap{\mop,\mval,\mkont} & \machstep
+\co{\mkont,\mval'},\bot \\
+\text{ where }\mkont &\in\msto(\maddr)
+\text{ and } \mvalx{u} \in \force(\msto,\mval), \mval'\in\interpdelta(\mop,\mvalx{u})
+\end{align*}
+\end{gather*}
+
+Reduction semantics:
+\begin{align*}
+\inject(\mexp) &= (\setof{\mstate}, \setof{\mstate}, \replay(\msdiff,\bot)) \\
+ \text{ where } \mstate, \msdiff &= \compile{e}^{\mtcntr}(\bot,\bot,\bot,\kmt) \\
+\reachable{\mexp} &= \setof{\wn(\mstate,\msto') \mid
+                             \inject(\mexp) \machstep^* (S,F,\msto),
+                             \ttuple{\mstate}{\msto'} \in S} \\
+(S,F,\msto) &\machstep (S \cup S', F', \msto') \\
+ \text{ where } I &=
+   \setof{ \ttuple{\mstate'}{\msdiff} \mid \mstate \in F, \mstate \machstep_\msto \mstate', \msdiff} \\
+   F' &= \setof{\mstate \mid \exists \msdiff. \ttuple{\mstate}{\msdiff} \in I} \\
+   \Xi &= \setof{\msdiff \mid \exists \mstate. \ttuple{\mstate}{\msdiff} \in I} \\
+   \msto' &= \replayall(\Xi,\msto) \\
+   S' &= \setof{\ttuple{\mstate}{\msto'} \mid \mstate \in F'} \\
+   \replayall(\varnothing,\msto) &= \msto \\
+   \replayall(\setof{\msdiff} \cup \Xi, \msto) &= \replayall(\Xi, \replay(\msdiff, \msto))
+\end{align*}
+
+%% This reduction semantics has an expensive fixed point computation
+%% since many states would be stepped several times, even if
+%% unnecessary. Instead, we use a frontier solution that maps states to
+%% the last store they were processed at to determine if they need to be
+%% stepped again.
+
+%% Frontier computation:
+%% \begin{align*}
+%% \mathit{reachable}(e) &= \lfp{{\mathcal F}}(\varnothing, \setof{\mstate}, \replay(\msdiff,\bot)) \\
+%%  \text{ where } \mstate, \msdiff &= \compile{e}^\mcntr(\bot,\bot,\bot,\kmt) \\
+%% {\mathcal F} &: ((\State \finto \Store) \times \wp(\State) \times \Store) \to
+%%                 ((\State \finto \Store) \times \wp(\State) \times \Store) \\
+%% {\mathcal F}(S,F,\msto) &= (S', F \cup F', \msto') \\
+%%  \text{ where }
+%%   I &= \setof{ \ttuple{\mstate'}{\msdiff} \mid \mstate \in F, \mstate \machstep_\msto \mstate', \msdiff} \\
+%%   \msto' &= \replayall(\setof{\msdiff \mid \exists \mstate. (\mstate, \msdiff) \in I}, \msto) \\
+%%   F' &= \setof{\mstate \mid \exists \msdiff. (\mstate,\msdiff) \in I,
+%%                 \msto' \neq S(\mstate)} \\
+%%   S' &= \lambda \mstate. \left\{\begin{array}{ll}
+%%                                  \msto' & \text{if } \mstate \in F' \\
+%%                                  S(\mstate) & \text{otherwise}
+%%                                 \end{array}\right.
+%% \end{align*}
+
+\subsection{Store deltas with timestamped store}
+
+\begin{align*}
+\inject(\mexp) &=
+ (S_0, \setof{\mstate},
+  \replay(\msdiff,\bot), 0) \\
+ \text{ where } \mstate, \msdiff &= \compile{e}^\mcntr(\bot,\bot,\bot,\kmt) \\
+                S_0 &= \lambda\mstate'.
+                        \left\{\begin{array}{ll}
+                         0 & \text{if } \mstate' = \mstate \\
+                         \epsilon & \text{otherwise}
+                        \end{array}\right. \\
+\mathit{reachable}(\mexp) &= \setof{\wn(\mstate,\Sigma(n)) \mid \inject(\mexp) \machstep^* (S,F,\Sigma,n'), \hd(S(\mstate)) = n} \\
+\System &= (\State \to {\mathbb N}^*) \times \wp(\State) \times ({\mathbb N} \finto \Store) \times {\mathbb N} \\
+(S,F,\Sigma,n) &\machstep (S', F \cup F', \Sigma[n' \mapsto \msto'],n') \\
+ \text{ where }
+ \msto &= \Sigma(n) \\
+  I &= \setof{ \ttuple{\mstate'}{\msdiff} \mid \mstate \in F, \mstate \machstep_\msto \mstate', \msdiff} \\
+  \msto',\updatedp &=
+     \replaychangeall(\setof{\msdiff \mid \exists \mstate. (\mstate, \msdiff) \in I}, \msto,\sfalse) \\
+  n' &= \left\{\begin{array}{ll}
+                n + 1 & \text{if } \updatedp \\
+                n & \text{otherwise}
+               \end{array}\right. \\
+  F' &= \setof{\mstate \mid \exists \msdiff. (\mstate,\msdiff) \in I,
+                n' \neq \hd(S(\mstate))} \\
+  S' &= \lambda \mstate. \left\{\begin{array}{ll}
+                                 n' S(\mstate) & \text{if } \mstate \in F' \\
+                                 S(\mstate) & \text{otherwise}
+                                \end{array}\right. \\
+  \replaychangeall(\setof{\msdiff} \cup \Xi, \msto, \updatedp) &=
+    \replaychangeall(\Xi, \msto', \updatedp \vee \joinp) \\
+   \text{ where } \msto', \joinp &= \replaychange(\msdiff, \msto, \sfalse) \\
+  \replaychange(\msdiff[\maddr \mapsto S], \msto, \joinp) &=
+   \replaychange(\msdiff, \msto', \joinp \vee \joinp') \\
+  \text{ where } S' &= S \sqcup \msto(\maddr) \\
+                 \joinp' &= S \deceq S' \\
+                 \msto' &= \msto[\maddr \mapsto S'] \\
+  \replaychange(\bot, \msto, \joinp) &= \msto, \joinp
+\end{align*}
+
+\section{Proofs}
+
+\subsection{Soundness of lazy-nondeterminism}
+Soundness is apparent when we consider $\saddr\maddr$ to represent all
+values in $\msto(\maddr)$. We make the argument simpler by requiring
+the order on stores to only relate functions with the same domain. We
+further require that fresh choice of addresses is deterministic based
+on map domain. This keeps machinery like partial bijections and
+renaming from cluttering the argument.
+
+\begin{align*}
+\alpha(\mstate) &= \mstate \\
+\gamma(\ev[^\mcntr]{\mexp, \menv, \msto, \mkont}) &= \setof{\ev[^\mcntr]{\mexp, \menv, \msto, \mkont}} \\
+\gamma(\co{\mkont, \mval, \msto}) &= \setof{\co{\mkont, \mval', \msto} \mid \mval' \in \force(\msto,\mval)} \\
+\gamma(\ap[_\mlab^\mcntr]{\mval, \mvalx{u}, \msto}) &= \setof{\ap[_\mlab^\mcntr]{\mval', \mvalx{u}', \msto} \mid \mval' \in \force(\msto,\mval), \mvalx{u}' \in \force(\msto,\mvalx{u})} \\
+\gamma(\ans{\msto, \mval}) &= \setof{\ans{\msto, \mval'} \mid \mval' \in \force(\msto,\mval)} \\
+\alpha^*(C) &= \setof{\alpha(\mstate) \mid \mstate \in C} \\
+\gamma^*(A) &= \bigcup\limits_{\hat{\mstate} \in A}{\gamma(\hat{\mstate})}
+\end{align*}
+
+\begin{mathpar}
+\inferrule{\dom(\msto) = \dom(\msto') \\ \forall \maddr. \msto(\addr) \subseteq \msto'(\maddr)}
+          {\msto \sqsubseteq \msto'} \\
+\inferrule{\msto \sqsubseteq \msto'}
+          {\ev[^\mcntr]{\mexp, \menv, \msto, \mkont} \sqsubseteq
+           \ev[^\mcntr]{\mexp, \menv, \msto', \mkont}}
+ \qquad
+\inferrule{\force(\msto, \mval) \subseteq \force(\msto', \mval') \\ \msto \sqsubseteq \msto'}
+          {\co{\mkont,\mval,\msto} \sqsubseteq \co{\mkont, \mval', \msto'}} \\
+%
+\inferrule{\force(\msto, \mval) \subseteq \force(\msto', \mval') \\
+           \force(\msto, \mvalx{u}) \subseteq \force(\msto', \mvalx{u}') \\
+           \msto \sqsubseteq \msto'}
+{\ap[_\mlab^\mcntr]{\mval, \mvalx{u}, \msto} \sqsubseteq \ap[_\mlab^\mcntr]{\mval', \mvalx{u}', \msto'}} \\
+%
+\inferrule{\force(\msto, \mval) \subseteq \force(\msto', \mval') \\ \msto \sqsubseteq \msto'}
+          {\ans{\msto, \mval} \sqsubseteq \ans{\msto', \mval'}}
+ \qquad
+\inferrule{\forall \hat{\mstate} \in S, \exists \hat{\mstate}' \in S'. \hat{\mstate} \sqsubseteq \hat{\mstate}'}
+          {S \sqsubseteq S'}
+\end{mathpar}
+
+By definitions of $\alpha, \gamma, \force$, $\gamma^* \circ \alpha^* =
+1_C$. Also $\alpha^*\circ\gamma^* \le 1_A$ is straightforward to prove. This forms a Galois connection.
+
+\begin{theorem}If $\mstate \machstep \mstate'$ and $\alpha(\mstate) \sqsubseteq \hat{\mstate}$ then
+$\exists \hat{\mstate}'. \hat{\mstate} \machstep \hat{\mstate}'$.
+\end{theorem}
+\begin{proof}
+By assumption, $\gamma^*(\alpha^*(\setof{\mstate})) \sqsubseteq
+\gamma^*{\setof{\hat{\mstate}}}$. By the above property, and
+definition of $\gamma^*$, $\mstate \in \gamma(\hat{\mstate})$.
+Since $\alpha$ does not introduce $\saddr{}$ values, most cases follow by definition.
+
+By cases on $\mstate \machstep \mstate'$:
+\begin{byCases}
+%% EVAL
+\case{\ev{\svar\mvar,\menv,\msto,\mkont} \machstep \co{\mkont,\mval,\msto}}{
+ where $\mval \in \msto(\menv(\mvar))$
+
+By assumption, $\hat{\mstate} \equiv \ev{\svar\mvar, \menv, \msto', \mkont}$ such that $\msto \sqsubseteq \msto'$.
+\begin{pfsteps*}
+ \item{Let $\hat{\mstate}' = \co{\mkont,\saddr{\menv(\mvar)},\msto'}$}
+ \item{$\setof{\mstate'} \sqsubseteq \gamma(\hat{\mstate}')$} \BY{def. $\gamma$}
+ \item{$\alpha(\mstate') \sqsubseteq \hat{\mstate}'$} \BY{def. $\alpha$, $\alpha^*\circ\gamma^* \le 1_A$}
+\end{pfsteps*}}
+
+\case{\ev{\slit\mlit,\menv,\msto,\mkont} \machstep \co{\mkont,\mlit,\msto}}{
+By assumption, $\hat{\mstate} \equiv \ev{\svar\mvar, \menv, \msto', \mkont}$ such that $\msto \sqsubseteq \msto'$.
+Let $\hat{\mstate}' = \co{\mkont,\mlit,\msto'}$. Conclusion holds by definition of
+$\alpha, \sqsubseteq, \machstep$.}
+
+\case{\ev{\slam\mvar\mexp,\menv,\msto,\mkont} \machstep \co{\mkont,\clos{\mvar,\mexp,\menv},\msto}}{
+By assumption, $\hat{\mstate} \equiv \ev{\svar\mvar, \menv, \msto', \mkont}$ such that $\msto \sqsubseteq \msto'$.
+Let $\hat{\mstate}' = \co{\mkont,\clos{\mvar,\mexp,\menv},\msto'}$. Conclusion holds by definition of
+$\alpha, \sqsubseteq, \machstep$.}
+
+\case{
+\ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} \machstep
+\ev[^\mcntr]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}}{
+ where $\maddr,\msto' = \push^\mcntr_\mlab(\msto,\mkont)$
+
+By assumption, $\hat{\mstate} \equiv \ev{\svar\mvar, \menv, \msto^*, \mkont}$ such that $\msto \sqsubseteq \msto^*$.
+Let $\hat{\mstate}' = \ev[^\mcntr]{\mexpi{0},\menv,\msto^*_1,\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}$ where
+$\maddr, \msto^*_1 = \push^\mcntr_\mlab(\msto^*,\mkont)$. Conclusion holds by definition of
+$\alpha, \sqsubseteq, \machstep, \push$.}
+
+\case{
+\ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} \machstep
+\ev[^\mcntr]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}}{
+ where $\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)$
+
+By assumption, $\hat{\mstate} \equiv \ev{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto^*,\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}$ such that $\msto \sqsubseteq \msto^*$.
+Let $\hat{\mstate}' = \ev[^\mcntr]{\mexpi0,\menv,\msto^*_1,\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}$
+where $\maddr,\msto^*_1 = \push_\mlab^\mcntr(\msto^*,\mkont)$.
+Conclusion holds by definition of $\alpha, \sqsubseteq, \machstep, \push$.}
+
+%% CONTINUE
+\case{\co{\kmt,\mval,\msto} \machstep \ans{\msto,\mval}}{
+By assumption, $\hat{\mstate} \equiv \co{\kmt,\mval',\msto^*}$ where $\msto \sqsubseteq \msto^*$ and $\force(\msto,\mval) \subseteq \force(\msto^*,\mval')$.
+
+By definition of $\force, \sqsubseteq$,  $\mval \in \force(\msto^*,\mval')$.
+Let $\hat{\mstate}' = \ans{\msto^*,\mval}$. Conclusion holds by definition of $\machstep, \force$.}
+
+\case{
+\co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto} \machstep
+\ev[^\mcntr]{\mexp,\menv,\msto',\kfn[^\mcntr_\mlab]{\maddralt,\maddr}}}{
+ where $\maddralt,\msto' = \stash_\mlab^\mcntr(\msto,\mval)$
+
+\begin{byCases}
+\case{\hat{\mstate} \equiv \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr}, \saddr{\maddrx{c}}, \msto^*}}{
+where $\msto \sqsubseteq \msto^*$
+
+Let $\hat{\mstate}' = \ev[^\mcntr]{\mexp,\menv,\msto^*, \kfn[^\mcntr_\mlab]{\maddralt,\maddr}}$ where $\maddralt, \msto* = \stash(\msto,\saddr{\maddrx{c}})$. By definition of $\stash$,
+ Conclusion holds by definition of $\alpha, \sqsubseteq, \stash, \machstep$.}
+\otherwise{$\hat{\mstate} \equiv \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr}, \mval, \msto^*}$
+ where $\msto \sqsubseteq \msto^*$ and $\mval \nequiv \saddr{\maddrx{c}}$.
+
+Let $\hat{\mstate}' = \ev[^\mcntr]{\mexp,\menv,\msto^*_1,\kfn[^\mcntr_\mlab]{\maddralt,\maddr}}$
+where $\maddralt, \msto^*_1 = \stash_\mlab^\mcntr(\msto^*,\mval)$.
+Conclusion holds by definition of $\alpha, \sqsubseteq, \stash, \machstep$.}
+\end{byCases}}
+
+\case{
+\co{\kfn[^\mcntr_\mlab]{\maddralt,\maddr},\mval,\msto} \machstep
+\ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont,\msto}}{
+ where $\mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddralt)$
+
+By assumption, $\hat{\mstate} \equiv \co{\kfn[^\mcntr_\mlab]{\maddralt,\maddr},\mval',\msto^*}$ where $\msto \sqsubseteq \msto^*$ and $\force(\msto,\mval) \subseteq \force(\msto^*,\mval')$.
+
+By definition of $\sqsubseteq$, $\force$, $\mkont \in \msto^*(\maddr)$ and $\mvalx{u} \in \msto^*(\maddralt)$. Thus
+letting $\hat{\mstate}' = \ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont,\msto^*}$. Conclusion holds by definition of $\alpha, \machstep$.}
+
+\case{
+\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto} \machstep
+\ev[^\mcntr]{\mexpi0,\menv,\msto,\mkont}}{
+ where $\mkont\in\msto(\maddr)$
+
+By assumption, $\hat{\mstate} \equiv
+\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto^*}$ where
+$\msto \sqsubseteq \msto^*$.
+
+Let $\hat{\mstate}' = \ev[^\mcntr]{\mexpi0,\menv,\msto^*,\mkont}$. Conclusion holds by definition of $\alpha, \machstep$.}
+
+\case{
+\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\sfalse,\msto} \machstep
+\ev[^\mcntr]{\mexpi1,\menv,\msto,\mkont}}{
+ where $\mkont\in\msto(\maddr)$
+
+By assumption, $\hat{\mstate} \equiv
+\co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\sfalse,\msto^*}$ where
+$\msto \sqsubseteq \msto^*$.
+
+Let $\hat{\mstate}' = \ev[^\mcntr]{\mexpi1,\menv,\msto^*,\mkont}$. Conclusion holds by definition of $\alpha, \machstep$.}
+
+%% APPLY
+\case{
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont} \machstep
+\ev[^{\mcntr'}\!]{\mexp,\menv',\msto',\mkont}}{
+ where $\menv',\msto',\mcntr' = \bind^{ \mcntr}_\mlab(\menv,\msto,\mvar,\mval)$
+
+By assumption, $\hat{\mstate} \equiv
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval',\msto^*,\mkont}$
+where $\msto \sqsubseteq \msto^*$ and $\force(\msto,\mval) \subseteq
+\force(\msto^*,\mval')$.
+
+Let $\hat{\mstate}' =
+\ev[^{\mcntr'}\!]{\mexp,\menv',\msto^*_1,\mkont}$ where
+$\menv',\msto^*_1,\mcntr' =
+\bind^\mcntr_\mlab(\menv,\msto^*,\mvar,\mval')$. Conclusion holds by
+definition of $\alpha, \bind, \sqsubseteq, \machstep$.}
+
+\case{
+\ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont} \machstep
+\co{\mkont,\mval',\msto}}{
+ where $\mval'\in\interpdelta(\mop,\mval)$
+
+By assumption, $\hat{\mstate} \equiv
+\ap[^\mcntr_\mlab]{\mop,\mval^*,\msto^*,\mkont}$ where $\msto \sqsubseteq \msto^*$ and $\force(\msto,\mval) \subseteq \force(\msto^*,\mval^*)$. By definition of $\force$, $\mval \in \force(\msto^*,\mval')$. 
+
+Let $\hat{\mstate}' = \co{\mkont, \mval',\msto^*}$. Conclusion holds by definition of $\alpha, \machstep$.}
+\end{byCases}
+\end{proof}
+
+\subsection{Semantic equivalence with abstract compilation}
+
+We show that in the presence of abstract compilation, even though
+there are fewer represented states in the reduction relation, that
+there is a bisimulation between the two. Particularly, the compiled
+semantics is a WEB refinement of the non-compiled semantics. We equate
+states that ``commit'' to non-$\ev{}$ states.
+
+To differentiate the two states spaces, denote the machine
+configuration space from the abstractly-compiled machine as
+$\CompState$. We additionally denote the reduction relation as $\cmachstep$.
+
+\begin{align*}
+\commit(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont}) &= \commitev(\mcntr,\menv,\msto,\mkont,\mexp) \\
+\commit(\mstate) &= \mstate \quad \text{otherwise} \\
+\commitev(\mcntr,\menv,\msto,\mkont,\svar{\mvar}) &= \co{\mkont,\saddr{\menv(\mvar)},\msto} \\
+\commitev(\mcntr,\menv,\msto,\mkont,\slit\mlit) &= \co{\mkont,\slit\mlit,\msto} \\
+\commitev(\mcntr,\menv,\msto,\mkont,\slam{\mvar,\mexp,\menv}) &= \co{\mkont,\clos{\mvar,\mexp,\menv},\msto} \\
+\commitev(\mcntr,\menv,\msto,\mkont,\sapp[^\mlab]{\mexpi0}{\mexpi1}) &=
+  \commitev(\mcntr,\menv,\msto',\kar[^\mcntr_\mlab]{\mexpi1, \menv, \maddr},\mexpi0) \\
+ \text{ where } \maddr, \msto' &= \push_\mlab^\mcntr(\msto,\mkont) \\
+\commitev(\mcntr,\menv,\msto,\mkont,\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2}) &=
+  \commitev(\mcntr,\menv,\msto',\kif[^\mcntr_\mlab]{\mexpi1, \mexpi2, \menv, \maddr},\mexpi0) \\
+ \text{ where } \maddr, \msto' &= \push_\mlab^\mcntr(\msto,\mkont)
+\end{align*}
+
+Next, the refinement map from non-compiled to compiled states.
+\begin{align*}
+%% STATES
+r(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont}) &= r(\commit(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont})) \\
+r(\co{\mkont, \mval,\msto}) &= \co{r(\mkont), r(\mval), r(\msto)} \\
+r(\ap[_\mlab^\mcntr]{\mvalx{u},\mval,\msto,\mkont}) &= \ap[_\mlab^\mcntr]{r(\mvalx{u}),r(\mval),r(\msto),r(\mkont)} \\
+r(\ans{\msto,\mval}) &= \ans{r(\msto), r(\mval)} \\[2mm]
+%% STORE
+r(\msto) &= \lambda \maddr. \setof{r(\mval) \mid \mval \in \msto(\maddr)} \\[2mm]
+%% CONTINUATIONS
+r(\kmt) &= \kmt \\
+r(\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr}) &= \kar[^\mcntr_\mlab]{\compile{\mexp},\menv,\maddr} \\
+r(\kfn[^\mcntr_\mlab]{\maddralt,\maddr}) &= \kfn[^\mcntr_\mlab]{\maddralt,\maddr} \\
+r(\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr}) &= \kif[^\mcntr]{\compile{\mexpi0},\compile{\mexpi1},\menv,\maddr} \\[2mm]
+%% VALUES
+r(\mop) &= \mop \\
+r(\mlit) &= \mlit \\
+r(\saddr{\maddr}) &= \saddr{\maddr} \\
+r(\clos{\mvar,\mexp,\menv}) &= \clos{\mvar,\compile{\mexp},\menv}
+\end{align*}
+$r$ terminates because the non-structurally descreasing call case is
+guaranteed to not happen unless on a structurally smaller
+counterpart. This is because $\commit$ never returns an $\ev{}$
+state. As a corollary, $r$ is idempotent.
+
+Next we relate states across the different machines with an
+equivalence relation $B$ on the two state spaces $S = \State \cup \CompState$, such that $\forall \mstate \in \State. s B r(s)$:
+\begin{align*}
+(s,s') \in B \iff r(s) = r(s')
+\end{align*}
+
+Finally, we show that $B$ is a WEB on the transition system
+$\langle S, \Rightarrow \rangle$ where $\Rightarrow = \machstep \cup \cmachstep$.
+
+Let $\langle W, \lessdot \rangle$ be the well-ordered set of expressions (ordered structurally) with a bottom element $\bot$.
+\begin{align*}
+\erankt(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont}) &= \mexp \\
+\erankt(\mstate) &= \bot \quad \text{otherwise} \\
+\erankl(s,s') &= \text{steps until $s$ commits to $s'$, +1. 0 if never.}
+\end{align*}
+
+\begin{proof}
+Let $s,u,w \in S$ be arbitrary such that $s B w$ and $s \Rightarrow u$.
+By cases on $s \Rightarrow u$:
+\begin{byCases}
+%% NON-COMPILED
+%% EVAL
+\case{
+ \ev{\svar\mvar,\menv,\msto,\mkont} \machstep
+ \co{\mkont,\saddr{\menv(\mvar)},\msto}}{
+...}
+
+\case{
+ \ev{\slit\mlit,\menv,\msto,\mkont} \machstep
+ \co{\mkont,\mlit,\msto}}{
+...}
+
+\case{
+ \ev{\slam\mvar\mexp,\menv,\msto,\mkont} \machstep
+ \co{\mkont,\clos{\mvar,\mexp,\menv},\msto}}{
+...}
+
+\case{
+ \ev[^\mcntr]{\sapp[^\mlab]{\mexpi0}{\mexpi1},\menv,\msto,\mkont} \machstep
+ \ev[^\mcntr]{\mexpi{0},\menv,\msto',\kar[_\mlab^\mcntr]{\mexpi{1},\menv,\maddr}}}{
+  where $\maddr,\msto' = \push^\mcntr_\mlab(\msto,\mkont)$
+...}
+
+\case{
+ \ev[^\mcntr]{\sif[^\mlab]{\mexpi0}{\mexpi1}{\mexpi2},\menv,\msto,\mkont} \machstep
+ \ev[^\mcntr]{\mexpi0,\menv,\msto',\kif[^\mcntr]{\mexpi1,\mexpi2,\menv,\maddr}}}{
+  where $\maddr,\msto' = \push_\mlab^\mcntr(\msto,\mkont)$
+...}
+
+%% CONTINUE
+\case{
+ \co{\kmt,\mval,\msto} \machstep
+ \ans{\msto,\mvalx{u}}}{
+  where $\mvalx{u} \in \force(\msto, \mval)$
+...}
+
+\case{
+ \co{\kar[^\mcntr_\mlab]{\mexp,\menv,\maddr},\mval,\msto} \machstep
+ \ev[^\mcntr]{\mexp,\menv,\msto',\kfn[^\mcntr_\mlab]{\maddralt,\maddr}}}{
+  where $\maddralt,\msto' = \stash_\mlab^\mcntr(\msto,\mval)$
+...}
+
+\case{
+ \co{\kfn[^\mcntr_\mlab]{\maddralt,\maddr},\mval,\msto}  \machstep
+ \ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont,\msto}}{
+  where $\mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddralt)$
+...}
+
+\case{
+ \co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\strue,\msto}  \machstep
+ \ev[^\mcntr]{\mexpi0,\menv,\msto,\mkont}}{
+  where $\mkont\in\msto(\maddr)$
+...}
+
+\case{
+ \co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\maddr},\sfalse,\msto}  \machstep
+ \ev[^\mcntr]{\mexpi1,\menv,\msto,\mkont}}{
+  where $\mkont\in\msto(\maddr)$
+...}
+
+%% APPLY
+\case{
+ \ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\msto,\mkont}  \machstep
+ \ev[^{\mcntr'}\!]{\mexp,\menv',\msto',\mkont}}{
+  where $\menv',\msto',\mcntr' = \bind^{ \mcntr}_\mlab(\menv,\msto,\mvar,\mval)$
+...}
+
+\case{
+ \ap[^\mcntr_\mlab]{\mop,\mval,\msto,\mkont}  \machstep
+ \co{\mkont,\mval',\msto}}{
+  where $\mvalx{u} \in \force(\msto, \mval), \mval'\in\interpdelta(\mop,\mvalx{u})$
+...}
+
+%% COMPILED
+
+%% CONTINUE
+\case{
+ \co{\kmt,\mval,\msto} \cmachstep
+ \ans{\msto,\mvalx{u}}}{
+ where $\mvalx{u} \in \force(\msto,\mval)$
+...}
+
+\case{
+ \co{\kar[^\mcntr_\mlab]{\mcomp,\menv,\maddr},\mval,\msto}  \cmachstep
+ \mcomp^\mcntr(\menv,\msto',\kfn[^\mcntr_\mlab]{\maddralt,\maddr})}{
+ where $\maddralt,\msto' = \stash_\mlab^\mcntr(\msto,\mval)$
+...}
+
+\case{
+ \co{\kfn[^\mcntr_\mlab]{\maddralt,\maddr},\mval,\msto}  \cmachstep
+ \ap[^\mcntr_\mlab]{\mvalx{u},\mval,\msto,\mkont}}{
+  where $\mkont \in \msto(\maddr), \mvalx{u} \in \msto(\maddralt)$
+...}
+
+\case{
+ \co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\strue,\msto}  \cmachstep
+ \mcompi0^\mcntr(\menv,\msto,\mkont)}{
+  where $\mkont\in\msto(\maddr)$
+...}
+
+\case{
+ \co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\maddr},\sfalse,\msto}  \cmachstep
+ \mcompi1^\mcntr(\menv,\msto,\mkont)}{
+  where $\mkont\in\msto(\maddr)$
+...}
+
+%% APPLY
+\case{
+ \ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\msto,\mkont}  \cmachstep
+ \mcomp^{\mcntr'}(\menv',\msto',\mkont)}{
+ where $\menv',\msto',\mcntr' = \bind^\mcntr_\mlab(\menv,\msto,\mvar,\mval)$
+...}
+
+\case{
+ \ap{\mop,\mval,\msto,\mkont}  \cmachstep
+ \co{\mkont,\mval',\msto}}{
+ where $\mkont \in\msto(\maddr)$
+ and $\mvalx{u} \in \force(\msto,\mval), \mval'\in\interpdelta(\mop,\mvalx{u})$
+...}
+\end{byCases}
+% (a) case is for non-ev to non-ev
+% (b) is for s \equiv ev w is r(s)
+% (c) is for s compiled, r(w) = s
+\end{proof}
+
+\subsection{Soundness of widened abstract compilation}
+
+...
+
+\subsection{Semantic equivalence with locally log-based store deltas}
+
+Here we show a simple lock-step bisimulation.
+
+\subsection{Semantic equivalence of log-based updates to a timestamped store}
+The original work of Shivers did not have bulk updates to the widened
+store, and could thus leak precision through the additional side
+channel. Additionally, the store was destructively updated, which
+makes temporal reasoning much more imprecise. Here we show that our
+representational change to the monotonically increasing store in the
+present of log-based store updates maintains the semantics of the previous machine.
+
+\end{document}

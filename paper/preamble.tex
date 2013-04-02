@@ -13,7 +13,7 @@
 \newcommand{\ans}[1]{\tuple{ans}{#1}}
 
 % Continuations
-\newcommand{\kmt}{\tt mt}
+\newcommand{\kmt}{{\tt mt}}
 \newcommand{\kar}[2][\ ]{\tuple[#1]{ar}{#2}}
 \newcommand{\kfn}[2][\ ]{\tuple[#1]{fn}{#2}}
 \newcommand{\kif}[2][\ ]{\tuple[#1]{fi}{#2}}
@@ -94,7 +94,33 @@
 \newcommand{\wn}{\mathit{wn}}
 \newcommand{\fmerge}{\mathit{merge}}
 \newcommand{\force}{\mathit{force}}
+\newcommand{\bind}{\mathit{bind}}
+\newcommand{\push}{\mathit{push}}
+\newcommand{\stash}{\mathit{stash}}
 
+% Notations for proofs
+\newcommand{\maddrx}[1]{#1}
+\newcommand{\CompState}{\compile{\State}}
+\newcommand{\cmachstep}{\mathbin{\compile{\machstep}}}
+\newcommand{\mstor}{s}
+\newcommand{\updatedp}{\mathit{updated?}}
+\newcommand{\joinp}{\mathit{join?}}
+\newcommand{\hd}{\mathit{hd}}
+\newcommand{\replayall}{\forall\mathit{replay}}
+\newcommand{\lfp}[1]{\mathbf{lfp}(#1)}
+\newcommand{\reachable}[1]{\mathit{reachable}(#1)}
+\newcommand{\nw}{\mathit{nw}}
+\newcommand{\commit}{\mathit{commit}}
+\newcommand{\commitev}{\mathit{commitev}}
+\newcommand{\replaychange}{\mathit{replay}\Delta}
+\newcommand{\replaychangeall}{\forall\mathit{replay}\Delta}
+\newcommand{\deceq}{\mathbin{\overset{?}{=}}}
+\newcommand{\Label}{\mathit{Label}}
+\newcommand{\Counter}{\mathit{Contour}}
+\newcommand{\System}{\mathit{System}}
+\newcommand{\Compiled}{\mathit{Compiled}}
+\newcommand{\erankt}{\mathit{erankt}}
+\newcommand{\erankl}{\mathit{erankl}}
 
 % Spaces
 \newcommand{\Store}{\mathit{Store}}
