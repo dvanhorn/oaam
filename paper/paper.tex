@@ -30,7 +30,7 @@
 % \preprintfooter{short description of paper}   % 'preprint' option specified.
 
 %\title{Provably Correct, Low-Cost Optimizations for Abstract Abstract Machines}
-\title{Systematically Optimizing Abstract Abstract Machines}
+\title{Correctly Optimizing Abstract Abstract Machines}
 
 \authorinfo{J. Ian Johnson \and Nicholas Labich \and Matthew Might \and David Van Horn}
            {}
@@ -244,7 +244,7 @@ address space, the store must map addresses to \emph{sets} of values.
 Store updates are interpreted as joins, and store dereferences are
 interpreted by non-deterministic choice of an element from a set.  The
 result of analyzing a program is a finite directed graph where nodes
-in the graph are machine states and edges denote machine
+in the graph are (abstract) machine states and edges denote machine
 transitions between states.
 
 The techniques we propose for optimizing analysis fall into the
@@ -290,7 +290,7 @@ Section~\ref{sec:related} relates this work to the literature and
 section~\ref{sec:conclusion} concludes.
 
 %\newpage
-\section{An analyzer for ISWIM}
+\section{Abstract interpretation of ISWIM}
 \label{sec:aam}
 
 In this section, we give a brief review of the AAM approach by
@@ -356,9 +356,10 @@ annotation in contexts where it is irrelevant.
 
 
 The semantics are defined in terms of a machine model.  The machine
-components are defined in figure~\ref{fig:domains} and
+components are defined in figure~\ref{fig:domains};
 figure~\ref{fig:aam} defines the transition relation.  The evaluation
-of a program is defined as its traces given by the machine transition relation.  The
+of a program is defined as its set of traces that arise from iterating the
+machine transition relation.  The
 machine is a very slight variation on a standard abstract machine for
 ISWIM in ``eval, continue, apply'' form~\cite{dvanhorn:Danvy:DSc}.  It
 can be systematically derived from a definitional interpreter through
@@ -371,8 +372,14 @@ Compared with the standard machine semantics, this definition is
 different in the following ways, which make it abstractable as a
 program analyzer:
 \begin{itemize}
-\item the store maps addresses to \emph{sets} of values, not
+\item the store maps addresses to \emph{sets} of values,\footnote{
+More generally, we can have stores map to any domain that forms
+ a Galois connection with values, enabling $\interpdelta$ to
+produce elaborate abstractions of base values (e.g., interval or octagon
+abstractions). We use sets of values for a simpler exposition.
+} not
   single values,
+
 \item continuations are heap-allocated, not stack-allocated,
 \item there are ``timestamps'' ($\mcntr \in \Counter$) and syntax
   labels ($\mlab$) threaded through the computation, and
@@ -381,11 +388,6 @@ program analyzer:
   $\Addr$, $\Counter$ (and initial $\mcntr_0 \in \Counter$).
 \end{itemize}
 
-More generally, we can make stores map to a domain that forms a galois
-connection with sets of values, so that $\interpdelta$ can give more
-elaborate abstractions of base values (e.g., with the interval
-abstraction, $\{0,[0,5]\} \equiv \{[0,5]\}$). We stick with sets for
-simpler exposition.
 
 \begin{figure}
 \begin{gather*}
@@ -461,18 +463,19 @@ simpler exposition.
 \paragraph{Concrete interpretation} To characterize concrete interpretation, set the implicit
 parameters of the relation given in figure~\ref{fig:aam} as follows:
 \begin{align*}
-\alloc(\mstate) &= \maddr \mbox{ where } \maddr \notin \text{ the } \msto \text{ within } \mstate \\
-\allockont^\mcntr_\mlab(\msto,\mkont) &=\maddr \mbox{ where } \maddr \notin \msto
+\alloc(\mstate) &= \maddr \mbox{ where } \maddr \notin \mstate.\msto \\
+\allockont^\mcntr_\mlab(\msto,\mkont) \mbox{ where } \maddr \notin \msto
 \end{align*}
-These functions appear to ignore $\mlab$ and $\mcntr$, but they can be
-used to determinize the choice of fresh addresses. The $\sqcup$ on
-stores in the figure is a point-wise lifting of $\cup$: $\msto \sqcup \msto' =
-\lambda \maddr. \msto(\maddr) \cup \msto'(\maddr)$. The resulting
-relation is non-deterministic in its choice of addresses, however it
-must always choose a fresh address when allocating a continuation or
-variable binding.  If we consider machine states equivalent up to
-consistent renaming and fix an allocation scheme, this relation
-defines a deterministic machine (the relation is really a function).
+where $\sqcup$ on stores is a point-wise lifting of $\sqcup$, \ie, $\msto
+\sqcup \msto' = \lambda \maddr. \msto(\maddr) \sqcup
+\msto'(\maddr)$. These functions appear to ignore $\mlab$ and
+$\mcntr$, but they can be used to determinize the choice of fresh
+addresses.  The resulting relation is non-deterministic in its choice
+of addresses, however it must always choose a fresh address when
+allocating a continuation or variable binding.  If we consider machine
+states equivalent up to consistent renaming and fix an allocation
+scheme, this relation defines a deterministic machine (the relation is
+really a function).
 
 The interpretation of primitive operations is defined by setting
 $\interpdelta$ as follows:
@@ -486,7 +489,7 @@ $\interpdelta$ as follows:
 
 \paragraph{Abstract interpretation} To characterize abstract
 interpretation, set the implicit parameters just as above, but drop
-the $\maddr \not\in \msto$ condition. $\interpdelta$ takes some care
+the $\maddr \not\in \msto$ condition. The $\interpdelta$ relation takes some care
 to not make the analysis run forever; a simple instantiation is a flat
 abstraction where arithmetic operations return an abstract top element
 $\sNum$, and $\szerohuh$ returns both $\strue$ and $\sfalse$ on
@@ -496,17 +499,17 @@ already in use.  Consequently, the machines may be non-deterministic
 when multiple values reside in a store location.
 
 It is important to recognize from this definition that \emph{any}
-allocation strategy is an abstract
+allocation strategy is a sound abstract
 interpretation~\cite{dvanhorn:Might2009Posteriori}.  In particular,
 concrete interpretation is a kind of abstract interpretation.  So is
 an interpretation that allocates a single cell into which all bindings
-and continuations are stored.  On the one hand is an abstract
+and continuations are stored.  The former is an abstract
 interpretation that is non-computable and gives only the ground truth
-of a programs behavior; on the other is an abstract interpretation
+of a programs behavior; the latter is an abstract interpretation
 that is easy to compute but gives little information.  Useful program
 analyses lay somewhere in between and can be characterized by their
 choice of address representation and allocation strategy.  Uniform
-\(k\)-CFA~\cite{dvanhorn:nielson-nielson-popl97} is one such analysis.
+\(k\)-CFA~\cite{dvanhorn:nielson-nielson-popl97}, presented next, is one such analysis.
 
 \paragraph{Uniform \(k\)-CFA} To characterize uniform \(k\)-CFA, set the allocation
 strategy as follows, for a fixed constant \(k\):
@@ -535,17 +538,17 @@ At this point, we have abstracted the original machine to one which
 has a finite state space for any given program, and thus forms the
 basis of a sound, computable program analyzer for ISWIM.
 
-\section{Machine semantics to baseline analyzer}
+\section{From machine semantics to baseline analyzer}
 \label{sec:baseline}
 
 The uniform $k$-CFA allocation strategy would make $\traces$ in figure
 \ref{fig:aam} a computable abstraction of possible executions, but not an
-efficient one. This is not the strategy that AAM, nor we, recommend. Through
-this section, we will explain a succession of approximations
-to reach the baseline analysis.  We'll compare performance at each stage to
-identify the criticality of each choice.
+efficient one.  Through
+this section, we explain a succession of approximations
+to reach the baseline analysis.  At each stage, we measure performance to
+identify the importance of each choice.
 %
-We ground this journey by first formulating the analysis in terms of a classic
+We ground this path by first formulating the analysis in terms of a classic
 fixed-point computation.
 
 
@@ -586,8 +589,8 @@ considerable time.  Even though the state space is finite, it is exponential in
 the size of the program.  Even with $k = 0$, there are exponentially many
 stores in the AAM framework.
 
-In the next subsection, we'll fix this with a widening and reach polynomial
-(albeit of a high degree) complexity.
+In the next subsection, we fix this with store widening and reach a polynomial
+(albeit of high degree) complexity.
 %
 This widening effectively lifts the store out of individual states to create
 a single, global shared store for all.
@@ -629,7 +632,7 @@ A context includes all non-store components, \emph{e.g.}, the expression, the en
 The transformed relation, $\widehat{\machstep}$, is
 %
 \begin{align*}
-(C, \msto) &\mathrel{\widehat{\machstep}} (C', \msto') \\
+(C, \msto) &\mathrel{\widehat{\machstep}} (C', \msto'), \\
 \mbox{where } C' &= \{c' \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto^c), c \in C\} \\
               \msto' &= \bigsqcup\; \{\msto^c \mid \wn(c,\msto)\mathrel{\machstep} \wn(c', \msto^c), c \in C\} \\
 \wn &: \widehat{\State} \times \Store \to \State \\
@@ -648,7 +651,7 @@ monovariant case.
 \subsection{Store-allocate all values}
 \label{sec:baselineeval}
 
-The final approximation we make to get to our point of departure is to
+The final approximation we make to get to our baseline is to
 store-allocate all values that appear, so that any non-machine state
 that contains a value instead contains an address to a value.  The AAM
 approach stops at the previous optimization.  However, the {\tt fn}
@@ -667,10 +670,10 @@ languages with $n$-ary functions, since otherwise the continuation
 space grows super-exponentially. We extend the semantics to
 additionally allocate an address for the function value when creating
 the $\kfn{}$ continuation. The continuation has to store this address
-to remember where to get values from, though sometimes your allocation
-strategy may allow you to elide that representation.
+to remember where to retreive values from in the store, though some allocation
+strategies allow this representation to be ellided.
 
-The new evaluation rules follow (where $\mcntr' = \tick(\mstate)$).
+The new evaluation rules follow, where $\mcntr' = \tick(\mstate)$:
 % In theory, this aggressive distinction between continuations might buy
 % additional precision, but in practice, it does not.
 
@@ -683,20 +686,15 @@ The new evaluation rules follow (where $\mcntr' = \tick(\mstate)$).
 \text{ where }
   \maddr_f &= \alloc(\mstate) \\
   \msto' &= \ext{\msto}{\maddr_f}{\{\mval\}}
-\end{align*}
-Now instead of storing the evaluated function in the continuation
-frame itself, we indirect it through the store for further control on
-complexity and precision.
-
-\begin{align*}
+\\
 \co[^\mcntr]{\kfn{\maddr_f,\maddr_\mkont},\mval,\msto} & \machstep
 \ap[^{\mcntr'}_\mlab]{\mvalx{u},\mval,\mkont,\msto'}
 \\
 \text{ if } \mkont &\in \msto(\maddr_\mkont), \mvalx{u} \in \msto(\maddr_f)
 \end{align*}
-Associated with this indirection, we now apply all functions stored in
-the address. This nondeterminism is demanded in order to continue with
-evaluation. More generally, this is because applied functions are in
+We associate the value in hand with the expression that produced
+it. Also, we fan out to all functions that are associated with the
+original function position, because applied functions are in
 \emph{strict position} (more about that later).
 
 % This extra store-allocation is effectively naming all intermediate
@@ -889,7 +887,7 @@ A taste of the changes to the reduction relation is as follows:
 
 \begin{align*}
 \dmachstep &\subseteq (\widehat{\State}\times\Store) \times (\widehat{\State}\times\StoreDelta) \\
-\ttuple{\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont}}{\msto} & \dmachstep
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont} & \dmachstep_\msto
 \ttuple{\ev[^{\mcntr'}]{\mexp,\menv',\mkont}}{\cons{\ttuple{\maddr}{\setof{\mval}}}{\epsilon}} \\
 \text{ where }\maddr &= \alloc(\mstate) \\
               \menv' &= \menv[\mvar\mapsto\maddr]
@@ -905,7 +903,7 @@ in the input and output, and change the frontier-based semantics in the followin
 \begin{align*}
 (S, F, \msto,\Sigma,t) &\mathrel{\damachstep} (S \cup S', F', \msto',\Sigma',t') \\
 \mbox{ where }
- I &= \setof{(\mastate',\msdiff) \mid \ttuple{\mastate}{\msto} \dmachstep \ttuple{\mastate'}{\msdiff} } \\
+ I &= \setof{(\mastate',\msdiff) \mid \mastate \dmachstep_\msto \ttuple{\mastate'}{\msdiff} } \\
  \ttuple{\msto'}{\changep} &= \replay(\appendall(\setof{\msdiff \mid (\_,\msdiff) \in I}),\msto) \\
  \ttuple{t'}{\Sigma'} &=
      \left\{
@@ -925,7 +923,7 @@ happens in doesn't matter, because join is associative and
 commutative.
 
 \begin{lemma}
-$\ttuple{\mastate}{\msto} \dmachstep \ttuple{\mastate'}{\msdiff}$ iff
+$\mastate \dmachstep_\msto \ttuple{\mastate'}{\msdiff}$ iff
 $\wn(\mastate,\msto) \machstep \wn(\mastate',\replay(\msdiff,\msto))$
 \end{lemma}
 By cases on $\dmachstep$ and $\machstep$.
@@ -1277,7 +1275,7 @@ constitutes the use of a notion of stuttering. We provide a formal
 analysis of abstract compilation \emph{without} store widening with a proof
 of a stuttering bisimulation~\cite{ianjohnson:BCG88} between this
 semantics and lazy non-determinism without widening to show precision
-preservation. %We revisit store widening at the end of the section.
+preservation. We revisit store widening at the end of the section.
 
 The number of transitions that can occur in succession from an
 abstract bytecode is roughly bounded by the amount of expression
@@ -1310,7 +1308,7 @@ $\wn(\mastate,\replay(\msdiff',\msto)) = \wn(\mastate',\replay(\msdiff,\msto'))$
 The proof is by induction on $\mexp$.
 
 \begin{theorem}[Precision preservation]
-$B$ is a WEB on $\lmachstep \uplus \machstep$
+$B$ is a WEB on $\lmachstep \cup \machstep$
 \end{theorem}
 
 The proof follows by cases on $\lmachstep \uplus \machstep$ with the
@@ -1451,7 +1449,7 @@ The intermediate data structures of the above transfer function can all be strea
 \begin{enumerate}
 \item{$S$: the \emph{seen} set, though made a map for faster membership tests and updates.}
 \item{$F$: the \emph{frontier} set, which must be persisent or copied for the iteration through the set to be correct.}
-\item{$\msto$: the store, which represents all stores that occur in the machine semantics.}
+\item{$\msto$: the store, which represents all stores that occur in the reduction semantics.}
 \item{$t$: the timestamp, or length of the store chain - all stores that occur in the semantics are totally ordered due to single-threading the store.}
 \item{$\changep$: whether there has been a store change stepping all states in $F$.}
 \end{enumerate}
