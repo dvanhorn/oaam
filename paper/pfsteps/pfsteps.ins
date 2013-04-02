@@ -1,0 +1,42 @@
+%% File: pfsteps.ins
+%% Copyright 2011 Jesse A. Tov
+%%
+%% This is the pfsteps installation file for extracting package and driver
+%% files from the original source file.  Simply process it with
+%% TeX or LaTeX.
+
+\input docstrip.tex
+\keepsilent
+
+\usedir{tex/latex/pfsteps}
+
+\preamble
+
+Copyright (C) 2011 by Jesse A. Tov
+
+This file may be distributed and/or modified under the conditions of the
+LaTeX Project Public License, either version 1.2 of this license or (at
+your option) any later version. The latest version of this license is
+in:
+
+   http://www.latex-project.org/lppl.txt
+
+and version 1.2 or later is part of all distributions of LaTeX
+version 1999/12/01 or later.
+
+\endpreamble
+
+\generate{\file{pfsteps.sty}{\from{pfsteps.dtx}{package}}
+          \file{listproc.sty}{\from{listproc.dtx}{package}}}
+
+\obeyspaces
+
+\Msg{*********************************************************}
+\Msg{* pfsteps.sty                                           *}
+\Msg{*                                                       *}
+\Msg{* To produce the documentation run the file             *}
+\Msg{* pfsteps.dtx through LaTeX.                            *}
+\Msg{*                                                       *}
+\Msg{*********************************************************}
+
+\endbatchfile
