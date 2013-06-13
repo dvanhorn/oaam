@@ -16,10 +16,10 @@
 \newcommand{\ans}[1]{\tuple{ans}{#1}}
 
 % Continuations
-\newcommand{\kmt}{{\tt mt}}
-\newcommand{\kar}[2][\ ]{\tuple[#1]{ar}{#2}}
-\newcommand{\kfn}[2][\ ]{\tuple[#1]{fn}{#2}}
-\newcommand{\kif}[2][\ ]{\tuple[#1]{fi}{#2}}
+\newcommand{\kmt}{{\tt halt}}
+\newcommand{\kar}[2][\ ]{\tuple[#1]{arg}{#2}}
+\newcommand{\kfn}[2][\ ]{\tuple[#1]{fun}{#2}}
+\newcommand{\kif}[2][\ ]{\tuple[#1]{ifk}{#2}}
 \newcommand{\kuop}[2][\ ]{\tuple[#1]{oa}{#2}}
 \newcommand{\kbopa}[2][\ ]{\tuple[#1]{oa1}{#2}}
 \newcommand{\kbopb}[2][\ ]{\tuple[#1]{oa2}{#2}}
@@ -68,7 +68,7 @@
 
 % Metavariables
 \newcommand{\maddr}{a}
-\newcommand{\mkaddr}{k}
+\newcommand{\mkaddr}{a_\kappa}
 \newcommand{\maddralt}{b}
 \newcommand{\mvar}{x}
 \newcommand{\mvarf}{f}

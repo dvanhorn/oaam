@@ -2,6 +2,7 @@
 
 (require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt" "primitives.rkt" "parse.rkt"
          "notation.rkt" "op-struct.rkt" "do.rkt" "add-lib.rkt"
+         "graph.rkt"
          (rename-in racket/generator
                     [yield real-yield]
                     [generator real-generator])
@@ -27,6 +28,8 @@
          (~optional (~seq #:clos clos:id) #:defaults ([clos (generate-temporary #'clos)]))
          (~optional (~seq #:rlos rlos:id) #:defaults ([rlos (generate-temporary #'rlos)]))
          (~optional (~seq #:primop primop:id) #:defaults ([primop (generate-temporary #'primop)]))
+         (~optional (~seq #:ev ev:id) #:defaults ([ev (generate-temporary #'ev)]))
+         (~optional (~seq #:co co:id) #:defaults ([co (generate-temporary #'co)]))
          ;; Analysis strategies flags (requires the right parameters too)
          (~optional (~and #:compiled compiled?))
          (~optional (~and #:collect-compiled collect-hash:id))
@@ -66,10 +69,11 @@
      (with-syntax ([((ρ-op ...) (δ-op ...) (l-op ...))
                     (if (zero? (attribute K)) #'(() () ()) #'((ρ) (δ) (l)))]
                    [ev: (format-id #'ev "~a:" #'ev)]
+                   [co: (format-id #'co "~a:" #'co)]
+                   [co? (format-id #'co "~a?" #'co)]
                    [clos? (format-id #'clos "~a?" #'clos)]
                    [rlos? (format-id #'rlos "~a?" #'rlos)]
                    [primop: (format-id #'primop "~a:" #'primop)]
-                   [ev #'ev]
                    ;; represent rσ explicitly in all states?
                    [(σ-op ...) (if (given wide?) #'() #'(rσ))]
                    ;; explicitly pass σ/∆ to compiled forms?
@@ -87,13 +91,17 @@
                    (syntax-parse syn #:literals (ev)
                      [(_ (ev . args)) (syntax/loc syn (ev . args))]
                      [(_ e:expr) (syntax/loc syn (yield-meaning e))]))
-             #'(syntax-rules () [(_ e) (yield-meaning e)])))
+             #'(λ (syn)
+                   (syntax-parse syn #:literals (ev)
+                     [(_ (ev . args)) (syntax/loc syn (begin (ev-state!) (yield-meaning (ev . args))))]
+                     [(_ e:expr) (syntax/loc syn (yield-meaning e))]))))
        (define eval ;; what does ev mean?
          (syntax/loc stx
            (match e
              [(var l x)
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([v #:in-delay ev-σ (lookup-env ρ x)])
+                    (co-after-var-state!)
                     (yield (co ev-σ k v)))
                   ;; Needed for strict/compiled, but for lazy this introduces
                   ;; an unnecessary administrative reduction.

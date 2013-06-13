@@ -8,7 +8,7 @@ default: introspective-base.pdf introspective-lazy.pdf introspective-lazyc.pdf \
 	 church-relative-space.pdf church-relative-time.pdf church-relative-speed.pdf \
 	 all-relative-space.pdf all-relative-speed.pdf all-relative-time.pdf \
 	 bench-overview.tex
-	xelatex $(CURRENT)
+	pdflatex $(CURRENT)
 
 refresh: getbib
 
@@ -24,6 +24,9 @@ bibtex:
 
 %.dvi: %.tex
 	latex $(basename $@)
+
+%.dot:
+	racket ../code/mk-graph.rkt
 
 all-relative-space.pdf: vis-bench.rkt
 	racket vis-bench.rkt

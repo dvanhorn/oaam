@@ -1,7 +1,9 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
-         "fix.rkt" "handle-limits.rkt"
-         "graph.rkt" racket/stxparam)
+         "fix.rkt" "handle-limits.rkt" "ast.rkt"
+         "graph.rkt" racket/stxparam
+         racket/trace
+         (for-syntax racket/syntax syntax/parse))
 (provide bind-join-whole bind-join*-whole
          (for-syntax bind-rest) ;; common helper
          wide-step hash-getter
@@ -54,6 +56,7 @@
                                   (add-edge! graph c c*)
                                   c*)
                        #'(∪ cs cs*)))
+               (reset-kind!)
                (values (join-store σ* σ**) cs**)))
            (set (cons σ* cs*))]))))
 
@@ -103,35 +106,46 @@
                        #:when (ans^? c))
                c)))))
 
-(define-simple-macro* (mk-special2-set-fixpoint^ fix name ans^?)
- (define-syntax-rule (name step fst)
-   (let ()
-     (define-values (f^σ cs) fst)
-     #,@(if (syntax-parameter-value #'generate-graph?)
-            #'((define graph (make-hash)))
-            #'())
-     (define state-count* (state-count))
-     (set-box! state-count* 0)
-     (define step^ ((wide-step-specialized2 step) state-count*
-                    #,@(if (syntax-parameter-value #'generate-graph?)
-                           #'(graph)
-                           #'())))
-     (set-box! (start-time) (current-milliseconds))
-     (define ss (fix step^ (set (cons f^σ cs))))
-     (define-values (last-σ final-cs)
-       (for/fold ([last-σ f^σ] [final-cs ∅])
-           ([s (in-set ss)])
-         (match s
-           [(cons σ cs) (values (join-store last-σ σ) (∪ final-cs cs))])))
-     (state-rate)
-     #,@(if (syntax-parameter-value #'generate-graph?) #'((dump-dot graph)) #'())
-     ;; filter the final results
-     (values (format "State count: ~a" (unbox state-count*))
-             (format "Point count: ~a" (set-count final-cs))
-             last-σ
-             (for/set ([c (in-set final-cs)]
-                       #:when (ans^? c))
-               c)))))
+(define-syntax (mk-special2-set-fixpoint^ stx)
+  (syntax-parse stx
+    [(_ fix name ans^? ev co compiled?)
+     (with-syntax ([ev? (format-id #'ev "~a?" #'ev)]
+                   [ev-e (format-id #'ev "~a-e" #'ev)]
+                   [co? (format-id #'co "~a?" #'co)])
+       #`(define-syntax-rule (name step fst)
+           (let ()
+             (define-values (f^σ cs) fst)
+             #,@(if (syntax-parameter-value #'generate-graph?)
+                    #'((define graph (make-hash)))
+                    #'())
+             (define state-count* (state-count))
+             (set-box! state-count* 0)
+             (define step^ ((wide-step-specialized2 step) state-count*
+                            #,@(if (syntax-parameter-value #'generate-graph?)
+                                   #'(graph)
+                                   #'())))
+             #,@(if (syntax-e #'compiled?)
+                    #'((define (ev? s) #f) ;; added for compiled
+                       (define (ev-e s) #f))
+                    #'())
+             (define (ev-var? s)
+               (and (ev? s) (var? (ev-e s))))
+             (set-box! (start-time) (current-milliseconds))
+             (define ss (fix step^ (set (cons f^σ cs))))
+             (define-values (last-σ final-cs)
+               (for/fold ([last-σ f^σ] [final-cs ∅])
+                   ([s (in-set ss)])
+                 (match s
+                   [(cons σ cs) (values (join-store last-σ σ) (∪ final-cs cs))])))
+             (state-rate)
+             #,@(if (syntax-parameter-value #'generate-graph?) #'((dump-dot graph ev-var? ev? co? compiled?)) #'())
+             ;; filter the final results
+             (values (format "State count: ~a" (unbox state-count*))
+                     (format "Point count: ~a" (set-count final-cs))
+                     last-σ
+                     (for/set ([c (in-set final-cs)]
+                               #:when (ans^? c))
+                       c)))))]))
 
 ;; Uses counting and merges stores between stepping all states.
 (define-syntax-rule (mk-special3-set-fixpoint^ name ans^?)

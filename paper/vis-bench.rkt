@@ -57,7 +57,7 @@
 (define (sec->anchor l)
   (case l
     (("§4") 'bottom-left)
-    (("§5.4" "§5.5") 'top)
+    (("§5.4" "§5.5.3") 'top)
     (else 'bottom)))
 
 (define (sec-mem->anchor l)
@@ -71,7 +71,7 @@
         "§5.2"
         "§5.3"
         "§5.4"
-        "§5.5"))
+        "§5.5.3"))
 
 (define accs (list numbers-run numbers-peak-mem numbers-state-rate))
 (define exps (list 1 ;; Base / New number grows since time goes down

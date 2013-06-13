@@ -100,7 +100,7 @@
 (define (sec->anchor l)
   (case l
     (("§4") 'bottom-left)
-    (("§5.4" "§5.5") 'top)
+    (("§5.4" "§5.5.3") 'top)
     (else 'bottom)))
 
 (define (sec-mem->anchor l)
@@ -114,7 +114,7 @@
         "§5.2"
         "§5.3"
         "§5.4"
-        "§5.5"))
+        "§5.5.3"))
 
 (define (sec-labels sec->anchor data)
   (map (λ (v l) (point-label v l #:anchor (sec->anchor l) #:point-size 12))
@@ -128,7 +128,7 @@
   (list
    (plot (list
           (lines rel-time-data #:color 2 #:width 4
-                 #:label "Total analysis time")
+                 #:label "Run time speed-up")
           (sec-labels sec->anchor rel-time-data))
          #:y-min -25
          #:y-max 400
@@ -140,7 +140,7 @@
 
    (plot (list
           (lines rel-states-per-sec-data #:color 6 #:width 4
-                 #:label "Rate of state transitions")
+                 #:label "Rate of state transitions speed-up")
           (sec-labels sec->anchor rel-states-per-sec-data))
          #:y-min -9
          #:y-max 85
