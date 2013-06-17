@@ -30,7 +30,7 @@
 % \preprintfooter{short description of paper}   % 'preprint' option specified.
 
 %\title{Provably Correct, Low-Cost Optimizations for Abstract Abstract Machines}
-\title{Correctly Optimizing Abstract Abstract Machines}
+\title{Optimizing Abstract Abstract Machines}
 
 \authorinfo{J. Ian Johnson}
            {Northeastern University}
@@ -610,8 +610,12 @@ common, global store.
 %
 To retain soundness, this store grows monotonically.
 %
-Formally, we can cast this optimization as a second abstraction or as the
-application of a widening operator\footnote{Technically, we would have to copy the value of the global store to all states being stepped to fit the formal definition of a widening, but the consequential accelerated convergence fits the M.O. of a widening operator.} during the fixed-point iteration.
+Formally, we can cast this optimization as a second abstraction or as
+the application of a widening operator\footnote{Technically, we would
+  have to copy the value of the global store to all states being
+  stepped to fit the formal definition of a widening, but this
+  representation is order-isomorphic to that.} during the fixed-point
+iteration.
 %
 In the ISWIM language, such a widening makes 0-CFA quartic in the size of the
 program.
@@ -659,12 +663,13 @@ semantics sound.
 The final approximation we make to get to our baseline is to
 store-allocate all values that appear, so that any non-machine state
 that contains a value instead contains an address to a value.  The AAM
-approach stops at the previous optimization.  However, the {\tt fn}
+approach stops at the previous optimization.  However, the \kfnalone
 continuation stores a value, and this makes the space of continuations
 quadratic rather than linear in the size of the program, for a
 monovariant analysis like 0-CFA.  Having the space of continuations
 grow linearly with the size of the program will drop the overall
-complexity to cubic (as expected).
+complexity to cubic (as expected). We also need to allocate an address
+for the argument position in an \apalone state.
 
 To achieve this linearity for continuations, we allocate an address
 for the value position when we create the continuation.  This address
@@ -674,7 +679,7 @@ complexity drops to cubic.  This is a critical abstraction in
 languages with $n$-ary functions, since otherwise the continuation
 space grows super-exponentially (${\mathcal O}(n^n)$). We extend the semantics to
 additionally allocate an address for the function value when creating
-the $\kfn{}$ continuation. The continuation has to contain this address
+the $\kfnalone$ continuation. The continuation has to contain this address
 to remember where to retrieve values from in the store.
 
 The new evaluation rules follow, where $\mcntr' = \tick(\mstate)$:
@@ -692,10 +697,13 @@ frame itself, we indirect it through the store for further control on
 complexity and precision:
 \begin{align*}
 \co[^\mcntr]{\kfn{\maddr,\mkaddr},\mval,\msto} & \machstep
-\ap[^{\mcntr'}_\mlab]{\mvalx{u},\mval,\mkont,\msto'}
+\ap[^{\mcntr'}_\mlab]{\mvalx{u},\maddr,\mkont,\msto'}
 \\
-\text{ if } \mkont &\in \msto(\mkaddr), \mvalx{u} \in \msto(\maddr)
+\text{ if } \mkont &\in \msto(\mkaddr), \mvalx{u} \in \msto(\maddr) \\
+\text{ where } \maddr &= \alloc(\mstate) \\
+               \msto' &= \ext{\msto}{\maddr}{\{\mval\}}
 \end{align*}
+
 Associated with this indirection, we now apply all functions stored in
 the address. This nondeterminism is necessary in order to continue with
 evaluation.
@@ -759,13 +767,13 @@ determinism. Specifically, higher precision, and it is deterministic
 even if set iteration is not.
 
 The state space changes from a store and set of contexts to a set
-of seen abstract states (context plus store), $S$, a set of contexts to
+of seen abstract states (context plus store), $\mseen$, a set of contexts to
 step (the frontier), $F$, and a store to step those contexts with, $\msto$:
 \begin{equation*}
-(S, F, \msto) \mathrel{\widehat{\machstep}} (S \cup S', F', \msto')
+(\mseen, F, \msto) \mathrel{\widehat{\machstep}} (\mseen \cup \mseen', F', \msto')
 \end{equation*}
 
-We constantly see more states, so $S$ is always growing. The frontier,
+We constantly see more states, so $\mseen$ is always growing. The frontier,
 which is what remains to be done, changes. Let's start with the result
 of stepping all the contexts in $F$ paired with the current store (call it $I$ for intermediate):
 %
@@ -784,12 +792,12 @@ the last frontier, but have not seen before. They must be
 \emph{states}, so we pair the contexts with the next store:
 %
 \begin{equation*}
-F' = \setof{c \mid (c,\_) \in I, (c,\msto') \notin S}
+F' = \setof{c \mid (c,\_) \in I, (c,\msto') \notin \mseen}
 \end{equation*}
 %
 Finally, we add what we know we had not yet seen to the seen set:
 \begin{equation*}
-  S' = \setof{(c,\msto') \mid c \in F'}
+  \mseen' = \setof{(c,\msto') \mid c \in F'}
 \end{equation*}
 %
 To inject a program $e$ into this machine, we start off knowing we
@@ -800,7 +808,7 @@ state:
 \text{ where } c_0 &= \ev{e,\bot,\kmt}
 \end{align*}
 
-Notice that now $S$ has several copies of the abstract store in it. As
+Notice that now $\mseen$ has several copies of the abstract store in it. As
 it is, this semantics is much less efficient (but still more precise)
 than the previously proposed semantics because membership checks have
 to compare entire stores. Checking equality is expensive because the stores within each are
@@ -830,24 +838,24 @@ timestamp technique that we can fix.
     updates each state's timestamp. This loses \emph{temporal}
     information about the contexts a state is visited in, and in what
     order. Our semantics has a drop-in replacement of timestamps for
-    stores in the seen set ($S$), so we do not experience precision
+    stores in the seen set ($\mseentime$), so we do not experience precision
     loss.}
 \end{enumerate}
 
 {\small
 \begin{align*}
-\Sigma \in \Store^* \qquad S \subseteq {\mathbb N} \times \Context \qquad F \subseteq \Context
+\Sigma \in \Store^* \qquad \mseentime \subseteq {\mathbb N} \times \Context \qquad F \subseteq \Context
 \end{align*}
 \begin{align*}
-(S, F, \msto, \Sigma, t) &\mathrel{\widehat{\machstep}^T} (S \cup S', F', \msto', \Sigma', t') \\
+(\mseentime, F, \msto, \Sigma, t) &\mathrel{\widehat{\machstep}^T} (\mseentime \cup \mseentime', F', \msto', \Sigma', t') \\
 \mbox{where } I &= \setof{(c',\msto^c) \mid \wn(c, \msto) \mathrel{\machstep} \wn(c', \msto^c), c \in F} \\
               \msto' &= \bigsqcup\; \{\msto^c \mid (\_,\msto^c) \in I\} \\
               (t',\Sigma') &=\left\{\begin{array}{ll}
                            (t+1,\msto'\Sigma') & \text{ if } \msto' \neq \msto \\
                            (t,\Sigma)   & \text{ otherwise}
                           \end{array}\right. \\
-              F' &= \setof{c \mid (c,\_) \in I, (c,t') \notin S} \\
-              S' &= \setof{(c,t') \mid c \in F'}\\
+              F' &= \setof{c \mid (c,\_) \in I, (c,t') \notin \mseentime} \\
+              \mseentime' &= \setof{(c,t') \mid c \in F'}\\
 \inject(e) &= (\setof{\ttuple{c_0}{0}},\setof{c_0},\bot,\cons{\bot}{\epsilon},0) \\
 \text{ where } c_0 &= \ev{e,\bot,\kmt}
 \end{align*}}
@@ -868,8 +876,8 @@ to this semantics, as well. In fact, $\widehat{\machstep}^T$ is a functional
 relation, so we can get the least fixed-point of it directly.
 
 \begin{lemma}
-  $\widehat{\machstep}$ maintains the invariant that all stores in $S$ are
-  totally ordered and $\msto$ is an upper bound of the stores in $S$.
+  $\widehat{\machstep}$ maintains the invariant that all stores in $\mseen$ are
+  totally ordered and $\msto$ is an upper bound of the stores in $\mseen$.
 \end{lemma}
 
 \begin{lemma}
@@ -881,9 +889,9 @@ relation, so we can get the least fixed-point of it directly.
 $\widehat{\machstep}^T$ is a complete abstraction of $\widehat{\machstep}$.
 \end{theorem}
 The proof follows from the order isomorphism that, in one direction,
-sorts all the stores in $S$ to form $\Sigma$, and translates stores in
-$S$ to their distance from the end of $\Sigma$ (their timestamp). In the other
-direction, timestamps in $S$ are replaced by the stores they point to in $\Sigma$.
+sorts all the stores in $\mseen$ to form $\Sigma$, and translates stores in
+$\mseen$ to their distance from the end of $\Sigma$ (their timestamp). In the other
+direction, timestamps in $\mseentime$ are replaced by the stores they point to in $\Sigma$.
 
 \subsection{Locally log-based store deltas}
 
@@ -908,8 +916,9 @@ is straightforward:
 \begin{align*}
 \replay(\left[ \ttuple{\maddr_i}{\mval{s_i}}, \ldots\right], \msto) &=
 \ttuple{\msto'}
-       {\mval{s_i} \overset{?}{=} \msto'(\maddr_i) \vee \ldots} \\
+       {\diffp(\mval{s_i}, \msto(\maddr_i)) \vee \ldots} \\
 \text{ where } \msto' &= {\msto \sqcup [\maddr_i \mapsto \mval{s_i}] \sqcup \ldots}
+\diffp(\mval{s}, \mval{s'}) &= \mval{s'} \overset{?}{=} \mval{s} \sqcup \mval{s'}
 \end{align*}
 
 We change the semantics slightly to add to the change log rather than
@@ -923,10 +932,10 @@ A taste of the changes to the reduction relation is as follows:
 \dmachstep \subseteq (\Context\times\Store) \times (\Context\times\StoreDelta) 
 \end{equation*}
 \begin{align*}
-\ttuple{\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\mval,\mkont}}{\msto} & \dmachstep
-\ttuple{\ev[^{\mcntr'}]{\mexp,\menv',\mkont}}{\cons{\ttuple{\maddr}{\setof{\mval}}}{\epsilon}} \\
-\text{ where }\maddr &= \alloc(\mstate) \\
-              \menv' &= \menv[\mvar\mapsto\maddr]
+\ttuple{\ap[^\mcntr_\mlab]{\clos{\mvar,\mexp,\menv},\maddr,\mkont}}{\msto} & \dmachstep
+\ttuple{\ev[^{\mcntr'}]{\mexp,\menv',\mkont}}{\cons{\ttuple{\maddr'}{\msto(\maddr)}}{\epsilon}} \\
+\text{ where }\maddr' &= \alloc(\mstate) \\
+              \menv' &= \menv[\mvar\mapsto\maddr']
 \end{align*}
 
 % Compilation changes to additionally take a $\msdiff$ component, so the
@@ -938,7 +947,7 @@ in the input and output, and change the frontier-based semantics in
 the following way:
 {\small
 \begin{align*}
-(S, F, \msto,\Sigma,t) &\mathrel{\damachstep} (S \cup S', F', \msto',\Sigma',t') \\
+(\mseentime, F, \msto,\Sigma,t) &\mathrel{\damachstep} (\mseentime \cup \mseentime', F', \msto',\Sigma',t') \\
 \mbox{ where }
  I &= \setof{(c',\msdiff) \mid \ttuple{c}{\msto} \dmachstep \ttuple{c'}{\msdiff} } \\
  \ttuple{\msto'}{\changep} &= \replay(\appendall(\setof{\msdiff \mid (\_,\msdiff) \in I}),\msto) \\
@@ -948,8 +957,8 @@ the following way:
          \ttuple{t+1}{\msto\Sigma} & \text{ if } \changep \\
          \ttuple{t}{\Sigma} & \text{ otherwise}
        \end{array}\right. \\
- F' &= \setof{c \mid (c,\_) \in I, (c,t') \notin S} \\
- S' &= \setof{(c,t') \mid c \in F'} \\
+ F' &= \setof{c \mid (c,\_) \in I, (c,t') \notin \mseentime} \\
+ \mseentime' &= \setof{(c,t') \mid c \in F'} \\
 \appendall(\varnothing) &= \epsilon \\
 \appendall(\setof{\msdiff}\cup\Xi) &= \append(\msdiff,\appendall(\Xi))
 \end{align*}}
@@ -1015,7 +1024,7 @@ application positions.
 Transition patterns of this shape litter the state-graph:
 %
 \begin{center}
-\includegraphics[scale=0.3]{fanout}
+\includegraphics[scale=0.2]{fanoutdot2}
 \end{center}
 To avoid the spurious forking and joining, we {\it delay} the non-determinism
 until and unless it is needed in {\it strict contexts} (such as the guard for an
@@ -1023,7 +1032,7 @@ until and unless it is needed in {\it strict contexts} (such as the guard for an
 %
 Doing so collapses these forks and joins into a linear sequence of states:
 \begin{center}
-\includegraphics[scale=0.3]{lazy}
+\includegraphics[scale=0.2]{lazydot}
 \end{center}
 
 This shift does not change the concrete semantics of the language to
@@ -1096,28 +1105,20 @@ a binding of a variable will happen in one step, since store widening
 leads to stepping several states in one big ``step.'' With laziness,
 the reference will mean the original binding(s) of the variable or the
 new binding, because the actual store lookup is delayed one step
-(i.e. laziness is administrative). Without laziness, the reference
-will fan out to all the bindings of the variable before the new
-binding happens and thus theoretically has an observable precision
-difference. % All our benchmarks maintain their precision with lazy non-determinism, however.
+(i.e. laziness is administrative).
 
 \paragraph{Option 2: Regain precision; complicate implementation}
 The administrative nature of laziness means that we could remove the
 loss in precision by storing the result of the lookup in a value
-representing a delayed nondeterministic choice. This has problems with
-the next optimization, leading to unsoundness. Regaining soundness
-would involve artificial complications to the semantics.
+representing a delayed nondeterministic choice. This is a more common
+choice in 0CFA implementations we have seen, but it interferes with
+the next optimization (discussion in next section).
 
 \paragraph{Our choice: option 1}
-The configurations that lead to precision loss happen too rarely to
-warrant the significant increase in time and memory needed for this
-eager non-determinism. Without a widened store, lazy
-non-determinism is not a complete abstraction with either approach,
-but the precision gains are not immediately apparent due to fake
-rebinding (a second reference to the same variable chooses a different
-value from the first) and other problems. The performance and memory
-gains are apparent, so we favor the simplicity over invisible
-gains.}{}
+The conditions for precision loss happen too rarely to warrant the
+added complexity to the next section's semantics to avoid such
+losses. Without abstract compilation, option 2 is the better
+choice.}{}
 
 \spchoice
 {
@@ -1204,7 +1205,7 @@ the other components of the {\tt ev} state. Its definition in figure
 {\tt ev} states. The next step is to change reduction rules that
 create {\tt ev} states to instead call these functions. Figure
 \ref{fig:caam} shows the modified reduction relation. The only change
-from the previous semantics is that $\ev{}$ state construction is
+from the previous semantics is that $\evalone$ state construction is
 replaced by calling the compiled expression. For notational coherence,
 we write $\lambda^\mcntr(\mathit{args} \ldots)$ for
 $\lambda(\mathit{args} \ldots, \mcntr)$ and
@@ -1270,7 +1271,7 @@ $\mcomp^\mcntr(\mathit{args}\ldots)$ for $\mcomp(\mathit{args}\ldots,
                \msdiff &= \cons{\ttuple{\maddr_f}{\force(\msto,\mval)}}{\epsilon}
 \\
 \co{\kfn[^\mcntr_\mlab]{\maddr_f,\mkaddr},\mval} & \cmachstep_\msto
-\ap[^\mcntr_\mlab]{\mvalx{u},\mval,\mkont},\epsilon \\
+\ap[^\mcntr_\mlab]{\mvalx{u},\maddr,\mkont},\cons{\ttuple{\maddr}{\force(\msto,\mval)}}{\epsilon} \\
 \text{ if }\mvalx{u} &\in \msto(\maddr_f), \mkont \in \msto(\mkaddr)
 \\
 \co{\kif[^\mcntr]{\mcompi0,\mcompi1,\menv,\mkaddr},\strue} & \cmachstep_\msto
@@ -1282,14 +1283,14 @@ $\mcomp^\mcntr(\mathit{args}\ldots)$ for $\mcomp(\mathit{args}\ldots,
 \text{ if }\mkont\in\msto(\mkaddr)
 \\[2mm]
 %% APPLY
-\ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\mval,\mkont} & \cmachstep_\msto
+\ap[^\mcntr_\mlab]{\clos{\mvar,\mcomp,\menv},\maddr,\mkont} & \cmachstep_\msto
 \mcomp^{\mcntr'}(\msto)(\menv',\msdiff,\mkont) \\
 \text{ where }\menv' &= \menv[\mvar\mapsto\maddr] \\
-              \msdiff &= \cons{\ttuple{\maddr}{\force(\msto,\mval)}}{\epsilon}
+              \msdiff &= \cons{\ttuple{\maddr}{\msto(\maddr)}}{\epsilon}
 \\
-\ap{\mop,\mval,\mkont} & \cmachstep_\msto
-\co{\mkont,\mval'},\epsilon \\
-\text{ where } \mvalx{u} &\in \spchoice{\force(\msto,\mval)}{\force(\mval)}, \mval'\in\interpdelta(\mop,\mvalx{u})
+\ap{\mop,\maddr,\mkont} & \cmachstep_\msto
+\co{\mkont,\mvalx{u}},\epsilon \\
+\text{ where } \mval &\in \spchoice{\msto(\maddr)}{\msto(\maddr)}, \mvalx{u}\in\interpdelta(\mop,\mval)
 \end{align*}
 \end{gather*}
 \caption{Abstract abstract machine for compiled ISWIM}
@@ -1313,13 +1314,18 @@ abstract bytecode is roughly bounded by the amount of expression
 nesting in the program. The partial order that defines subexpressions
 smaller than the expression in which they occur is well-founded, so we
 use this observation to drive our use of a well-founded equivalence
-bisimulation (WEB)~\cite{ianjohnson:manolios-diss}. WEBs are equivalent to the notion of a stuttering
-bisimulation, but are more amenable to mechanisation (and thus
-rigorous proof). They also only require reasoning over one step of the
-reduction relation, which makes the proof concise.
+bisimulation (WEB)~\cite{ianjohnson:manolios-diss}. WEBs are
+equivalent to the notion of a stuttering bisimulation, but are more
+amenable to mechanisation (and thus rigorous proof). They also only
+require reasoning over one step of the reduction relation, which makes
+the proof concise. The trick is in defining a well-founded ordering
+that determines when the two semantics will match up again, what
+Manolios calls the pair of functions $\erankt$ and $\erankl$ (but we
+don't need the generality that requires $\erankl$ since the uncompiled
+semantics doesn't stutter at all).
 
-We define a refinement from non-compiled to compiled states by
-``committing'' all the actions of an $\ev{}$ state (defined similarly to
+We define a refinement, $r$, from non-compiled to compiled states (built structurally) by
+``committing'' all the actions of an $\evalone$ state (defined similarly to
 $\compile{\_}$, but immediately applies the functions), and
 subsequently changing all expressions with their compiled
 variants. Since WEBs are for single transition systems, a WEB
@@ -1329,7 +1335,7 @@ refined state (and itself). Call this relation $B$.
 
 Before we prove this setup is indeed a WEB, we need one lemma that
 applying an abstract bytecode's function is equal to refining the
-corresponding $\ev{}$ state:
+corresponding $\evalone$ state:
 %
 \begin{lemma}[Compile/commit]
 Let $c,\msdiff' = \compile{\mexp}^\mcntr_{r(\msto)}(\menv,\msdiff,r(\mkont))$.
@@ -1360,15 +1366,19 @@ The fact that many changes happen in one step also makes the
 comparison with the widened lazy semantics more subtle. It is possible
 for different stores to occur between the different semantics because
 abstract compilation can change the order in which the store is
-changed. Consider the case where before we might call the same
-function from two different places in 3 and 2 steps respectively,
-compilation can make that 2 and 1, reversing the order that we bind
-values in the store, leading to a mismatch from the previous
-semantics. This kind of cross-step store poisoning is inevitable when
-a store is shared between several traces. The binding could have just
-as easily been observed the other way around in the non-compiled
-semantics. Call $\camachstep$ the result of the widening operator from
-the previous section on $\cmachstep$.
+changed (across steps). Consider the case where before we might call
+the same function from two different places in 3 and 2 steps
+respectively, compilation can make that 2 and 1, reversing the order
+that we bind values in the store, leading to a mismatch from the wide
+lazy semantics.  This kind of cross-step store poisoning is inevitable
+when a store is shared between several traces. The binding could have
+just as easily been observed the other way around in the non-compiled
+semantics. Although there is a difference pre- and post- abstract
+compilation, the result is still deterministic in contrast to Shivers'
+technique. The soundness is in tact since we can add store-widening
+the correct unwidened semantics with an easy correctness proof. Call
+$\camachstep$ the result of the widening operator from the previous
+section on $\cmachstep$.
 
 % Compile: cpu time: 255397 real time: 261532 gc time: 2947
 
@@ -1386,7 +1396,7 @@ Thus far, we have made our optimizations in a purely functional
 manner. For the final push for performance, we need to dip into the
 imperative. In this section, we show an alternative representation of
 the store and seen set that are more space-efficient and are amenable
-to destructive updates.
+to destructive updates by adhering to a history for each address.
 
 The following transfer function has several components that can be
 destructively updated, and intermediate sets can be elided by adding
@@ -1397,15 +1407,17 @@ purely functional view.
 
 \subsubsection{Pure setup for imperative implementation}
 
-The store maps to a stack of timestamped sets of abstract values.
+The store maps to a stack of timestamped sets of abstract
+values. Throughout this section, we will be taking the parameter $t$
+to be the ``current time,'' or the length of the store chain at the
+beginning of the step.
 
 \begin{align*}
 \msto \in \Store &= \Addr \to \Valstack \\
 \mvalstack \in \Valstack &= (\Timestamp \times \wp(\Storeable))^*
 \end{align*}
 
-Here we formally define what lookup and update mean at a given
-timestamp.
+To allow imperative store updates, we maintain an invariant that we never look up values tagged at a time in the future:
 
 {\small
 \begin{align*}
@@ -1414,15 +1426,22 @@ timestamp.
     \begin{array}{ll}
       \mval{s} & \text{ if } \mvalstack = \cons{\ttuple{t'}{\mval{s}}}{\mvalstack'}, t' \le t \\
       \mval{s'} & \text{ if } \mvalstack = \cons{\ttuple{t'}{\mval{s}}}{\cons{\ttuple{t''}{\mval{s'}}}{\mvalstack'}}, t' > t
-    \end{array}\right. \\
+    \end{array}\right.
+\end{align*}} To construct this value stack, we have a
+time-parameterized join operation that also tracks changes to the
+store. If joining with a time in the future, we just add to
+it. Otherwise, we're making a change for the future ($t+1$), but only
+if there is an actual change.
+{\small
+\begin{align*}
 \msto \sqcup_t [\maddr \mapsto \mval{s}] &= \msto[\maddr \mapsto \mvalstack],\changep \\
- (\mvalstack,\changep) &= \msto(\maddr)\sqcup_t \mval{s} \\
-\epsilon \sqcup_t \mval{s} &= \ttuple{t}{\mval{s}} \\
-\cons{\ttuple{t'}{\mval{s}}}{\mvalstack} \sqcup_t \mval{s'} &= \cons{\ttuple{t'}{\mval{s}\sqcup\mval{s'}}}{\mvalstack},\strue \text{ if } t' > t \\
+\text{where } (\mvalstack,\changep) &= \msto(\maddr)\sqcup_t \mval{s} \\
+\epsilon \sqcup_t \mval{s} &= \ttuple{t}{\mval{s}},\strue \\
+\cons{\ttuple{t'}{\mval{s}}}{\mvalstack} \sqcup_t \mval{s'} &= \cons{\ttuple{t'}{\mval{s}\sqcup\mval{s'}}}{\mvalstack},\diffp(\mval{s}, \mval{s'}) \text{ if } t' > t \\
 \mvalstack \sqcup_t \mval{s} &= \cons{\ttuple{t+1}{\mval{s^*}}}{\mvalstack},\strue
-           \text{ if } \mval{s'} \neq \mval{s^*} \\
- \mval{s'} &= \lookup(\msto(\maddr),t) \\
- \mval{s^*} &= \mval{s} \sqcup \mval{s'} \\
+           \text{ if } \mval{s_t} \neq \mval{s^*} \\
+ \text{where } &\mval{s_t} = \lookup(\msto(\maddr),t) \\
+ &\mval{s^*} = \mval{s} \sqcup \mval{s_t} \\
 \mvalstack \sqcup_t \mval{s} &= \mvalstack,\sfalse \text{ otherwise}
 \end{align*}}
 
@@ -1439,7 +1458,7 @@ section.
 \begin{align*}
 \System &= (\widehat{\State} \to {\Timestamp}^*) \times \wp(\widehat{\State}) \times \Store \times \Timestamp \\
 {\mathcal F} &: \System \to \System \\
-{\mathcal F}(S,F, \msto,t) &= (S',F',\msto', t') \\
+{\mathcal F}(\mseentime,F, \msto,t) &= (\mseentime',F',\msto', t') \\
 \text{ where }
 I &= \setof{(c',\msdiff) \mid
        c \in F,
@@ -1449,10 +1468,10 @@ I &= \setof{(c',\msdiff) \mid
 t' &= \left\{\begin{array}{ll} t+1 & \text{ if } \changep \\
               t   & \text{ otherwise}
              \end{array}\right. \\
-F' &= \setof{c \mid (c,\_) \in I, \changep \vee S(c) \neq \cons{t}{\_}} \\
-S' &= \lambda c. \left\{\begin{array}{ll}
-                               \cons{t'}{S(c)} & \text{ if } c \in F' \\
-                               S(c) & \text{ otherwise}
+F' &= \setof{c \mid (c,\_) \in I, \changep \vee \mseentime(c) \neq \cons{t}{\_}} \\
+\mseentime' &= \lambda c. \left\{\begin{array}{ll}
+                               \cons{t'}{\mseentime(c)} & \text{ if } c \in F' \\
+                               \mseentime(c) & \text{ otherwise}
                              \end{array}\right.
 \end{align*}}
 
@@ -1480,7 +1499,7 @@ ${\mathcal F}$ is a complete abstraction of $\camachstep$.
 The intermediate data structures of the above transfer function can all be streamlined into globals that are destructively updated. In particular, there are 5 globals:
 
 \begin{enumerate}
-\item{$S$: the \emph{seen} set, though made a map for faster membership tests and updates.}
+\item{$\mseentime$: the \emph{seen} set, though made a map for faster membership tests and updates.}
 \item{$F$: the \emph{frontier} set, which must be persisent or copied for the iteration through the set to be correct.}
 \item{$\msto$: the store, which represents all stores that occur in the machine semantics.}
 \item{$t$: the timestamp, or length of the store chain - all stores that occur in the semantics are totally ordered due to single-threading the store.}
@@ -1490,8 +1509,8 @@ The intermediate data structures of the above transfer function can all be strea
 The reduction relation would then instead of building store deltas,
 update the global store. We would also not view it as a general
 relation, but a function that adds all next states to $F$ if they have
-not already been seen. At the end of iterating through $F$, $S$ is
-updated with the new states at the next timestamp.
+not already been seen. At the end of iterating through $F$, $\mseentime$ is
+updated with the new states at the next timestamp. There is no cross-step store poisoning since the lookup is restricted to the current step's time, which points to the same value throughout the step.
 
 \subsubsection{Pre-allocating the store}
 
@@ -1662,7 +1681,7 @@ are achieved with purely functional methods, which suggest potential
 further gains from parellelization.  Peak memory usage is often
 considerably improved by the end of the optimization steps, but the
 effect of mutation has unexpected consequence on the analyzers memory
-consumption.
+consumption, likely due to a larger-than-necessary preallocated store.
 
 
 Source code of the implementation and benchmark suite is at:

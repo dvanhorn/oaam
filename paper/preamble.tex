@@ -9,6 +9,8 @@
 \newcommand{\rlos}[1]{\tuple{rlos}{#1}}
 
 % States
+\newcommand{\evalone}{{\tt ev}}
+\newcommand{\apalone}{{\tt ap}}
 \newcommand{\ev}[2][\ ]{\tuple[#1]{ev}{#2}}
 \newcommand{\co}[2][\ ]{\tuple[#1]{co}{#2}}
 \newcommand{\ap}[2][\ ]{\tuple[#1]{ap}{#2}}
@@ -16,6 +18,7 @@
 \newcommand{\ans}[1]{\tuple{ans}{#1}}
 
 % Continuations
+\newcommand{\kfnalone}{{\tt fun}}
 \newcommand{\kmt}{{\tt halt}}
 \newcommand{\kar}[2][\ ]{\tuple[#1]{arg}{#2}}
 \newcommand{\kfn}[2][\ ]{\tuple[#1]{fun}{#2}}
@@ -93,6 +96,9 @@
 \newcommand{\interpdelta}{\Delta}
 \newcommand{\msdiff}{\xi}
 
+\newcommand{\mseen}{S}
+\newcommand{\mseentime}{\hat{S}}
+
 \newcommand{\compile}[1]{\llbracket#1\rrbracket}
 \newcommand{\kpush}[2][\ ]{\lfloor #2 \rfloor{#1}}
 
@@ -112,6 +118,7 @@
 \newcommand{\allockont}{\mathit{allockont}}
 \newcommand{\tick}{\mathit{tick}}
 \newcommand{\replay}{\mathit{replay}}
+\newcommand{\diffp}{\mathit{\delta?}}
 \newcommand{\states}{\mathit{cs}}
 \newcommand{\concat}{\mathit{concat}}
 \newcommand{\append}{\mathit{append}}
