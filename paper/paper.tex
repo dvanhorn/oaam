@@ -47,17 +47,11 @@
 \maketitle
 
 \begin{abstract}
-The technique of \emph{abstracting abstract machines} (AAM) provides a
-systematic approach for deriving computable approximations of
-evaluators that are easily proved sound.
+The technique of \emph{abstracting abstract machines} (AAM) provides a systematic approach for deriving computable approximations of evaluators that are easily proved sound.
 %
-This article contributes a complementary step-by-step process for
-subsequently going from a \naive{} analyzer derived under the AAM
-approach, to an efficient and correct implementation.  The end result
-of the process is a two to three order-of-magnitude improvement over
-the systematically derived analyzer, making it competitive with
-hand-optimized implementations that compute fundamentally less precise
-results.
+This article contributes a complementary step-by-step process for subsequently going from a \naive{} analyzer derived under the AAM approach, to an efficient and correct implementation.
+%
+The end result of the process is a two to three order-of-magnitude improvement over the systematically derived analyzer, making it competitive with hand-optimized implementations that compute fundamentally less precise results.
 \end{abstract}
 
 %% \category{CR-number}{subcategory}{third-level}
@@ -70,74 +64,56 @@ results.
 
 \section{Introduction}
 
-Program analysis provides sound predictive models of program behavior, but
-in order for such models to be effective, they must be efficiently
-computable and correct.  Past approaches to designing program analysis
-have often featured abstractions that are far removed from the
-original language semantics, requiring ingenuity in their construction
-and effort in their verification.
+Program analysis provides sound predictive models of program behavior, but in order for such models to be effective, they must be efficiently computable and correct.
 %
-The \emph{abstracting abstract machines} (AAM)
-approach~\cite{dvanhorn:VanHorn2011Abstracting,dvanhorn:VanHorn2012Systematic}
-to deriving program analyses provides an alternative: a systematic way
-of transforming a programming language semantics in the form of an
-abstract machine into a family of abstract interpreters.  It thus reduces
-the burden of constructing and verifying the soundness of an abstract
-interpreter.
+Past approaches to designing program analysis have often featured abstractions that are far removed from the original language semantics, requiring ingenuity in their construction and effort in their verification.
+%
+The \emph{abstracting abstract machines} (AAM) approach~\cite{dvanhorn:VanHorn2011Abstracting,dvanhorn:VanHorn2012Systematic} to deriving program analyses provides an alternative: a systematic way of transforming a programming language semantics in the form of an abstract machine into a family of abstract interpreters.
+%
+It thus reduces the burden of constructing and verifying the soundness of an abstract interpreter.
 %
 
 %
 % Specifically, these policies tune precision for control,
 % the environment, the store, and base value domains.
 
-By taking a
-machine-oriented view of computation, AAM makes it possible to design,
-verify, and implement program analyzers for realistic language
-features typically considered difficult to model.  The approach was
-originally applied to features such as higher-order functions,
-stack inspection, exceptions, laziness, first-class continuations, and
-garbage collection.  It has since been used to verify actor-
-\cite{local:DOsualdo:12A} and
-thread-based~\cite{dvanhorn:Might2011Family} parallelism and
-behavioral contracts~\cite{dvanhorn:TobinHochstadt2012Higherorder}; it
-has been used to model Coq~\cite{local:harvard},
-Dalvik~\cite{local:dalvik}, Erlang~\cite{local:DOsualdo:12B},
-JavaScript~\cite{local:DBLP:journals/corr/abs-1109-4467}, and
-Racket~\cite{dvanhorn:TobinHochstadt2012Higherorder}.
-
-The primary strength of the approach is that abstract interpreters can
-be easily derived through a small number of steps from existing
-machine models.  Since the relationships between abstract machines and
-higher-level semantic models---such as definitional
-interpreters~\cite{dvanhorn:reynolds-hosc98}, structured operational
-semantics~\cite{dvanhorn:Plotkin1981Structural}, and reduction
-semantics~\cite{dvanhorn:Felleisen2009Semantics}---are well
-understood~\cite{dvanhorn:Danvy:DSc}, it is possible to navigate from
-these high-level semantic models to sound program analyzers in a
-systematic way.  Moreover, since these analyses so closely resemble a
-language's interpreter (a) implementing an analysis requires little
-more than implementing an interpreter, (b) a single implementation can
-serve as both an interpreter and analyzer, and (c) verifying the
-correctness of the implementation is straightforward.
-
-Unfortunately, the AAM approach yields analyzers with poor performance
-relative to hand-optimized analyzers.
+By taking a machine-oriented view of computation, AAM makes it possible to design, verify, and implement program analyzers for realistic language features typically considered difficult to model.
 %
-Our work takes aim squarely at this ``efficiency gap,'' and narrows it
-in an equally systematic way through a number of simple steps, many of
-which are inspired by run-time implementation techniques such as
-laziness and compilation to avoid interpretative overhead.  Each of
-these steps is proven correct, so the end result is an implementation
-that is trustworthy and efficient.
+The approach was originally applied to features such as higher-order functions, stack inspection, exceptions, laziness, first-class continuations, and garbage collection.
+%
+It has since been used to verify actor-\cite{local:DOsualdo:12A} and thread-based~\cite{dvanhorn:Might2011Family} parallelism and behavioral contracts~\cite{dvanhorn:TobinHochstadt2012Higherorder};
+%
+it has been used to model Coq~\cite{local:harvard}, Dalvik~\cite{local:dalvik}, Erlang~\cite{local:DOsualdo:12B}, JavaScript~\cite{local:DBLP:journals/corr/abs-1109-4467}, and Racket~\cite{dvanhorn:TobinHochstadt2012Higherorder}.
+%%
 
-In this article, we develop a systematic approach to deriving a
-practical implementation of an abstract-machine-based analyzer using
-mostly semantic means rather than tricky engineering. Our goal is to
-empower programming language implementers and researchers to explore
-and convincingly exhibit their ideas with a low barrier to entry. The
-optimizations we describe are widely applicable and apparently
-effective to scale far beyond the size of programs typically considered
-in the recent literature on flow analysis for functional languages.
+%%
+The primary strength of the approach is that abstract interpreters can be easily derived through a small number of steps from existing machine models.
+%
+Since the relationships between abstract machines and higher-level semantic models---such as definitional interpreters~\cite{dvanhorn:reynolds-hosc98}, structured operational semantics~\cite{dvanhorn:Plotkin1981Structural}, and reduction semantics~\cite{dvanhorn:Felleisen2009Semantics}---are well understood~\cite{dvanhorn:Danvy:DSc}, it is possible to navigate from these high-level semantic models to sound program analyzers in a systematic way.
+%
+Moreover, since these analyses so closely resemble a language's interpreter
+%
+(a) implementing an analysis requires little more than implementing an interpreter,
+%
+(b) a single implementation can serve as both an interpreter and analyzer, and
+%
+(c) verifying the correctness of the implementation is straightforward.
+%%
+
+%%
+Unfortunately, the AAM approach yields analyzers with poor performance relative to hand-optimized analyzers.
+%
+Our work takes aim squarely at this ``efficiency gap,'' and narrows it in an equally systematic way through a number of simple steps, many of which are inspired by run-time implementation techniques such as laziness and compilation to avoid interpretative overhead.
+%
+Each of these steps is proven correct, so the end result is an implementation that is trustworthy and efficient.
+%%
+
+%%
+In this article, we develop a systematic approach to deriving a practical implementation of an abstract-machine-based analyzer using mostly semantic means rather than tricky engineering.
+%
+Our goal is to empower programming language implementers and researchers to explore and convincingly exhibit their ideas with a low barrier to entry.
+%
+The optimizations we describe are widely applicable and apparently effective to scale far beyond the size of programs typically considered in the recent literature on flow analysis for functional languages.
 
 \section{At a glance}
 
@@ -149,112 +125,101 @@ in the recent literature on flow analysis for functional languages.
 \includegraphics[width=3.2in]{church-relative-time}
 \vspace{-1.5em}
 \end{center}
-\caption{Factor improvements over the baseline analyzer for the
-  \Church{} benchmark in terms of the rate of state
-  transitions and total analysis time. (Bigger is better.) Each point
-  is marked with the section that introduces the optimization.}
+\caption{
+Factor improvements over the baseline analyzer for the \Church{} benchmark in terms of the rate of state transitions and total analysis time.
+%
+(Bigger is better.)
+%
+Each point is marked with the section that introduces the optimization.}
 \label{fig:churchtime}
 \end{figure}
 
 
-We start with a quick review of the AAM approach to develop an
-analysis framework and then apply our step-by-step optimization
-techniques in the simplified setting of a core functional language.
-This allows us to explicate the optimizations with a minimal amount of
-inessential technical overhead.  Following that, we scale this
-approach up to an analyzer for a realistic untyped, higher-order
-imperative language with a number of interesting features and then
-measure improvements across a suite of benchmarks.
+We start with a quick review of the AAM approach to develop an analysis framework and then apply our step-by-step optimization techniques in the simplified setting of a core functional language.
+%
+This allows us to explicate the optimizations with a minimal amount of inessential technical overhead.
+%
+Following that, we scale this approach up to an analyzer for a realistic untyped, higher-order imperative language with a number of interesting features and then measure improvements across a suite of benchmarks.
+%%
 
-At each step during the initial presentation and development, we
-evaluated the implementation on a set of benchmarks. The highlighted
-benchmark in figure \ref{fig:churchtime} is from Vardoulakis and
-Shivers~\cite{dvanhorn:Vardoulakis2011CFA2} that tests distributivity
-of multiplication over addition on Church numerals.  For the
-step-by-step development, this benchmark is particularly informative:
+%%
+At each step during the initial presentation and development, we evaluated the implementation on a set of benchmarks.
+%
+The highlighted benchmark in figure \ref{fig:churchtime} is from Vardoulakis and Shivers~\cite{dvanhorn:Vardoulakis2011CFA2} that tests distributivity of multiplication over addition on Church numerals.
+%
+For the step-by-step development, this benchmark is particularly informative:
 \begin{enumerate}
 \item it can be written in most modern programming languages,
 %
-\item it was designed to stress an analyzer's ability to deal with
-  complicated environment and control structure arising from the use
-  of higher-order functions to encode arithmetic, and
+\item it was designed to stress an analyzer's ability to deal with complicated environment and control structure arising from the use of higher-order functions to encode arithmetic, and
 %
-\item its improvement is about median in the benchmark suite
-  considered in section~\ref{sec:eval}, and thus it serves as a good
-  sanity check for each of the optimization techniques considered.
+\item its improvement is about median in the benchmark suite considered in section~\ref{sec:eval}, and thus it serves as a good sanity check for each of the optimization techniques considered.
 \end{enumerate}
 
-We start, in section~\ref{sec:aam}, by developing an abstract
-interpreter according to the AAM approach.  In the initial
-abstraction, each state carries a store (what is called per-state
-store variance). The space of stores is exponential in size; without
-further abstraction, the analysis is exponential and thus cannot
-analyze the example in a reasonable amount of time.  In
-section~\ref{sec:baseline}, we perform a further abstraction by
-widening the store.  The resulting analyzer sacrifices precision for
-speed and is able to analyze the example in about 1 minute.  This step
-is described by Van Horn and Might~\cite[\S
-3.5--6]{dvanhorn:VanHorn2012Systematic} and is necessary to make even
-small examples feasible.  We therefore take a widened interpreter as
-the baseline for our evaluation.
+We start, in section~\ref{sec:aam}, by developing an abstract interpreter according to the AAM approach.
+%
+In the initial abstraction, each state carries a store (what is called per-state store variance).
+%
+The space of stores is exponential in size; without further abstraction, the analysis is exponential and thus cannot analyze the example in a reasonable amount of time.
+%
+In section~\ref{sec:baseline}, we perform a further abstraction by widening the store.
+%
+The resulting analyzer sacrifices precision for speed and is able to analyze the example in about 1 minute.
+%
+This step is described by Van Horn and Might~\cite[\S 3.5--6]{dvanhorn:VanHorn2012Systematic} and is necessary to make even small examples feasible.
+%
+We therefore take a widened interpreter as the baseline for our evaluation.
+%%
 
-Section~\ref{sec:opt} gives a series of simple abstractions and
-implementation techniques that, in total, speed up the analysis by
-nearly a factor of 500, dropping the analysis time to a fraction of a
-second.  Figure~\ref{fig:churchtime} shows the step-wise improvement
-of the analysis time for this example.
+%%
+Section~\ref{sec:opt} gives a series of simple abstractions and implementation techniques that, in total, speed up the analysis by nearly a factor of 500, dropping the analysis time to a fraction of a second.
+%
+Figure~\ref{fig:churchtime} shows the step-wise improvement of the analysis time for this example.
+%%
 
-The AAM approach, in essence, does the following: it takes a
-machine-based view of computation and turns it into a \emph{finitary
-  approximation} by bounding the size of the store.  With a limited
-address space, the store must map addresses to \emph{sets} of values.
-Store updates are interpreted as joins, and store dereferences are
-interpreted by non-deterministic choice of an element from a set.  The
-result of analyzing a program is a finite directed graph where nodes
-in the graph are (abstract) machine states and edges denote machine
-transitions between states.
+%%
+The AAM approach, in essence, does the following: it takes a machine-based view of computation and turns it into a \emph{finitary approximation} by bounding the size of the store.
+%
+With a limited address space, the store must map addresses to \emph{sets} of values.
+%
+Store updates are interpreted as joins, and store dereferences are interpreted by non-deterministic choice of an element from a set.
+%
+The result of analyzing a program is a finite directed graph where nodes in the graph are (abstract) machine states and edges denote machine transitions between states.
+%%
 
-The techniques we propose for optimizing analysis fall into the
-following categories:
+%%
+The techniques we propose for optimizing analysis fall into the following categories:
 \begin{enumerate}
-\item generate fewer states by avoiding the eager exploration of
-  non-deterministic choices that will later collapse into a single
-  join point.  We accomplish this by applying lazy evaluation
-  techniques so that non-determinism is evaluated \emph{by need}.
+\item generate fewer states by avoiding the eager exploration of non-deterministic choices that will later collapse into a single join point.
+%
+  We accomplish this by applying lazy evaluation techniques so that non-determinism is evaluated \emph{by need}.
 
-\item generate fewer states by avoiding unnecessary, intermediate
-  states of a computation.  We accomplish this by applying compilation
-  techniques from functional languages to avoid interpretive overhead
-  in the machine transition system.
+\item generate fewer states by avoiding unnecessary, intermediate states of a computation.
+%
+  We accomplish this by applying compilation techniques from functional languages to avoid interpretive overhead in the machine transition system.
 
-\item generate states faster.  We accomplish this by better algorithm
-  design in the fixed-point computation we use to generate state graphs.
+\item generate states faster.
+%
+  We accomplish this by better algorithm design in the fixed-point computation we use to generate state graphs.
 \end{enumerate}
-Figure~\ref{fig:state-graphs} shows the effect of (1) and (2) for the
-small motivating example in Earl, et
-al.~\cite{dvanhorn:Earl2012Introspective}.  By generating
-significantly fewer states at a significantly faster rate, we are able
-to achieve large performance improvements in terms of both time and
-space.
+%
+Figure~\ref{fig:state-graphs} shows the effect of (1) and (2) for the small motivating example in Earl, et al.~\cite{dvanhorn:Earl2012Introspective}.
+%
+By generating significantly fewer states at a significantly faster rate, we are able to achieve large performance improvements in terms of both time and space.
+%%
 
-Section~\ref{sec:eval} describes the evaluation of each optimization
-technique applied to an implementation supporting a more realistic set
-of features, including mutation, first-class control, compound data, a
-full numeric tower and many more forms of primitive data and
-operations.
+%%
+Section~\ref{sec:eval} describes the evaluation of each optimization technique applied to an implementation supporting a more realistic set of features, including mutation, first-class control, compound data, a full numeric tower and many more forms of primitive data and operations.
 %
-We evaluate this implementation against a set of benchmark programs
-drawn from the literature.
+We evaluate this implementation against a set of benchmark programs drawn from the literature.
 %
-For all benchmarks, the optimized analyzer outperforms the baseline
-by at least a factor of
+For all benchmarks, the optimized analyzer outperforms the baseline by at least a factor of
 % 475
 two to
 % 4,382
 three orders of magnitude.
 
-Section~\ref{sec:related} relates this work to the literature and
-section~\ref{sec:conclusion} concludes.
+Section~\ref{sec:related} relates this work to the literature and section~\ref{sec:conclusion} concludes.
 
 
 \begin{figure}[t]
@@ -277,17 +242,20 @@ section~\ref{sec:conclusion} concludes.
 (c) Compiled (\& lazy)
 \end{tabular}
 \end{center}
-\caption{Example state graphs for Earl et. al. program.  Gray states
-  follow variable references, {\tt ev} states are black, and all others
-  are white. Part (a) shows the result of the baseline analyzer.  It
-  has long ``corridor'' transitions and ``diamond'' subgraphs that
-  fan-out from nondeterminism and fan-in from joins.  Part (b) shows
-  the result of performing nondeterminism lazily and thus avoids many
-  of the diamond subgraphs.  Part (c) shows the result of abstract
-  compilation that removes interpretive overhead in the form of
-  intermediate states, thus minimizing the corridor transitions.  The
-  end result is a more compact abstraction of the program that can be
-  generated faster.}
+\caption{
+Example state graphs for Earl et. al. program.
+%
+  Gray states follow variable references, {\tt ev} states are black, and all others are white.
+%
+ Part (a) shows the result of the baseline analyzer.
+%
+  It has long ``corridor'' transitions and ``diamond'' subgraphs that fan-out from nondeterminism and fan-in from joins.
+%
+  Part (b) shows the result of performing nondeterminism lazily and thus avoids many of the diamond subgraphs.
+%
+  Part (c) shows the result of abstract compilation that removes interpretive overhead in the form of intermediate states, thus minimizing the corridor transitions.
+%
+  The end result is a more compact abstraction of the program that can be generated faster.}
 \label{fig:state-graphs}
 \end{figure}
 
@@ -297,25 +265,23 @@ section~\ref{sec:conclusion} concludes.
 
 In this section, we give a brief review of the AAM approach by
 defining a sound analytic framework for a core higher-order functional
-language: Landin's ISWIM~\cite{dvanhorn:Landin1966Next}.  In the
-subsequent sections, we will explore optimizations for the analyzer in
-this simplified setting, but scaling these techniques to realistic
-languages is straightforward and has been done for the analyzer
-evaluated in section~\ref{sec:eval}.
-
-ISWIM is a family of programming languages parameterized by a set of
-base values and operations.  To make things concrete, we consider a
-member of the ISWIM family with integers, booleans, and a few
-operations.
+language: Landin's ISWIM~\cite{dvanhorn:Landin1966Next}.
 %
-Figure~\ref{fig:syntax} defines the syntax of ISWIM.  It
-includes variables, literals (either integers, booleans, or
-operations), $\lambda$-expressions for defining procedures, procedure
-applications, and conditionals.  Expressions carry a label, $\mlab$,
-which is drawn from an unspecified set and denotes the source location
-of the expression; labels are used to disambiguate distinct, but
-syntactically identical pieces of syntax.  We omit the label
-annotation in contexts where it is irrelevant.
+In the subsequent sections, we will explore optimizations for the analyzer in this simplified setting, but scaling these techniques to realistic languages is straightforward and has been done for the analyzer evaluated in section~\ref{sec:eval}.
+%%
+
+%%
+ISWIM is a family of programming languages parameterized by a set of base values and operations.
+%
+To make things concrete, we consider a member of the ISWIM family with integers, booleans, and a few operations.
+%
+Figure~\ref{fig:syntax} defines the syntax of ISWIM.
+%
+It includes variables, literals (either integers, booleans, or operations), $\lambda$-expressions for defining procedures, procedure applications, and conditionals.
+%
+Expressions carry a label, $\mlab$, which is drawn from an unspecified set and denotes the source location of the expression; labels are used to disambiguate distinct, but syntactically identical pieces of syntax.
+%
+We omit the label annotation in contexts where it is irrelevant.
 
 \begin{figure}
 \small
@@ -360,40 +326,41 @@ annotation in contexts where it is irrelevant.
 \end{figure}
 
 
-The semantics are defined in terms of a machine model.  The machine
-components are defined in figure~\ref{fig:domains};
-figure~\ref{fig:aam} defines the transition relation (unmentioned
-components stay the same).  The evaluation of a program is defined as
-its set of traces that arise from iterating the machine transition
-relation. The $\traces$ function produces the set of all proofs of
-reachability for any state $\mstate$ from the injection of program
-$\mexp$ (from which one could extract a string of states). The machine
-is a very slight variation on a standard abstract machine for ISWIM in
-``eval, continue, apply'' form~\cite{dvanhorn:Danvy:DSc}.  It can be
-systematically derived from a definitional interpreter through a
-continuation-passing style transformation and defunctionalization, or
-from a structural operational semantics using the refocusing
-construction of Danvy and
-Nielsen~\cite{dvanhorn:Danvy-Nielsen:RS-04-26}.
+The semantics are defined in terms of a machine model.
+%
+The machine components are defined in figure~\ref{fig:domains};
+%
+figure~\ref{fig:aam} defines the transition relation (unmentioned components stay the same).
+%
+The evaluation of a program is defined as its set of traces that arise from iterating the machine transition relation.
+%
+The $\traces$ function produces the set of all proofs of reachability for any state $\mstate$ from the injection of program $\mexp$ (from which one could extract a string of states).
+%
+ The machine is a very slight variation on a standard abstract machine for ISWIM in ``eval, continue, apply'' form~\cite{dvanhorn:Danvy:DSc}.
+%
+It can be systematically derived from a definitional interpreter through a continuation-passing style transformation and defunctionalization, or from a structural operational semantics using the refocusing construction of Danvy and Nielsen~\cite{dvanhorn:Danvy-Nielsen:RS-04-26}.
+%%
 
+%%
 Compared with the standard machine semantics, this definition is
 different in the following ways, which make it abstractable as a
 program analyzer:
 \begin{itemize}
-\item the store maps addresses to \emph{sets} of values,\footnote{
-More generally, we can have stores map to any domain that forms
- a Galois connection with sets of values, enabling $\interpdelta$ to
-produce elaborate abstractions of base values (e.g., interval or octagon
-abstractions). We use sets of values for a simpler exposition.
-} not
-  single values,
+\item the store maps addresses to \emph{sets} of values,
+%
+\footnote{
+More generally, we can have stores map to any domain that forms a Galois connection with sets of values, enabling $\interpdelta$ to produce elaborate abstractions of base values (e.g., interval or octagon abstractions).
+%
+We use sets of values for a simpler exposition.
+}
+%
+not single values,
 
 \item continuations are heap-allocated, not stack-allocated,
-\item there are ``timestamps'' ($\mcntr \in \Counter$) and syntax
-  labels ($\mlab$) threaded through the computation, and
-\item the machine is implicitly parameterized by the functions
-  $\alloc$, $\allockont$, $\tick$, $\interpdelta$, and spaces
-  $\Addr$, $\Counter$ (and initial $\mcntr_0 \in \Counter$).
+%
+\item there are ``timestamps'' ($\mcntr \in \Counter$) and syntax labels ($\mlab$) threaded through the computation, and
+%
+\item the machine is implicitly parameterized by the functions $\alloc$, $\allockont$, $\tick$, $\interpdelta$, and spaces $\Addr$, $\Counter$ (and initial $\mcntr_0 \in \Counter$).
 \end{itemize}
 
 
@@ -475,17 +442,19 @@ parameters of the relation given in figure~\ref{fig:aam} as follows:
 \allockont^\mcntr_\mlab(\msto,\mkont) &=\mkaddr \mbox{ where } \mkaddr \notin \msto
 \end{align*}
 These functions appear to ignore $\mlab$ and $\mcntr$, but they can be
-used to determinize the choice of fresh addresses. The $\sqcup$ on
-stores in the figure is a point-wise lifting of $\cup$: $\msto \sqcup \msto' =
-\lambda \maddr. \msto(\maddr) \cup \msto'(\maddr)$. The resulting
-relation is non-deterministic in its choice of addresses, however it
-must always choose a fresh address when allocating a continuation or
-variable binding.  If we consider machine states equivalent up to
-consistent renaming and fix an allocation scheme, this relation
-defines a deterministic machine (the relation is really a function).
+used to determinize the choice of fresh addresses.
+%
+The $\sqcup$ on stores in the figure is a point-wise lifting of $\cup$:
+%
+ $\msto \sqcup \msto' = \lambda \maddr. \msto(\maddr) \cup \msto'(\maddr)$.
+%
+The resulting relation is non-deterministic in its choice of addresses, however it must always choose a fresh address when allocating a continuation or variable binding.
+%
+If we consider machine states equivalent up to consistent renaming and fix an allocation scheme, this relation defines a deterministic machine (the relation is really a function).
+%%
 
-The interpretation of primitive operations is defined by setting
-$\interpdelta$ as follows:
+%%
+The interpretation of primitive operations is defined by setting $\interpdelta$ as follows:
 \begin{align*}
 \mnum+1 &\in \interpdelta(\saddone,\mnum) &
 \mnum-1 &\in \interpdelta(\ssubone,\mnum)\\
@@ -1316,7 +1285,7 @@ smaller than the expression in which they occur is well-founded, so we
 use this observation to drive our use of a well-founded equivalence
 bisimulation (WEB)~\cite{ianjohnson:manolios-diss}. WEBs are
 equivalent to the notion of a stuttering bisimulation, but are more
-amenable to mechanisation (and thus rigorous proof). They also only
+amenable to mechanization (and thus rigorous proof). They also only
 require reasoning over one step of the reduction relation, which makes
 the proof concise. The trick is in defining a well-founded ordering
 that determines when the two semantics will match up again, what
@@ -1482,7 +1451,7 @@ follow from equational reasoning from the following lemmas:
 \begin{lemma}
 Stores of value stacks completely abstract stacks of stores.
 \end{lemma}
-This depends on some wellformedness conditions about the order of the
+This depends on some well-formedness conditions about the order of the
 stacks. The store of value stacks can be translated to a stack of
 stores by taking successive ``snapshots'' of the store at different
 timestamps from the max timestamp it holds down to 0. Vice versa, we
@@ -1496,7 +1465,9 @@ ${\mathcal F}$ is a complete abstraction of $\camachstep$.
 
 \subsubsection{Pure to imperative}
 
-The intermediate data structures of the above transfer function can all be streamlined into globals that are destructively updated. In particular, there are 5 globals:
+The intermediate data structures of the above transfer function can all be streamlined into globals that are destructively updated.
+%
+In particular, there are 5 globals:
 
 \begin{enumerate}
 \item{$\mseentime$: the \emph{seen} set, though made a map for faster membership tests and updates.}
@@ -1506,60 +1477,54 @@ The intermediate data structures of the above transfer function can all be strea
 \item{$\changep$: whether a store change occurred when stepping states in $F$.}
 \end{enumerate}
 
-The reduction relation would then instead of building store deltas,
-update the global store. We would also not view it as a general
-relation, but a function that adds all next states to $F$ if they have
-not already been seen. At the end of iterating through $F$, $\mseentime$ is
-updated with the new states at the next timestamp. There is no cross-step store poisoning since the lookup is restricted to the current step's time, which points to the same value throughout the step.
+The reduction relation would then instead of building store deltas, update the global store.
+%
+We would also not view it as a general relation, but a function that adds all next states to $F$ if they have
+not already been seen.
+%
+At the end of iterating through $F$, $\mseentime$ is updated with the new states at the next timestamp.
+%
+There is no cross-step store poisoning since the lookup is restricted to the current step's time, which points to the same value throughout the step.
 
 \subsubsection{Pre-allocating the store}
 
 Internally, the algorithm at this stage uses hash tables to model the store to allow arbitrary address representations.
 %
-But, such a dynamic structure isn't necessary when we know the
-structure of the store in advance: we know all possible entries, and
-we know its maximum size.
+But, such a dynamic structure isn't necessary when we know the structure of the store in advance: we know all possible entries, and we know its maximum size.
 %
-In a monovariant allocation strategy, the domain of the store is
-exactly the set of expressions in the program.
+In a monovariant allocation strategy, the domain of the store is exactly the set of expressions in the program.
 %
-If we label each expression with a unique natural, the analysis can
-index directly into the store without a hash or a collision.
+If we label each expression with a unique natural, the analysis can index directly into the store without a hash or a collision.
 %
-Even for polyvariant analyses, it is possible to compute the maximum
-number of addresses and similarly pre-allocate either the spine of the
-store or (if memory is no concern) the entire store.
+Even for polyvariant analyses, it is possible to compute the maximum number of addresses and similarly pre-allocate either the spine of the store or (if memory is no concern) the entire store.
 
 \section{Evaluation}
 \label{sec:eval}
 
-We have implemented, optimized, and evaluated an analysis framework
-supporting higher-order functions, state, first-class control,
-compound data, and a large number of primitive kinds of data and
-operations such as floating point, complex, and exact rational
-arithmetic.  The analysis is evaluated against a suite of Scheme benchmarks
-drawn from the literature.
+We have implemented, optimized, and evaluated an analysis framework supporting higher-order functions, state, first-class control, compound data, and a large number of primitive kinds of data and operations such as floating point, complex, and exact rational arithmetic.
 %
-For each benchmark, we collect analysis times, peak memory usage (as
-determined by Racket's GC statistics), and the rate of
-states-per-second explored by the analysis for each of the
-optimizations discussed in section~\ref{sec:opt}, cumulatively
-applied.  The analysis is stopped after consuming 30 minutes of time
-or 1 gigabyte of space.  When presenting \emph{relative} numbers, we
-use the timeout limits as a lower bound on the actual time required (i.e., one minute versus timeout is at least 30 times faster),
+The analysis is evaluated against a suite of Scheme benchmarks drawn from the literature.
+%
+For each benchmark, we collect analysis times, peak memory usage (as determined by Racket's GC statistics), and the rate of states-per-second explored by the analysis for each of the optimizations discussed in section~\ref{sec:opt}, cumulatively applied.
+%
+The analysis is stopped after consuming 30 minutes of time or 1 gigabyte of space.
+%
+When presenting \emph{relative} numbers, we use the timeout limits as a lower bound on the actual time required (i.e., one minute versus timeout is at least 30 times faster),
 thus giving a conservative estimate of improvements.
+%%
 
+%%
 All benchmarks are calculated as an average of 5 runs, done in
 parallel (each isolated to a core), on an 12-core, 64-bit Intel Xeon machine running at 2.40GHz
 with 12Gb of memory.
+%%
 
-Many benchmarks cause the baseline analyzer to take longer than 30
-minutes or to consume more than 1 gigabyte of memory, at which point the
-analysis is stopped.  This is the case for the largest benchmark
-program, {\bf nucleic}, which is 3,500 lines of code and takes under a minute in the
-most optimized analyzer.  For those benchmarks that did complete on
-the baseline, the optimized analyzer outperformed the baseline by a
-factor of two to three orders of magnitude.
+%%
+Many benchmarks cause the baseline analyzer to take longer than 30 minutes or to consume more than 1 gigabyte of memory, at which point the analysis is stopped.
+%
+This is the case for the largest benchmark program, {\bf nucleic}, which is 3,500 lines of code and takes under a minute in the most optimized analyzer.
+%
+For those benchmarks that did complete on the baseline, the optimized analyzer outperformed the baseline by a factor of two to three orders of magnitude.
 % safer to not give exact factors
 % 475 to 4,382.
 
@@ -1574,56 +1539,36 @@ We use the following set of benchmarks:
 
 \begin{enumerate}  %% Maybe use ``dictionary'' style enumeration.
 
-\item {\bf nucleic}: a floating-point intensive application taken from
-  molecular biology that has been used widely in benchmarking
-  functional language
-  implementations~\cite{dvanhorn:Hartel1996Benchmarking} and analyses
-  (e.g.~\cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
-  It is a constraint satisfaction algorithm used to determine the
-  three-dimensional structure of nucleic acids.
+\item {\bf nucleic}: a floating-point intensive application taken from molecular biology that has been used widely in benchmarking functional language implementations~\cite{dvanhorn:Hartel1996Benchmarking} and analyses (e.g.~\cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
+%
+  It is a constraint satisfaction algorithm used to determine the three-dimensional structure of nucleic acids.
 
-\item {\bf matrix} tests whether a matrix is maximal among all
-  matrices of the same dimension obtainable by simple reordering of
-  rows and columns and negation of any subset of rows and columns.  It
-  is written in continuation-passing style (used in
-  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
+\item {\bf matrix} tests whether a matrix is maximal among all matrices of the same dimension obtainable by simple reordering of rows and columns and negation of any subset of rows and columns.
+%
+  It is written in continuation-passing style (used in \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 
 
-\item {\bf nbody}: implementation~\cite{ianjohnson:nbody87} of the
-  Greengard multipole algorithm for computing gravitational forces on
-  point masses distributed uniformly in a cube (used in
-  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
+\item {\bf nbody}: implementation~\cite{ianjohnson:nbody87} of the Greengard multipole algorithm for computing gravitational forces on point masses distributed uniformly in a cube (used in \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
+%%
 
-\item {\bf earley}: Earley's parsing algorithm, applied to a 15-symbol
-  input according to a simple ambiguous grammar.  A real program,
-  applied to small data whose exponential behavior leads to a peak
-  heap size of half a gigabyte or more during concrete execution.
+%%
+\item {\bf earley}: Earley's parsing algorithm, applied to a 15-symbol input according to a simple ambiguous grammar.
+%
+  A real program, applied to small data whose exponential behavior leads to a peak heap size of half a gigabyte or more during concrete execution.
 
-\item {\bf maze}: generates a random maze using Scheme's {\tt
-  call/cc} operation and finds a path solving
-  the maze (used in
-  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
+\item {\bf maze}: generates a random maze using Scheme's {\tt call/cc} operation and finds a path solving the maze (used in \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 
-\item {\bf church}: tests distributivity of multiplication over
-  addition for Church numerals (introduced by
-  \cite{dvanhorn:Vardoulakis2011CFA2}).
+\item {\bf church}: tests distributivity of multiplication over addition for Church numerals (introduced by \cite{dvanhorn:Vardoulakis2011CFA2}).
 
-\item {\bf lattice}: enumerates the order-preserving maps between two
-  finite lattices (used in
-  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
+\item {\bf lattice}: enumerates the order-preserving maps between two finite lattices (used in \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 
-\item {\bf boyer}: a term-rewriting theorem prover (used in
-  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
+\item {\bf boyer}: a term-rewriting theorem prover (used in \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 
-\item {\bf mbrotZ}: generates Mandelbrot fractal using complex
-  numbers.
+\item {\bf mbrotZ}: generates Mandelbrot fractal using complex numbers.
 
-\item {\bf graphs}: counts the number of directed graphs with a
-  distinguished root and \(k\) vertices, each having out-degree at
-  most 2. It is written in a continuation-passing style and makes
-  extensive use of higher-order procedures---it creates closures
-  almost as often as it performs non-tail procedure calls (used by
-  \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
+\item {\bf graphs}: counts the number of directed graphs with a distinguished root and \(k\) vertices, each having out-degree at most 2.
+%
+ It is written in a continuation-passing style and makes extensive use of higher-order procedures---it creates closures almost as often as it performs non-tail procedure calls (used by \cite{dvanhorn:wright-jagannathan-toplas98,dvanhorn:jagannathan-etal-popl98}).
 \end{enumerate}
 
 %% 400 lines for the core, 700 lines for
@@ -1631,11 +1576,9 @@ We use the following set of benchmarks:
 %% list operations, 700 lines for instantiations to different
 %% optimizations and 300 for parsing and macro transformers.
 
-Figure~\ref{fig:bench-overview} gives an overview of the benchmark
-results in terms of absolute time, space, and speed between the
-baseline and most optimized analyzer.  Figure~\ref{fig:bench-all}
-plots the factors of improvement over the baseline for each
-optimization step.
+Figure~\ref{fig:bench-overview} gives an overview of the benchmark results in terms of absolute time, space, and speed between the baseline and most optimized analyzer.
+%
+Figure~\ref{fig:bench-all} plots the factors of improvement over the baseline for each optimization step.
 
 % The dip we see in transition rate even though time
 % taken decreases is to be expected - fewer ``easy'' states are added by
@@ -1660,30 +1603,26 @@ optimization step.
 
   (c) Peak memory usage improvement (baseline / optimized)
 \end{center}
-\caption{Factors of improvement over baseline for each step of
-  optimization (bigger is better).}
+\caption{Factors of improvement over baseline for each step of optimization (bigger is better).}
 \label{fig:bench-all}
 \end{figure*}
 
-To determine the impact of each section's technique on precision, we evaluated
-a singleton variable analysis to find opportunities to inline
-constants and closed functions.  We found no change in the results
-across all implementations, including Shivers' timestamp
-approximation---from an empirical point of view, these techniques are
-precision preserving despite the theoterical loss of precision.
+To determine the impact of each section's technique on precision, we evaluated a singleton variable analysis to find opportunities to inline constants and closed functions.
+%
+We found no change in the results across all implementations, including Shivers' timestamp approximation---from an empirical point of view, these techniques are precision preserving despite the theoterical loss of precision.
+%%
 
-Our step-wise optimizations strictly produce better analysis times
-with no observed loss of precision.  The final result is a
-systematically derived and verified implementation that operates
-within a small factor performance loss compared to a hand-optimized,
-unverified implementation.  Moreover, much of the performance gains
-are achieved with purely functional methods, which suggest potential
-further gains from parellelization.  Peak memory usage is often
-considerably improved by the end of the optimization steps, but the
-effect of mutation has unexpected consequence on the analyzers memory
-consumption, likely due to a larger-than-necessary preallocated store.
+%%
+Our step-wise optimizations strictly produce better analysis times with no observed loss of precision.
+%
+The final result is a systematically derived and verified implementation that operates within a small factor performance loss compared to a hand-optimized, unverified implementation.
+%
+Moreover, much of the performance gains are achieved with purely functional methods, which suggest potential further gains from parellelization.
+%
+Peak memory usage is often considerably improved by the end of the optimization steps, but the effect of mutation has unexpected consequence on the analyzers memory consumption, likely due to a larger-than-necessary preallocated store.
+%%
 
-
+%%
 Source code of the implementation and benchmark suite is at:
 
 \begin{center}
@@ -1692,153 +1631,121 @@ Source code of the implementation and benchmark suite is at:
 
 \paragraph{Comparison with other flow analysis implementations}
 
-The analysis considered here computes results similar to Earl, et al.'s
-0-CFA implementation~\cite{dvanhorn:Earl2012Introspective}, which
-times out on the \Church{} benchmark because it does not widen the
-store as described for our baseline evaluator.  So even though it
-offers a fair point of comparison, a more thorough evaluation is
-probably uninformative as the other benchmarks are likely to timeout
-as well (and it would require significant effort to extend their
-implementation with the features needed to analyze our benchmark
-suite).  That implementation is evaluated against much smaller
-benchmarks: the largest program is 30 lines.
+The analysis considered here computes results similar to Earl, et al.'s 0-CFA implementation~\cite{dvanhorn:Earl2012Introspective}, which times out on the \Church{} benchmark because it does not widen the store as described for our baseline evaluator.
+%
+So even though it offers a fair point of comparison, a more thorough evaluation is probably uninformative as the other benchmarks are likely to timeout as well (and it would require significant effort to extend their implementation with the features needed to analyze our benchmark suite).
+%
+That implementation is evaluated against much smaller benchmarks: the largest program is 30 lines.
+%%
 
-Vardoulakis and Shivers evaluate their CFA2
-analyzer~\cite{dvanhorn:Vardoulakis2011CFA2} against a variant of
-0-CFA defined in their framework and the example we draw on is the
-largest benchmark Vardoulakis and Shivers consider.  More work would
-be required to scale the analyzer to the set of features required by
-our benchmarks.
+%%
+Vardoulakis and Shivers evaluate their CFA2 analyzer~\cite{dvanhorn:Vardoulakis2011CFA2} against a variant of 0-CFA defined in their framework and the example we draw on is the largest benchmark Vardoulakis and Shivers consider.
+%
+More work would be required to scale the analyzer to the set of features required by our benchmarks.
+%%
 
+%%
 The only analyzers we were able to find that proved capable of
 analyzing the full suite of benchmarks considered here were the Soft
 Typing system of Wright and
 Cartwright~\cite{dvanhorn:Wright1997Practical} and, in many ways its
 successor, the Polymorphic splitting system of Wright and
-Jagannathan~\cite{dvanhorn:wright-jagannathan-toplas98}.\footnote{This
-  is not a coincidence; these papers set a high standard for
-  evaluation, which we consciously aimed to approach.}  Unfortunately,
-these analyses compute an inherently different and incomparable form
-of analysis.  Consequently, we have omitted a complete comparison with
-these implementations.  The AAM approach provides more precision in
-terms of temporal-ordering of program states, which comes at a cost
-that can be avoided in constraint-based approaches.  Consequently
-implementation techniques cannot be ``ported'' between these two
-approaches.  However, our optimized implementation is within an order
-of magnitude of the performance of Wright and Jaganathan's analyzer.
-Although we would like to improve this to be more competitive, the
-optimized AAM approach still has many strengths to recommend it in
-terms of precision, ease of implementation and verification, and rapid
-design. We can get closer to their performance by relying on the
-representation of addresses and the behavior of $\alloc$ to
-pre-allocate most data structures and split the abstract store out
-into parts that are more quickly accessed and updated. Our semantic
-optimizations can still be applied to an analysis that does abstract
-garbage collection~\cite{dvanhorn:Might:2006:GammaCFA}, whereas the
-polymorphic splitting implementation is tied strongly to a
-single-threaded store.
+Jagannathan~\cite{dvanhorn:wright-jagannathan-toplas98}.
+%
+\footnote{This is not a coincidence; these papers set a high standard for evaluation, which we consciously aimed to approach.}
+%
+Unfortunately, these analyses compute an inherently different and incomparable form of analysis.
+%
+Consequently, we have omitted a complete comparison with these implementations.
+%
+The AAM approach provides more precision in terms of temporal-ordering of program states, which comes at a cost that can be avoided in constraint-based approaches.
+%
+Consequently implementation techniques cannot be ``ported'' between these two approaches.
+%
+  However, our optimized implementation is within an order of magnitude of the performance of Wright and Jaganathan's analyzer.
+%
+Although we would like to improve this to be more competitive, the optimized AAM approach still has many strengths to recommend it in terms of precision, ease of implementation and verification, and rapid design.
+%
+ We can get closer to their performance by relying on the representation of addresses and the behavior of $\alloc$ to pre-allocate most data structures and split the abstract store out into parts that are more quickly accessed and updated.
+%
+Our semantic optimizations can still be applied to an analysis that does abstract garbage collection~\cite{dvanhorn:Might:2006:GammaCFA}, whereas the polymorphic splitting implementation is tied strongly to a single-threaded store.
 
 \section{Related work}
 \label{sec:related}
 
 \paragraph{Abstracting Abstract Machines}
 
-This work clearly closely follows Van Horn and Might's original papers
-on abstracting abstract
-machines~\cite{dvanhorn:VanHorn2011Abstracting,dvanhorn:VanHorn2012Systematic},
-which in turn is one piece of the large body of research on flow
-analysis for higher-order languages (see
-Midtgaard~\cite{dvanhorn:Midtgaard2011Controlflow} for a thorough
-survey).  The AAM approach sits at the confluence of two major lines
-of research: (1) the study of abstract
-machines~\cite{dvanhorn:landin-64} and their systematic
-construction~\cite{dvanhorn:reynolds-hosc98}, and (2) the theory of
-abstract interpretation
-\cite{dvanhorn:Cousot:1977:AI,dvanhorn:Cousot1979Systematic}.
+This work clearly closely follows Van Horn and Might's original papers on abstracting abstract machines~\cite{dvanhorn:VanHorn2011Abstracting,dvanhorn:VanHorn2012Systematic}, which in turn is one piece of the large body of research on flow analysis for higher-order languages (see Midtgaard~\cite{dvanhorn:Midtgaard2011Controlflow} for a thorough survey).
+%
+The AAM approach sits at the confluence of two major lines of research:
+%
+(1) the study of abstract machines~\cite{dvanhorn:landin-64} and their systematic construction~\cite{dvanhorn:reynolds-hosc98},
+%
+and (2) the theory of abstract interpretation \cite{dvanhorn:Cousot:1977:AI,dvanhorn:Cousot1979Systematic}.
 
 
 \paragraph{Frameworks for flow analysis of higher-order programs}
 
-Besides the original AAM work, the analysis most similar to that
-presented in section~\ref{sec:aam} is the infinitary control-flow
-analysis of Nielson and Nielson~\cite{dvanhorn:nielson-nielson-popl97}
-and the unified treatment of flow analysis by Jagannathan and
-Weeks~\cite{dvanhorn:jagannathan-weeks-popl95}.  Both are
-parameterized in such a way that in the limit, the analysis is
-equivalent to an interpreter for the language, just as is the case
-here.  What is different is that both give a constraint-based
-formulation of the abstract semantics rather than a finite machine
-model.
+Besides the original AAM work, the analysis most similar to that presented in section~\ref{sec:aam} is the infinitary control-flow analysis of Nielson and Nielson~\cite{dvanhorn:nielson-nielson-popl97} and the unified treatment of flow analysis by Jagannathan and Weeks~\cite{dvanhorn:jagannathan-weeks-popl95}.
+%
+Both are parameterized in such a way that in the limit, the analysis is equivalent to an interpreter for the language, just as is the case here.
+%
+What is different is that both give a constraint-based formulation of the abstract semantics rather than a finite machine model.
 
 \paragraph{Abstract compilation}
 
-Boucher and Feeley \cite{dvanhorn:Boucher1996Abstract} introduced the
-idea of abstract compilation, which used closure generation
-\cite{dvanhorn:Feeley1987Using} to improve the performance of control
-flow analysis.  We have adapted the closure generation technique from
-compositional evaluators to abstract machines and applied it to similar
-effect.
+Boucher and Feeley \cite{dvanhorn:Boucher1996Abstract} introduced the idea of abstract compilation, which used closure generation \cite{dvanhorn:Feeley1987Using} to improve the performance of control flow analysis.
+%
+We have adapted the closure generation technique from compositional evaluators to abstract machines and applied it to similar effect.
 
 \paragraph{Constraint-based program analysis for higher-order languages}
 
-Constraint-based program analyses
-(e.g.~\cite{dvanhorn:nielson-nielson-popl97,dvanhorn:wright-jagannathan-toplas98,dvanhorn:Meunier2006Modular,dvanhorn:steckler-wand-toplas97})
-typically compute sets of abstract values for each program point.
-These values approximate values arising at run-time for each
-program point.  Value sets are computed as the least solution to a set
-of (inclusion or equality) constraints.  The
-constraints must be designed and proved as a sound approximation of
-the semantics.  Efficient implementations of these kinds of analyses
-often take the form of worklist-based graph algorithms for constraint
-solving, and are thus quite different from the interpreter
-implementation.  The approach thus requires effort in constraint
-system design and implementation, and the resulting system require
-verification effort to prove the constraint system is sound and that
-the implementation is correct.
+Constraint-based program analyses (e.g.~\cite{dvanhorn:nielson-nielson-popl97,dvanhorn:wright-jagannathan-toplas98,dvanhorn:Meunier2006Modular,dvanhorn:steckler-wand-toplas97}) typically compute sets of abstract values for each program point.
+%
+These values approximate values arising at run-time for each program point.
+%
+Value sets are computed as the least solution to a set of (inclusion or equality) constraints.
+%
+The constraints must be designed and proved as a sound approximation of the semantics.
+%
+Efficient implementations of these kinds of analyses often take the form of worklist-based graph algorithms for constraint solving, and are thus quite different from the interpreter implementation.
+%
+The approach thus requires effort in constraint system design and implementation, and the resulting system require verification effort to prove the constraint system is sound and that the implementation is correct.
+%%
 
-This effort increases substantially as the complexity of the analyzed
-language increases.  Both the work of maintaining the concrete
-semantics and constraint system (and the relations between them) must
-be scaled simultaneously.  However, constraint systems, which have
-been extensively studied in their own right, enjoy efficient
-implementation techniques and can be expressed in declarative logic
-languages that are heavily
-optimized~\cite{dvanhorn:bravenboer-smaragdakis-oopsla09}.
-Consequently, constraint-based analyses can be computed quickly.  For
-example, Jagannathan and Wright's polymorphic splitting
-implementation~\cite{dvanhorn:wright-jagannathan-toplas98} analyses
-the \Church{} benchmark about 5.5 times faster than the fastest
-implementation considered here.  These analyses compute very different
-things, so the performance comparison is not apples-to-apples.
+%%
+This effort increases substantially as the complexity of the analyzed language increases.
+%
+Both the work of maintaining the concrete semantics and constraint system (and the relations between them) must be scaled simultaneously.
+%
+However, constraint systems, which have been extensively studied in their own right, enjoy efficient implementation techniques and can be expressed in declarative logic languages that are heavily optimized~\cite{dvanhorn:bravenboer-smaragdakis-oopsla09}.
+%
+Consequently, constraint-based analyses can be computed quickly.
+%
+For example, Jagannathan and Wright's polymorphic splitting implementation~\cite{dvanhorn:wright-jagannathan-toplas98} analyses the \Church{} benchmark about 5.5 times faster than the fastest implementation considered here.
+%
+These analyses compute very different things, so the performance comparison is not apples-to-apples.
+%%
 
-The AAM approach, and the state transition graphs it generates, encodes
-temporal properties not found in classical constraint-based analyses
-for higher-order programs.
+%%
+The AAM approach, and the state transition graphs it generates, encodes temporal properties not found in classical constraint-based analyses for higher-order programs.
 %
-Such analyses (ultimately) compute judgments on program terms and
-contexts, e.g., at expression $e$, variable $x$ may have value $v$.
+Such analyses (ultimately) compute judgments on program terms and contexts, e.g., at expression $e$, variable $x$ may have value $v$.
 %
-The judgments do not relate the order in which expressions and context
-may be evaluated in a program, e.g., it has nothing
-to say with regard to question like, ``Do we always evaluate $e_1$
-before $e_2$?'' or ``Is it always the case that a file handle is
-opened, read and then closed in that order?''
+The judgments do not relate the order in which expressions and context may be evaluated in a program, e.g., it has nothing to say with regard to question like,
 %
-The state transition graphs can answer these kinds of queries, but
-this does not come for free: respecting temporal order imposes an
-order in which states and terms may be evaluated \emph{during} the
-analysis.
+``Do we always evaluate $e_1$ before $e_2$?'' or
+%
+``Is it always the case that a file handle is opened, read and then closed in that order?''
+%
+The state transition graphs can answer these kinds of queries, but this does not come for free: respecting temporal order imposes an order in which states and terms may be evaluated \emph{during} the analysis.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-Abstract machines are not only a good model for rapid analysis
-development, they can be systematically developed into efficient
-algorithms that can be proved correct. We view the primary
-contribution of this work as a systematic path that eases the design,
-verification, and implementation of analyses using the abstracting
-abstract machine approach to within a factor of performant
-constraint-based analyses.
+Abstract machines are not only a good model for rapid analysis development, they can be systematically developed into efficient algorithms that can be proved correct.
+%
+We view the primary contribution of this work as a systematic path that eases the design, verification, and implementation of analyses using the abstracting abstract machine approach to within a factor of performant constraint-based analyses.
 
 %% \acks Sam Tobin-Hochstadt for encouragement and feedback -- he was
 %% the first to prompt us to look into how make effective
@@ -1852,11 +1759,7 @@ constraint-based analyses.
 
 \paragraph{Acknowledgments}
 
-We thank Suresh Jagannathan for providing source code to the
-polymorphic splitting
-analyzer~\cite{dvanhorn:wright-jagannathan-toplas98} and Ilya Sergey
-for the introspective pushdown
-analyzer~\cite{dvanhorn:Earl2012Introspective}.
+We thank Suresh Jagannathan for providing source code to the polymorphic splitting analyzer~\cite{dvanhorn:wright-jagannathan-toplas98} and Ilya Sergey for the introspective pushdown analyzer~\cite{dvanhorn:Earl2012Introspective}.
 
 
 \balance
