@@ -1003,15 +1003,19 @@ For example, in a function application, {\tt (f x y)}, where {\tt f}, {\tt x} an
 %
 Transition patterns of this shape litter the state-graph:
 %
+\vspace{-1em}
 \begin{center}
 \includegraphics[scale=0.2]{fanoutdot2}
 \end{center}
+\vspace{-1em}
 To avoid the spurious forking and joining, we {\it delay} the non-determinism until and unless it is needed in {\it strict contexts} (such as the guard of an {\tt if}, a called procedure, or a numerical primitive application).
 %
 Doing so collapses these forks and joins into a linear sequence of states:
+\vspace{-1em}
 \begin{center}
 \includegraphics[scale=0.2]{lazydot}
 \end{center}
+\vspace{-1em}
 %%
 
 %%
@@ -1383,7 +1387,7 @@ We start with the purely functional view.
 The store maps to a stack of timestamped sets of abstract values.
 %
 Throughout this section, we will be taking the parameter $t$ to be the ``current time,'' or the length of the store chain at the beginning of the step.
-
+\vspace{-0.9em}
 \begin{align*}
 \msto \in \Store &= \Addr \to \Valstack \\
 \mvalstack \in \Valstack &= (\Timestamp \times \wp(\Storeable))^*
