@@ -86,6 +86,23 @@ It has since been used to verify actor-\cite{local:DOsualdo:12A} and thread-base
 it has been used to model Coq~\cite{local:harvard}, Dalvik~\cite{local:dalvik}, Erlang~\cite{local:DOsualdo:12B}, JavaScript~\cite{local:DBLP:journals/corr/abs-1109-4467}, and Racket~\cite{dvanhorn:TobinHochstadt2012Higherorder}.
 %%
 
+\begin{figure}[t]
+\small
+\begin{center}
+%\includegraphics[width=3.2in]{church-relative-space}
+\includegraphics[width=3.2in]{church-relative-speed}
+\includegraphics[width=3.2in]{church-relative-time}
+\vspace{-1.5em}
+\end{center}
+\caption{
+Factor improvements over the baseline analyzer for the \Church{} benchmark in terms of the rate of state transitions and total analysis time.
+%
+(Bigger is better.)
+%
+Each point is marked with the section that introduces the optimization.}
+\label{fig:churchtime}
+\end{figure}
+
 %%
 The primary strength of the approach is that abstract interpreters can be easily derived through a small number of steps from existing machine models.
 %
@@ -116,24 +133,6 @@ Our goal is to empower programming language implementers and researchers to expl
 The optimizations we describe are widely applicable and apparently effective to scale far beyond the size of programs typically considered in the recent literature on flow analysis for functional languages.
 
 \section{At a glance}
-
-\begin{figure}[t]
-\small
-\begin{center}
-%\includegraphics[width=3.2in]{church-relative-space}
-\includegraphics[width=3.2in]{church-relative-speed}
-\includegraphics[width=3.2in]{church-relative-time}
-\vspace{-1.5em}
-\end{center}
-\caption{
-Factor improvements over the baseline analyzer for the \Church{} benchmark in terms of the rate of state transitions and total analysis time.
-%
-(Bigger is better.)
-%
-Each point is marked with the section that introduces the optimization.}
-\label{fig:churchtime}
-\end{figure}
-
 
 We start with a quick review of the AAM approach to develop an analysis framework and then apply our step-by-step optimization techniques in the simplified setting of a core functional language.
 %
