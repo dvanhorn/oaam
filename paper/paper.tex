@@ -66,7 +66,7 @@ The end result of the process is a two to three order-of-magnitude improvement o
 
 Program analysis provides sound predictive models of program behavior, but in order for such models to be effective, they must be efficiently computable and correct.
 %
-Past approaches to designing program analysis have often featured abstractions that are far removed from the original language semantics, requiring ingenuity in their construction and effort in their verification.
+Past approaches to designing program analyses have often featured abstractions that are far removed from the original language semantics, requiring ingenuity in their construction and effort in their verification.
 %
 The \emph{abstracting abstract machines} (AAM) approach~\cite{dvanhorn:VanHorn2011Abstracting,dvanhorn:VanHorn2012Systematic} to deriving program analyses provides an alternative: a systematic way of transforming a programming language semantics in the form of an abstract machine into a family of abstract interpreters.
 %
@@ -247,7 +247,7 @@ Example state graphs for Earl et. al. program.
 %
   Gray states follow variable references, {\tt ev} states are black, and all others are white.
 %
- Part (a) shows the result of the baseline analyzer.
+ Part (a) shows the baseline analyzer result.
 %
   It has long ``corridor'' transitions and ``diamond'' subgraphs that fan-out from nondeterminism and fan-in from joins.
 %
@@ -326,7 +326,7 @@ We omit the label annotation in contexts where it is irrelevant.
 \end{figure}
 
 
-The semantics are defined in terms of a machine model.
+The semantics is defined in terms of a machine model.
 %
 The machine components are defined in figure~\ref{fig:domains};
 %
@@ -463,33 +463,38 @@ The interpretation of primitive operations is defined by setting $\interpdelta$ 
 \end{align*}
 
 
-\paragraph{Abstract interpretation} To characterize abstract
-interpretation, set the implicit parameters just as above, but drop
-the $\maddr \not\in \msto$ condition. The $\interpdelta$ relation takes some care
-to not make the analysis run forever; a simple instantiation is a flat
-abstraction where arithmetic operations return an abstract top element
-$\sNum$, and $\szerohuh$ returns both $\strue$ and $\sfalse$ on
-$\sNum$.  This family of interpreters is also non-deterministic in
-choices of addresses, but it is free to choose addresses that are
-already in use.  Consequently, the machines may be non-deterministic
-when multiple values reside in a store location.
+\paragraph{Abstract interpretation}
+%
+To characterize abstract interpretation, set the implicit parameters just as above, but drop the $\maddr \not\in \msto$ condition.
+%
+The $\interpdelta$ relation takes some care to not make the analysis run forever; a simple instantiation is a flat abstraction where arithmetic operations return an abstract top element $\sNum$, and $\szerohuh$ returns both $\strue$ and $\sfalse$ on $\sNum$.
+%
+This family of interpreters is also non-deterministic in choices of addresses, but it is free to choose addresses that are already in use.
+%
+Consequently, the machines may be non-deterministic when multiple values reside in a store location.
+%%
 
-It is important to recognize from this definition that \emph{any}
-allocation strategy is a sound abstract
-interpretation~\cite{dvanhorn:Might2009Posteriori}.  In particular,
-concrete interpretation is a kind of abstract interpretation.  So is
-an interpretation that allocates a single cell into which all bindings
-and continuations are stored.  The former is an abstract
-interpretation that is non-computable and gives only the ground truth
-of a programs behavior; the latter is an abstract interpretation
-that is easy to compute but gives little information.  Useful program
-analyses lay somewhere in between and can be characterized by their
-choice of address representation and allocation strategy.  Uniform
-\(k\)-CFA~\cite{dvanhorn:nielson-nielson-popl97}, presented next, is one such analysis.
+%%
+It is important to recognize from this definition that \emph{any} allocation strategy is a sound abstract interpretation~\cite{dvanhorn:Might2009Posteriori}.
+%
+In particular, concrete interpretation is a kind of abstract interpretation.
+%
+So is an interpretation that allocates a single cell into which all bindings and continuations are stored.
+%
+The former is an abstract interpretation with uncomputable reachability and gives only the ground truth of a program's behavior; the latter is an abstract interpretation that is easy to compute but gives little information.
+%
+Useful program analyses lay somewhere in between and can be characterized by their choice of address representation and allocation strategy.
+%
+Uniform \(k\)-CFA~\cite{dvanhorn:nielson-nielson-popl97}, presented next, is one such analysis.
+%%
 
-\paragraph{Uniform \(k\)-CFA} To characterize uniform \(k\)-CFA, set the allocation
-strategy as follows, for a fixed constant \(k\):
+%%
+\paragraph{Uniform \(k\)-CFA}
+%
+To characterize uniform \(k\)-CFA, set the allocation strategy as follows, for a fixed constant \(k\):
+%%
 
+%%
 {\small
 \begin{align*}
 \Counter &= \Label^* \\
@@ -574,37 +579,31 @@ a single, global shared store for all.
 \subsection{Store widening}
 \label{sec:storewiden}
 
-A common technique to accelerate convergence in flow analyses is to share a
-common, global store.
+A common technique to accelerate convergence in flow analyses is to share a common, global store.
 %
-To retain soundness, this store grows monotonically.
+Formally, we can cast this optimization as a second abstraction or as the application of a widening operator
 %
-Formally, we can cast this optimization as a second abstraction or as
-the application of a widening operator\footnote{Technically, we would
-  have to copy the value of the global store to all states being
-  stepped to fit the formal definition of a widening, but this
-  representation is order-isomorphic to that.} during the fixed-point
-iteration.
+\footnote{Technically, we would have to copy the value of the global store to all states being stepped to fit the formal definition of a widening, but this representation is order-isomorphic to that.}
 %
-In the ISWIM language, such a widening makes 0-CFA quartic in the size of the
-program.
+during the fixed-point iteration.
 %
-Thus, complexity drops from intractable exponentiality to a merely
-daunting polynomial.
+In the ISWIM language, such a widening makes 0-CFA quartic in the size of the program.
+%
+Thus, complexity drops from intractable exponentiality to a merely daunting polynomial.
+%%
 
-Since we can cast this optimization as a widening, there is no need to change
-the transition relation itself.
+%%
+Since we can cast this optimization as a widening, there is no need to change the transition relation itself.
 %
 Rather, what changes is the structure of the fixed-point iteration.
 %
-In each pass, the algorithm will collect all newly produced stores and join
-them together.
+In each pass, the algorithm will collect all newly produced stores and join them together.
 %
-Then, before each transition, it installs this joined store into current
-state.
+Then, before each transition, it installs this joined store into current state.
+%%
 
-To describe this process, AAM defined a transformation of the reduction relation so that it operates on
-a pair of a set of contexts ($C$) and a store ($\sigma$).
+%%
+To describe this process, AAM defined a transformation of the reduction relation so that it operates on a pair of a set of contexts ($C$) and a store ($\sigma$).
 %
 A context includes all non-store components, \emph{e.g.}, the expression, the environment and the stack.
 %
@@ -622,35 +621,37 @@ The transformed relation, $\widehat{\machstep}$, is
 %%\wn(\ans{\mval}, \msto) &= \ans{\msto, \mval}
 \end{align*}}
 %
-The new store is computed as the least upper bound of all
-stores after stepping in order to have only one, and keep the
-semantics sound.
+To retain soundness, this store grows monotonically as the least upper bound of all occurring stores.
+%
+%The new store is computed as the least upper bound of all stores after stepping in order to have only one, and keep the semantics sound.
 
 \subsection{Store-allocate all values}
 \label{sec:baselineeval}
 
-The final approximation we make to get to our baseline is to
-store-allocate all values that appear, so that any non-machine state
-that contains a value instead contains an address to a value.  The AAM
-approach stops at the previous optimization.  However, the \kfnalone
-continuation stores a value, and this makes the space of continuations
-quadratic rather than linear in the size of the program, for a
-monovariant analysis like 0-CFA.  Having the space of continuations
-grow linearly with the size of the program will drop the overall
-complexity to cubic (as expected). We also need to allocate an address
-for the argument position in an \apalone state.
+The final approximation we make to get to our baseline is to store-allocate all values that appear, so that any non-machine state that contains a value instead contains an address to a value.
+%
+The AAM approach stops at the previous optimization.
+%
+However, the \kfnalone continuation stores a value, and this makes the space of continuations quadratic rather than linear in the size of the program, for a monovariant analysis like 0-CFA.
+%
+Having the space of continuations grow linearly with the size of the program will drop the overall complexity to cubic (as expected).
+%
+We also need to allocate an address for the argument position in an \apalone state.
+%%
 
-To achieve this linearity for continuations, we allocate an address
-for the value position when we create the continuation.  This address
-and the tail address are both determined by the label of the
-application point, so the space becomes linear and the overall
-complexity drops to cubic.  This is a critical abstraction in
-languages with $n$-ary functions, since otherwise the continuation
-space grows super-exponentially (${\mathcal O}(n^n)$). We extend the semantics to
-additionally allocate an address for the function value when creating
-the $\kfnalone$ continuation. The continuation has to contain this address
-to remember where to retrieve values from in the store.
+%%
+To achieve this linearity for continuations, we allocate an address for the value position when we create the continuation.
+%
+This address and the tail address are both determined by the label of the application point, so the space becomes linear and the overall complexity drops to cubic.
+%
+This is a critical abstraction in languages with $n$-ary functions, since otherwise the continuation space grows super-exponentially (${\mathcal O}(n^n)$).
+%
+We extend the semantics to additionally allocate an address for the function value when creating the $\kfnalone$ continuation.
+%
+The continuation has to contain this address to remember where to retrieve values from in the store.
+%%
 
+%%
 The new evaluation rules follow, where $\mcntr' = \tick(\mstate)$:
 % In theory, this aggressive distinction between continuations might buy
 % additional precision, but in practice, it does not.
@@ -769,29 +770,35 @@ Finally, we add what we know we had not yet seen to the seen set:
   \mseen' = \setof{(c,\msto') \mid c \in F'}
 \end{equation*}
 %
-To inject a program $e$ into this machine, we start off knowing we
-have seen the first state, and that we need to process the first
-state:
+To inject a program $e$ into this machine, we start off knowing we have seen the first state, and that we need to process the first state:
 \begin{align*}
 \inject(e) &= (\setof{\ttuple{c_0}{\bot}},\setof{c_0},\bot) \\
 \text{ where } c_0 &= \ev{e,\bot,\kmt}
 \end{align*}
+%%
 
-Notice that now $\mseen$ has several copies of the abstract store in it. As
-it is, this semantics is much less efficient (but still more precise)
-than the previously proposed semantics because membership checks have
-to compare entire stores. Checking equality is expensive because the stores within each are
-large, and every entry must be checked against every other. Hashes can
-sometimes rule out inequality relatively quickly, but the incidence of
-collisions and actual equality is costly.
+%%
+Notice that now $\mseen$ has several copies of the abstract store in it.
+%
+As it is, this semantics is much less efficient (but still more precise) than the previously proposed semantics because membership checks have to compare entire stores.
+%
+Checking equality is expensive because the stores within each state are large, and nearly every entry must be checked against every other due to high similarities amongst stores.
+%%
 
-And, there is a better way. Shivers' original work on $k$-CFA was
-susceptible to the same problem, and he suggested three complementary
-optimizations: (1) make the store global; (2) update the store
-imperatively; and (3) associate every change in the store with a
-version number -- its timestamp. Then, put timestamps in states
-where previously there were stores. Given two states, the analysis can
-now compare their stores just by comparing their timestamps -- a
+%%
+And, there is a better way.
+%
+Shivers' original work on $k$-CFA was susceptible to the same problem, and he suggested three complementary optimizations:
+%
+ (1) make the store global;
+%
+ (2) update the store imperatively; and
+%
+ (3) associate every change in the store with a version number -- its timestamp.
+%
+Then, put timestamps in states where previously there were stores.
+%
+Given two states, the analysis can now compare their stores just by comparing their timestamps -- a
 constant-time operation.
 
 There are two subtle losses of precision in Shivers' original
@@ -931,23 +938,29 @@ the following way:
 \appendall(\varnothing) &= \epsilon \\
 \appendall(\setof{\msdiff}\cup\Xi) &= \append(\msdiff,\appendall(\Xi))
 \end{align*}}
+%%
 
-Here $\appendall$ combines change logs across all non-deterministic
-steps for a state to later be replayed. The order the combination
-happens in doesn't matter, because join is associative and
-commutative.
+%%
+Here $\appendall$ combines change logs across all non-deterministic steps for a state to later be replayed.
+%
+The order the combination happens in doesn't matter, because join is associative and commutative.
+%%
 
+%%
 \begin{lemma}
-$\ttuple{c}{\msto} \dmachstep \ttuple{c'}{\msdiff}$ iff
-$\wn(c,\msto) \machstep \wn(c',\replay(\msdiff,\msto))$
+$\ttuple{c}{\msto} \dmachstep \ttuple{c'}{\msdiff}$ iff $\wn(c,\msto) \machstep \wn(c',\replay(\msdiff,\msto))$
 \end{lemma}
 By cases on $\dmachstep$ and $\machstep$.
+%%
 
+%%
 \begin{lemma}[$\changep$ means change]
 Let $\replay(\msdiff,\msto) = \ttuple{\msto'}{\changep}$. $\msto' \neq \msto$ iff $\changep$.
 \end{lemma}
 By induction on $\msdiff$.
+%%
 
+%%
 \begin{theorem}
 $\damachstep$ is a complete abstraction of $\widehat{\machstep}^T$.
 \end{theorem}
@@ -980,38 +993,33 @@ Follows from previous lemma and that join is associative and commutative.
 
 \subsection{Lazy non-determinism}
 
-Tracing the execution of the analysis reveals an immediate shortcoming:
-there is a high degree of branching and merging in the exploration.
+Tracing the execution of the analysis reveals an immediate shortcoming: there is a high degree of branching and merging in the exploration.
 %
 Surveying this branching has no benefit for precision.
 %
-For example, in a function application, {\tt (f x y)},
-where {\tt f}, {\tt x} and {\tt y} each have several values
-each argument evaluation induces $n$-way branching, only to be ultimately joined back together in their respective
-application positions.
+For example, in a function application, {\tt (f x y)}, where {\tt f}, {\tt x} and {\tt y} each have several values each argument evaluation induces $n$-way branching, only to be ultimately joined back together in their respective application positions.
 %
 Transition patterns of this shape litter the state-graph:
 %
 \begin{center}
 \includegraphics[scale=0.2]{fanoutdot2}
 \end{center}
-To avoid the spurious forking and joining, we {\it delay} the non-determinism
-until and unless it is needed in {\it strict contexts} (such as the guard for an
-{\tt if}, a called procedure, or a numerical primitive application).
+To avoid the spurious forking and joining, we {\it delay} the non-determinism until and unless it is needed in {\it strict contexts} (such as the guard of an {\tt if}, a called procedure, or a numerical primitive application).
 %
 Doing so collapses these forks and joins into a linear sequence of states:
 \begin{center}
 \includegraphics[scale=0.2]{lazydot}
 \end{center}
+%%
 
-This shift does not change the concrete semantics of the language to
-be lazy.  Rather, it abstracts over transitions that the original
-non-deterministic semantics steps through.
+%%
+This shift does not change the concrete semantics of the language to be lazy.
 %
-We say the abstraction is \emph{lazy} because it delays splitting on
-the values in an address until they are \emph{needed} in the
-semantics. It does not change the execution order that leads to the
-values that are stored in the address.
+Rather, it abstracts over transitions that the original non-deterministic semantics steps through.
+%
+We say the abstraction is \emph{lazy} because it delays splitting on the values in an address until they are \emph{needed} in the semantics.
+%
+It does not change the execution order that leads to the values that are stored in the address.
 
 We introduce a new kind of value,
 \spchoice
@@ -1054,40 +1062,39 @@ The following rules highlight the changes to the semantics:
 %
 \co{\kif[^\mcntr]{\mexpi0,\mexpi1,\menv,\mkaddr},\mval,\msto}
 &\lmachstep\;
-\ev[^{\mcntr'}]{\mexpi,\menv,\msto,\mkont} \\
+\ev[^{\mcntr'}]{\mexpi0,\menv,\msto,\mkont} \\
 \text{ if } \mkont &\in \msto(\mkaddr),
             \strue \in \spchoice{\force(\msto,\mval)}{\force(\mval)}
 \end{align*}}
 Since {\tt if} guards are in strict position, we must force the value
-to determine which branch to to take. The middle rule uses $\force$
-only to combine with values in the store - it does not introduce
-needless non-determinism.
+to determine which branch to to take.
+%
+The middle rule uses $\force$ only to combine with values in the store - it does not introduce needless non-determinism.
+%%
 
+%%
 \spchoice{
 \noindent
 We have two choices for how to implement lazy non-determinism.
 
 \paragraph{Option 1: Lose precision; simplify implementation}
-This semantics introduces a subtle precision difference over the
-baseline. Consider a configuration where a reference to a variable and
-a binding of a variable will happen in one step, since store widening
-leads to stepping several states in one big ``step.'' With laziness,
-the reference will mean the original binding(s) of the variable or the
-new binding, because the actual store lookup is delayed one step
-(i.e. laziness is administrative).
+This semantics introduces a subtle precision difference over the baseline.
+%
+Consider a configuration where a reference to a variable and a binding of a variable will happen in one step, since store widening leads to stepping several states in one big ``step.''
+%
+With laziness, the reference will mean the original binding(s) of the variable \emph{or} the new binding, because the actual store lookup is delayed one step (i.e. laziness is administrative).
 
 \paragraph{Option 2: Regain precision; complicate implementation}
-The administrative nature of laziness means that we could remove the
-loss in precision by storing the result of the lookup in a value
-representing a delayed nondeterministic choice. This is a more common
-choice in 0CFA implementations we have seen, but it interferes with
-the next optimization (discussion in next section).
+The administrative nature of laziness means that we could remove the loss in precision by storing the result of the lookup in a value representing a delayed nondeterministic choice.
+%
+This is a more common choice in 0CFA implementations we have seen, but it interferes with the next optimization due to the invariant from store deltas we have that lookups must not depend on the change log.
 
-\paragraph{Our choice: option 1}
-The conditions for precision loss happen too rarely to warrant the
-added complexity to the next section's semantics to avoid such
-losses. Without abstract compilation, option 2 is the better
-choice.}{}
+% \paragraph{Our choice: option 1}
+% The conditions for precision loss happen too rarely to warrant the
+% added complexity to the next section's semantics to avoid such
+% losses. Without abstract compilation, option 2 is the better
+% choice.
+}{}
 
 \spchoice
 {
@@ -1267,44 +1274,39 @@ $\mcomp^\mcntr(\mathit{args}\ldots)$ for $\mcomp(\mathit{args}\ldots,
 \end{figure}
 
 \paragraph{Correctness}
-The correctness of abstract compilation seems obvious, but it has
-never before been rigorously proved. What constitutes correctness in
-the case of dropped states, anyway? Applying an abstract bytecode's
-function does many ``steps'' in one go, at the end of which, the two
-semantics line up again (modulo representation of expressions). This
-constitutes the use of a notion of stuttering. We provide a formal
-analysis of abstract compilation \emph{without} store widening with a proof
-of a stuttering bisimulation~\cite{ianjohnson:BCG88} between this
-semantics and lazy non-determinism without widening to show precision
-preservation. %We revisit store widening at the end of the section.
+The correctness of abstract compilation seems obvious, but it has never before been rigorously proved.
+%
+What constitutes correctness in the case of dropped states, anyway?
+%
+Applying an abstract bytecode's function does many ``steps'' in one go, at the end of which, the two semantics line up again (modulo representation of expressions).
+%
+ This constitutes the use of a notion of stuttering.
+%
+ We provide a formal analysis of abstract compilation \emph{without} store widening with a proof of a stuttering bisimulation~\cite{ianjohnson:BCG88} between this semantics and lazy non-determinism without widening to show precision preservation.
+%We revisit store widening at the end of the section.
+%%
 
-The number of transitions that can occur in succession from an
-abstract bytecode is roughly bounded by the amount of expression
-nesting in the program. The partial order that defines subexpressions
-smaller than the expression in which they occur is well-founded, so we
-use this observation to drive our use of a well-founded equivalence
-bisimulation (WEB)~\cite{ianjohnson:manolios-diss}. WEBs are
-equivalent to the notion of a stuttering bisimulation, but are more
-amenable to mechanization (and thus rigorous proof). They also only
-require reasoning over one step of the reduction relation, which makes
-the proof concise. The trick is in defining a well-founded ordering
-that determines when the two semantics will match up again, what
-Manolios calls the pair of functions $\erankt$ and $\erankl$ (but we
-don't need the generality that requires $\erankl$ since the uncompiled
-semantics doesn't stutter at all).
+%%
+The number of transitions that can occur in succession from an abstract bytecode is roughly bounded by the amount of expression nesting in the program.
+%
+We can use the expression containment order to prove stuttering bisimulation with a well-founded equivalence bisimulation (WEB)~\cite{ianjohnson:manolios-diss}.
+%The partial order that defines subexpressions smaller than the expression in which they occur is well-founded, so we use this observation to drive our use of a well-founded equivalence bisimulation (WEB)
+%
+ WEBs are equivalent to the notion of a stuttering bisimulation, but are more amenable to mechanization since they also only require reasoning over one step of the reduction relation.
+%
+The trick is in defining a well-founded ordering that determines when the two semantics will match up again, what Manolios calls the pair of functions $\erankt$ and $\erankl$ (but we don't need $\erankl$ since the uncompiled semantics doesn't stutter).
+%%
 
-We define a refinement, $r$, from non-compiled to compiled states (built structurally) by
-``committing'' all the actions of an $\evalone$ state (defined similarly to
-$\compile{\_}$, but immediately applies the functions), and
-subsequently changing all expressions with their compiled
-variants. Since WEBs are for single transition systems, a WEB
-refinement is over the disjoint union of our two semantics, and the
-equivalence relation we use is just that a state is related to its
-refined state (and itself). Call this relation $B$.
+%%
+We define a refinement, $r$, from non-compiled to compiled states (built structurally) by ``committing'' all the actions of an $\evalone$ state (defined similarly to $\compile{\_}$, but immediately applies the functions), and subsequently changing all expressions with their compiled variants.
+%
+ Since WEBs are for single transition systems, a WEB refinement is over the disjoint union of our two semantics, and the equivalence relation we use is just that a state is related to its refined state (and itself).
+%
+ Call this relation $B$.
+%%
 
-Before we prove this setup is indeed a WEB, we need one lemma that
-applying an abstract bytecode's function is equal to refining the
-corresponding $\evalone$ state:
+%%
+Before we prove this setup is indeed a WEB, we need one lemma that applying an abstract bytecode's function is equal to refining the corresponding $\evalone$ state:
 %
 \begin{lemma}[Compile/commit]
 Let $c,\msdiff' = \compile{\mexp}^\mcntr_{r(\msto)}(\menv,\msdiff,r(\mkont))$.
@@ -1317,37 +1319,35 @@ The proof is by induction on $\mexp$.
 $B$ is a WEB on $\lmachstep \uplus \machstep$
 \end{theorem}
 
-The proof follows by cases on $\lmachstep \uplus \machstep$ with the
-WEB \emph{witness} being the well-order on expressions (with a $\bot$
-element), and the following $\erankt$, $\erankl$ functions:
+The proof follows by cases on $\lmachstep \uplus \machstep$ with the WEB \emph{witness} being the well-order on expressions (with a $\bot$ element), and the following $\erankt$, $\erankl$ functions:
 
 \begin{align*}
 \erankt(\ev[^\mcntr]{\mexp,\menv,\msto,\mkont}) &= \mexp \\
 \erankt(\mstate) &= \bot \quad \text{otherwise} \\
 \erankl(s,s') &= 0
 \end{align*}
-All cases are either simple steps or appeals to the well-order on $\erankt$'s range. The other rank function,
-$\erankl$ is unnecessary, so we just make it the constant 0
-function. The $\cmachstep$ cases are trivial.
+All cases are either simple steps or appeals to the well-order on $\erankt$'s range.
+%
+The other rank function, $\erankl$ is unnecessary, so we just make it the constant 0 function.
+%
+The $\cmachstep$ cases are trivial.
 
 \paragraph{Wide store and abstract compilation}
-The fact that many changes happen in one step also makes the
-comparison with the widened lazy semantics more subtle. It is possible
-for different stores to occur between the different semantics because
-abstract compilation can change the order in which the store is
-changed (across steps). Consider the case where before we might call
-the same function from two different places in 3 and 2 steps
-respectively, compilation can make that 2 and 1, reversing the order
-that we bind values in the store, leading to a mismatch from the wide
-lazy semantics.  This kind of cross-step store poisoning is inevitable
-when a store is shared between several traces. The binding could have
-just as easily been observed the other way around in the non-compiled
-semantics. Although there is a difference pre- and post- abstract
-compilation, the result is still deterministic in contrast to Shivers'
-technique. The soundness is in tact since we can add store-widening
-the correct unwidened semantics with an easy correctness proof. Call
-$\camachstep$ the result of the widening operator from the previous
-section on $\cmachstep$.
+%The fact that many changes happen in one step also makes the comparison with the widened lazy semantics more subtle.
+%
+ It is possible for different stores to occur between the different semantics because abstract compilation can change the order in which the store is changed (across steps).
+%
+ This is the case because some ``corridor'' expressions may compile down to change the store before some others, meaning there is no stuttering relationship with the wide lazy semantics.
+%
+% This kind of cross-step store poisoning is inevitable when a store is shared between several traces.
+%
+% The binding could have just as easily been observed the other way around in the non-compiled semantics.
+%
+ Although there is a difference pre- and post- abstract compilation, the result is still deterministic in contrast to Shivers' technique.
+%
+ The soundness is in tact since we can add store-widening the correct unwidened semantics with an easy correctness proof.
+%
+ Call $\camachstep$ the result of the widening operator from the previous section on $\cmachstep$.
 
 % Compile: cpu time: 255397 real time: 261532 gc time: 2947
 
@@ -1361,25 +1361,25 @@ section on $\cmachstep$.
 
 \subsection{Imperative, pre-allocated data structures}
 
-Thus far, we have made our optimizations in a purely functional
-manner. For the final push for performance, we need to dip into the
-imperative. In this section, we show an alternative representation of
-the store and seen set that are more space-efficient and are amenable
-to destructive updates by adhering to a history for each address.
+Thus far, we have made our optimizations in a purely functional manner.
+%
+For the final push for performance, we need to dip into the imperative.
+%
+In this section, we show an alternative representation of the store and seen set that are more space-efficient and are amenable to destructive updates by adhering to a history for each address.
+%%
 
-The following transfer function has several components that can be
-destructively updated, and intermediate sets can be elided by adding
-to global sets. In fact, the log of store deltas can be removed as
-well, by updating the store in-place, and on lookup, using the first
-value timestamped $\le$ the current timestamp. We start with the
-purely functional view.
+%%
+The following transfer function has several components that can be destructively updated, and intermediate sets can be elided by adding to global sets.
+%
+In fact, the log of store deltas can be removed as well, by updating the store in-place, and on lookup, using the first value timestamped $\le$ the current timestamp.
+%
+We start with the purely functional view.
 
 \subsubsection{Pure setup for imperative implementation}
 
-The store maps to a stack of timestamped sets of abstract
-values. Throughout this section, we will be taking the parameter $t$
-to be the ``current time,'' or the length of the store chain at the
-beginning of the step.
+The store maps to a stack of timestamped sets of abstract values.
+%
+Throughout this section, we will be taking the parameter $t$ to be the ``current time,'' or the length of the store chain at the beginning of the step.
 
 \begin{align*}
 \msto \in \Store &= \Addr \to \Valstack \\
@@ -1396,11 +1396,13 @@ To allow imperative store updates, we maintain an invariant that we never look u
       \mval{s} & \text{ if } \mvalstack = \cons{\ttuple{t'}{\mval{s}}}{\mvalstack'}, t' \le t \\
       \mval{s'} & \text{ if } \mvalstack = \cons{\ttuple{t'}{\mval{s}}}{\cons{\ttuple{t''}{\mval{s'}}}{\mvalstack'}}, t' > t
     \end{array}\right.
-\end{align*}} To construct this value stack, we have a
-time-parameterized join operation that also tracks changes to the
-store. If joining with a time in the future, we just add to
-it. Otherwise, we're making a change for the future ($t+1$), but only
-if there is an actual change.
+\end{align*}}
+%
+To construct this value stack, we have a time-parameterized join operation that also tracks changes to the store.
+%
+If joining with a time in the future, we just add to it.
+%
+Otherwise, we're making a change for the future ($t+1$), but only if there is an actual change.
 {\small
 \begin{align*}
 \msto \sqcup_t [\maddr \mapsto \mval{s}] &= \msto[\maddr \mapsto \mvalstack],\changep \\
@@ -1414,14 +1416,11 @@ if there is an actual change.
 \mvalstack \sqcup_t \mval{s} &= \mvalstack,\sfalse \text{ otherwise}
 \end{align*}}
 
-For the purposes of space, we reuse the $\cmachstep$ semantics,
-although the $\replay$ of the produced $\msdiff$ objects should be
-in-place, and the $\lookup$ function should be using this
-single-threaded store.  Because the store has all the temporal
-information baked into it, we rephrase the core semantics in terms of
-a transfer function. The least fixed-point of this function gives a
-more compact representation of the reduction relation of the previous
-section.
+For the purposes of space, we reuse the $\cmachstep$ semantics, although the $\replay$ of the produced $\msdiff$ objects should be in-place, and the $\lookup$ function should be using this single-threaded store.
+%
+Because the store has all the temporal information baked into it, we rephrase the core semantics in terms of a transfer function.
+%
+The least fixed-point of this function gives a more compact representation of the reduction relation of the previous section.
 
 {\small
 \begin{align*}
@@ -1473,8 +1472,8 @@ In particular, there are 5 globals:
 \item{$\mseentime$: the \emph{seen} set, though made a map for faster membership tests and updates.}
 \item{$F$: the \emph{frontier} set, which must be persisent or copied for the iteration through the set to be correct.}
 \item{$\msto$: the store, which represents all stores that occur in the machine semantics.}
-\item{$t$: the timestamp, or length of the store chain - all stores that occur in the semantics are totally ordered due to single-threading the store.}
-\item{$\changep$: whether a store change occurred when stepping states in $F$.}
+\item{$t$: the timestamp, or length of the store chain.}
+\item{$\changep$: whether the store changed when stepping states in $F$.}
 \end{enumerate}
 
 The reduction relation would then instead of building store deltas, update the global store.
@@ -1490,9 +1489,9 @@ There is no cross-step store poisoning since the lookup is restricted to the cur
 
 Internally, the algorithm at this stage uses hash tables to model the store to allow arbitrary address representations.
 %
-But, such a dynamic structure isn't necessary when we know the structure of the store in advance: we know all possible entries, and we know its maximum size.
+But, such a dynamic structure isn't necessary when we know the structure of the store in advance.%: we know all possible entries, and we know its maximum size.
 %
-In a monovariant allocation strategy, the domain of the store is exactly the set of expressions in the program.
+In a monovariant allocation strategy, the domain of the store is bounded by the number of expressions in the program.
 %
 If we label each expression with a unique natural, the analysis can index directly into the store without a hash or a collision.
 %
@@ -1504,25 +1503,23 @@ Even for polyvariant analyses, it is possible to compute the maximum number of a
 We have implemented, optimized, and evaluated an analysis framework supporting higher-order functions, state, first-class control, compound data, and a large number of primitive kinds of data and operations such as floating point, complex, and exact rational arithmetic.
 %
 The analysis is evaluated against a suite of Scheme benchmarks drawn from the literature.
+\footnote{Source code of the implementation and benchmark suite available at \url{https://github.com/dvanhorn/oaam}}
 %
 For each benchmark, we collect analysis times, peak memory usage (as determined by Racket's GC statistics), and the rate of states-per-second explored by the analysis for each of the optimizations discussed in section~\ref{sec:opt}, cumulatively applied.
 %
-The analysis is stopped after consuming 30 minutes of time or 1 gigabyte of space.
+The analysis is stopped after consuming 30 minutes of time or 1 gigabyte of space
+\footnote{All benchmarks are calculated as an average of 5 runs, done in parallel (each isolated to a core), on an 12-core, 64-bit Intel Xeon machine running at 2.40GHz with 12Gb of memory.}.
 %
-When presenting \emph{relative} numbers, we use the timeout limits as a lower bound on the actual time required (i.e., one minute versus timeout is at least 30 times faster),
-thus giving a conservative estimate of improvements.
+When presenting \emph{relative} numbers, we use the timeout limits as a lower bound on the actual time required (i.e., one minute versus timeout is at least 30 times faster), thus giving a conservative estimate of improvements.
 %%
 
 %%
-All benchmarks are calculated as an average of 5 runs, done in
-parallel (each isolated to a core), on an 12-core, 64-bit Intel Xeon machine running at 2.40GHz
-with 12Gb of memory.
 %%
-
 %%
-Many benchmarks cause the baseline analyzer to take longer than 30 minutes or to consume more than 1 gigabyte of memory, at which point the analysis is stopped.
+%%
+%% Many benchmarks cause the baseline analyzer to take longer than 30 minutes or to consume more than 1 gigabyte of memory, at which point the analysis is stopped.
 %
-This is the case for the largest benchmark program, {\bf nucleic}, which is 3,500 lines of code and takes under a minute in the most optimized analyzer.
+%%This is the case for the largest benchmark program, {\bf nucleic}, which is 3,500 lines of code and takes under a minute in the most optimized analyzer.
 %
 For those benchmarks that did complete on the baseline, the optimized analyzer outperformed the baseline by a factor of two to three orders of magnitude.
 % safer to not give exact factors
@@ -1617,17 +1614,10 @@ Our step-wise optimizations strictly produce better analysis times with no obser
 %
 The final result is a systematically derived and verified implementation that operates within a small factor performance loss compared to a hand-optimized, unverified implementation.
 %
-Moreover, much of the performance gains are achieved with purely functional methods, which suggest potential further gains from parellelization.
+Moreover, much of the performance gains are achieved with purely functional methods, which allow the use of these methods in rewriting tools and others with restricted input languages.
 %
 Peak memory usage is often considerably improved by the end of the optimization steps, but the effect of mutation has unexpected consequence on the analyzers memory consumption, likely due to a larger-than-necessary preallocated store.
 %%
-
-%%
-Source code of the implementation and benchmark suite is at:
-
-\begin{center}
-\url{https://github.com/dvanhorn/oaam}
-\end{center}
 
 \paragraph{Comparison with other flow analysis implementations}
 
@@ -1645,16 +1635,13 @@ More work would be required to scale the analyzer to the set of features require
 %%
 
 %%
-The only analyzers we were able to find that proved capable of
-analyzing the full suite of benchmarks considered here were the Soft
-Typing system of Wright and
-Cartwright~\cite{dvanhorn:Wright1997Practical} and, in many ways its
-successor, the Polymorphic splitting system of Wright and
-Jagannathan~\cite{dvanhorn:wright-jagannathan-toplas98}.
+The only analyzer we were able to find that proved capable of analyzing the full suite of benchmarks considered here
+% were the Soft Typing system of Wright and Cartwright~\cite{dvanhorn:Wright1997Practical} and, in many ways its successor,
+was the Polymorphic splitting system of Wright and Jagannathan~\cite{dvanhorn:wright-jagannathan-toplas98}.
 %
 \footnote{This is not a coincidence; these papers set a high standard for evaluation, which we consciously aimed to approach.}
 %
-Unfortunately, these analyses compute an inherently different and incomparable form of analysis.
+Unfortunately, these analyses compute an inherently different and incomparable form of analysis via a global acceptability judgment.
 %
 Consequently, we have omitted a complete comparison with these implementations.
 %
@@ -1662,7 +1649,7 @@ The AAM approach provides more precision in terms of temporal-ordering of progra
 %
 Consequently implementation techniques cannot be ``ported'' between these two approaches.
 %
-  However, our optimized implementation is within an order of magnitude of the performance of Wright and Jaganathan's analyzer.
+However, our optimized implementation is within an order of magnitude of the performance of Wright and Jaganathan's analyzer.
 %
 Although we would like to improve this to be more competitive, the optimized AAM approach still has many strengths to recommend it in terms of precision, ease of implementation and verification, and rapid design.
 %
@@ -1734,11 +1721,12 @@ Such analyses (ultimately) compute judgments on program terms and contexts, e.g.
 %
 The judgments do not relate the order in which expressions and context may be evaluated in a program, e.g., it has nothing to say with regard to question like,
 %
-``Do we always evaluate $e_1$ before $e_2$?'' or
+``Do we always evaluate $e_1$ before $e_2$?''% or
 %
-``Is it always the case that a file handle is opened, read and then closed in that order?''
+%``Is it always the case that a file handle is opened, read and then closed in that order?''
 %
-The state transition graphs can answer these kinds of queries, but this does not come for free: respecting temporal order imposes an order in which states and terms may be evaluated \emph{during} the analysis.
+The state transition graphs can answer these kinds of queries, but evaluation demonstrated this does not come for free.
+%%: respecting temporal order imposes an order in which states and terms may be evaluated \emph{during} the analysis.
 
 \section{Conclusion}
 \label{sec:conclusion}
