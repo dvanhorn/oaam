@@ -560,20 +560,23 @@ Then, the evaluator for the analysis computes the least fixed-point of the globa
 %\end{equation*}
 where $\mstate_0 = \ev[^\mtcntr]{\mexp, \varnothing, \varnothing, \kmt}$.
 
-The possible traces of execution tell us the most about a program, so
-we take $\traces(\mexp)$ to be the (regular) set of paths through the
-computed graph. We elide the construction of the set of edges in this paper.
-
-To conduct this \naive{} exploration on the \Church{} example would require
-considerable time.  Even though the state space is finite, it is exponential in
-the size of the program.  Even with $k = 0$, there are exponentially many
-stores in the AAM framework.
-
-In the next subsection, we fix this with store widening to reach polynomial
-(albeit of high degree) complexity.
+The possible traces of execution tell us the most about a program, so we take $\traces(\mexp)$ to be the (regular) set of paths through the computed graph.
 %
-This widening effectively lifts the store out of individual states to create
-a single, global shared store for all.
+ We elide the construction of the set of edges in this paper.
+%%
+
+%%
+To conduct this \naive{} exploration on the \Church{} example would require considerable time.
+%
+  Even though the state space is finite, it is exponential in the size of the program.
+%
+  Even with $k = 0$, there are exponentially many stores in the AAM framework.
+%%
+
+%%
+In the next subsection, we fix this with store widening to reach polynomial (albeit of high degree) complexity.
+%
+This widening effectively lifts the store out of individual states to create a single, global shared store for all.
 
 
 \subsection{Store widening}
@@ -662,9 +665,9 @@ The new evaluation rules follow, where $\mcntr' = \tick(\mstate)$:
   \maddr &= \alloc(\mstate) \\
   \msto' &= \ext{\msto}{\maddr}{\{\mval\}}
 \end{align*}
-Now instead of storing the evaluated function in the continuation
-frame itself, we indirect it through the store for further control on
-complexity and precision:
+%%
+Now instead of storing the evaluated function in the continuation frame itself, we indirect it through the store for further control on complexity and precision:
+%%
 \begin{align*}
 \co[^\mcntr]{\kfn{\maddr,\mkaddr},\mval,\msto} & \machstep
 \ap[^{\mcntr'}_\mlab]{\mvalx{u},\maddr,\mkont,\msto'}
@@ -673,10 +676,12 @@ complexity and precision:
 \text{ where } \maddr &= \alloc(\mstate) \\
                \msto' &= \ext{\msto}{\maddr}{\{\mval\}}
 \end{align*}
+%%
 
-Associated with this indirection, we now apply all functions stored in
-the address. This nondeterminism is necessary in order to continue with
-evaluation.
+%%
+Associated with this indirection, we now apply all functions stored in the address.
+%
+This nondeterminism is necessary in order to continue with evaluation.
 
 % This extra store-allocation is effectively naming all intermediate
 % results, and thus the precision aligns with an analysis specialized to
@@ -711,34 +716,40 @@ made by the analyzer by performing:
  \item lazy non-determinism; and
  \item abstract compilation.
 \end{enumerate}
+%%
 
-All pragmatic improvements are precision preserving (form complete
-abstractions), but the semantic changes are not in some cases, for reasons we
-will describe. We did not observe the precision differences in our evaluation.
+%%
+All pragmatic improvements are precision preserving (form complete abstractions), but the semantic changes are not in some cases, for reasons we will describe.
+%
+ We did not observe the precision differences in our evaluation.
+%%
 
-We apply the frontier-based semantics combined with timestamped stores
-as our first step.  The move to the imperative will be made last in
-order to show the effectiveness of these techniques in the purely
-functional realm.
+%%
+We apply the frontier-based semantics combined with timestamped stores as our first step.
+%
+  The move to the imperative will be made last in order to show the effectiveness of these techniques in the purely functional realm.
 
 \subsection{Timestamped frontier}
 
-The semantics given for store widening in section \ref{sec:storewiden},
-while simple, is wasteful. It also does not model what typical
-implementations do. It causes all states found so far to step each
-iteration, even if they are not revisited. This has negative
-performance \emph{and} precision consequences (changes to the store
-can travel back in time in straight-line code). We instead use a
-frontier-based semantics that corresponds to the classic worklist
-algorithms for analysis. The difference is that the store is not
-modified in-place, but updated after all frontier states have been
-processed. This has implications for the analysis' precision and
-determinism. Specifically, higher precision, and it is deterministic
-even if set iteration is not.
+The semantics given for store widening in section \ref{sec:storewiden}, while simple, is wasteful.
+%
+ It also does not model what typical implementations do.
+%
+ It causes all states found so far to step each iteration, even if they are not revisited.
+%
+ This has negative performance \emph{and} precision consequences (changes to the store can travel back in time in straight-line code).
+%
+ We instead use a frontier-based semantics that corresponds to the classic worklist algorithms for analysis.
+%
+ The difference is that the store is not modified in-place, but updated after all frontier states have been processed.
+%
+ This has implications for the analysis' precision and determinism.
+%
+ Specifically, higher precision, and it is deterministic even if set iteration is not.
+%%
 
-The state space changes from a store and set of contexts to a set
-of seen abstract states (context plus store), $\mseen$, a set of contexts to
-step (the frontier), $F$, and a store to step those contexts with, $\msto$:
+%%
+The state space changes from a store and set of contexts to a set of seen abstract states (context plus store), $\mseen$, a set of contexts to step (the frontier), $F$, and a store to step those contexts with, $\msto$:
 \begin{equation*}
 (\mseen, F, \msto) \mathrel{\widehat{\machstep}} (\mseen \cup \mseen', F', \msto')
 \end{equation*}
@@ -798,24 +809,19 @@ Shivers' original work on $k$-CFA was susceptible to the same problem, and he su
 %
 Then, put timestamps in states where previously there were stores.
 %
-Given two states, the analysis can now compare their stores just by comparing their timestamps -- a
-constant-time operation.
+Given two states, the analysis can now compare their stores just by comparing their timestamps -- a constant-time operation.
 
-There are two subtle losses of precision in Shivers' original
-timestamp technique that we can fix.
+There are two subtle losses of precision in Shivers' original timestamp technique that we can fix.
 
 \begin{enumerate}
-\item{In our semantics, the store does not change until the entire
-    frontier has been explored. This avoids cross-branch pollution
-    which would otherwise happen in Shivers' semantics, e.g., when one branch writes to
-    address $\maddr$ and another branch reads from address
-    $\maddr$.}
-\item{The common implementation strategy for timestamps destructively
-    updates each state's timestamp. This loses \emph{temporal}
-    information about the contexts a state is visited in, and in what
-    order. Our semantics has a drop-in replacement of timestamps for
-    stores in the seen set ($\mseentime$), so we do not experience precision
-    loss.}
+\item{In our semantics, the store does not change until the entire frontier has been explored.
+%
+ This avoids cross-branch pollution which would otherwise happen in Shivers' semantics, e.g., when one branch writes to address $\maddr$ and another branch reads from address $\maddr$.}
+\item{The common implementation strategy for timestamps destructively updates each state's timestamp.
+%
+ This loses \emph{temporal} information about the contexts a state is visited in, and in what order.
+%
+ Our semantics has a drop-in replacement of timestamps for stores in the seen set ($\mseentime$), so we do not experience precision loss.}
 \end{enumerate}
 
 {\small
@@ -836,56 +842,54 @@ timestamp technique that we can fix.
 \text{ where } c_0 &= \ev{e,\bot,\kmt}
 \end{align*}}
 
-The observation Shivers made was that the store is increasing
-monotonically, so all stores throughout execution will be totally
-ordered (form a chain). This observation allows you to replace stores
-with pointers into this chain. We keep the stores around in $\Sigma$
-to achieve a complete abstraction. This corresponds to the temporal
-information about the execution's effect on the store.
+The observation Shivers made was that the store is increasing monotonically, so all stores throughout execution will be totally ordered (form a chain).
+%
+ This observation allows you to replace stores with pointers into this chain.
+%
+ We keep the stores around in $\Sigma$ to achieve a complete abstraction.
+%
+ This corresponds to the temporal information about the execution's effect on the store.
 
-Note also that $F$ is only populated with states that have not been
-seen at the resulting store. This is what produces the more precise
-abstraction than the baseline widening.
+Note also that $F$ is only populated with states that have not been seen at the resulting store.
+%
+ This is what produces the more precise abstraction than the baseline widening.
 
-The general fixed-point combinator we showed above can be specialized
-to this semantics, as well. In fact, $\widehat{\machstep}^T$ is a functional
-relation, so we can get the least fixed-point of it directly.
+The general fixed-point combinator we showed above can be specialized to this semantics, as well.
+%
+ In fact, $\widehat{\machstep}^T$ is a functional relation, so we can get the least fixed-point of it directly.
 
 \begin{lemma}
-  $\widehat{\machstep}$ maintains the invariant that all stores in $\mseen$ are
-  totally ordered and $\msto$ is an upper bound of the stores in $\mseen$.
+  $\widehat{\machstep}$ maintains the invariant that all stores in $\mseen$ are totally ordered and $\msto$ is an upper bound of the stores in $\mseen$.
 \end{lemma}
 
 \begin{lemma}
-  $\widehat{\machstep}^T$ maintains the invariant that $\Sigma$ is in
-  order with respect to $\sqsupset$ and $\msto = \hd(\Sigma)$.
+  $\widehat{\machstep}^T$ maintains the invariant that $\Sigma$ is in order with respect to $\sqsupset$ and $\msto = \hd(\Sigma)$.
 \end{lemma}
 
 \begin{theorem}
 $\widehat{\machstep}^T$ is a complete abstraction of $\widehat{\machstep}$.
 \end{theorem}
-The proof follows from the order isomorphism that, in one direction,
-sorts all the stores in $\mseen$ to form $\Sigma$, and translates stores in
-$\mseen$ to their distance from the end of $\Sigma$ (their timestamp). In the other
-direction, timestamps in $\mseentime$ are replaced by the stores they point to in $\Sigma$.
+The proof follows from the order isomorphism that, in one direction, sorts all the stores in $\mseen$ to form $\Sigma$, and translates stores in $\mseen$ to their distance from the end of $\Sigma$ (their timestamp).
+%
+ In the other direction, timestamps in $\mseentime$ are replaced by the stores they point to in $\Sigma$.
 
 \subsection{Locally log-based store deltas}
 
-The above technique requires joining entire (large) stores
-together. Additionally, there is still a comparison of stores, which
-we established is expensive. Not every step will modify all addresses
-of the store, so joining entire stores is wasteful in terms of memory
-and time. We can instead log store changes and replay the change log
-on the full store after all steps have completed, noting when there is
-an actual change. This uses far fewer join and comparison operations,
-leading to less overhead, and is precision-preserving.
+The above technique requires joining entire (large) stores together.
+%
+ Additionally, there is still a comparison of stores, which we established is expensive.
+%
+ Not every step will modify all addresses of the store, so joining entire stores is wasteful in terms of memory and time.
+%
+ We can instead log store changes and replay the change log on the full store after all steps have completed, noting when there is an actual change.
+%
+ This uses far fewer join and comparison operations, leading to less overhead, and is precision-preserving.
 
-We represent change logs as $\msdiff \in \StoreDelta = (\Addr \times
-  \Set(\Storeable))^*$. Each $\msto\sqcup[\maddr \mapsto \mval{s}]$
- becomes a log addition
-$\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$ begins
-empty ($\mtlst$) for each step. Applying the changes to the full store
-is straightforward:
+We represent change logs as $\msdiff \in \StoreDelta = (\Addr \times \Set(\Storeable))^*$.
+%
+ Each $\msto\sqcup[\maddr \mapsto \mval{s}]$ becomes a log addition $\cons{\ttuple{\maddr}{\mval{s}}}{\msdiff}$, where $\msdiff$ begins empty ($\mtlst$) for each step.
+%
+ Applying the changes to the full store is straightforward:
 \begin{equation*}
 \replay : (\StoreDelta \times \Store) \to (\Store \times \Boolean)
 \end{equation*}
@@ -897,11 +901,11 @@ is straightforward:
 \diffp(\mval{s}, \mval{s'}) &= \mval{s'} \overset{?}{=} \mval{s} \sqcup \mval{s'}
 \end{align*}
 
-We change the semantics slightly to add to the change log rather than
-produce an entire modified store.  The transition relation is
-identical except for the addition of this change log.  We maintain the
-invariant that lookups will never rely on the change log, so we can
-use the originally supplied store unmodified.
+We change the semantics slightly to add to the change log rather than produce an entire modified store.
+%
+The transition relation is identical except for the addition of this change log.
+%
+  We maintain the invariant that lookups will never rely on the change log, so we can use the originally supplied store unmodified.
 
 A taste of the changes to the reduction relation is as follows:
 \begin{equation*}
@@ -918,9 +922,7 @@ A taste of the changes to the reduction relation is as follows:
 % above rule's right hand side would instead be $k^{\mcntr'}(\menv',
 % \msto, \msdiff', \mkont)$ where $k = \compile{e}$ would be in the closure.
 
-We lift $\dmachstep$ to accommodate for the asymmetry
-in the input and output, and change the frontier-based semantics in
-the following way:
+We lift $\dmachstep$ to accommodate for the asymmetry in the input and output, and change the frontier-based semantics in the following way:
 {\small
 \begin{align*}
 (\mseentime, F, \msto,\Sigma,t) &\mathrel{\damachstep} (\mseentime \cup \mseentime', F', \msto',\Sigma',t') \\
@@ -1066,8 +1068,7 @@ The following rules highlight the changes to the semantics:
 \text{ if } \mkont &\in \msto(\mkaddr),
             \strue \in \spchoice{\force(\msto,\mval)}{\force(\mval)}
 \end{align*}}
-Since {\tt if} guards are in strict position, we must force the value
-to determine which branch to to take.
+Since {\tt if} guards are in strict position, we must force the value to determine which branch to to take.
 %
 The middle rule uses $\force$ only to combine with values in the store - it does not introduce needless non-determinism.
 %%
@@ -1099,93 +1100,95 @@ This is a more common choice in 0CFA implementations we have seen, but it interf
 \spchoice
 {
 \begin{theorem}[Soundness]
-  If $\mstate \machstep \mstate'$ and $\mstate \sqsubseteq
-  \mastate$ then there exists a $\mastate'$ such that $\mastate
-  \lmachstep \mastate'$ and $\mstate' \sqsubseteq \mastate'$
+  If $\mstate \machstep \mstate'$ and $\mstate \sqsubseteq \mastate$ then there exists a $\mastate'$ such that $\mastate \lmachstep \mastate'$ and $\mstate' \sqsubseteq \mastate'$
 \end{theorem}
-Here $\sqsubseteq$ is straightforward --- the left-hand side store must be
-contained in the right-hand-side store, and if values occur in the states,
-the left-hand-side value must be in the forced corresponding right-hand-side value.
+Here $\sqsubseteq$ is straightforward --- the left-hand side store must be contained in the right-hand-side store, and if values occur in the states, the left-hand-side value must be in the forced corresponding right-hand-side value.
+%
 The proof is by cases on $\mstate \machstep \mstate'$.}
 {
 \begin{theorem}[Completeness]For all $\mexp$,
  $\traces_{\text{Lazy}}(\mexp)$ is a complete abstraction of $\traces_{\text{ISWIM}}(\mexp)$.
 \end{theorem}
-We have a statement about traces because we need induction to show no
-cruft values are in superposition.  The induction hypothesis tells us
-that there are non-lazy traces that lead to all the values in
-superposition, so when we take a lazy step, we are taking several
-non-lazy steps, and we stay in sync. The other direction we just
-collapse the superposition in each possibility to construct the
-non-lazy traces.}
+We have a statement about traces because we need induction to show no cruft values are in superposition.
+%
+The induction hypothesis tells us that there are non-lazy traces that lead to all the values in superposition, so when we take a lazy step, we are taking several non-lazy steps, and we stay in sync.
+%
+ The other direction we just collapse the superposition in each possibility to construct the non-lazy traces.}
 
 % Lazy:  cpu time: 32481 real time: 32881 gc time: 547
 
 \subsection{Abstract compilation}
 
-The prior optimization saved time by doing the same amount of
-reasoning as before but in fewer transitions. We can exploit the same
-idea---same reasoning, fewer transitions---with abstract
-compilation. Abstract compilation transforms complex expressions whose
-\emph{abstract} evaluation is deterministic into ``abstract
-bytecodes.''  The abstract interpreter then does in one transition
-what previously took many. In short, abstract compilation eliminates
-unnecessary allocation, deallocation and branching. The technique is
-precision preserving without store widening. We discuss the precision
-differences with store widening at the end of the section.
+The prior optimization saved time by doing the same amount of reasoning as before but in fewer transitions.
+%
+ We can exploit the same idea---same reasoning, fewer transitions---with abstract compilation.
+%
+ Abstract compilation transforms complex expressions whose \emph{abstract} evaluation is deterministic into ``abstract bytecodes.''
+%
+  The abstract interpreter then does in one transition what previously took many.
+%
+  Refer back to figure \ref{fig:state-graphs} to see the effect of abstract compilation.
+%
+ In short, abstract compilation eliminates unnecessary allocation, deallocation and branching.
+%
+ The technique is precision preserving without store widening.
+%
+ We discuss the precision differences with store widening at the end of the section.
+%%
 
-The following example illustrates
-the essence of abstract compilation's effect:
-\[
-\mexp := \sapp{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2}}{\mexp_3}
-\]
-makes the following transitions:
-\begin{align}
-& \ev[^\mcntr]{\sapp{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2}}{\mexp_3},\menv,\msto_0,\mkont}\\
-\machstep\; &
-\ev[^{\mcntr'}]{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2},\menv,\msto_1,\kar{\mexp_3,\menv,\maddr_1}}
-\\
-\machstep\; &
-\ev[^{\mcntr''}]{\sapp\mvar{\mexp_1},\menv,\msto_2,\kar{\mexp_2,\menv,\maddr_2}}
-\\
-\machstep\; &
-\ev[^{\mcntr'''}]{\mvar, \menv,\msto_3,\kar{\mexp_1,\menv,\maddr_3}} % {\mexp_2}
-\\
-\machstep\; &
-\spchoice
-{\co{\kar{\mexp_1,\menv,\maddr_3},\saddr{\menv(\mvar)},\msto_4}}
-{\co{\kar{\mexp_1,\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\superposition{\msto_4(\menv(\mvar))},\msto_4}}
-\end{align}
-where \(
-\msto_4 = \msto_0 \sqcup [\maddr_1 \mapsto \setof{\mkont},
-\maddr_2 \mapsto \setof{\kar{\compile{\mexp_3},\menv,\maddr_1}},
-\maddr_3 \mapsto \setof{\kar{\compile{\mexp_2},\menv,\maddr_2}}]\).
+% %5
+% The following example illustrates
+% the essence of abstract compilation's effect:
+% \[
+% \mexp := \sapp{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2}}{\mexp_3}
+% \]
+% makes the following transitions:
+% \begin{align}
+% & \ev[^\mcntr]{\sapp{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2}}{\mexp_3},\menv,\msto_0,\mkont}\\
+% \machstep\; &
+% \ev[^{\mcntr'}]{\sapp{\sapp\mvar{\mexp_1}}{\mexp_2},\menv,\msto_1,\kar{\mexp_3,\menv,\maddr_1}}
+% \\
+% \machstep\; &
+% \ev[^{\mcntr''}]{\sapp\mvar{\mexp_1},\menv,\msto_2,\kar{\mexp_2,\menv,\maddr_2}}
+% \\
+% \machstep\; &
+% \ev[^{\mcntr'''}]{\mvar, \menv,\msto_3,\kar{\mexp_1,\menv,\maddr_3}} % {\mexp_2}
+% \\
+% \machstep\; &
+% \spchoice
+% {\co{\kar{\mexp_1,\menv,\maddr_3},\saddr{\menv(\mvar)},\msto_4}}
+% {\co{\kar{\mexp_1,\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\superposition{\msto_4(\menv(\mvar))},\msto_4}}
+% \end{align}
+% where \(
+% \msto_4 = \msto_0 \sqcup [\maddr_1 \mapsto \setof{\mkont},
+% \maddr_2 \mapsto \setof{\kar{\compile{\mexp_3},\menv,\maddr_1}},
+% \maddr_3 \mapsto \setof{\kar{\compile{\mexp_2},\menv,\maddr_2}}]\).
 
-Whereas abstract compilation gives us in one step:
-\begin{align*}
-\compile{\mexp}^\mcntr(\msto_0)(\menv,\epsilon,\mkont) =
-\spchoice
-{\co{\kar{\compile{\mexp_1},\menv,\maddr_3},\saddr{\menv(\mvar)}},\msdiff_4}
-{\co{\kar{\compile{\mexp_1},\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\superposition{\msto'_4(\menv(\mvar))},\msto'_4}}
-\end{align*}
-where
-\begin{equation*}
-\msdiff_4 = [\ttuple{\maddr_1}{\setof{\mkont}},
-             \ttuple{\maddr_2}{\setof{\kar{\compile{\mexp_3},\menv,\maddr_1}}},
-             \ttuple{\maddr_3}{\setof{\kar{\compile{\mexp_2},\menv,\maddr_2}}}]\text.
-\end{equation*}
+% Whereas abstract compilation gives us in one step:
+% \begin{align*}
+% \compile{\mexp}^\mcntr(\msto_0)(\menv,\epsilon,\mkont) =
+% \spchoice
+% {\co{\kar{\compile{\mexp_1},\menv,\maddr_3},\saddr{\menv(\mvar)}},\msdiff_4}
+% {\co{\kar{\compile{\mexp_1},\menv,\maddr_{f3},\maddr_{a3},\maddr_3},\superposition{\msto'_4(\menv(\mvar))},\msto'_4}}
+% \end{align*}
+% where
+% \begin{equation*}
+% \msdiff_4 = [\ttuple{\maddr_1}{\setof{\mkont}},
+%              \ttuple{\maddr_2}{\setof{\kar{\compile{\mexp_3},\menv,\maddr_1}}},
+%              \ttuple{\maddr_3}{\setof{\kar{\compile{\mexp_2},\menv,\maddr_2}}}]\text.
+% \end{equation*}
 
-The compilation step converts expressions into functions that expect
-the other components of the {\tt ev} state. Its definition in figure
-\ref{fig:compile} shows close similarity to the rules for interpreting
-{\tt ev} states. The next step is to change reduction rules that
-create {\tt ev} states to instead call these functions. Figure
-\ref{fig:caam} shows the modified reduction relation. The only change
-from the previous semantics is that $\evalone$ state construction is
-replaced by calling the compiled expression. For notational coherence,
-we write $\lambda^\mcntr(\mathit{args} \ldots)$ for
-$\lambda(\mathit{args} \ldots, \mcntr)$ and
-$\mcomp^\mcntr(\mathit{args}\ldots)$ for $\mcomp(\mathit{args}\ldots,
+The compilation step converts expressions into functions that expect the other components of the {\tt ev} state.
+%
+Its definition in figure \ref{fig:compile} shows close similarity to the rules for interpreting {\tt ev} states.
+%
+ The next step is to change reduction rules that create {\tt ev} states to instead call these functions.
+%
+ Figure \ref{fig:caam} shows the modified reduction relation.
+%
+ The only change from the previous semantics is that $\evalone$ state construction is replaced by calling the compiled expression.
+%
+ For notational coherence, we write $\lambda^\mcntr(\mathit{args} \ldots)$ for $\lambda(\mathit{args} \ldots, \mcntr)$ and $\mcomp^\mcntr(\mathit{args}\ldots)$ for $\mcomp(\mathit{args}\ldots,
 \mcntr)$.
 
 \begin{figure}
