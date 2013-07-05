@@ -2,6 +2,7 @@ Optimizing Abstract Abstract Machines
 =====================================
 
 Authors: [J. Ian Johnson](http://www.ccs.neu.edu/home/ianj/),
+[Nicholas Labich](http://www.ccs.neu.edu/home/labichn/),
 [Matthew Might](http://matt.might.net/), 
 [David Van Horn](http://www.ccs.neu.edu/home/dvanhorn/)
 
