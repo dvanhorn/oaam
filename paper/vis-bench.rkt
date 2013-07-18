@@ -146,5 +146,5 @@
             #:x-min xmin
             #:x-max xmax
             #:y-label "" #;"Factor improvement over baseline"
-            #:out-file (format "all-relative-~a.pdf" desc))
+            #:out-file (format "all-relative-~a.ps" desc))
             )))
