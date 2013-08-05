@@ -5,6 +5,7 @@
 (provide prepare-prealloc
          prepare-prealloc/stacked
          with-0-ctx/prealloc
+         with-1-ctx/prealloc
          mk-prealloc/timestamp^-fixpoint
          mk-prealloc/timestamp^-fixpoint/stacked
          mk-prealloc/∆s/acc^-fixpoint
@@ -34,7 +35,7 @@
   (when (= next-loc (vector-length global-σ))
     (set-global-σ! (grow-vector global-σ next-loc))))
 
-(define-syntax-rule (get-contour-index!-0 c)
+(define-syntax-rule (get-contour-index! c)
   (or (hash-ref contour-table c #f)
       (begin0 next-loc
               (ensure-σ-size)
@@ -43,7 +44,10 @@
 
 (define-syntax-rule (make-var-contour-0-prealloc x δ)
   (cond [(exact-nonnegative-integer? x) x]
-        [else (get-contour-index!-0 x)]))
+        [else (get-contour-index! x)]))
+
+(define-syntax-rule (make-var-contour-1-prealloc x δ)
+  (get-contour-index! (cons x δ)))
 
 (define (prepare-prealloc-base parser sexp)
   (define nlabels 0)
@@ -72,6 +76,13 @@
    ([bind (make-rename-transformer #'bind-0)]
     [bind-rest (make-rename-transformer #'bind-rest-0)]
     [make-var-contour (make-rename-transformer #'make-var-contour-0-prealloc)])
+   body))
+
+(define-syntax-rule (with-1-ctx/prealloc body)
+  (splicing-syntax-parameterize
+   ([bind (make-rename-transformer #'bind-1)]
+    [bind-rest (make-rename-transformer #'bind-rest-1)]
+    [make-var-contour (make-rename-transformer #'make-var-contour-1-prealloc)])
    body))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

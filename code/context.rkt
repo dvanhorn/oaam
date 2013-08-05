@@ -72,7 +72,7 @@
      (if (zero? K)
          (vs #'xs)
          #`(let* ([δ* (truncate (cons l δ) #,K)]
-                  [as (map (λ (x) (cons x δ*)) xs)]
+                  [as (map (λ (x) (make-var-contour x δ*)) xs)]
                   [ρ* (extend* ρ xs as)])
              #,(vs #'as)))]))
 (define-syntax-rule (make-var-contour-0 x δ) x)
