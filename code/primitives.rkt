@@ -48,9 +48,10 @@
 (define-simple-macro* (yield-both bσ)
   (do (bσ) ([b (in-list '(#t #f))]) (yield b)))
 
-(define-for-syntax (prim-defines clos? rlos? concrete?)
+(define-for-syntax (prim-defines clos? rlos? blclos? concrete?)
   (with-syntax ([clos? clos?]
-                [rlos? rlos?])
+                [rlos? rlos?]
+                [blclos? blclos?])
     #`((define-syntax-rule (yield-delay ydσ v)
          (do (ydσ) ([v* #:in-delay ydσ v]) (yield v*)))
        (define-simple-macro* (errorv vs)
@@ -95,7 +96,7 @@
                 (continue)]
                [else (yield (widen (remainder z0 z1)))]))
 
-       (define/basic (procedure?v v) (yield (or (clos? v) (rlos? v))))
+       (define/basic (procedure?v v) (yield (or (clos? v) (rlos? v) (blclos? v))))
        (define/basic (vectorv-length v)
          (match v
            [(or (vectorv len _) (vectorv^ len _)
@@ -136,6 +137,8 @@
               (yield-both eσ)]
              [((? clos?) _) (both-if (clos? v1))]
              [(_ (? clos?)) (yield #f)] ;; first not a closure
+             [((? blclos?) _) (both-if (blclos? v1))]
+             [(_ (? blclos?)) (yield #f)]
              [((? rlos?) _) (both-if (rlos? v1))]
              [(_ (? rlos?)) (yield #f)]
              [((or (== cons^) (? consv?) (== qcons^)) _)
@@ -734,11 +737,11 @@
 
 (define-for-syntax ((mk-mk-prims global-σ? σ-passing? σ-∆s? compiled? K) stx)
   (syntax-parse stx
-    [(_ mean:id compile:id co:id clos?:id rlos?:id)
+    [(_ mean:id compile:id co:id clos?:id rlos?:id blclos?:id)
      (quasisyntax/loc stx
        (mk-primitive-meaning
         #,global-σ? #,σ-passing? #,σ-∆s? #,compiled? #,(= K 0)
-        mean compile co #,@(prim-defines #'clos? #'rlos? (= K +inf.0)) 
+        mean compile co #,@(prim-defines #'clos? #'rlos? #'blclos? (= K +inf.0)) 
         #,prim-table))]))
 
 (define prim-constants

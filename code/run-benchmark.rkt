@@ -1,5 +1,5 @@
 #lang racket
-(require "parse.rkt" "kcfa-instantiations.rkt" "LK-instantiations.rkt"
+(require "parse.rkt" "kcfa-instantiations.rkt" #;"LK-instantiations.rkt"
          "handle-limits.rkt"
          racket/sandbox)
 (provide test aval prep)
@@ -48,18 +48,22 @@
     (command-line #:once-any
 #;                  [("--bl") "Benchmark baseline"
                    (aval baseline)] ;; least optimized
-                  [("--sp") "Benchmark specialized fixpoint"
+#;                  [("--sp") "Benchmark specialized fixpoint"
                    (aval 0cfa^)]
+#|
                   [("--spt") "Benchmark specialized fixpoint with timestamps"
                    (aval 0cfa^/t)]
                   [("--sdt") "Benchmark specialized fixpoint with timestamps and store deltas"
                    (aval 0cfa^-∆s/t)]
-                  [("--ls") "Benchmark specialized lazy non-determinism"
+|#
+#;                  [("--ls") "Benchmark specialized lazy non-determinism"
                    (aval lazy-0cfa^)]
-                  [("--lst") "Benchmark specialized lazy non-determinism with timestamps"
-                   (aval lazy-0cfa^-∆s/t)]
                   [("--lc") "Benchmark compiled specialized lazy non-determinism"
                    (aval lazy-0cfa^/c)]
+#|
+                  [("--lst") "Benchmark specialized lazy non-determinism with timestamps"
+                   (aval lazy-0cfa^-∆s/t)]
+
                   [("--lct") "Benchmark compiled specialized lazy non-determinism with timestamps"
                    (aval lazy-0cfa^-∆s/t/c)]
                   [("--ld")
@@ -83,9 +87,13 @@
 #;                  [("--pd")
                    "Benchmark compiled preallocated store-diff lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/prealloc!)]
-                  [("--ps")
+|#
+#;                  [("--ps")
                    "Benchmark compiled preallocated stacked store lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/prealloc/stacked!)]
+#;                  [("--ps1")
+                   "Benchmark compiled preallocated stacked store lazy non-determinism k=1"
+                   (aval lazy-1cfa^/c/∆s/prealloc/stacked!)]
 #;                  [("--it")
                    "Benchmark compiled imperative store lazy non-determinism timestap approx"
                    (aval lazy-0cfa^/c/timestamp!)]
@@ -97,10 +105,10 @@
                    "Benchmark baseline continuation marks"
                    (aval baseline/cm)]
                   ;; Lazy language analysis
-                  [("--kb")
+#;                  [("--kb")
                    "Benchmark baseline lazy-Krivine machine"
                    (aval LK-baseline)]
-                  [("--kp")
+#;                  [("--kp")
                    "Benchmark best lazy-Krivine machine"
                    (aval LK-lazy-0cfa^/c/∆s/prealloc!)]
                   ;; Not benchmarked for paper
@@ -131,3 +139,9 @@
                 #:args (filename)
                 filename))
 (test (prep test-file)))
+
+(define vis-bench (prep "/home/ianj/projects/xcfa/racket-impl/test-suite/introspective.sch"))
+(require "graph.rkt")
+;;(parameterize ([graph-file "1.dot"] [aval 0cfa^]) (test vis-bench))
+;;(parameterize ([graph-file "2.dot"] [aval lazy-0cfa^]) (test vis-bench))
+(parameterize ([graph-file "3.dot"] [aval lazy-0cfa^/c]) (test vis-bench))

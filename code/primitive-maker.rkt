@@ -351,7 +351,7 @@
                                 [m (in-list (map ap (attribute p.meaning)))]
                                 [checker (in-list (attribute p.checker-fn))])
                        #`[(#,p)
-                          (λP (pσ ℓ δ k v-addrs)
+                          (λP (pσ pτ ℓ δ k v-addrs)
                               (with-prim-yield
                                k
                                ;; Checkers will force what they need to and keep the rest
@@ -372,23 +372,25 @@
                            (λ (sx)
                               (syntax-parse sx
                                 [(_ v)
-                                 (yield-tr (syntax/loc sx (yield (co target-σ k v))))])))
+                                 (yield-tr (syntax/loc sx (yield (co target-σ target-τ k v))))])))
                          #`(syntax-parameterize ([yield #,new]) body)]))
                 defines ...
                 ;; λP very much like λ%
-                (define-syntax-rule (... (λP (pσ ℓ δ k v-addrs) body ...))
+                (define-syntax-rule (... (λP (pσ pτ ℓ δ k v-addrs) body ...))
                   #,(if compiled?
-                        #'(λ (top ... σ-gop ... ℓ δ-op ... k v-addrs)
+                        #'(λ (top ... σ-gop ... pτ ℓ δ-op ... k v-addrs)
                              (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
                                                    [target-σ (make-rename-transformer #'pσ)]
+                                                   [target-τ (make-rename-transformer #'pτ)]
                                                    [top-σ? #t])
                                body (... ...)))
-                        #'(syntax-parameterize ([target-σ (make-rename-transformer #'pσ)])
+                        #'(syntax-parameterize ([target-σ (make-rename-transformer #'pσ)]
+                                                [target-τ (make-rename-transformer #'pτ)])
                             body (... ...))))
                 ;; Identity if not compiled.
                 (define-syntax-rule (compile o)
                   #,(if compiled? eval #'o))
-                (define-syntax-rule (mean o pσ ℓ δ k v-addrs)
+                (define-syntax-rule (mean o pσ pτ ℓ δ k v-addrs)
                   #,(if compiled?
-                        #'(o top-op ... σ-gop ... ℓ δ-op ... k v-addrs)
+                        #'(o top-op ... σ-gop ... pτ ℓ δ-op ... k v-addrs)
                         eval)))))]))
