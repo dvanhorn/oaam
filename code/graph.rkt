@@ -8,7 +8,7 @@
 (define (ev-state!) (set! state-kind 'ev))
 (define (co-after-var-state!) (set! state-kind 'co-after-var))
 
-(define-syntax-parameter generate-graph? #t)
+(define-syntax-parameter generate-graph? #f)
 
 (struct ev (s) #:transparent)
 (struct cov (s) #:transparent)
