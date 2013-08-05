@@ -27,6 +27,7 @@
          (~optional (~seq #:touches touches:id)) ;; Touch relation specialized for clos
          (~optional (~seq #:clos clos:id) #:defaults ([clos (generate-temporary #'clos)]))
          (~optional (~seq #:rlos rlos:id) #:defaults ([rlos (generate-temporary #'rlos)]))
+         (~optional (~seq #:blclos blclos:id) #:defaults ([blclos (generate-temporary #'blclos)]))
          (~optional (~seq #:primop primop:id) #:defaults ([primop (generate-temporary #'primop)]))
          (~optional (~seq #:ev ev:id) #:defaults ([ev (generate-temporary #'ev)]))
          (~optional (~seq #:co co:id) #:defaults ([co (generate-temporary #'co)]))
@@ -73,6 +74,7 @@
                    [co? (format-id #'co "~a?" #'co)]
                    [clos? (format-id #'clos "~a?" #'clos)]
                    [rlos? (format-id #'rlos "~a?" #'rlos)]
+                   [blclos? (format-id #'blclos "~a?" #'blclos)]
                    [primop: (format-id #'primop "~a:" #'primop)]
                    ;; represent rσ explicitly in all states?
                    [(σ-op ...) (if (given wide?) #'() #'(rσ))]
@@ -231,6 +233,7 @@
            (struct primop (which) #:prefab)
            (mk-op-struct clos (x e ρ free) (x e ρ-op ... free) #:expander-id clos:)
            (mk-op-struct rlos (x r e ρ free) (x r e ρ-op ... free) #:expander-id rlos:)
+           (mk-op-struct blclos (vaddr ncs pc ℓs name η free) (vaddr ncs pc ℓs name η free) #:expander-id blclos:)
            (define (kont? v) (or (ls? v) (lrk? v) (ifk? v) (sk!? v) (mt? v)))
            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
            ;; Handling of continuation marks
@@ -328,7 +331,7 @@
                     #,c-passing?
                     #,(given global-σ?)
                     #,(given generators?)))
-           (mk-flatten-value flatten-value-fn clos: rlos: kont?)
+           (mk-flatten-value flatten-value-fn clos: rlos: blclos: kont?)
            (splicing-syntax-parameterize ([do (make-rename-transformer #'do-macro)]
                                           [flatten-value (make-rename-transformer #'flatten-value-fn)])
 

@@ -103,7 +103,7 @@
       [(or (? output-port^?) (? output-port?)) 'output-port]
       [(or (clos _ _ _ _)
            (rlos _ _ _ _ _)
-           (blclos _ _ _ _ _ _ _ _)) 'function]
+           (blclos _ _ _ _ _ _ _)) 'function]
       [(? kont?) 'continuation]
       [else (error "Unknown base value" v)])))
 
@@ -188,7 +188,7 @@
              #'(for/set ([x (in-set fvs)])
                  (hash-ref ρ x
                            (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ)))))]      
-      [(blclos vaddr ncs pc _ _ _ _ _)
+      [(blclos vaddr ncs pc _ _ _ _)
        (∪1 (∪ (for/union ([nc (in-list ncs)]) (touches nc))
               (touches pc))
            vaddr)]
