@@ -26,6 +26,11 @@
          (struct-out vectorv)
          (struct-out vectorv-immutable)
          (struct-out addr)
+         ;; Constructed contracts
+         (struct-out ccons)
+         (struct-out cblarr)
+         (struct-out cand)
+         (struct-out cor)
          atomic?
          nothing singleton
          ≡ ⊑? big⊓ ⊓ ⊓1)
@@ -81,7 +86,7 @@
 (define-nonce fail)
 
 (define-syntax-parameter flatten-value #f)
-(define-simple-macro* (mk-flatten-value name clos rlos kont?)
+(define-simple-macro* (mk-flatten-value name clos rlos blclos kont?)
   (define (name v)
     (match v
       [(? number?) number^]
@@ -97,7 +102,8 @@
       [(or (? input-port^?) (? input-port?)) 'input-port]
       [(or (? output-port^?) (? output-port?)) 'output-port]
       [(or (clos _ _ _ _)
-           (rlos _ _ _ _ _)) 'function]
+           (rlos _ _ _ _ _)
+           (blclos _ _ _ _ _ _ _ _)) 'function]
       [(? kont?) 'continuation]
       [else (error "Unknown base value" v)])))
 
@@ -150,6 +156,13 @@
 (struct vectorv-immutable (length addrs) #:prefab)
 (struct addr (a) #:prefab)
 
+;; Contract "values" though not 1st class
+(struct ccons (ca cd) #:prefab)
+(struct cblarr (ℓs ncs pc name η) #:prefab) ;; arrow contract for a given timeline, not get attached.
+(struct cand (c₀ c₁) #:prefab)
+(struct cor (c₀ c₁) #:prefab)
+;; flat contracts are just the values themselves
+
 ;; For the lazy Krivine machine, a lazy cons (lazy in both arguments)
 (struct lconsv (car cdr) #:prefab)
 
@@ -165,21 +178,26 @@
       (null? x)
       (eof-object? x)))
 
-(define-simple-macro* (mk-touches touches:id clos:id rlos:id promise:id 0cfa?:boolean)
+(define-simple-macro* (mk-touches touches:id clos:id rlos:id blclos:id promise:id 0cfa?:boolean)
   (define (touches v)
     (match v
-      [(clos xs e ρ fvs)
+      [(or (clos xs e ρ fvs)
+           (rlos xs _ e ρ fvs))
        #,(if (syntax-e #'0cfa?)
              #'fvs
-             #'(for/hash ([x (in-set fvs)])
+             #'(for/set ([x (in-set fvs)])
                  (hash-ref ρ x
-                           (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ)))))]
-      [(rlos xs rest e ρ fvs)
-       #,(if (syntax-e #'0cfa?)
-             #'fvs
-             #'(for/hash ([x (in-set fvs)])
-                 (hash-ref ρ x
-                           (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ)))))]
+                           (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ)))))]      
+      [(blclos vaddr ncs pc _ _ _ _ _)
+       (∪1 (∪ (for/union ([nc (in-list ncs)]) (touches nc))
+              (touches pc))
+           vaddr)]
+      [(or (ccons ca cd)
+           (cand ca cd)
+           (cor ca cd)) (∪ (touches ca) (touches cd))]
+      [(cblarr _ ncs pc _ _)
+       (for/union #:initial (touches pc) ([nc (in-list ncs)])
+                  (touches nc))]
       [(consv a d) (set a d)]
       [(or (vectorv _ l)
            (vectorv-immutable _ l)) (list->set l)]

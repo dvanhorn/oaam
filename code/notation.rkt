@@ -2,18 +2,25 @@
 
 (require (for-syntax syntax/parse))
 (provide for/append for/union for*/union for/set for*/set
+         and0
          define-simple-macro* hash-reverse
          ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
 
 ;; define-simple-macro does not have an implicit quasisyntax.
 (define-syntax (define-simple-macro* stx)
   (syntax-parse stx
-    [(_ (name:id . pattern) directives ... template)
+    [(_ (name:id . pattern) directives ... template-code)
      (syntax/loc stx
        (define-syntax (name syn)
          (syntax-parse syn
-           [(name . pattern) directives ... (quasisyntax/loc syn template)])))]))
+           [(name . pattern) directives ... (quasisyntax/loc syn template-code)])))]))
 
+;; Perform an and but return the first value anded.
+(define-syntax and0
+  (syntax-rules ()
+    [(_) #t]
+    [(_ e) e]
+    [(_ e es ...) (let ([x e]) (and x es ... x))]))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; for/union
 
