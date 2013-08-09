@@ -734,7 +734,7 @@
                          (yield (ap co-σ co-τ l vaddr arg-addrs (postretk cm fnv a) δ))))
                      (define-syntax-rule (bad)
                        (do (co-σ) ()
-                         (yield (ans co-σ co-τ cm (blame pℓ cℓ "Timeline ~a violated contract at ~a" η event)))))
+                         (yield (ans co-σ co-τ cm (blame pℓ cℓ "Violated timeline contract at" η event)))))
                      ;; Finished validating arguments, so send call event.
                      (define event (call fnv (map (λ (a) (getter co-σ a)) arg-addrs)))
                      (define-values (τ* cause-blame?) (step-event ð co-τ η event))
@@ -746,12 +746,12 @@
                            (yield (chk co-σ co-τ l nc argv chkA ℓs
                                        (chkargs cm l (add1 i) ℓs ncs arg-addrs (cons chkA done-addrs) fnv a δ) δ))))]
                     [(postretk: cm (and fnv (blclos: vaddr ncs pc name η (and ℓs (list pℓ nℓ cℓ)))) a)
+                     (define event (ret fnv v))
                      (define-syntax-rule (bad)
                        (do (co-σ) ()
-                         (yield (ans co-σ co-τ cm (blame pℓ cℓ "Timeline ~a violated contract at ~a" η event)))))
+                         (yield (ans co-σ co-τ cm (blame pℓ cℓ "Violated timeline contract at ~a" η event)))))
                      (define-syntax-rule (good)
                        (do (co-σ) ([k* #:in-get co-σ a]) (yield (co co-σ τ* k* v))))
-                     (define event (ret fnv v))
                      (define-values (τ* cause-blame?) (step-event ð co-τ η event))
                      (blamer generator co-σ cause-blame? good bad)]
                     [(chkflt: cm tempFn tmpArg (list pℓ nℓ cℓ) a)

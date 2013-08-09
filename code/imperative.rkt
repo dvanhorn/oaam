@@ -1,5 +1,6 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
+         (for-syntax racket/syntax)
          (only-in "store-passing.rkt" bind-rest) "data.rkt" "deltas.rkt" "add-lib.rkt"
          "handle-limits.rkt"
          racket/unsafe/ops)
@@ -122,35 +123,40 @@
 (mk-bind-joiner bind-join*-h/stacked! join*-h/stacked!)
 
 (define-syntax-rule (mk-mk-imperative/timestamp^-fixpoint mk-name cleaner extra-reset)
-  (define-syntax-rule (mk-name name ans^? ans^-v touches)
-    (define-syntax-rule (name step fst)
-      (let ()
-        (set-box! (start-time) (current-milliseconds))
-        fst
-        (define state-count* (state-count))
-        (set-box! state-count* 0)
-        (define clean-σ (cleaner touches))
-        (let loop ()
-          (cond [(empty-todo? todo) ;; → null?
-                 (state-rate)
-                 (define vs
-                   (for*/set ([(c at-unions) (in-hash seen)]
-                              #:when (ans^? c))
-                     (ans^-v c)))
-                 (values (format "State count: ~a" (unbox state-count*))
-                         (format "Point count: ~a" (hash-count seen))
-                         #;
-                         global-σ
-                         (clean-σ global-σ vs)
-                         vs)]
-                [else
-                 (define todo-old todo)
-                 extra-reset
-                 (set-box! state-count* (+ (unbox state-count*) todo-num))
-                 (reset-todo!) ;; → '()
-                 (for ([c (in-todo todo-old)])
-                   (step c)) ;; → in-list
-                 (loop)]))))))
+  (define-syntax (mk-name stx)
+    (syntax-case stx ()
+      [(_ name ans^ touches)
+       (with-syntax ([ans^? (format-id #'ans^ "~a?" #'ans^)]
+                     [ans^-v (format-id #'ans^ "~a-v" #'ans^)]
+                     [ans^-τ (format-id #'ans^ "~a-τ" #'ans^)])
+         #'(define-syntax-rule (name step fst)
+             (let ()
+               (set-box! (start-time) (current-milliseconds))
+               fst
+               (define state-count* (state-count))
+               (set-box! state-count* 0)
+               (define clean-σ (cleaner touches))
+               (let loop ()
+                 (cond [(empty-todo? todo) ;; → null?
+                        (state-rate)
+                        (define vs
+                          (for*/set ([(c at-unions) (in-hash seen)]
+                                     #:when (ans^? c))
+                            (cons (ans^-v c) (ans^-τ c))))
+                        (values (format "State count: ~a" (unbox state-count*))
+                                (format "Point count: ~a" (hash-count seen))
+                                #;
+                                global-σ
+                                (clean-σ global-σ vs)
+                                vs)]
+                       [else
+                        (define todo-old todo)
+                        extra-reset
+                        (set-box! state-count* (+ (unbox state-count*) todo-num))
+                        (reset-todo!) ;; → '()
+                        (for ([c (in-todo todo-old)])
+                          (step c)) ;; → in-list
+                        (loop)])))))])))
 (mk-mk-imperative/timestamp^-fixpoint
  mk-imperative/timestamp^-fixpoint restrict-to-reachable (void))
 
@@ -226,42 +232,47 @@
             body))
 
 (define-syntax-rule (mk-mk-imperative/∆s/acc^-fixpoint mk-name cleaner joiner set-σ! get-σ)
-  (define-syntax-rule (mk-name name ans^? ans^-v touches)
-    (define-syntax-rule (name step fst)
-      (let ()        
-      (set-box! (start-time) (current-milliseconds))
-      ;; fst contains all the ∆s from the first step(s)
-      (for ([a×vs (in-list fst)]) (joiner (car a×vs) (cdr a×vs)))
-      (inc-unions!)
-      (define state-count* (state-count))
-      (set-box! state-count* 0)
-      (define clean-σ (cleaner touches))
-      (let loop ()
-        (cond [(empty-todo? todo)
-               (state-rate)
-               (define vs
-                 (for*/set ([(c at-unions) (in-hash seen)]
-                            #:when (ans^? c))
-                   (ans^-v c)))
-               (values (format "State count: ~a" (unbox state-count*))
-                       (format "Point count: ~a" (hash-count seen))
-                       #;
-                       global-σ
-                       (clean-σ global-σ vs)
-                       vs)]
-              [else
-               (define todo-old todo)
-               (set-box! state-count* (+ (unbox state-count) todo-num))
-               (reset-todo!)
-               (define ∆s (for/append ([c (in-todo todo-old)])
-                            (reset-saw-change?!)
-                            (step c)))
-               (for* ([a×vs (in-list ∆s)])
-                 (define a (car a×vs))
-                 (set-σ! global-σ a (⊓ (get-σ global-σ a nothing) (cdr a×vs))))
-               ;; Only one inc needed since all updates are synced.
-               (unless (null? ∆s) (inc-unions!))
-               (loop)]))))))
+  (define-syntax (mk-name stx)
+    (syntax-case stx ()
+      [(_ name ans^ touches)
+       (with-syntax ([ans^? (format-id #'ans^ "~a?" #'ans^)]
+                     [ans^-v (format-id #'ans^ "~a-v" #'ans^)]
+                     [ans^-τ (format-id #'ans^ "~a-τ" #'ans^)])
+         #'(define-syntax-rule (name step fst)
+             (let ()        
+               (set-box! (start-time) (current-milliseconds))
+               ;; fst contains all the ∆s from the first step(s)
+               (for ([a×vs (in-list fst)]) (joiner (car a×vs) (cdr a×vs)))
+               (inc-unions!)
+               (define state-count* (state-count))
+               (set-box! state-count* 0)
+               (define clean-σ (cleaner touches))
+               (let loop ()
+                 (cond [(empty-todo? todo)
+                        (state-rate)
+                        (define vs
+                          (for*/set ([(c at-unions) (in-hash seen)]
+                                     #:when (ans^? c))
+                            (cons (ans^-v c) (ans^-τ c))))
+                        (values (format "State count: ~a" (unbox state-count*))
+                                (format "Point count: ~a" (hash-count seen))
+                                #;
+                                global-σ
+                                (clean-σ global-σ vs)
+                                vs)]
+                       [else
+                        (define todo-old todo)
+                        (set-box! state-count* (+ (unbox state-count) todo-num))
+                        (reset-todo!)
+                        (define ∆s (for/append ([c (in-todo todo-old)])
+                                     (reset-saw-change?!)
+                                     (step c)))
+                        (for* ([a×vs (in-list ∆s)])
+                          (define a (car a×vs))
+                          (set-σ! global-σ a (⊓ (get-σ global-σ a nothing) (cdr a×vs))))
+                        ;; Only one inc needed since all updates are synced.
+                        (unless (null? ∆s) (inc-unions!))
+                        (loop)])))))])))
 (mk-mk-imperative/∆s/acc^-fixpoint
  mk-imperative/∆s/acc^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -307,57 +318,62 @@
    body))
 
 (define-syntax-rule (mk-mk-imperative/∆s^-fixpoint mk-name cleaner joiner set-σ! get-σ)
-  (define-syntax-rule (mk-name name ans^? ans^-v touches)
-    (define-syntax-rule (name step fst)
-       (let ()
-      ;; fst contains all the ∆s from the first step(s)
-      (set-box! (start-time) (current-milliseconds))
-      fst
-      (for ([a×vs (in-list global-∆s)]) (joiner (car a×vs) (cdr a×vs)))
-      (reset-∆s!)
-      (define state-count* (state-count))
-      (set-box! state-count* 0)
-      (define clean-σ (cleaner touches))
-      (let loop ()
-        (cond [(empty-todo? todo)
-               (state-rate)
-               (define vs
-                 (for*/set ([(c at-unions) (in-hash seen)]
-                            #:when (ans^? c))
-                   (ans^-v c)))
-               (values (format "State count: ~a" (unbox state-count*))
-                       (format "Point count: ~a" (hash-count seen))
-                       #;
-                       global-σ
-                       (clean-σ global-σ vs)
-                       vs)]
-              [else
-               (define todo-old todo)
-               (set-box! state-count* (+ (unbox state-count*) todo-num))
-               (reset-todo!)
-               ;; REMARK: there are a couple ways that we can populate the "seen"
-               ;; hash. 
-               ;; 1) determine at every yield if the store changes
-               ;;    actually grow the store, and populate accordingly.
-               ;; 2) Associate changes with "todo" and after a step has occurred
-               ;;    and we're updating the store, we change "seen" AND "todo" accordingly.
-               ;; 3) Keep a secondary global store that is changed on each yield
-               ;;    and which governs changing "seen." After the step, bang in the
-               ;;    secondary store. (Requires an /immutable/ global store to avoid large copies)
-               ;; We choose the first option since it's the cheapest.
-               (for ([c (in-todo todo-old)])
-                 (reset-saw-change?!)
-                 (step c))
-               ;; Integrate all the store diffs accumulated over the last
-               ;; frontier steps.
-               ;; We know that changes MUST change the store by the add-∆s functions
-               (for* ([a×vs (in-list global-∆s)])
-                 (define a (car a×vs))
-                 (set-σ! global-σ a (⊓ (get-σ global-σ a nothing) (cdr a×vs))))
-               ;; Only one inc needed since all updates are synced.
-               (unless (null? global-∆s) (inc-unions!))
+  (define-syntax (mk-name stx)
+    (syntax-case stx ()
+      [(_ name ans^ touches)
+       (with-syntax ([ans^? (format-id #'ans^ "~a?" #'ans^)]
+                     [ans^-v (format-id #'ans^ "~a-v" #'ans^)]
+                     [ans^-τ (format-id #'ans^ "~a-τ" #'ans^)])
+         #'(define-syntax-rule (name step fst)
+             (let ()
+               ;; fst contains all the ∆s from the first step(s)
+               (set-box! (start-time) (current-milliseconds))
+               fst
+               (for ([a×vs (in-list global-∆s)]) (joiner (car a×vs) (cdr a×vs)))
                (reset-∆s!)
-               (loop)]))))))
+               (define state-count* (state-count))
+               (set-box! state-count* 0)
+               (define clean-σ (cleaner touches))
+               (let loop ()
+                 (cond [(empty-todo? todo)
+                        (state-rate)
+                        (define vs
+                          (for*/set ([(c at-unions) (in-hash seen)]
+                                     #:when (ans^? c))
+                            (cons (ans^-v c) (ans^-τ c))))
+                        (values (format "State count: ~a" (unbox state-count*))
+                                (format "Point count: ~a" (hash-count seen))
+                                #;
+                                global-σ
+                                (clean-σ global-σ vs)
+                                vs)]
+                       [else
+                        (define todo-old todo)
+                        (set-box! state-count* (+ (unbox state-count*) todo-num))
+                        (reset-todo!)
+                        ;; REMARK: there are a couple ways that we can populate the "seen"
+                        ;; hash. 
+                        ;; 1) determine at every yield if the store changes
+                        ;;    actually grow the store, and populate accordingly.
+                        ;; 2) Associate changes with "todo" and after a step has occurred
+                        ;;    and we're updating the store, we change "seen" AND "todo" accordingly.
+                        ;; 3) Keep a secondary global store that is changed on each yield
+                        ;;    and which governs changing "seen." After the step, bang in the
+                        ;;    secondary store. (Requires an /immutable/ global store to avoid large copies)
+                        ;; We choose the first option since it's the cheapest.
+                        (for ([c (in-todo todo-old)])
+                          (reset-saw-change?!)
+                          (step c))
+                        ;; Integrate all the store diffs accumulated over the last
+                        ;; frontier steps.
+                        ;; We know that changes MUST change the store by the add-∆s functions
+                        (for* ([a×vs (in-list global-∆s)])
+                          (define a (car a×vs))
+                          (set-σ! global-σ a (⊓ (get-σ global-σ a nothing) (cdr a×vs))))
+                        ;; Only one inc needed since all updates are synced.
+                        (unless (null? global-∆s) (inc-unions!))
+                        (reset-∆s!)
+                        (loop)])))))])))
 (mk-mk-imperative/∆s^-fixpoint
   mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
 

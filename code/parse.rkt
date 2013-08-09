@@ -70,7 +70,7 @@
           [`(mon (quote ,(? symbol? pℓ)) (quote ,(? symbol? nℓ)) (quote ,(? symbol? cℓ)) ,s ,e)
            (mon (fresh-label!) pℓ nℓ cℓ (parse-scon s) (parse e))]
           [`(tmon (quote ,(? symbol? pℓ)) (quote ,(? symbol? nℓ)) (quote ,(? symbol? cℓ)) ,s ,t ,e)
-           (tmon (fresh-label!) pℓ nℓ cℓ (parse-scon s) (parse-tcon t) (parse e))]
+           (tmon (fresh-label!) pℓ nℓ cℓ (parse-scon s) (simple (parse-tcon t)) (parse e))]
           ;; End contract monitoring forms
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           [`(,(or 'lambda 'if 'letrec 'set!

@@ -109,10 +109,12 @@
 
 (define-syntax (mk-special2-set-fixpoint^ stx)
   (syntax-parse stx
-    [(_ fix name ans^? ev co compiled?)
+    [(_ fix name ans^ ev co compiled?)
      (with-syntax ([ev? (format-id #'ev "~a?" #'ev)]
                    [ev-e (format-id #'ev "~a-e" #'ev)]
-                   [co? (format-id #'co "~a?" #'co)])
+                   [co? (format-id #'co "~a?" #'co)]
+                   [ans^? (format-id #'ans^ "~a?" #'ans^)]
+                   [ans^-τ (format-id #'ans^ "~a-τ" #'ans^)])
        #`(define-syntax-rule (name step fst)
            (let ()
              (define-values (f^σ cs) fst)

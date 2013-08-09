@@ -127,7 +127,7 @@ Welcome to Racket v5.3.3.
 
 ;; The baseline in the paper
 ;; "sp"
-(mk-special2-set-fixpoint^ fix 0cfa-set-fixpoint^ 0cfa-ans^? 0ev^ 0co^ #f)
+(mk-special2-set-fixpoint^ fix 0cfa-set-fixpoint^ 0cfa-ans^ 0ev^ 0co^ #f)
 (with-nonsparse
  (with-strict
   (with-0-ctx
@@ -156,7 +156,7 @@ Welcome to Racket v5.3.3.
 (provide 0cfa^-∆s/t)
 
 ;; "ls"
-(mk-special2-set-fixpoint^ fix lazy-0cfa-set-fixpoint^ lazy-0cfa-ans^? l-0ev l-0co #f)
+(mk-special2-set-fixpoint^ fix lazy-0cfa-set-fixpoint^ lazy-0cfa-ans^ l-0ev l-0co #f)
 (with-nonsparse
  (with-lazy
   (with-0-ctx
@@ -185,7 +185,7 @@ Welcome to Racket v5.3.3.
 
 ;; "lc"
 (splicing-syntax-parameterize ([generate-graph? #t])
- (mk-special2-set-fixpoint^ fix 0cfa-set-fixpoint^/c 0cfa-ans^/c? levc lcoc #t)
+ (mk-special2-set-fixpoint^ fix 0cfa-set-fixpoint^/c 0cfa-ans^/c levc lcoc #t)
  (with-nonsparse
   (with-lazy
    (with-0-ctx
@@ -330,8 +330,10 @@ Welcome to Racket v5.3.3.
 
 
 ;; "ps"
-(mk-prealloc/timestamp^-fixpoint/stacked prealloc/∆s-fixpoint/stacked/c prealloc/∆s-ans/stacked/c?
-              prealloc/∆s-ans/stacked/c-v prealloc/∆s-touches-0/stacked/c)
+(mk-prealloc/timestamp^-fixpoint/stacked
+ prealloc/∆s-fixpoint/stacked/c
+ prealloc/∆s-ans/stacked/c
+ prealloc/∆s-touches-0/stacked/c)
 (with-nonsparse
  (with-lazy
   (with-0-ctx/prealloc
@@ -352,8 +354,7 @@ Welcome to Racket v5.3.3.
 
 #;#;#;
 ;; "ps1"
-(mk-prealloc/timestamp^-fixpoint/stacked prealloc/∆s-fixpoint-1/stacked/c prealloc/∆s-ans-1/stacked/c?
-              prealloc/∆s-ans-1/stacked/c-v prealloc/∆s-touches-1/stacked/c)
+(mk-prealloc/timestamp^-fixpoint/stacked prealloc/∆s-fixpoint-1/stacked/c prealloc/∆s-ans-1/stacked/c prealloc/∆s-touches-1/stacked/c)
 (with-nonsparse
  (with-lazy
   (with-1-ctx/prealloc
@@ -490,7 +491,7 @@ Welcome to Racket v5.3.3.
                             #:compiled)))))))
  (provide lazy-0cfa∆/c/timestamp)
  
- (mk-special2-set-fixpoint^ fix lazy-0cfa-set-fixpoint^2 lazy-0cfa-ans^2? #f)
+ (mk-special2-set-fixpoint^ fix lazy-0cfa-set-fixpoint^2 lazy-0cfa-ans^ #f)
  (with-nonsparse
   (with-lazy
    (with-0-ctx
