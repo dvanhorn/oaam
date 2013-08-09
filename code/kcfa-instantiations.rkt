@@ -11,6 +11,7 @@
          "imperative.rkt"
          "prealloc.rkt"
          "nonsparse.rkt"
+         "graph.rkt"
          racket/splicing)
 
 #|
@@ -183,18 +184,19 @@ Welcome to Racket v5.3.3.
 (provide lazy-0cfa^-∆s/t)
 
 ;; "lc"
-(mk-special2-set-fixpoint^ fix 0cfa-set-fixpoint^/c 0cfa-ans^/c? levc lcoc #t)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx
-   (with-whole-σ
-    (with-σ-passing-set-monad
-     (with-abstract
-      (mk-analysis #:aval lazy-0cfa^/c #:ans 0cfa-ans^/c
-                   #:fixpoint 0cfa-set-fixpoint^/c
-                   #:σ-passing
-                   #:compiled #:wide #:set-monad
-                   #:ev levc #:co lcoc)))))))
+(splicing-syntax-parameterize ([generate-graph? #t])
+ (mk-special2-set-fixpoint^ fix 0cfa-set-fixpoint^/c 0cfa-ans^/c? levc lcoc #t)
+ (with-nonsparse
+  (with-lazy
+   (with-0-ctx
+    (with-whole-σ
+     (with-σ-passing-set-monad
+      (with-abstract
+       (mk-analysis #:aval lazy-0cfa^/c #:ans 0cfa-ans^/c
+                    #:fixpoint 0cfa-set-fixpoint^/c
+                    #:σ-passing
+                    #:compiled #:wide #:set-monad
+                    #:ev levc #:co lcoc))))))))
  (provide lazy-0cfa^/c)
 
 #;#;#;
@@ -326,7 +328,7 @@ Welcome to Racket v5.3.3.
 ;;                    #:global-σ #:compiled #:wide))))))
 ;; (provide lazy-0cfa^/c/∆s/prealloc!)
 
-#;#;#;
+
 ;; "ps"
 (mk-prealloc/timestamp^-fixpoint/stacked prealloc/∆s-fixpoint/stacked/c prealloc/∆s-ans/stacked/c?
               prealloc/∆s-ans/stacked/c-v prealloc/∆s-touches-0/stacked/c)

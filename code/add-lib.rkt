@@ -357,13 +357,13 @@
   (define rename-rev (hash-reverse renaming))
   (define ((fresh-upto var) x)
     (if (eq? x var)
-        (hash-ref renaming x)
+        (hash-ref renaming x (λ () (error 'fresh-upto "Missing var ~a" x)))
         (fresh-variable! x)))
   ;; maps the fresh name to the meaning.
   (define-values (prims prim-defs)
     (for*/lists (prims prim-defs)
         ([v (in-set fv-raw)]
-         [primv (in-value (hash-ref rename-rev v))]
+         [primv (in-value (hash-ref rename-rev v (λ () (error 'prims "Bad renaming ~a" v))))]
          [def (in-value (hash-ref r4rs-prims primv
                                   (λ () (error 'add-lib "Unsupported ~a" primv))))])
       ;; in order for the primitive references to match up between expr and the

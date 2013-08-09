@@ -1,5 +1,5 @@
 #lang racket/base
-(require racket/sandbox)
+(require racket/sandbox racket/match)
 (provide with-limit-handler state-count start-time state-rate)
 
 (define state-count (make-parameter #f))
@@ -22,5 +22,8 @@
                         (case (exn:fail:resource-resource e)
                           [(time) (dump-memory-stats) (printf "Result: Timeout~%")]
                           [(memory) (printf "Result: Exhausted memory~%")]))]
-                    [exn:fail? (λ (e) (printf "Barf ~a" e))])
+                    [exn:fail? (λ (e) (printf "Barf ~a"
+                                              (match e
+                                                [(exn msg cm) 
+                                                 (list msg (continuation-mark-set->context cm))])))])
       body ...)))

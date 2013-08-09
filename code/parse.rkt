@@ -67,9 +67,9 @@
            (frm (fresh-label!) (list->set Rs) (parse e))]
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ;; Contract monitoring forms
-          [`(mon ,(? symbol? pℓ) ,(? symbol? nℓ) ,(? symbol? cℓ) ,s ,e)
+          [`(mon (quote ,(? symbol? pℓ)) (quote ,(? symbol? nℓ)) (quote ,(? symbol? cℓ)) ,s ,e)
            (mon (fresh-label!) pℓ nℓ cℓ (parse-scon s) (parse e))]
-          [`(tmon ,(? symbol? pℓ) ,(? symbol? nℓ) ,(? symbol? cℓ) ,s ,t ,e)
+          [`(tmon (quote ,(? symbol? pℓ)) (quote ,(? symbol? nℓ)) (quote ,(? symbol? cℓ)) ,s ,t ,e)
            (tmon (fresh-label!) pℓ nℓ cℓ (parse-scon s) (parse-tcon t) (parse e))]
           ;; End contract monitoring forms
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -84,14 +84,15 @@
              [#f (fail)]
              [tf (parse (tf sexp))])]
           [`(,e . ,es)
-           (app (fresh-label!) (parse e) (map parse es))]))
+           (app (fresh-label!) (parse e) (map parse es))]
+          [err (error 'parse-core "Wat ~a" err)]))
 
       (define (rassoc f2 f if-empty lst)
         (let loop ([lst lst])
          (match lst
            ['() if-empty]
            [(list c) (f c)]
-           [(cons s ss) (f2 (fresh-label!) (f s) (loop ss))])))
+           [(cons s ss) (f2 (f s) (loop ss))])))
 
       (define (parse-scon s)
         (match s
@@ -106,15 +107,15 @@
                           [_ #t]))
              (error 'parse "Expected higher-order component of disjunction contract in far right ~a" s))
            (rassoc (λ (s₀ s₁) (orc (fresh-label!) s₀ s₁)) parse-scon nonec ss)]
-          [`(flat ,e) (fltc (fresh-label!) (parse e))]
           [`any anyc]
           [`none nonec]
-          [(or `(,(or '-> '→) ,(? symbol? name) : ,sns ,sp)
-               `(,(? symbol? name) : ,sns ... ,(or '-> '→) ,sp))
+          [(or `(,(or '-> '→) (quote ,(? symbol? name)) : ,sns ,sp)
+               `((quote ,(? symbol? name)) : ,sns ... ,(or '-> '→) ,sp))
            (arrc (fresh-label!) name (map parse-scon sns) (parse-scon sp))]
           [(or `(-> ,sns ,sp)
                `(,sns ... ,(or '→ '->) ,sp))
-           (arrc (fresh-label!) #f (map parse-scon sns) (parse-scon sp))]))
+           (arrc (fresh-label!) #f (map parse-scon sns) (parse-scon sp))]
+          [e (fltc (fresh-label!) (parse e))]))
 
       (define (parse-tcon t)
         (match t
@@ -130,13 +131,15 @@
 
       (define (parse-pat pat)
         (match pat
-          [`(call ,nf ,args ...) (call (map parse-pat (cons nf args)))]
-          [`(!call ,nf ,args ...) (!call (map parse-pat (cons nf args)))]
-          [`(ret ,nf ,vp) (ret (list (parse-pat nf) (parse-pat vp)))]
-          [`(!ret ,nf ,vp) (!ret (list (parse-pat nf) (parse-pat vp)))]
+          [`(call ,nf ,args ...) (call (parse-pat nf) (map parse-pat args))]
+          [`(!call ,nf ,args ...) (!call (parse-pat nf) (map parse-pat args))]
+          [`(ret ,nf ,vp) (ret (parse-pat nf) (parse-pat vp))]
+          [`(!ret ,nf ,vp) (!ret (parse-pat nf) (parse-pat vp))]
           ['_ Any]
+          [`(quote ,ℓ) (label ℓ)]
           [`($ ,(? symbol? x)) ($ x)]
-          [`(? ,(? symbol? x)) (□ x)]))
+          [`(? ,(? symbol? x)) (□ x)]
+          [err (error 'parse-pat "Wuh ~a" err)]))
 
       (match sexp
         [`(,(== special) . ,s) (primr (fresh-label!) s)]

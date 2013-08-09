@@ -20,7 +20,8 @@
                 (match* (xs* vs)
                   [('() vs) (values (reverse axs) vs)]
                   [((cons x xrest) (cons a arest))
-                   (loop xrest (cons a axs) arest)])))
+                   (loop xrest (cons a axs) arest)]
+                  [(xs vs) (error 'bind-args "Bad xs vs ~a ~a" xs vs)])))
             (add-r (σ* ρ* iσ ρ r δ* vrest)
                    (bind-alias* (σ* σ* #,as vfirst) body))))))
      ;; Abstractly, rest-arg is an infinite list.
@@ -45,7 +46,8 @@
                   (define rnextD `((,sr D . ,count) . ,sδ*))
                   (do (sσ) ([νσ #:alias sσ rnextA a]
                             [νσ #:join νσ last (singleton (consv rnextA rnextD))])
-                    (loop νσ as rnextD (add1 count)))]))))
+                    (loop νσ as rnextD (add1 count)))]
+                 [_ (error 'conc-r "Bad as ~a" as)]))))
      (cond [(zero? K)
             (bind-args values #'xs abs-r)]
            [(< K +inf.0)

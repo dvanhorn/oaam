@@ -2,13 +2,16 @@
 (require racket/unit (except-in "notation.rkt" ∪ ∩))
 (require racket/trace)
 
-(provide TCon-deriv@
+(provide TCon-deriv^ TCon-deriv@ weak-eq^
+         may must
+         for/∧ for*/∧
          ¬ · kl bind ε
          call ret !call !ret
-         $ □ Any ;; TODO: labels
+         $ □ Any label
          (rename-out [∪ tor] [∩ tand] )
          (struct-out kl)
-         blame
+         (struct-out tl)
+         M⊥
          ε)
 
 (struct -unmapped ()) (define unmapped (-unmapped))
@@ -42,6 +45,7 @@
 (struct -Any () #:transparent) (define Any (-Any))
 (struct $ (x) #:transparent)
 (struct □ (x) #:transparent)
+(struct label (ℓ) #:transparent)
 
 ;; Niceties for writing temporal contracts using the general language of patterns.
 (define (call nf pas) (constructed 'call (cons nf pas)))
@@ -70,6 +74,11 @@
   [((== must eq?) _) must]
   [(_ (== must eq?)) must]
   [(_ _) may])
+
+(define-syntax-rule (for/∧ guards body)
+  (for/fold ([res must]) guards (∧ res (let () body))))
+(define-syntax-rule (for*/∧ guards body)
+  (for*/fold ([res must]) guards (∧ res (let () body))))
 
 ;; valuations with updated bindings
 (struct mres (t ρ) #:transparent)
@@ -123,7 +132,8 @@
           ([s (in-set S)])
         (match (f s)
           [#f (break #f)]
-          [(mres t′ ρ′) (values (∧ t t′) (ρ . ◃ . ρ′))])))
+          [(mres t′ ρ′) (values (∧ t t′) (ρ . ◃ . ρ′))]
+          [err (error '⨅ "Bad res ~a" err)])))
     (mres t ρ)))
 
 (define (⨅/lst f L R)
@@ -135,7 +145,8 @@
            [r (in-list R)])
         (match (f l r)
           [#f (break #f)]
-          [(mres t′ ρ′) (values (∧ t t′) (ρ . ◃ . ρ′))])))
+          [(mres t′ ρ′) (values (∧ t t′) (ρ . ◃ . ρ′))]
+          [err (error '⨅ "Bad res ~a" err)])))
     (mres t ρ)))
 
 ;; Is the contract nullable?
@@ -153,10 +164,10 @@
   [((¬ T)) T]
   [(T) (¬ T)])
 
-(define-signature weak-eq^ (≃))
+(define-signature weak-eq^ (≃ matchℓ?))
 (define-signature TCon-deriv^ (run ð))
 
-(define (matches≃ ≃)
+(define (matches≃ ≃ matchℓ?)
   (define (matches P A γ)
     (define (matches1 P) (matches P A γ))
     (define (matches2 P A) (matches P A γ))
@@ -166,13 +177,17 @@
        (match (matches1 (constructed kind pats))
          [(mres (== must eq?) _) #f]
          [#f (mres must γ)]
-         [(mres _ γ′) (mres may γ)])]
+         [(mres _ γ′) (mres may γ)]
+         [err (error 'matches "Bad ! ~a" err)])]
       [(constructed kind pats)
        (match A
          [(constructed (== kind eq?) data)
           (⨅/lst matches2 pats data)]
          [_ #f])]
       [(== Any eq?) (mres must γ)]
+      [(label ℓ)
+       (and (matchℓ? A ℓ)
+            (mres must γ))]
       [(□ x) (mres must (hash-set γ x A))]
       [($ x)
        (match (hash-ref γ x unmapped)
@@ -186,10 +201,7 @@
 (define-unit TCon-deriv@
   (import weak-eq^)
    (export TCon-deriv^)
-   (define-syntax-rule (weak-if t ρ)
-     (let ([t′ t])
-       (and t′ (mres t′ ρ))))
-   (define matches (matches≃ ≃))
+   (define matches (matches≃ ≃ matchℓ?))
 
    ;; Negation differs because it waits until we have a /full/ match.
    ;; Thus, we do a nullability check to see if it is satisfied.
@@ -257,13 +269,13 @@
 
    (define (bindp B A T ρ)
      (match (matches B A ρ)
-       [(== M⊥ eq?) M⊥]
+       [#f M⊥]
        [(mres t′ ρ′) (tl (cons T ρ′) t′)]
        [M (error '∂ "oops10 ~a" M)]))
    
    (define (patp pat A ρ)
      (match (matches pat A ρ)
-       [(== M⊥ eq?) M⊥]
+       [#f M⊥]
        [(mres t ρ′) (tl ε t)]
        [M (error '∂ "oops11 ~a" M)]))
    
@@ -308,15 +320,14 @@
         (match Tt
           [(tl T t) (run* (ð A T) π)]
           [(== M⊥ eq?) M⊥]
-          [M (error 'run* "oops12 ~a" M)])]))
+          [M (error 'run* "oops12 ~a" M)])]
+       [err (error 'run* "Bad ~a" err)]))
    (define run run*))
-
-(define (blame M)
-  (and M (eq? (tl-t M) may)))
 
 (define-unit concrete@
   (import)
    (export weak-eq^)
-   (define (≃ x y) (and (equal? x y) must)))
+   (define (≃ x y) (and (equal? x y) must))
+   (define matchℓ? eq?))
 
 (define-values/invoke-unit/infer (export TCon-deriv^) (link concrete@ TCon-deriv@))

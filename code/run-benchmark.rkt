@@ -56,7 +56,7 @@
                   [("--sdt") "Benchmark specialized fixpoint with timestamps and store deltas"
                    (aval 0cfa^-∆s/t)]
 |#
-#;                  [("--ls") "Benchmark specialized lazy non-determinism"
+                  [("--ls") "Benchmark specialized lazy non-determinism"
                    (aval lazy-0cfa^)]
                   [("--lc") "Benchmark compiled specialized lazy non-determinism"
                    (aval lazy-0cfa^/c)]
@@ -88,7 +88,7 @@
                    "Benchmark compiled preallocated store-diff lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/prealloc!)]
 |#
-#;                  [("--ps")
+                  [("--ps")
                    "Benchmark compiled preallocated stacked store lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/prealloc/stacked!)]
 #;                  [("--ps1")
@@ -138,10 +138,12 @@
                   |#
                 #:args (filename)
                 filename))
-(test (prep test-file)))
-
-(define vis-bench (prep "/home/ianj/projects/xcfa/racket-impl/test-suite/introspective.sch"))
 (require "graph.rkt")
+(parameterize ([graph-file "test.dot"])
+ (test (prep test-file))))
+
+;(define vis-bench (prep "/home/ianj/projects/xcfa/racket-impl/test-suite/introspective.sch"))
+;
 ;;(parameterize ([graph-file "1.dot"] [aval 0cfa^]) (test vis-bench))
 ;;(parameterize ([graph-file "2.dot"] [aval lazy-0cfa^]) (test vis-bench))
-(parameterize ([graph-file "3.dot"] [aval lazy-0cfa^/c]) (test vis-bench))
+;(parameterize ([graph-file "3.dot"] [aval lazy-0cfa^/c]) (test vis-bench))

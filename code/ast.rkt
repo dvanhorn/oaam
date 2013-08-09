@@ -94,6 +94,7 @@
        (∪ (loop s₀) (loop s₁))]
       [(fltc _ e) (expr-free e bound)]
       [(arrc _ _ ncs pc)
-       (∪/l (loop pc) (map loop ncs))]
-      [(or (== anyc eq?) (== nonec eq?)) bound]))
+       (for/union #:initial (loop pc) ([nc (in-list ncs)]) (loop nc))]
+      [(or (== anyc eq?) (== nonec eq?)) bound]
+      [_ (error 'scon-free "Bad scon ~a" s)]))
   (expr-free e ∅))

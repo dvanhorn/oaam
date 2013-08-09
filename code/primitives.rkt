@@ -1,6 +1,6 @@
 #lang racket
 
-(require "data.rkt" "notation.rkt" "do.rkt"
+(require "data.rkt" "notation.rkt" "do.rkt" (only-in "tcon.rkt" may must)
          "primitive-maker.rkt"
          (for-syntax syntax/parse) ;; for core syntax-classes
          racket/unsafe/ops
@@ -48,7 +48,7 @@
 (define-simple-macro* (yield-both bσ)
   (do (bσ) ([b (in-list '(#t #f))]) (yield b)))
 
-(define-for-syntax (prim-defines clos? rlos? blclos? concrete?)
+(define-for-syntax (prim-defines clos? rlos? blclos? concrete? prim-eq)
   (with-syntax ([clos? clos?]
                 [rlos? rlos?]
                 [blclos? blclos?])
@@ -119,96 +119,104 @@
        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ;; Prims that read the store
 
+       (define-syntax-rule (#,prim-eq eσ v0 v1)
+         (match* (v0 v1)
+           [((== ●) _) may]
+           [(_ (== ●)) may]
+           [((== qdata^) (or (== vec0) (== qvector^) (? vector?) (? vectorv-immutable^?) (? vectorv-immutable?)
+                             (== cons^) (== qcons^)
+                             (? atomic?)))
+            may]
+           [((or (== vec0) (== qvector^) (? vector?) (? vectorv-immutable^?) (? vectorv-immutable?)
+                 (== cons^) (== qcons^)
+                 (? atomic?))
+             (== qdata^))
+            may]
+           [((? clos?) _) (and (clos? v1) may)]
+           [(_ (? clos?)) #f] ;; first not a closure
+           [((? blclos?) _) (and (blclos? v1) may)]
+           [(_ (? blclos?)) #f]
+           [((? rlos?) _) (and (rlos? v1) may)]
+           [(_ (? rlos?)) #f]
+           [((or (== cons^) (? consv?) (== qcons^)) _)
+            (and (or (consv? v1) (eq? v1 cons^) (eq? v1 qcons^)) may)] ;; FIXME: overapproximate for concrete
+           [(_ (or (== cons^) (? consv?))) #f] ;; first not a cons
+           ;; next 4 clauses handle 0-length vectors specifically
+           [((== vec0) _) (and (or (eq? v1 vec0)
+                                   (and (vector? v1)
+                                        (zero? (vector-length v1))))
+                               must)]
+           [(_ (== vec0)) (and (or (eq? v0 vec0)
+                                   (and (vector? v0)
+                                        (zero? (vector-length v0))))
+                               must)]            
+           [((? vector?) _) (=> fail) (if (zero? (vector-length v0))
+                                          (and (or (eq? v1 vec0) (equal? v0 v1)) must)
+                                          (fail))]
+           [(_ (? vector?)) (=> fail) (if (zero? (vector-length v1))
+                                          (and (or (eq? v0 vec0) (equal? v0 v1)) must)
+                                          (fail))]
+           [((or (== vector^) (== vector-immutable^)
+                 (== qvector^)
+                 (? vector?) ;; Racket's immutable vectors
+                 (? vectorv-immutable^?) (? vectorv?)
+                 (? vectorv^?) (? vectorv-immutable?)) _)
+            (and (or (vectorv? v1) (vectorv-immutable? v1) (eq? v1 vector^)
+                         (eq? qvector^ v1)
+                         (eq? v1 vector-immutable^)
+                         (vector? v1)
+                         (vectorv-immutable^? v1))
+                 may)] ;; FIXME: not right for concrete
+           [(_ (or (== vector^) (== vector-immutable^) (== qvector^)
+                   (? vectorv-immutable^?) (? vectorv?)
+                   (? vectorv^?) (? vectorv-immutable?)
+                   (? vector?)))
+            #f] ;; first not a vector
+           [((? primop?) _) (and (equal? v0 v1) must)]
+           [(_ (? primop?)) #f] ;; first not a primop
+           [((? number?) _) (cond [(number^? v1) may]
+                                  [(number? v1) (and (= v0 v1) must)]
+                                  [else #f])]
+           [((? number^?) _) (and (or (number^? v1) (number? v1)) may)]
+           [(_ (? number^?)) #f]
+           [((? string?) _) (cond [(eq? string^ v1) may]
+                                  [(string? v1) (and (string=? v0 v1) must)]
+                                  [else #f])]
+           [((== string^) _) (and (or (eq? string^ v1) (string? v1)) may)]
+           [((? char?) _) (cond [(eq? char^ v1) may]
+                                [(char? v1) (and (char=? v0 v1) must)]
+                                [else #f])]
+           [((== char^) _) (and (or (eq? char^ v1) (char? v1)) may)]
+           [(_ (== string^)) #f]
+           [((? symbol?) _) (cond [(eq? symbol^ v1) may]
+                                  [(symbol? v1) (and (eq? v0 v1) must)]
+                                  [else #f])]
+           [((== symbol^) _) (and (or (eq? symbol^ v1) (symbol? v1)) may)]
+           [(_ (or (? symbol?) (== symbol^))) #f]
+           [((? boolean?) _) (and (equal? v0 v1) must)]
+           [('() _) (and (eq? '() v1) must)]
+           [(_ '()) #f]
+           [((? void?) _) (and (void? v1) must)]
+           [(_ (? void?)) #f]
+           [((? input-port^?) _) (and (input-port^?) may)]
+           [(_ (? input-port^?)) #f]
+           [((? output-port^?) _) (and (output-port^?) may)]
+           [(_ (? output-port^?)) #f]
+           [((? input-port?) _) (and (equal? v0 v1) must)]
+           [(_ (? input-port?)) #f]
+           [((? output-port?) _) (equal? v0 v1)]
+           [(_ (? output-port?)) #f]
+           [(_ (== eof)) (and (eof-object? v0) must)]
+           [((== eof) _) (and (eof-object? v1) must)]
+           [(_ _) (error 'equalv? "Incomplete match ~a ~a" v0 v1)]))
+
        (define/read (equalv? eσ v0 v1)
-         (define-syntax-rule (both-if pred) (if pred (yield-both eσ) (yield #f)))
          (do (eσ) ([v0 #:in-force eσ v0]
                    [v1 #:in-force eσ v1])
-           (match* (v0 v1)
-             [((== ●) _) (yield-both eσ)]
-             [(_ (== ●)) (yield-both eσ)]
-             [((== qdata^) (or (== vec0) (== qvector^) (? vector?) (? vectorv-immutable^?) (? vectorv-immutable?)
-                               (== cons^) (== qcons^)
-                               (? atomic?)))
-              (yield-both eσ)]
-             [((or (== vec0) (== qvector^) (? vector?) (? vectorv-immutable^?) (? vectorv-immutable?)
-                   (== cons^) (== qcons^)
-                   (? atomic?))
-               (== qdata^))
-              (yield-both eσ)]
-             [((? clos?) _) (both-if (clos? v1))]
-             [(_ (? clos?)) (yield #f)] ;; first not a closure
-             [((? blclos?) _) (both-if (blclos? v1))]
-             [(_ (? blclos?)) (yield #f)]
-             [((? rlos?) _) (both-if (rlos? v1))]
-             [(_ (? rlos?)) (yield #f)]
-             [((or (== cons^) (? consv?) (== qcons^)) _)
-              (both-if (or (consv? v1) (eq? v1 cons^) (eq? v1 qcons^)))] ;; FIXME: overapproximate for concrete
-             [(_ (or (== cons^) (? consv?))) (yield #f)] ;; first not a cons
-             ;; next 4 clauses handle 0-length vectors specifically
-             [((== vec0) _) (yield (or (eq? v1 vec0)
-                                       (and (vector? v1)
-                                            (zero? (vector-length v1)))))]
-             [(_ (== vec0)) (yield (or (eq? v0 vec0)
-                                       (and (vector? v0)
-                                            (zero? (vector-length v0)))))]            
-             [((? vector?) _) (=> fail) (if (zero? (vector-length v0))
-                                            (yield (or (eq? v1 vec0) (equal? v0 v1)))
-                                            (fail))]
-             [(_ (? vector?)) (=> fail) (if (zero? (vector-length v1))
-                                            (yield (or (eq? v0 vec0) (equal? v0 v1)))
-                                            (fail))]
-             [((or (== vector^) (== vector-immutable^)
-                   (== qvector^)
-                   (? vector?) ;; Racket's immutable vectors
-                   (? vectorv-immutable^?) (? vectorv?)
-                   (? vectorv^?) (? vectorv-immutable?)) _)
-              (both-if (or (vectorv? v1) (vectorv-immutable? v1) (eq? v1 vector^)
-                           (eq? qvector^ v1)
-                           (eq? v1 vector-immutable^)
-                           (vector? v1)
-                           (vectorv-immutable^? v1)))] ;; FIXME: not right for concrete
-             [(_ (or (== vector^) (== vector-immutable^) (== qvector^)
-                     (? vectorv-immutable^?) (? vectorv?)
-                     (? vectorv^?) (? vectorv-immutable?)
-                     (? vector?)))
-              (yield #f)] ;; first not a vector
-             [((? primop?) _) (yield (equal? v0 v1))]
-             [(_ (? primop?)) (yield #f)] ;; first not a primop
-             [((? number?) _) (cond [(number^? v1) (yield-both eσ)]
-                                    [(number? v1) (yield (= v0 v1))]
-                                    [else (yield #f)])]
-             [((? number^?) _) (both-if (or (number^? v1) (number? v1)))]
-             [(_ (? number^?)) (yield #f)]
-             [((? string?) _) (cond [(eq? string^ v1) (yield-both eσ)]
-                                    [(string? v1) (yield (string=? v0 v1))]
-                                    [else (yield #f)])]
-             [((== string^) _) (both-if (or (eq? string^ v1) (string? v1)))]
-             [((? char?) _) (cond [(eq? char^ v1) (yield-both eσ)]
-                                  [(char? v1) (yield (char=? v0 v1))]
-                                  [else (yield #f)])]
-             [((== char^) _) (both-if (or (eq? char^ v1) (char? v1)))]
-             [(_ (== string^)) (yield #f)]
-             [((? symbol?) _) (cond [(eq? symbol^ v1) (yield-both eσ)]
-                                    [(symbol? v1) (yield (eq? v0 v1))]
-                                    [else (yield #f)])]
-             [((== symbol^) _) (both-if (or (eq? symbol^ v1) (symbol? v1)))]
-             [(_ (or (? symbol?) (== symbol^))) (yield #f)]
-             [((? boolean?) _) (yield (equal? v0 v1))]
-             [('() _) (yield (eq? '() v1))]
-             [(_ '()) (yield #f)]
-             [((? void?) _) (yield (void? v1))]
-             [(_ (? void?)) (yield #f)]
-             [((? input-port^?) _) (both-if (input-port^?))]
-             [(_ (? input-port^?)) (yield #f)]
-             [((? output-port^?) _) (both-if (output-port^?))]
-             [(_ (? output-port^?)) (yield #f)]
-             [((? input-port?) _) (equal? v0 v1)]
-             [(_ (? input-port?)) (yield #f)]
-             [((? output-port?) _) (equal? v0 v1)]
-             [(_ (? output-port?)) (yield #f)]
-             [(_ (== eof)) (yield (eof-object? v0))]
-             [((== eof) _) (yield (eof-object? v1))]
-             [(_ _) (error 'equalv? "Incomplete match ~a ~a" v0 v1)])))
+           (match (#,prim-eq eσ v0 v1)
+             [(== must eq?) (yield #t)]
+             [(== may eq?) (yield-both eσ)]
+             [_ (yield #f)])))
 
        (define/read (vectorv-ref vrσ vec z)
          (match vec
@@ -241,12 +249,14 @@
          (match p
            [(consv A _) (yield-delay caσ A)]
            [(? qcons^?) (yield qdata^)]
-           [(? cons^?) (yield ●)]))
+           [(? cons^?) (yield ●)]
+           [_ (error 'car "BAD ~a" p)]))
        (define/read (cdrv cdσ p)
          (match p
            [(consv _ D) (yield-delay cdσ D)]
            [(? qcons^?) (yield qdata^)]
-           [(? cons^?) (yield ●)]))
+           [(? cons^?) (yield ●)]
+           [_ (error 'cdr "BAD ~a" p)]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ;; Prims that write the store
@@ -737,11 +747,11 @@
 
 (define-for-syntax ((mk-mk-prims global-σ? σ-passing? σ-∆s? compiled? K) stx)
   (syntax-parse stx
-    [(_ mean:id compile:id co:id clos?:id rlos?:id blclos?:id)
+    [(_ mean:id compile:id co:id clos?:id rlos?:id blclos?:id prim-eq:id)
      (quasisyntax/loc stx
        (mk-primitive-meaning
         #,global-σ? #,σ-passing? #,σ-∆s? #,compiled? #,(= K 0)
-        mean compile co #,@(prim-defines #'clos? #'rlos? #'blclos? (= K +inf.0)) 
+        mean compile co #,@(prim-defines #'clos? #'rlos? #'blclos? (= K +inf.0) #'prim-eq) 
         #,prim-table))]))
 
 (define prim-constants

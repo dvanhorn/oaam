@@ -58,7 +58,8 @@
                        #'(∪ cs cs*)))
                (reset-kind!)
                (values (join-store σ* σ**) cs**)))
-           (set (cons σ* cs*))]))))
+           (set (cons σ* cs*))]
+          [_ (error 'wide-step-specialized2 "Wat ~a" state)]))))
 
 (define-syntax-rule (wide-step step)
   (λ (state-count)
@@ -136,7 +137,8 @@
                (for/fold ([last-σ f^σ] [final-cs ∅])
                    ([s (in-set ss)])
                  (match s
-                   [(cons σ cs) (values (join-store last-σ σ) (∪ final-cs cs))])))
+                   [(cons σ cs) (values (join-store last-σ σ) (∪ final-cs cs))]
+                   [_ (error 'special "Wat ~a" s)])))
              (state-rate)
              #,@(if (syntax-parameter-value #'generate-graph?) #'((dump-dot graph ev-var? ev? co? compiled?)) #'())
              ;; filter the final results
