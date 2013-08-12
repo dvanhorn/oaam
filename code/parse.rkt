@@ -68,9 +68,9 @@
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ;; Contract monitoring forms
           [`(mon (quote ,(? symbol? pℓ)) (quote ,(? symbol? nℓ)) (quote ,(? symbol? cℓ)) ,s ,e)
-           (mon (fresh-label!) pℓ nℓ cℓ (parse-scon s) (parse e))]
+           (mon (fresh-label!) (fresh-label!) pℓ nℓ cℓ (parse-scon s) (parse e))]
           [`(tmon (quote ,(? symbol? pℓ)) (quote ,(? symbol? nℓ)) (quote ,(? symbol? cℓ)) ,s ,t ,e)
-           (tmon (fresh-label!) pℓ nℓ cℓ (parse-scon s) (simple (parse-tcon t)) (parse e))]
+           (tmon (fresh-label!) (fresh-label!) pℓ nℓ cℓ (parse-scon s) (simple (parse-tcon t)) (parse e))]
           ;; End contract monitoring forms
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           [`(,(or 'lambda 'if 'letrec 'set!
@@ -84,7 +84,7 @@
              [#f (fail)]
              [tf (parse (tf sexp))])]
           [`(,e . ,es)
-           (app (fresh-label!) (parse e) (map parse es))]
+           (app (fresh-label!) (fresh-label!) (parse e) (map parse es))]
           [err (error 'parse-core "Wat ~a" err)]))
 
       (define (rassoc f2 f if-empty lst)
@@ -146,12 +146,14 @@
         [`((,(== special) . ,s) . ,es)
          (if (primitive? s)
              (app (fresh-label!)
+                  (fresh-label!)
                   (primr (fresh-label!) s)
                   (map parse es))
              (parse-core (cons s es)))]
         [`(,e . ,es)
          (cond [(hash-has-key? ρ e)
                 (app (fresh-label!)
+                     (fresh-label!)
                      (var (fresh-label!) (rename e))
                      (map parse es))]               
                [else (parse-core sexp)])]
@@ -171,7 +173,7 @@
 (define (unparse e)
   (match e
     [(or (var _ x) (datum _ x) (primr _ x)) x]
-    [(app _ e es) (map unparse (cons e es))]
+    [(app _ _ e es) (map unparse (cons e es))]
     [(lam _ xs body) `(λ ,xs ,(unparse body))]
     [(ife _ g t e) `(if ,(unparse g) ,(unparse t) ,(unparse e))]
     [(st! _ x e) `(set! ,x ,(unparse e))]

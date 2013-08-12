@@ -3,7 +3,7 @@
 (require (for-syntax syntax/parse))
 (provide for/append for/union for*/union for/set for*/set
          and0
-         define-simple-macro* hash-reverse
+         define-simple-macro* hash-reverse hash-add hash-union set-map
          ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
 
 ;; define-simple-macro does not have an implicit quasisyntax.
@@ -50,6 +50,14 @@
 (define (hash-reverse h)
   (for/hash ([(k v) (in-hash h)])
     (values v k)))
+
+(define (hash-add h k v)
+  (hash-set h k (∪1 (hash-ref h k ∅) v)))
+(define (hash-union h k v)
+  (hash-set h k (∪ (hash-ref h k ∅) v)))
+
+(define (set-map f s)
+  (for/set ([a (in-set s)]) (f a)))
 
 (define-simple-macro* (for/union (~var o (ops #'∅)) guards body ...+)
   (for/fold ([o.res o.init]) guards (∪ o.res (let () body ...))))

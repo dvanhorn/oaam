@@ -145,9 +145,9 @@
                             (cons (ans^-v c) (ans^-τ c))))
                         (values (format "State count: ~a" (unbox state-count*))
                                 (format "Point count: ~a" (hash-count seen))
-                                #;
+                       
                                 global-σ
-                                (clean-σ global-σ vs)
+                     #;           (clean-σ global-σ (set-map car vs))
                                 vs)]
                        [else
                         (define todo-old todo)
@@ -258,7 +258,7 @@
                                 (format "Point count: ~a" (hash-count seen))
                                 #;
                                 global-σ
-                                (clean-σ global-σ vs)
+                                (clean-σ global-σ (set-map car vs))
                                 vs)]
                        [else
                         (define todo-old todo)
@@ -345,7 +345,7 @@
                                 (format "Point count: ~a" (hash-count seen))
                                 #;
                                 global-σ
-                                (clean-σ global-σ vs)
+                                (clean-σ global-σ (map car vs))
                                 vs)]
                        [else
                         (define todo-old todo)

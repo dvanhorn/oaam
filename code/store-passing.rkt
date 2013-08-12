@@ -135,6 +135,7 @@
                (and (ev? s) (var? (ev-e s))))
              (set-box! (start-time) (current-milliseconds))
              (define ss (fix step^ (set (cons f^σ cs))))
+             (printf "Fixed~%")
              (define-values (last-σ final-cs)
                (for/fold ([last-σ f^σ] [final-cs ∅])
                    ([s (in-set ss)])

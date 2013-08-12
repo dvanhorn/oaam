@@ -16,7 +16,7 @@
 (struct lrc exp (xs es e)     #:transparent)
 (struct lam exp (xs exp)      #:transparent)
 (struct rlm exp (xs rest exp) #:transparent)
-(struct app exp (rator rand)  #:transparent)
+(struct app exp (ℓchk rator rand)  #:transparent)
 (struct ife exp (t c a)       #:transparent)
 (struct st! exp (x e)         #:transparent)
 (struct lcc exp (x e)         #:transparent)
@@ -26,8 +26,8 @@
 (struct frm exp (r e)         #:transparent) ;; Frame
 (struct tst exp (r t e)       #:transparent) ;; Test
 ;; Contract monitoring forms
-(struct mon exp (pℓ nℓ sℓ s e) #:transparent) ;; Structural contract
-(struct tmon exp (pℓ nℓ sℓ s t e) #:transparent) ;; Temporal contract attached to structural contract.
+(struct mon exp (ℓchk pℓ nℓ sℓ s e) #:transparent) ;; Structural contract
+(struct tmon exp (ℓchk pℓ nℓ sℓ s t e) #:transparent) ;; Temporal contract attached to structural contract.
 ;; Structural contract constructors
 (struct consc exp (ca cd)     #:transparent)
 (struct andc exp (c₀ c₁)      #:transparent)
@@ -65,7 +65,7 @@
          (expr-free e bound*))]
       [(lam _ vars body) (expr-free body (∪/l bound vars))]
       [(rlm _ vars rest body) (expr-free body (∪1 (∪/l bound vars) rest))]
-      [(app _ rator rands) (for/union #:initial (loop rator)
+      [(app _ _ rator rands) (for/union #:initial (loop rator)
                                       ([rand (in-list rands)])
                              (loop rand))]
       [(ife _ t c a) (∪ (loop t) (loop c) (loop a))]
@@ -81,8 +81,8 @@
       [(fal _) ∅]
       [(tst _ _ t e) (∪ (loop t) (loop e))]
       ;; Monitoring forms
-      [(or (mon _ _ _ _ s e)
-           (tmon _ _ _ _ s _ e))
+      [(or (mon _ _ _ _ _ s e)
+           (tmon _ _ _ _ _ s _ e))
        (∪ (scon-free s bound) (loop e))]
       [_ (error 'free "Bad expr ~a" e)]))
   (define (scon-free s bound)
@@ -95,6 +95,6 @@
       [(fltc _ e) (expr-free e bound)]
       [(arrc _ _ ncs pc)
        (for/union #:initial (loop pc) ([nc (in-list ncs)]) (loop nc))]
-      [(or (== anyc eq?) (== nonec eq?)) bound]
+      [(or (== anyc eq?) (== nonec eq?)) ∅]
       [_ (error 'scon-free "Bad scon ~a" s)]))
   (expr-free e ∅))
