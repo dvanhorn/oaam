@@ -79,6 +79,7 @@
                    [rlos? (format-id #'rlos "~a?" #'rlos)]
                    [blclos? (format-id #'blclos "~a?" #'blclos)]
                    [primop: (format-id #'primop "~a:" #'primop)]
+                   [primop? (format-id #'primop "~a?" #'primop)]
                    ;; represent rσ explicitly in all states?
                    [(σ-op ...) (if (given wide?) #'() #'(rσ))]
                    ;; explicitly pass σ/∆ to compiled forms?
@@ -95,9 +96,7 @@
              #'(λ (syn)
                    (syntax-parse syn #:literals (ev cc)
                      [(_ ((~and constr:id (~or ev cc)) . args)) (syntax/loc syn (constr . args))]
-                     [(_ e:expr) (syntax/loc syn (let ([v e]) 
-                                                   #;(printf "yield ~a~%~%" v)
-                                                   (yield-meaning v)))]))
+                     [(_ e:expr) (syntax/loc syn (yield-meaning v))]))
              #'(λ (syn)
                    (syntax-parse syn #:literals (ev)
                      [(_ (ev . args)) (syntax/loc syn (begin (ev-state!) (yield-meaning (ev . args))))]
@@ -116,8 +115,6 @@
                   (do (ev-σ) ()
                     (yield (dr ev-σ k (lookup-env ρ x)))))]
              [(datum l d) (λ% (ev-σ ev-τ ρ k δ)
-                              (when (memq d '(here))
-                                (printf "Got to ~a~%" d))
                               (do (ev-σ) () (yield (co ev-σ ev-τ k d))))]
              [(primr l which)
               (define p (primop (compile-primop which)))
@@ -244,7 +241,7 @@
               (match cncs
                 ['() (λc% (cc-σ cc-τ ρ η ℓs k δ)
                          (do (cc-σ) ([(σ*-dom a) #:push cc-σ l δ k])
-                           (yield (cc σ*-dom cc-τ cpc ρ η ℓs (rngk (marks-of k) η ℓs '() cpc name a δ) δ))))]
+                           (yield (cc σ*-dom cc-τ cpc ρ η ℓs (rngk (marks-of k) η ℓs '() name a δ) δ))))]
                 [(cons cnc cncs)
                  (λc% (cc-σ cc-τ ρ η ℓs k δ)
                      (do (cc-σ) ([(σ*-dom a) #:push cc-σ l δ k])
@@ -342,7 +339,7 @@
            ;; Contract construction continuation frames
            (mk-op-struct domk (cm η ℓs todo done pos ρ name k δ) (cm-op ... η ℓs todo done pos ρ-op ... name k δ-op ...))
 ;; mflatt: Add any one of these and get a <local-code> error.
-           (mk-op-struct rngk (cm η ℓs ncs pc name k δ) (cm-op ... η ℓs ncs pc name k δ-op ...))
+           (mk-op-struct rngk (cm η ℓs ncs name k δ) (cm-op ... η ℓs ncs name k δ-op ...))
            (mk-op-struct cak (cm η ℓs cd ρ k δ) (cm-op ... η ℓs cd ρ-op ... k δ-op ...))
            (mk-op-struct cdk (cm cv k) (cm-op ... cv k))
            (mk-op-struct and0k (cm η ℓs cc ρ k δ) (cm-op ... η ℓs cc ρ-op ... k δ-op ...))
@@ -374,7 +371,7 @@
                             (ls: cm _ _ _ _ _ _ _ _)
                             (stmonk: cm _ _ _ _ _ _ _)
                             (domk: cm _ _ _ _ _ _ _ _ _)
-                            (rngk: cm _ _ _ _ _ _ _)
+                            (rngk: cm _ _ _ _ _ _)
                             (cak: cm _ _ _ _ _ _)
                             (cdk: cm _ _)
                             (and0k: cm _ _ _ _ _ _)
@@ -400,7 +397,7 @@
                             (ls: _ _ _ _ _ _ _ k _)
                             (stmonk: _ _ _ _ _ _ k _)
                             (domk: _ _ _ _ _ _ _ _ k _)
-                            (rngk: _ _ _ _ _ _ k _)
+                            (rngk: _ _ _ _ _ k _)
                             (cak: _ _ _ _ _ k _)
                             (cdk: _ _ k)
                             (and0k: _ _ _ _ _ k _)
@@ -585,11 +582,12 @@
                                  (for/fold ([ts* ∅] [cause-blame? #f])
                                      ([T (in-set (hash-ref τ η (λ () (error 'step "Unbound η ~a" η))))])
                                    (match (ð event T)
-                                     [(== M⊥ eq?) (values ts* (⊕ cause-blame? must))]
+                                     [(== M⊥ eq?) (values ts* (or cause-blame? must))] ;; must > #f but must < may
                                      [(tl T* t)
-                                      (printf "t ~a cause-blame? ~a T ~a~%" t cause-blame? T*)
-                                      (values (set-add ts* T*) (or (and (eq? may t) t) cause-blame?))]))])
-                     (printf "Cause blame? ~a ~%" cause-blame?)
+                                      (values (set-add ts* T*)
+                                              (or (and (eq? may t) t) ;; Jump up to may, if may.
+                                                  ;; Otherwise, use whatever else we had.
+                                                  cause-blame?))]))])
                      (values (hash-set τ η stepped-ts)
                              (if (set-empty? stepped-ts)
                                  must
@@ -622,6 +620,7 @@
                       (define-values/invoke-unit/infer
                         (export #,(syntax-local-introduce #'TCon-deriv^))
                         (link weak-eq@ TCon-deriv@)))]))
+
              ;; [Rel State State]
              (define (step state)
                (match state
@@ -674,7 +673,7 @@
                            (yield (co σ*-sk! co-τ k* (void)))))]
 
                     ;; Contract construction
-                    [(cak: cm η ℓs ccd ρ a δ)
+                    [(cak: cm η ℓs ccd ρ a δ) ;; FIXME: what if v is lazy?
                      (generator
                          (do (co-σ) () (yield (cc co-σ co-τ ccd ρ η ℓs (cdk cm v a) δ))))]
                     [(cdk: cm va a)
@@ -695,15 +694,15 @@
                      (generator
                          (do (co-σ) ([k* #:in-get co-σ a])
                            (yield (co co-σ co-τ k* (cor vl v)))))]
-                    [(rngk: cm η ℓs ncs pc name a δ)
+                    [(rngk: cm η ℓs ncs name a δ)
                      (generator
                          (do (co-σ) ([k* #:in-get co-σ a])
-                           (yield (co co-σ co-τ k* (cblarr ℓs ncs pc name η)))))]
+                           (yield (co co-σ co-τ k* (cblarr ℓs ncs v name η)))))]
                     [(domk: cm η ℓs '() ncs-done cpc ρ name a δ)
                      (generator
                        (do (co-σ) ()
                          (yield (cc co-σ co-τ cpc ρ η ℓs
-                                    (rngk cm η ℓs (reverse (cons v ncs-done)) cpc name a δ) δ))))]
+                                    (rngk cm η ℓs (reverse (cons v ncs-done)) name a δ) δ))))]
                     [(domk: cm η ℓs (cons nc ncs-todo) ncs-done cpc ρ name a δ)
                      (generator
                        (do (co-σ) ()
@@ -737,13 +736,15 @@
                      (generator
                          (do (co-σ) ([σ*-bcons #:join co-σ res-addr (singleton (consv aca acd))]
                                      [k* #:in-get σ*-bcons a])
+                           ;; XXX: res-addr may never have a contract in it!
                            (yield (co σ*-bcons co-τ k* (addr res-addr)))))]
                     
                     [(chkargs: cm l lchk i ℓs '() '() done-addrs (and fnv (blclos: vaddr _ _ _ η (list pℓ _ cℓ))) a δ)
                      (define arg-addrs (reverse done-addrs))
                      (define-syntax-rule (good)
                        (do (co-σ) ()
-                         (yield (ap co-σ co-τ l lchk vaddr arg-addrs (postretk cm l lchk fnv a δ) δ))))
+                         (ap-after-call-state!)
+                         (yield (ap co-σ τ* l lchk vaddr arg-addrs (postretk cm l lchk fnv a δ) δ))))
                      (define-syntax-rule (bad)
                        (do (co-σ) ()
                          (yield (ans co-σ co-τ cm (blame pℓ cℓ "Violated timeline contract at call" η event)))))
@@ -762,12 +763,12 @@
                      (define event (ret fnv (force co-σ v)))
                      (define ret-addr (make-var-contour `(ret . ,l) δ))
                      (define ret-cont (make-var-contour `(retk . ,l) δ))
-                     (printf "Returning ~a~%" event)
                      (define-syntax-rule (bad)
                        (do (co-σ) ()
                          (yield (ans co-σ co-τ cm (blame pℓ cℓ "Violated timeline contract at return" η event)))))
                      (define-syntax-rule (good)
                        (do (co-σ) ([rv #:in-force co-σ v])
+                         (chk-after-ret-state!)
                          (yield (chk co-σ τ* l ret-cont pc rv ret-addr ℓs (retk cm ret-addr a) δ))))
                      (define-values (τ* cause-blame?) (step-event ð co-τ η event))
                      (blamer generator co-σ cause-blame? good bad)]
@@ -785,6 +786,7 @@
                     [_ (error 'step "Bad continuation ~a" k)])]
 
                  [(chk: ch-σ ch-τ l lchk vc v res-addr (and ℓs (list pℓ nℓ cℓ)) k δ)
+                  (when (procedure? v) (error 'step "WTF ~a" state))
                   (match vc
                     [(ccons ca cd)
                      (match v
@@ -806,11 +808,11 @@
                     [(cor c₀ c₁)
                      (generator
                          (do (ch-σ) ([(σ*-or a) #:push ch-σ lchk δ k])
-                           (chk σ*-or ch-τ l lchk c₀ v res-addr ℓs (chkor₀ (marks-of k) l lchk ℓs c₁ v res-addr a δ) δ)))]
+                           (yield (chk σ*-or ch-τ l lchk c₀ v res-addr ℓs (chkor₀ (marks-of k) l lchk ℓs c₁ v res-addr a δ) δ))))]
                     [(cand c₀ c₁)
                      (generator
                          (do (ch-σ) ([(σ*-and a) #:push ch-σ lchk δ k])
-                           (chk σ*-and ch-τ l lchk c₀ v res-addr ℓs (chkand₀ (marks-of k) l lchk ℓs c₁ v res-addr a δ) δ)))]
+                           (yield (chk σ*-and ch-τ l lchk c₀ v res-addr ℓs (chkand₀ (marks-of k) l lchk ℓs c₁ v res-addr a δ) δ))))]
                     [(cblarr ℓs′ ncs pc name η)
                      (define (wrap-if-arity= n)
                        (cond
@@ -828,7 +830,7 @@
                        [(blclos: _ ncs′ _ _ _ _) (wrap-if-arity= (length ncs′))]
                        [(primop o) (error 'todo "Wrap primops")]
                        [_ (generator (do (ch-σ) () (yield (ans ch-σ ch-τ (marks-of k) (blame pℓ cℓ "Not a function" vc v)))))])]
-                    [_ ;; Must be a flat contract.
+                    [(or (? blclos?) (? clos?) (? rlos?) (? primop?)) ;; Must be a flat contract.
                      (define tempFn (make-var-contour `(flt-tmp-fn . ,l) δ))
                      (define templ (make-var-contour `(flt-tmp-l . ,l) δ))
                      (define tempChk (make-var-contour `(flt-tmp-chk . ,l) δ))
@@ -837,7 +839,10 @@
                      (generator
                        (do (ch-σ) ([σ*-tmp #:join* ch-σ (cons tempFn ltmpArg) (list (singleton vc) (singleton v))]
                                    [(σ*-tmpk a) #:push σ*-tmp tempChk δ k])
-                         (yield (ap σ*-tmpk ch-τ templ tempChk2 tempFn ltmpArg (chkflt (marks-of k) tempFn res-addr ℓs a) δ))))])]
+                         (yield (ap σ*-tmpk ch-τ templ tempChk2 tempFn ltmpArg (chkflt (marks-of k) tempFn res-addr ℓs a) δ))))]
+                    [_
+                     (log-info "Bad contract to check ~a on ~a" vc v)
+                     (generator (do (ch-σ) () (yield (chk ch-σ ch-τ l lchk vc v res-addr ℓs k δ))))])]
 
                  ;; v is not a value here. It is an address.
                  [(ap: ap-σ ap-τ l lchk fn-addr arg-addrs k δ)
@@ -873,7 +878,8 @@
                               [(null? arg-addrs)
                                (define-syntax-rule (good)
                                  (do (ap-σ) ([(σ*-wr a) #:push ap-σ lchk δ k])
-                                   (yield (ap σ*-wr ap-τ l lchk vaddr arg-addrs
+                                   (ap-after-call-state!)
+                                   (yield (ap σ*-wr τ* l lchk vaddr arg-addrs
                                               (postretk (marks-of k) l lchk f a δ) δ))))
                                (define event (call f '()))
                                (define-values (τ* cause-blame?) (step-event ð ap-τ η event))

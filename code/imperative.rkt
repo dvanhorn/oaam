@@ -2,7 +2,9 @@
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          (for-syntax racket/syntax)
          (only-in "store-passing.rkt" bind-rest) "data.rkt" "deltas.rkt" "add-lib.rkt"
+         (only-in "ast.rkt" var)
          "handle-limits.rkt"
+         "graph.rkt"
          racket/unsafe/ops)
 (provide reset-globals! reset-todo! add-todo! inc-unions! set-global-σ!
          saw-change!
@@ -79,8 +81,14 @@
            ;; haven't seen state before
            (do-add))))
 
-(define-for-syntax yield! (syntax-rules () [(_ e) (do-yield! e)]))
-(define-for-syntax yield/stacked! (syntax-rules () [(_ e) (do-yield/stacked! e)]))
+(define current-state #f)
+(define graph #f) (define (set-graph! g) (set! graph g))
+(define (current-state! s) (set! current-state s))
+(define-syntax (emit-edge! stx)
+  (syntax-case stx ()
+    [(_ e) #`(begin #,@(if-graph #'(add-edge! graph current-state e)))]))
+(define-for-syntax yield! (syntax-rules () [(_ e) (let ([s e]) (emit-edge! s) (reset-kind!) (do-yield! s))]))
+(define-for-syntax yield/stacked! (syntax-rules () [(_ e) (let ([s e]) (emit-edge! s) (reset-kind!) (do-yield/stacked! s))]))
 
 (define-syntax-rule (mk-bind-joiner name joiner)
   (define-syntax-rule (name (σ* jhσ a vs) body)
@@ -125,12 +133,16 @@
 (define-syntax-rule (mk-mk-imperative/timestamp^-fixpoint mk-name cleaner extra-reset)
   (define-syntax (mk-name stx)
     (syntax-case stx ()
-      [(_ name ans^ touches)
+      [(_ name ans^ touches ev co compiled?)
        (with-syntax ([ans^? (format-id #'ans^ "~a?" #'ans^)]
                      [ans^-v (format-id #'ans^ "~a-v" #'ans^)]
-                     [ans^-τ (format-id #'ans^ "~a-τ" #'ans^)])
-         #'(define-syntax-rule (name step fst)
+                     [ans^-τ (format-id #'ans^ "~a-τ" #'ans^)]
+                     [ev? (format-id #'ev "~a?" #'ev)]
+                     [ev-e (format-id #'ev "~a-e" #'ev)]
+                     [co? (format-id #'co "~a?" #'co)])
+         #`(define-syntax-rule (name step fst)
              (let ()
+               #,@(if-graph #'(set-graph! (make-hash)))
                (set-box! (start-time) (current-milliseconds))
                fst
                (define state-count* (state-count))
@@ -139,14 +151,27 @@
                (let loop ()
                  (cond [(empty-todo? todo) ;; → null?
                         (state-rate)
+                        #,@(if-graph #`(dump-dot graph
+                                                 #,(if (syntax-e #'compiled?)
+                                                       #'(λ _ #f)
+                                                       #'(λ (s) (and (ev? s) (var? (ev-e s)))))
+                                                 #,(if (syntax-e #'compiled?)
+                                                       #'(λ _ #f)
+                                                       #'ev?)
+                                                 co? compiled?))
                         (define vs
                           (for*/set ([(c at-unions) (in-hash seen)]
                                      #:when (ans^? c))
                             (cons (ans^-v c) (ans^-τ c))))
                         (values (format "State count: ~a" (unbox state-count*))
                                 (format "Point count: ~a" (hash-count seen))
-                       
-                                global-σ
+                                (with-output-to-string
+                                  (λ ()
+                                     (pretty-print
+                                      (for/list ([i (in-naturals)]
+                                                 [lst (in-vector global-σ)]
+                                                 #:unless (null? lst))
+                                        (list i lst)))))
                      #;           (clean-σ global-σ (set-map car vs))
                                 vs)]
                        [else
@@ -155,6 +180,7 @@
                         (set-box! state-count* (+ (unbox state-count*) todo-num))
                         (reset-todo!) ;; → '()
                         (for ([c (in-todo todo-old)])
+                          #,@(if-graph #'(current-state! c))
                           (step c)) ;; → in-list
                         (loop)])))))])))
 (mk-mk-imperative/timestamp^-fixpoint

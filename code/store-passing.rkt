@@ -96,7 +96,6 @@
        (for/fold ([final-cs ∅]) ([s ss])
          (match s
            [(cons fsσ c)
-            #,@(if (syntax-parameter-value #'generate-graph?) #'((dump-dot graph)) #'())
             (values (∪1 final-cs c))]
            [_ (error 'name "bad output ~a~%" s)])))
      ;; filter the final results
@@ -143,7 +142,7 @@
                    [(cons σ cs) (values (join-store last-σ σ) (∪ final-cs cs))]
                    [_ (error 'special "Wat ~a" s)])))
              (state-rate)
-             #,@(if (syntax-parameter-value #'generate-graph?) #'((dump-dot graph ev-var? ev? co? compiled?)) #'())
+             #,@(if-graph #'(dump-dot graph ev-var? ev? co? compiled?))
              ;; filter the final results
              (values (format "State count: ~a" (unbox state-count*))
                      (format "Point count: ~a" (set-count final-cs))

@@ -132,12 +132,8 @@
                  (? atomic?))
              (== qdata^))
             may]
-           [((? clos?) _) (and (clos? v1) may)]
-           [(_ (? clos?)) #f] ;; first not a closure
-           [((? blclos?) _) (and (blclos? v1) may)]
-           [(_ (? blclos?)) #f]
-           [((? rlos?) _) (and (rlos? v1) may)]
-           [(_ (? rlos?)) #f]
+           [((or (? clos?) (? blclos?) (? rlos?)) _) (and (equal? v0 v1) may)]
+           [(_ (or (? clos?) (? blclos?) (? rlos?))) #f] ;; first not a closure
            [((or (== cons^) (? consv?) (== qcons^)) _)
             (and (or (consv? v1) (eq? v1 cons^) (eq? v1 qcons^)) may)] ;; FIXME: overapproximate for concrete
            [(_ (or (== cons^) (? consv?))) #f] ;; first not a cons
