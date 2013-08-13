@@ -96,7 +96,7 @@
              #'(λ (syn)
                    (syntax-parse syn #:literals (ev cc)
                      [(_ ((~and constr:id (~or ev cc)) . args)) (syntax/loc syn (constr . args))]
-                     [(_ e:expr) (syntax/loc syn (yield-meaning v))]))
+                     [(_ e:expr) (syntax/loc syn (yield-meaning e))]))
              #'(λ (syn)
                    (syntax-parse syn #:literals (ev)
                      [(_ (ev . args)) (syntax/loc syn (begin (ev-state!) (yield-meaning (ev . args))))]

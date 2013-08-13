@@ -23,7 +23,7 @@
         ('sort : ('cmp : integer? integer? -> boolean?)
                (listof integer?)
                ->
-               any #;(listof integer?)
+                                       #;(listof integer?) any
                )
         (and (not (seq ... (call 'sort _ _) (star (!ret 'sort _)) (call 'sort _ _)))
            
@@ -33,4 +33,4 @@
         sort))
 (define lst (list 1 2 3 4))
 (csort (λ (x y) (<= x y)) lst)
-(narf 0 1)
+;(narf 0 1)
