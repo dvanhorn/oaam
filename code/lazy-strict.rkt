@@ -2,14 +2,14 @@
 (require "data.rkt" "primitives.rkt" racket/splicing)
 (provide with-lazy with-strict)
 
-(define-syntax-rule (lazy-force lfσ x)
+(define-syntax-rule (lazy-force x)
   (match x
-    [(addr a) (getter lfσ a)]
+    [(addr a) (getter a)]
     [v (singleton v)]))
-(define-syntax-rule (strict-force lfσ x) (singleton x))
+(define-syntax-rule (strict-force x) (singleton x))
 
-(define-syntax-rule (lazy-delay ldσ a) (singleton (addr a)))
-(define-syntax-rule (strict-delay ldσ a) (getter ldσ a))
+(define-syntax-rule (lazy-delay a) (singleton (addr a)))
+(define-syntax-rule (strict-delay a) (getter a))
 
 (define-syntax-rule (with-lazy body)
   (splicing-syntax-parameterize

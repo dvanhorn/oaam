@@ -217,13 +217,17 @@
 (define-for-syntax (bind-rest inner-σ body)
   #`(syntax-parameterize ([target-σ (make-rename-transformer #'#,inner-σ)])
       #,body))
-(define-simple-macro* (bind-join-whole (σjoin sσ a vs) body)
-  (let ([σjoin (join sσ a vs)]) #,(bind-rest #'σjoin #'body)))
-(define-simple-macro* (bind-join*-whole (σjoin* sσ as vss) body)
-  (let ([σjoin* (join* sσ as vss)]) #,(bind-rest #'σjoin* #'body)))
+(define-simple-macro* (bind-join-whole (a vs) body)
+  (let ([σjoin (join target-σ a vs)]) #,(bind-rest #'σjoin #'body)))
+(define-simple-macro* (bind-join*-whole (as vss) body)
+  (let ([σjoin* (join* target-σ as vss)]) #,(bind-rest #'σjoin* #'body)))
 
 (define (hash-getter hgσ a)
   (hash-ref hgσ a (λ () (error 'getter "Unbound address ~a in store ~a" a hgσ))))
+(define-syntax-rule (mk-target-getter name target getter)
+  (define-syntax-rule (name a) (getter target a)))
+(mk-target-getter target-hash-getter target-σ hash-getter)
+(mk-target-getter target-hash-μgetter target-μ hash-getter)
 
 (define-syntax-rule (with-σ-passing-set-monad body)
   (splicing-syntax-parameterize
@@ -237,9 +241,17 @@
     [do-body-transformer do-body-transform-cs])
    body))
 
+(define-simple-macro* (bind-μbump-whole (a) . body)
+  #,(if-μ #'(let ([μ* (μinc target-μ a)])
+              (syntax-parameterize ([target-μ (make-rename-transformer #'μ*)])
+                . body))
+          #'(let () . body)))
+
 (define-syntax-rule (with-whole-σ body)
   (splicing-syntax-parameterize
    ([bind-join (make-rename-transformer #'bind-join-whole)]
     [bind-join* (make-rename-transformer #'bind-join*-whole)]
-    [getter (make-rename-transformer #'hash-getter)])
+    [bind-μbump (make-rename-transformer #'bind-μbump-whole)]
+    [getter (make-rename-transformer #'target-hash-getter)]
+    [μgetter (make-rename-transformer #'target-hash-μgetter)])
    body))

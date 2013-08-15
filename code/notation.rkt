@@ -2,7 +2,7 @@
 
 (require (for-syntax syntax/parse))
 (provide for/append for/union for*/union for/set for*/set
-         and0
+         and0 μinc
          define-simple-macro* hash-reverse hash-add hash-union set-map
          ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
 
@@ -58,6 +58,10 @@
 
 (define (set-map f s)
   (for/set ([a (in-set s)]) (f a)))
+
+(define/match (μinc n)
+  [((== 0 eq?)) 1]
+  [(_) '∞])
 
 (define-simple-macro* (for/union (~var o (ops #'∅)) guards body ...+)
   (for/fold ([o.res o.init]) guards (∪ o.res (let () body ...))))

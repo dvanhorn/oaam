@@ -2,11 +2,11 @@
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          (for-syntax racket/syntax)
          (only-in "store-passing.rkt" bind-rest) "data.rkt" "deltas.rkt" "add-lib.rkt"
-         (only-in "ast.rkt" var)
+         (only-in "ast.rkt" var?)
          "handle-limits.rkt"
          "graph.rkt"
          racket/unsafe/ops)
-(provide reset-globals! reset-todo! add-todo! inc-unions! set-global-σ!
+(provide reset-globals! reset-todo! add-todo! inc-unions! set-global-σ! set-global-μ!
          saw-change!
          reset-saw-change?!
          mk-mk-imperative/timestamp^-fixpoint
@@ -18,10 +18,16 @@
          mk-imperative/∆s^-fixpoint
          mk-add-∆/s
          mk-add-∆/s!
-         mk-join* mk-joiner mk-joiner/stacked mk-bind-joiner mk-global-store-getter mk-with-store mk-global-store-getter/stacked
+         mk-join* mk-joiner mk-μbump mk-μbump/stacked mk-bind-μbump
+         mk-joiner/stacked mk-bind-joiner
+         mk-global-store-getter
+         mk-global-μ-getter
+         mk-with-store
+         mk-global-store-getter/stacked
+         mk-global-μ-getter/stacked
          reset-∆?!
          prepare-imperative
-         unions todo seen global-σ
+         unions todo seen global-σ global-μ
          with-mutable-store
          with-mutable-store/stacked
          with-mutable-worklist
@@ -34,6 +40,7 @@
 (define todo #f) (define todo-num 0)
 (define seen #f)
 (define global-σ #f)
+(define global-μ #f)
 (define ∆? #f)
 (define (set-∆?!) (set! ∆? #t))
 (define (reset-∆?!) (when ∆? (inc-unions!) (set! ∆? #f)))
@@ -90,13 +97,17 @@
 (define-for-syntax yield! (syntax-rules () [(_ e) (let ([s e]) (emit-edge! s) (reset-kind!) (do-yield! s))]))
 (define-for-syntax yield/stacked! (syntax-rules () [(_ e) (let ([s e]) (emit-edge! s) (reset-kind!) (do-yield/stacked! s))]))
 
-(define-syntax-rule (mk-bind-joiner name joiner)
-  (define-syntax-rule (name (σ* jhσ a vs) body)
-    (begin (joiner a vs) body)))
-(define-syntax-rule (mk-joiner name getter setter)
+(define-simple-macro* (mk-bind-joiner name joiner)
+  (define-syntax-rule (name (a vs) . body)
+    (let () (joiner a vs) . body)))
+(define-simple-macro* (mk-bind-μbump name μbump)
+  (define-syntax-rule (name (a) . body)
+    (let () #,@(if-μ #'(μbump a)) . body)))
+(define-simple-macro* (mk-joiner name getter setter μbump)
   (define (name a vs)
     (define prev (getter global-σ a ∅))
     (define upd (⊓ vs prev))
+    #,@(if-μ #'(μbump a))
     (unless (≡ prev upd)
       (setter global-σ a upd)
       (inc-unions!))))
@@ -106,29 +117,52 @@
           [vs (in-list vss)])
       (joiner a vs))))
 
-(define-syntax-rule (mk-joiner/stacked name getter setter)
+(define-syntax-rule (mk-μbump name μgetter μsetter)
+  (define (name a)
+    (μsetter global-μ a (μinc (μgetter global-μ a 0)))))
+(define-simple-macro* (mk-μbump/stacked name μgetter μsetter)
+  (define (name a)
+    #,@(if-μ
+        #'(define (μadd t n stack)
+            (μsetter global-μ a (cons (cons t n) stack))))
+    #,(if-μ #'(match (μgetter global-μ a)
+                ['() (μsetter a (list (cons unions* 1)))]
+                [(and μstack (cons (cons t* n) μstack*))
+                 (unless (eq? n '∞)
+                   (if (< t unions)
+                       (μadd (add1 unions) (μinc n) μstack)
+                       (μadd t* (μinc n) μstack*)))])
+            #'(void))))
+(define-simple-macro* (mk-joiner/stacked name getter setter μbump)
   (define (name a vs)
     (define (add t vs stack)
       (set-∆?!)
       (setter global-σ a (cons (cons t vs) stack)))
     (match (getter global-σ a '())
-      ['() (add (add1 unions) vs '())]
+      ['()
+       (define unions* (add1 unions))
+       (add unions* vs '())]
       [(and stack (cons (cons t vs*) stack*))
        (define upd (⊓ vs vs*))
        (unless (≡ upd vs*)
          (if (< t unions)
              (add (add1 unions) upd stack)
              (add t upd stack*)))]
-      [sv (error 'name "Bad store value at ~a: ~a" a sv)])))
-(mk-joiner join-h! hash-ref hash-set!)
-(mk-joiner/stacked join-h/stacked! hash-ref hash-set!)
+      [sv (error 'name "Bad store value at ~a: ~a" a sv)])
+    #,@(if-μ #'(μbump a))))
+(mk-μbump μbump-h! hash-ref hash-set!)
+(mk-joiner join-h! hash-ref hash-set! μbump-h!)
+(mk-μbump/stacked μbump-h/stacked! hash-ref hash-set!)
+(mk-joiner/stacked join-h/stacked! hash-ref hash-set! μbump-h/stacked!)
 (mk-bind-joiner bind-join-h! join-h!)
 (mk-bind-joiner bind-join-h/stacked! join-h/stacked!)
-
+(mk-bind-μbump bind-μbump-h! μbump-h!)
+(mk-bind-μbump bind-μbump-h/stacked! μbump-h/stacked!)
 (mk-join* join*-h! join-h!)
 (mk-join* join*-h/stacked! join-h/stacked!)
 (mk-bind-joiner bind-join*-h! join*-h!)
 (mk-bind-joiner bind-join*-h/stacked! join*-h/stacked!)
+
 
 (define-syntax-rule (mk-mk-imperative/timestamp^-fixpoint mk-name cleaner extra-reset)
   (define-syntax (mk-name stx)
@@ -207,15 +241,27 @@
   (splicing-syntax-parameterize
    ([yield-meaning yield/stacked!])
    body))
-(define-syntax-rule (mk-with-store name join join* get)
+(define-syntax-rule (mk-with-store name join join* μbump get μget)
   (define-syntax-rule (name . body)
     (splicing-syntax-parameterize
         ([bind-join (make-rename-transformer #'join)]
          [bind-join* (make-rename-transformer #'join*)]
-         [getter (make-rename-transformer #'get)])
+         [bind-μbump (make-rename-transformer #'μbump)]
+         [getter (make-rename-transformer #'get)]
+         [μgetter (make-rename-transformer #'μget)])
       . body)))
-(mk-with-store with-mutable-store bind-join-h! bind-join*-h! global-hash-getter)
-(mk-with-store with-mutable-store/stacked bind-join-h/stacked! bind-join*-h/stacked! global-hash-getter/stacked)
+(mk-with-store with-mutable-store
+               bind-join-h!
+               bind-join*-h!
+               bind-μbump-h!
+               global-hash-getter
+               global-hash-μgetter)
+(mk-with-store with-mutable-store/stacked
+               bind-join-h/stacked!
+               bind-join*-h/stacked!
+               bind-μbump-h/stacked!
+               global-hash-getter/stacked
+               global-hash-μgetter/stacked)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Accumulated deltas
@@ -254,8 +300,9 @@
    ([bind-join (make-rename-transformer #'bind-join-∆s/change)]
     [bind-join* (make-rename-transformer #'bind-join*-∆s/change)]
     [yield-meaning yield/∆s/acc!]
-    [getter (make-rename-transformer #'global-hash-getter)])
-            body))
+    [getter (make-rename-transformer #'global-hash-getter)]
+    [μgetter (make-rename-transformer #'global-hash-μgetter)])
+   body))
 
 (define-syntax-rule (mk-mk-imperative/∆s/acc^-fixpoint mk-name cleaner joiner set-σ! get-σ)
   (define-syntax (mk-name stx)
@@ -407,15 +454,17 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Common functionality
-(define (reset-globals! σ)
+(define (reset-globals! σ μ)
   (set! unions 0)
   (set! saw-change? #f)
   (reset-todo!)
   (set! seen (make-hash))
   (set! ∆? #f)
   (set! global-σ σ)
+  (set! global-μ μ)
   (set! global-∆s '()))
 (define (set-global-σ! v) (set! global-σ v))
+(define (set-global-μ! v) (set! global-μ v))
 (define (reset-todo!)
   (set! todo empty-todo)
   (set! todo-num 0))
@@ -426,23 +475,39 @@
   ;; Start with a constant factor larger store since we are likely to
   ;; allocate some composite data. This way we don't incur a reallocation
   ;; right up front.
-  (reset-globals! (make-hash))
+  (reset-globals! (make-hash) (make-hash))
   e*)
 
 (define (unbound-addr-error sym addr) (error sym "Unbound address ~a" addr))
 (define (bad-stack-error sym addr) (error sym "Internal error: bad stack at address ~a" addr))
-(define-syntax-rule (mk-global-store-getter name getter)
-  (define-syntax-rule (name σ* a)
-    (getter global-σ a (λ () (unbound-addr-error 'name a)))))
-(define-syntax-rule (mk-global-store-getter/stacked name getter)
-  (define-syntax-rule (name σ* a)
-    (match (getter global-σ a (λ () (unbound-addr-error 'name a)))
-        [(cons (cons t vs) stack*)
-         (if (<= t unions)
-             vs
-             (match stack*
-               [(cons (cons _ vs*) _) vs*]
-               [_ (bad-stack-error 'name a)]))]
-        [_ (unbound-addr-error 'name a)])))
-(mk-global-store-getter global-hash-getter hash-ref)
-(mk-global-store-getter/stacked global-hash-getter/stacked hash-ref)
+(define-syntax-rule (mk-global-getter name target getter a get-default)
+  (define-syntax-rule (name a)
+    (getter target a get-default)))
+(define-syntax-rule (mk-global-store-getter name target getter)
+  (mk-global-getter name target getter a (λ () (unbound-addr-error 'name a))))
+(define-syntax-rule (mk-global-μ-getter name target getter)
+  (mk-global-getter name target getter a 0))
+(define-syntax-rule (mk-global-getter/stacked name target getter a get-default get-fail)
+  (define-syntax (name stx)
+    (syntax-case stx ()
+      [(_ a)
+       (syntax/loc stx
+         (match (getter target a get-default)
+           [(cons (cons t vs) stack*)
+            (if (<= t unions)
+                vs
+                (match stack*
+                  [(cons (cons _ vs*) _) vs*]
+                  [_ (bad-stack-error 'name a)]))]
+           [_ get-fail]))]
+      [name (syntax/loc stx (λ (a) (name a)))])))
+(define-syntax-rule (mk-global-store-getter/stacked name target getter)
+  (mk-global-getter/stacked name target getter a
+                            (λ () (unbound-addr-error 'name a))
+                            (unbound-addr-error 'name a)))
+(define-syntax-rule (mk-global-μ-getter/stacked name target getter)
+  (mk-global-getter/stacked name target getter a #f 0))
+(mk-global-store-getter global-hash-getter global-σ hash-ref)
+(mk-global-μ-getter global-hash-μgetter global-μ hash-ref)
+(mk-global-store-getter/stacked global-hash-getter/stacked global-σ hash-ref)
+(mk-global-μ-getter/stacked global-hash-μgetter/stacked global-μ hash-ref)

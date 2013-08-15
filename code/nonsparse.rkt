@@ -4,21 +4,21 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Non-sparse analyses do not need to accumulate actions
-(define-syntax-rule (bind-get-nonsparse (res σ a) body)
-  (let ([res (getter σ a)]) body))
+(define-syntax-rule (bind-get-nonsparse (res a) body)
+  (let ([res (getter a)]) body))
 
-(define-syntax-rule (bind-force-nonsparse (res σ v) body)
-  (let ([res (force σ v)]) body))
+(define-syntax-rule (bind-force-nonsparse (res v) body)
+  (let ([res (force v)]) body))
 
-(define-syntax-rule (bind-delay-nonsparse (res σ a) body)
-  (let ([res (delay σ a)]) body))
+(define-syntax-rule (bind-delay-nonsparse (res a) body)
+  (let ([res (delay a)]) body))
 
-(define-syntax-rule (bind-big-alias-nonsparse (σ* σ alias all-to-alias) body)
-  (bind-join (σ* σ alias (for/fold ([acc nothing]) ([a (in-list all-to-alias)])
-                           (⊓ acc (getter σ a))))
+(define-syntax-rule (bind-big-alias-nonsparse (alias all-to-alias) body)
+  (bind-join (alias (for/fold ([acc nothing]) ([a (in-list all-to-alias)])
+                      (⊓ acc (getter a))))
              body))
-(define-syntax-rule (bind-alias*-nonsparse (σ* σ aliases all-to-alias) body)
-  (bind-join* (σ* σ aliases (for/list ([a (in-list all-to-alias)]) (getter σ a))) body))
+(define-syntax-rule (bind-alias*-nonsparse (aliases all-to-alias) body)
+  (bind-join* (aliases (for/list ([a (in-list all-to-alias)]) (getter a))) body))
 
 (define-syntax-rule (with-nonsparse body)
   (splicing-syntax-parameterize

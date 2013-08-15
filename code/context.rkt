@@ -8,12 +8,12 @@
 
 (define-for-syntax ((mk-bind-rest K) stx)
   (syntax-parse stx
-    [(_ (ρ* σ* δ*) (ρ iσ l δ xs r v-addrs) body)
+    [(_ (ρ* δ*) (ρ l δ xs r v-addrs) body)
      (define (bind-args wrap as r-meaning)
        (wrap
         (quasisyntax/loc stx
           (let-syntax ([add-r (syntax-rules ()
-                                [(_ (νσ νρ sσ sρ sr sδ* vrest) body*)
+                                [(_ (νρ sρ sr sδ* vrest) body*)
                                  #,r-meaning])])
             (define-values (vfirst vrest)
               (let loop ([xs* xs] [axs '()] [vs v-addrs])
@@ -22,31 +22,31 @@
                   [((cons x xrest) (cons a arest))
                    (loop xrest (cons a axs) arest)]
                   [(xs vs) (error 'bind-args "Bad xs vs ~a ~a" xs vs)])))
-            (add-r (σ* ρ* iσ ρ r δ* vrest)
-                   (bind-alias* (σ* σ* #,as vfirst) body))))))
+            (add-r (ρ* ρ r δ* vrest)
+                   (bind-alias* (#,as vfirst) body))))))
      ;; Abstractly, rest-arg is an infinite list.
      (define abs-r
        #`(let* ([ra sr]
                 [rA (make-var-contour `(A . ,sr) sδ*)]
                 [rvs (if (null? vrest) snull (⊓1 snull (consv rA ra)))]
                 #,@(if (zero? K) #'() #'([νρ (extend sρ r rA)])))
-           (bind-join (νσ sσ ra rvs)
-                      (bind-big-alias (νσ νσ rA vrest) body*))))
+           (bind-join (ra rvs)
+                      (bind-big-alias (rA vrest) body*))))
      ;; Concretely, rest-arg is a finite list.
      (define conc-r
        #'(let*-values ([(ra) (cons sr sδ*)]
                        [(νρ) (extend sρ r ra)])
-           (do (sσ) loop ([as vrest] [last ra] [count 0])
+           (do loop ([as vrest] [last ra] [count 0])
                (match as
                  ['()
-                  (do (sσ) ([νσ #:join sσ last snull])
+                  (do  ([#:join last snull])
                     body*)]
                  [(cons a as)
                   (define rnextA `((,sr A . ,count) . ,sδ*))
                   (define rnextD `((,sr D . ,count) . ,sδ*))
-                  (do (sσ) ([νσ #:alias sσ rnextA a]
-                            [νσ #:join νσ last (singleton (consv rnextA rnextD))])
-                    (loop νσ as rnextD (add1 count)))]
+                  (do ([#:alias rnextA a]
+                       [#:join last (singleton (consv rnextA rnextD))])
+                    (loop as rnextD (add1 count)))]
                  [_ (error 'conc-r "Bad as ~a" as)]))))
      (cond [(zero? K)
             (bind-args values #'xs abs-r)]
@@ -66,11 +66,11 @@
 
 (define-for-syntax ((mk-bind K) stx)
   (syntax-parse stx
-    [(_ (ρ* σ* δ*) (ρ bσ l δ xs v-addrs) body)
+    [(_ (ρ* δ*) (ρ l δ xs v-addrs) body)
      (define vs
        (λ (addrs)
        (quasisyntax/loc stx
-         (bind-alias* (σ* bσ #,addrs v-addrs) body))))
+         (bind-alias* (#,addrs v-addrs) body))))
      (if (zero? K)
          (vs #'xs)
          #`(let* ([δ* (truncate (cons l δ) #,K)]

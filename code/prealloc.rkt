@@ -32,13 +32,16 @@
                   #:when (< i old-size))
     v))
 (define (ensure-σ-size)
-  (when (= next-loc (vector-length global-σ))
-    (set-global-σ! (grow-vector global-σ next-loc))))
+  (and (= next-loc (vector-length global-σ))
+       (set-global-σ! (grow-vector global-σ next-loc))))
+(define (ensure-μ-size)
+  (set-global-μ! (grow-vector global-μ next-loc)))
 
-(define-syntax-rule (get-contour-index! c)
+(define-simple-macro* (get-contour-index! c)
   (or (hash-ref contour-table c #f)
       (begin0 next-loc
-              (ensure-σ-size)
+              (and (ensure-σ-size)
+                   #,@(if-μ #'(ensure-μ-size)))
               (hash-set! contour-table c next-loc)
               (inc-next-loc!))))
 
@@ -60,7 +63,8 @@
   ;; right up front.
   (set! next-loc nlabels)
   (set! contour-table (make-hash))
-  (reset-globals! (make-vector (* 2 nlabels) nothing-proxy))
+  (reset-globals! (make-vector (* 2 nlabels) nothing-proxy)
+                  (make-vector (* 2 nlabels) 0))
   e*)
 (define (prepare-prealloc parser sexp)
   (set! nothing-proxy nothing)
@@ -69,7 +73,8 @@
   (set! nothing-proxy '())
   (prepare-prealloc-base parser sexp))
 
-(mk-global-store-getter global-vector-getter vector-ref-ignore-third)
+(mk-global-store-getter global-vector-getter global-σ vector-ref-ignore-third)
+(mk-global-μ-getter global-vector-μgetter global-μ vector-ref-ignore-third)
 
 (define-syntax-rule (with-0-ctx/prealloc body)
   (splicing-syntax-parameterize
@@ -87,10 +92,12 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Timestamp approximation
-(mk-joiner join! vector-ref-ignore-third vector-set!)
+(mk-μbump μbump! vector-ref-ignore-third vector-set!)
+(mk-joiner join! vector-ref-ignore-third vector-set! μbump!)
 (mk-join* join*! join!)
 (mk-bind-joiner bind-join! join!)
 (mk-bind-joiner bind-join*! join*!)
+(mk-bind-μbump bind-μbump! μbump!)
 
 (mk-mk-imperative/timestamp^-fixpoint
  mk-prealloc/timestamp^-fixpoint restrict-to-reachable/vector (void))
@@ -98,15 +105,27 @@
 (mk-with-store with-prealloc/timestamp-store
                bind-join!
                bind-join*!
-               global-vector-getter)
+               bind-μbump!
+               global-vector-getter
+               global-vector-μgetter)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Lossless timestamp approximation
-(mk-global-store-getter/stacked global-vector-getter/stacked vector-ref-ignore-third)
-(mk-joiner/stacked join/stacked! vector-ref-ignore-third vector-set!)
+(mk-μbump/stacked μbump/stacked! vector-ref-ignore-third vector-set!)
+(mk-global-store-getter/stacked global-vector-getter/stacked global-σ vector-ref-ignore-third)
+(mk-global-μ-getter/stacked global-vector-μgetter/stacked global-μ vector-ref-ignore-third)
+(mk-joiner/stacked join/stacked! vector-ref-ignore-third vector-set! μbump/stacked!)
 (mk-join* join*/stacked! join/stacked!)
 (mk-bind-joiner bind-join/stacked! join/stacked!)
 (mk-bind-joiner bind-join*/stacked! join*/stacked!)
+(mk-bind-μbump bind-μbump/stacked! μbump/stacked!)
+
+(mk-with-store with-prealloc/timestamp-store/stacked
+               bind-join/stacked!
+               bind-join*/stacked!
+               bind-μbump/stacked!
+               global-vector-getter/stacked
+               global-vector-μgetter/stacked)
 
 (define (restrict-to-reachable/vector/stacked touches)
   (define rtr (restrict-to-reachable touches))
@@ -123,11 +142,6 @@
 (mk-mk-imperative/timestamp^-fixpoint
  mk-prealloc/timestamp^-fixpoint/stacked restrict-to-reachable/vector/stacked (reset-∆?!))
 
-(mk-with-store with-prealloc/timestamp-store/stacked
-               bind-join/stacked!
-               bind-join*/stacked!
-               global-vector-getter/stacked)
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Accumulated deltas
 (define-syntax-rule (vector-ref-ignore-third v a ignore) (vector-ref v a))
@@ -140,7 +154,8 @@
    (splicing-syntax-parameterize
     ([bind-join (make-rename-transformer #'bind-join/∆s/acc/prealloc)]
      [bind-join* (make-rename-transformer #'bind-join*/∆s/acc/prealloc)]
-     [getter (make-rename-transformer #'global-vector-getter)])
+     [getter (make-rename-transformer #'global-vector-getter)]
+     [μgetter (make-rename-transformer #'global-vector-μgetter)])
     body)))
 (mk-mk-imperative/∆s/acc^-fixpoint
   mk-prealloc/∆s/acc^-fixpoint restrict-to-reachable/vector join! vector-set! vector-ref-ignore-third)
@@ -154,7 +169,8 @@
    (splicing-syntax-parameterize
     ([bind-join (make-rename-transformer #'bind-join/∆s/prealloc)]
      [bind-join* (make-rename-transformer #'bind-join*/∆s/prealloc)]
-     [getter (make-rename-transformer #'global-vector-getter)])
+     [getter (make-rename-transformer #'global-vector-getter)]
+     [μgetter (make-rename-transformer #'global-vector-μgetter)])
     body)))
 (mk-mk-imperative/∆s^-fixpoint
   mk-prealloc/∆s^-fixpoint restrict-to-reachable/vector join! vector-set! vector-ref-ignore-third)

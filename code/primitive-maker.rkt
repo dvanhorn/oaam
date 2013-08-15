@@ -3,14 +3,28 @@
 (require "data.rkt" "notation.rkt" "do.rkt"
          (for-syntax syntax/parse racket/syntax
                      racket/match racket/list racket/base)
+         (for-meta 2 racket/base)
          racket/stxparam)
-(provide getter force widen delay yield yield-meaning snull
-         mk-primitive-meaning mk-static-primitive-functions)
+(provide getter μgetter force widen delay yield yield-meaning snull abs-count?
+         mk-primitive-meaning mk-static-primitive-functions
+         (for-syntax if-μ))
 
 (define-syntax-parameter getter #f)
+(define-syntax-parameter μgetter #f)
+(define-syntax-parameter abs-count? #f)
 (define-syntax-parameter force #f)
 (define-syntax-parameter widen #f)
 (define-syntax-parameter delay #f)
+(begin-for-syntax
+ (define-syntax (if-μ stx)
+   (syntax-case stx ()
+     [(_ t) #'(if (syntax-parameter-value #'abs-count?)
+                  (list t)
+                  '())]
+     [(_ t e) #'(if (syntax-parameter-value #'abs-count?)
+                    t
+                    e)])))
+
 (define-syntax-parameter yield
   (λ (stx)
      (raise-syntax-error #f "Must be within the context of a generator" stx)))
@@ -124,16 +138,16 @@
        [_ (flat-pred t)])))
 
 ;; FIXME: does not carry actions correctly
- (define (type-match t tmσ addr)
+ (define (type-match t addr)
    #`(let ([addr #,addr])
        (let-syntax ([good
                      (syntax-rules ()
                        [(_ v pred)
-                        (for/set ([v (in-set (getter #,tmσ addr))]
+                        (for/set ([v (in-set (getter addr))] ;; uses target-σ
                                   #:when pred)
                           v)])])
          #,(if (eq? t 'any)
-               #`(delay #,tmσ addr)
+               #`(delay addr) ;; uses target-σ
                #`(good v #,(type->pred-stx t #'v))))))
 
  (define (mk-is-abs? t)
@@ -153,7 +167,7 @@
                                     (eq? vector-immutable^ #,arg-stx)))]
             [else (λ (arg-stx) #'#f)])]))
 
- (define (abs-of t)
+ (define (abs-of t stx)
    (case t
      [(n z fx fl q) #'number^]
      [(s) #'string^]
@@ -165,46 +179,47 @@
      [(n) #''()]
      [(!) #'(void)]
      [(e) #'eof]
-     [else (error 'abs-of "Unsupported abs-of ~a" t)]))
+     [else #'(raise-syntax-error #f (format "Unsupported abs-of ~a" #,t) #,stx)]))
 
- (define (mk-abs-out t)
+;; TODO remove λ
+ (define (mk-abs-out t stx)
    (cond [(type-union? t)
-          (λ (σ-stx)
-             #`(do (#,σ-stx)
-                   ([a (in-list (list #,@(map abs-of (type-union-abbrevs t))))])
-                 (yield a)))]
-         [else (λ _ #`(yield #,(abs-of t)))]))
+          #`(do ([a (in-list (list #,@(for/list ([t (in-list (type-union-abbrevs t))]) (abs-of t stx))))])
+                (yield a))]
+         [else #`(yield #,(abs-of t stx))]))
 
+;; Doesn't yield, so doesn't need μ or τ
  (define (mk-checker no-σ? ts rest)
    (define mk-vs
      (for/list ([t (in-list ts)]
                 [i (in-naturals)])
-       (type-match t #'σderp #`(list-ref vs #,i))))
+       (type-match t #`(list-ref vs #,i))))
    (define mk-rest
      (and rest
           #`(for/list ([v (in-list (drop vs #,(length ts)))])
-              #,(type-match rest #'σderp #'v))))
+              #,(type-match rest #'v))))
    (λ (prim mult-ary?)
       (with-syntax ([prim prim])
         #`(λ (#,@(if no-σ? #'() #'(σderp)) vs)
-             (cond [#,(if rest
-                          #`(>= (length vs) #,(length ts))
-                          #`(= (length vs) #,(length ts)))
-                    (define argsets #,(if rest
-                                          #`(list* #,@mk-vs #,mk-rest)
-                                          #`(list #,@mk-vs)))
-                    #,@(listy (and (not mult-ary?)
-                                   #'(for ([a (in-list argsets)]
-                                           [i (in-naturals)]
-                                           #:when (null? a))
-                                       (log-info "Bad input to primitive: ~a (arg ~a)" 'prim i))))
-                    (toSetOfLists argsets)]
-                   [else
-                    #,@(listy
-                        (and (not mult-ary?)
-                             #`(log-info "Primitive application arity mismatch (Expect: ~a, given ~a): ~a"
-                                         #,(length ts) (length vs) 'prim)))
-                    ∅])))))
+             (syntax-parameterize ([target-σ (make-rename-transformer #'σderp)])
+               (cond [#,(if rest
+                            #`(>= (length vs) #,(length ts))
+                            #`(= (length vs) #,(length ts)))
+                      (define argsets #,(if rest
+                                            #`(list* #,@mk-vs #,mk-rest)
+                                            #`(list #,@mk-vs)))
+                      #,@(listy (and (not mult-ary?)
+                                     #'(for ([a (in-list argsets)]
+                                             [i (in-naturals)]
+                                             #:when (null? a))
+                                         (log-info "Bad input to primitive: ~a (arg ~a)" 'prim i))))
+                      (toSetOfLists argsets)]
+                     [else
+                      #,@(listy
+                          (and (not mult-ary?)
+                               #`(log-info "Primitive application arity mismatch (Expect: ~a, given ~a): ~a"
+                                           #,(length ts) (length vs) 'prim)))
+                      ∅]))))))
 
  ;; Creates a transformer that expects pσ vs (so it can use yield-both or force if it needs to)
  ;; vs will have already been forced if necessary. Any types will have to be forced for non-abstract applications.
@@ -215,6 +230,7 @@
                        #'((rest) rest (#%app apply))
                        #'(() '() (#%app)))]
                   [(args ...) arglist]
+                  [return-out return-out]
                   [guard
                    #`(or #,@(for/list ([m (in-list mandatory)]
                                        [arg (in-list arglist)])
@@ -227,17 +243,17 @@
      ;; mk-simple
      (λ (stx)
         (syntax-parse stx
-          [(pσ vs)
+          [(vs)
             (with-syntax ([(force-clauses ...)
                             (for/list ([t (in-list mtypes)]
                                        [arg (in-list arglist)]
                                        #:when (eq? t 'any))
-                              #`[#,arg #:in-force pσ #,arg])])
+                              #`[#,arg #:in-force #,arg])])
                (quasisyntax/loc stx
                  (match vs
                    [(list-rest args ... rest-arg)
-                    (do (pσ) (force-clauses ...)
-                      (cond [guard #,(return-out #'pσ)]
+                    (do (force-clauses ...)
+                      (cond [guard return-out]
                             [else (yield (wrap (ap ... op args ... rest ...)))]))]
                    [_ (error 'mk-simple "Internal error ~a" vs)])))]))))
 
@@ -247,11 +263,12 @@
             #:fail-unless (type-abbrevs? #'name) "Expected type abbreviation"
             #:attr type (unalias (syntax-e #'name))
             #:attr is-abs? (mk-is-abs? (attribute type))
-            #:attr abs-out (mk-abs-out (attribute type)))
-   (pattern (∪ b:basic ...)
+            #:attr abs-out (mk-abs-out (attribute type) #'name))
+   (pattern (~and stx
+                  (∪ b:basic ...))
             #:attr type (flatten-type (attribute b.type))
             #:attr is-abs? (mk-is-abs? (attribute type))
-            #:attr abs-out (mk-abs-out (attribute type))))
+            #:attr abs-out (mk-abs-out (attribute type) #'stx)))
 
  (define-syntax-class (flat no-σ?) #:literals (->)
    #:attributes (checker-fn mk-simple (ts 1))
@@ -270,15 +287,17 @@
             #:attr mk-simple (attribute f.mk-simple))
    (pattern ((~var fs (flat no-σ?)) ...)
             #:do [(define σs (if no-σ? #'() #'(σherderp)))]
-            #:attr checker-fn
+            #:attr checker-fn ;; doesn't yield, so doesn't need τ or μ
             (λ (prim _)
+               ;; Abstract over some bits.
                #`(λ (#,@σs vs)
-                    (or #,@(for/list ([f (in-list (attribute fs.checker-fn))])
-                             #`(let ([arg (#,(f prim #t) #,@σs vs)])
-                                 (and (not (∅? arg)) arg)))
-                        (begin (log-info "Primitive application arity mismatch (Expect: ~a, given ~a): ~a"
-                                         '#,(map length (attribute fs.ts)) (length vs) 'prim)
-                               ∅))))
+                    (syntax-parameterize ([target-σ (make-rename-transformer #'σherderp)])
+                      (or #,@(for/list ([f (in-list (attribute fs.checker-fn))])
+                               #`(let ([arg (#,(f prim #t) #,@σs vs)])
+                                   (and (not (∅? arg)) arg)))
+                          (begin (log-info "Primitive application arity mismatch (Expect: ~a, given ~a): ~a"
+                                           '#,(map length (attribute fs.ts)) (length vs) 'prim)
+                                 ∅)))))
             #:attr mk-simple
             (λ (widen?) (error 'mk-primitive-meaning "Simple primitives cannot have many arities."))))
 
@@ -301,14 +320,14 @@
             #:attr meaning (or (attribute implementation)
                                (and (attribute p)
                                     (syntax-parser
-                                      [(pσ vs)
-                                       #`(do (pσ) ([v #:in-force pσ (car vs)]
-                                                   [res (in-list
-                                                         (let ([r #,(type->pred-stx (attribute p.type) #'v)])
-                                                           (if (eq? v ●)
-                                                               '(#t #f)
-                                                               (list r))))])
-                                           (yield res))]))
+                                      [(vs)
+                                       #`(do ([v #:in-force (car vs)]
+                                              [res (in-list
+                                                    (let ([r #,(type->pred-stx (attribute p.type) #'v)])
+                                                      (if (eq? v ●)
+                                                          '(#t #f)
+                                                          (list r))))])
+                                             (yield res))]))
                                ((attribute t.mk-simple) #'prim (syntax? (attribute widen?)))))))
 
 (define-syntax (mk-static-primitive-functions stx)
@@ -325,11 +344,12 @@
 
 (define-syntax (mk-primitive-meaning stx)
   (syntax-parse stx
-         [(_ gb?:boolean σpb?:boolean σdb?:boolean cb?:boolean 0b?:boolean
+         [(_ gb?:boolean σpb?:boolean σdb?:boolean μb?:boolean cb?:boolean 0b?:boolean
              mean:id compile:id co:id defines ... ((~var p (prim-entry (syntax-e #'gb?))) ...))
           (define global-σ? (syntax-e #'gb?))
           (define σ-passing? (syntax-e #'σpb?))
           (define σ-∆s? (syntax-e #'σdb?))
+          (define μ? (syntax-e #'μb?))
           (define compiled? (syntax-e #'cb?))
           (define 0cfa? (syntax-e #'0b?))          
           (define ((ap m) arg-stx)
@@ -337,7 +357,7 @@
                 (m arg-stx)
                 (datum->syntax arg-stx (cons m arg-stx) arg-stx)))
           (define hidden-σ (and σ-∆s? (not global-σ?) (generate-temporary #'hidden)))
-          (with-syntax ([(σ-op ...) (if global-σ? #'() #'(pσ))]
+          (with-syntax ([(μ-op ...) (if (or global-σ? (not μ?)) #'() #'(pμ))]
                         [(σ-gop ...) (if σ-passing? #'(pσ) #'())]
                         [(top ...) (listy hidden-σ)]
                         [topp (or hidden-σ #'pσ)]
@@ -351,16 +371,15 @@
                                 [m (in-list (map ap (attribute p.meaning)))]
                                 [checker (in-list (attribute p.checker-fn))])
                        #`[(#,p)
-                          (λP (pσ pτ ℓ δ k v-addrs)
+                          (λP (pσ pμ pτ ℓ δ k v-addrs)
                               (with-prim-yield
                                k
                                ;; Checkers will force what they need to and keep the rest
                                ;; lazy. Forced values are exploded into possible
                                ;; argument combinations
-                               (do (pσ) ([vs (#,checker σ-op ... v-addrs)])
-                                 #,(cond [w? (m #'(pσ ℓ δ vs))]
-                                         [r? (m #'(pσ vs))]
-                                         [else (m #'(vs))]))))])))
+                               (do ([vs (#,checker σ-gop ... μ-op ... v-addrs)])
+                                 #,(cond [w? (m #'(ℓ δ vs))]
+                                         [else #;r? (m #'(vs))]))))])))
             (quasisyntax/loc stx
               (begin
                 ;; Let primitives yield single values instead of entire states.
@@ -372,25 +391,27 @@
                            (λ (sx)
                               (syntax-parse sx
                                 [(_ v)
-                                 (yield-tr (syntax/loc sx (yield (co target-σ target-τ k v))))])))
+                                 (yield-tr (syntax/loc sx (yield (co target-σ target-μ target-τ k v))))])))
                          #`(syntax-parameterize ([yield #,new]) body)]))
                 defines ...
                 ;; λP very much like λ%
-                (define-syntax-rule (... (λP (pσ pτ ℓ δ k v-addrs) body ...))
+                (define-syntax-rule (... (λP (pσ pμ pτ ℓ δ k v-addrs) body ...))
                   #,(if compiled?
-                        #'(λ (top ... σ-gop ... pτ ℓ δ-op ... k v-addrs)
+                        #'(λ (top ... σ-gop ... μ-op ... pτ ℓ δ-op ... k v-addrs)
                              (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
                                                    [target-σ (make-rename-transformer #'pσ)]
+                                                   [target-μ (make-rename-transformer #'pμ)]
                                                    [target-τ (make-rename-transformer #'pτ)]
                                                    [top-σ? #t])
                                body (... ...)))
                         #'(syntax-parameterize ([target-σ (make-rename-transformer #'pσ)]
+                                                [target-μ (make-rename-transformer #'pμ)]
                                                 [target-τ (make-rename-transformer #'pτ)])
                             body (... ...))))
                 ;; Identity if not compiled.
                 (define-syntax-rule (compile o)
                   #,(if compiled? eval #'o))
-                (define-syntax-rule (mean o pσ pτ ℓ δ k v-addrs)
+                (define-syntax-rule (mean o pσ pμ pτ ℓ δ k v-addrs)
                   #,(if compiled?
-                        #'(o top-op ... σ-gop ... pτ ℓ δ-op ... k v-addrs)
+                        #'(o top-op ... σ-gop ... μ-op ... pτ ℓ δ-op ... k v-addrs)
                         eval)))))]))
