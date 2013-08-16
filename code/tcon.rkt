@@ -1,5 +1,7 @@
 #lang racket
-(require racket/unit (except-in "notation.rkt" ∪ ∩))
+(require racket/unit 
+         "ast.rkt"
+         (except-in "notation.rkt" ∪ ∩))
 (require racket/trace)
 
 (provide TCon-deriv^ TCon-deriv@ weak-eq^
@@ -15,16 +17,22 @@
 (define ρ₀ #hasheq())
 (struct -unmapped ()) (define unmapped (-unmapped))
 
+(define (default-free-box e) (error 'free-box "Tcons don't have fvs, so no box ~a" e))
+(define-simple-macro* (tcon-struct name (fields ...))
+  (struct name (fields ...) #:transparent 
+         ;; #:methods #,(syntax-local-introduce #'gen:binds-variables)
+          ;;[(define free-box default-free-box)]
+          ))
 ;; Temporal contracts
-(struct closed (T ρ) #:transparent) ;; like above, but closes free variables.
+(tcon-struct closed (T ρ))
 (define (simple T) (closed T ρ₀))
-(struct ¬ (T) #:transparent)
-(struct · (T₀ T₁) #:transparent)
-(struct kl (T) #:transparent)
-(struct bind (B T) #:transparent)
-(struct ∪ (Ts) #:transparent)
-(struct ∩ (Ts) #:transparent)
-(struct -ε () #:transparent)
+(tcon-struct ¬ (T))
+(tcon-struct · (T₀ T₁))
+(tcon-struct kl (T))
+(tcon-struct bind (B T))
+(tcon-struct ∪ (Ts))
+(tcon-struct ∩ (Ts))
+(tcon-struct -ε ())
 
 (define ε (-ε)) (define (ε? x) (eq? x ε))
 (define T⊥ (∪ ∅)) (define (T⊥? x) (eq? x T⊥))

@@ -9,9 +9,12 @@
   (define time-taken-in-seconds (/ (- (current-milliseconds)
                                       (unbox (start-time)))
                                    1000))
-  (printf "States/second: ~a~%" (exact->inexact ;; for decimal places
+  (cond
+   [(number? (unbox (state-count)))
+    (printf "States/second: ~a~%" (exact->inexact ;; for decimal places
                                  (/ (unbox (state-count))
-                                   time-taken-in-seconds))))
+                                   time-taken-in-seconds)))]
+   [else (printf "States weren't counted: ~a~%" (unbox (state-count)))]))
 
 (define-syntax-rule (with-limit-handler body ...)
   (parameterize ([state-count (box #f)]

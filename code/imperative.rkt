@@ -1,6 +1,6 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
-         (for-syntax racket/syntax)
+         (for-syntax racket/syntax syntax/parse)
          (only-in "store-passing.rkt" bind-rest) "data.rkt" "deltas.rkt" "add-lib.rkt"
          (only-in "ast.rkt" var?)
          "handle-limits.rkt"
@@ -166,11 +166,11 @@
 
 (define-syntax-rule (mk-mk-imperative/timestamp^-fixpoint mk-name cleaner extra-reset)
   (define-syntax (mk-name stx)
-    (syntax-case stx ()
-      [(_ name ans^ touches ev co compiled?)
+    (syntax-parse stx
+      [(_ name state-base ans^ touches #:ev ev #:co co (~optional (~and #:compiled compiled?)))
        (with-syntax ([ans^? (format-id #'ans^ "~a?" #'ans^)]
                      [ans^-v (format-id #'ans^ "~a-v" #'ans^)]
-                     [ans^-τ (format-id #'ans^ "~a-τ" #'ans^)]
+                     [state-base-τ (format-id #'state-base "~a-τ" #'state-base)]
                      [ev? (format-id #'ev "~a?" #'ev)]
                      [ev-e (format-id #'ev "~a-e" #'ev)]
                      [co? (format-id #'co "~a?" #'co)])
@@ -196,7 +196,7 @@
                         (define vs
                           (for*/set ([(c at-unions) (in-hash seen)]
                                      #:when (ans^? c))
-                            (cons (ans^-v c) (ans^-τ c))))
+                            (cons (ans^-v c) (state-base-τ c))))
                         (values (format "State count: ~a" (unbox state-count*))
                                 (format "Point count: ~a" (hash-count seen))
                                 (with-output-to-string
@@ -272,7 +272,7 @@
                               (hash-set! seen c unions)
                               (add-todo! c))
                             target-σ)]))
-(define-syntax-rule (mk-add-∆/s add-∆ add-∆s bind-join bind-join* get-σ)
+(define-simple-macro* (mk-add-∆/s add-∆ add-∆s bind-join bind-join* get-σ)
   (begin
     (define (add-∆ acc a vs)
       (define prev (get-σ global-σ a nothing))
@@ -304,13 +304,13 @@
     [μgetter (make-rename-transformer #'global-hash-μgetter)])
    body))
 
-(define-syntax-rule (mk-mk-imperative/∆s/acc^-fixpoint mk-name cleaner joiner set-σ! get-σ)
+(define-syntax-rule (mk-mk-imperative/∆s/acc^-fixpoint mk-name cleaner joiner set-σ! get-σ μbump)
   (define-syntax (mk-name stx)
     (syntax-case stx ()
-      [(_ name ans^ touches)
+      [(_ name state-base ans^ touches)
        (with-syntax ([ans^? (format-id #'ans^ "~a?" #'ans^)]
                      [ans^-v (format-id #'ans^ "~a-v" #'ans^)]
-                     [ans^-τ (format-id #'ans^ "~a-τ" #'ans^)])
+                     [state-base (format-id #'state-base "~a-τ" #'state-base)])
          #'(define-syntax-rule (name step fst)
              (let ()        
                (set-box! (start-time) (current-milliseconds))
@@ -326,7 +326,7 @@
                         (define vs
                           (for*/set ([(c at-unions) (in-hash seen)]
                                      #:when (ans^? c))
-                            (cons (ans^-v c) (ans^-τ c))))
+                            (cons (ans^-v c) (state-base-τ c))))
                         (values (format "State count: ~a" (unbox state-count*))
                                 (format "Point count: ~a" (hash-count seen))
                                 #;
@@ -342,12 +342,13 @@
                                      (step c)))
                         (for* ([a×vs (in-list ∆s)])
                           (define a (car a×vs))
+                          #,@(if-μ #'(μbump a))
                           (set-σ! global-σ a (⊓ (get-σ global-σ a nothing) (cdr a×vs))))
                         ;; Only one inc needed since all updates are synced.
                         (unless (null? ∆s) (inc-unions!))
                         (loop)])))))])))
 (mk-mk-imperative/∆s/acc^-fixpoint
- mk-imperative/∆s/acc^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
+ mk-imperative/∆s/acc^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref μbump-h!)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Imperative deltas
 (define global-∆s #f)
@@ -390,13 +391,13 @@
     [getter (make-rename-transformer #'global-hash-getter)])
    body))
 
-(define-syntax-rule (mk-mk-imperative/∆s^-fixpoint mk-name cleaner joiner set-σ! get-σ)
+(define-syntax-rule (mk-mk-imperative/∆s^-fixpoint mk-name cleaner joiner set-σ! get-σ μbump)
   (define-syntax (mk-name stx)
     (syntax-case stx ()
-      [(_ name ans^ touches)
+      [(_ name state-base ans^ touches)
        (with-syntax ([ans^? (format-id #'ans^ "~a?" #'ans^)]
                      [ans^-v (format-id #'ans^ "~a-v" #'ans^)]
-                     [ans^-τ (format-id #'ans^ "~a-τ" #'ans^)])
+                     [state-base-τ (format-id #'state-base "~a-τ" #'state-base)])
          #'(define-syntax-rule (name step fst)
              (let ()
                ;; fst contains all the ∆s from the first step(s)
@@ -413,7 +414,7 @@
                         (define vs
                           (for*/set ([(c at-unions) (in-hash seen)]
                                      #:when (ans^? c))
-                            (cons (ans^-v c) (ans^-τ c))))
+                            (cons (ans^-v c) (state-base-τ c))))
                         (values (format "State count: ~a" (unbox state-count*))
                                 (format "Point count: ~a" (hash-count seen))
                                 #;
@@ -442,15 +443,57 @@
                         ;; We know that changes MUST change the store by the add-∆s functions
                         (for* ([a×vs (in-list global-∆s)])
                           (define a (car a×vs))
+                          #,@(if-μ #'(μbump a))
                           (set-σ! global-σ a (⊓ (get-σ global-σ a nothing) (cdr a×vs))))
                         ;; Only one inc needed since all updates are synced.
                         (unless (null? global-∆s) (inc-unions!))
                         (reset-∆s!)
                         (loop)])))))])))
 (mk-mk-imperative/∆s^-fixpoint
-  mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
+  mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref μbump-h!)
 
 (define (reset-∆s!) (set! global-∆s '()))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Imperative narrow deltas with GC
+(define-simple-macro* (mk-timestamp-∆-fix/Γ name state-base (co dr chk ans ap cc ev) touches
+                                     (~optional (~and #:compiled compiled?)))
+  #,(with-syntax ([ans? (format-id #'ans "~a?" #'ans)]
+                  [state-base-rσ (format-id #'state-base "~a-rσ" #'state-base)]
+                  [state-base-μ (format-id #'state-base "~a-μ" #'state-base)]
+                  [state-base-τ (format-id #'state-base "~a-τ" #'state-base)]
+                  [(μ-op ...) (if-μ #'μ)])
+      #`(define-syntax-rule (name step fst)
+          (let ()
+            (set-box! (start-time) (current-milliseconds))
+            (define state-count* (state-count))
+            (set-box! state-count* 0)
+            (let loop ()
+              (cond [(empty-todo? todo)
+                     (state-rate)
+                     ;; TODO: Some report here
+                     ]
+                    [else
+                     (define todo-old todo)
+                     (set-box! state-count* (+ (unbox state-count*) todo-num))
+                     (reset-todo!)
+                     (for ([c (in-todo todo-old)])
+                       (step c))
+                     (set! todo
+                           (for/list ([c (in-todo todo)])
+                             (define-values (σ μ-op ... τ)
+                               (values (state-base-rσ c)
+                                       #,@(if-μ #'(state-base-rσ c))
+                                       (state-base-τ c)))
+                             (touches c)))
+                     (for* ([a×vs (in-list global-∆s)])
+                       (define a (car a×vs))
+                       #,@(if-μ #'(μbump a))
+                       (set-σ! global-σ a (⊓ (get-σ global-σ a nothing) (cdr a×vs))))
+                     ;; Only one inc needed since all updates are synced.
+                     (unless (null? global-∆s) (inc-unions!))
+                     (reset-∆s!)
+                     (loop)]))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Common functionality

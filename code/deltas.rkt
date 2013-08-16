@@ -2,7 +2,8 @@
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          "store-passing.rkt" "context.rkt" "fix.rkt"
          "handle-limits.rkt"
-         "graph.rkt" racket/stxparam)
+         "graph.rkt" racket/stxparam
+         (for-syntax racket/syntax))
 (provide bind-join-∆s bind-join*-∆s mk-∆-fix^ mk-∆-fix2^ mk-timestamp-∆-fix^ with-σ-∆s)
 
 ;; Utility function for combining multiple σ-∆s
@@ -69,7 +70,6 @@
               (format "Point count: ~a" (set-count (for/set ([p (in-set ss)]) (cdr p))))
               (car Σ) final-cs))))
 
-
 (define-syntax-rule (mk-∆-fix2^ name ans^?)
   (define-syntax-rule (name step fst)
     (let-values ([(∆ cs) fst])
@@ -93,48 +93,49 @@
               last-σ final-cs))))
 
 ;; Uses counting and merges stores between stepping all states.
-(define-simple-macro* (mk-timestamp-∆-fix^ name ans^?)
- (define-syntax-rule (name step fst)
-   (let ()
-     (set-box! (start-time) (current-milliseconds))
-     (define state-count* (state-count))
-     (set-box! state-count* 0)
-     (define-values (∆ cs) fst)
-     #,@(if (syntax-parameter-value #'generate-graph?) #'((define graph (make-hash))) #'())
-     (define-values (last-σ final-cs)
-       (let loop ([accum (hash)] [front cs] [σ (update ∆ (hash))] [σ-count 0])
-         (cond [(∅? front)
-                (state-rate)
-                #,@(if (syntax-parameter-value #'generate-graph?) #'((dump-dot graph)) #'())
-                (values σ (for/set ([(c _) (in-hash accum)]) c))]
-               [else
-                ;; If a state is revisited with a different store, that counts as
-                ;; a different state.
-                (set-box! state-count* (+ (unbox state-count*) (set-count front)))
-                (let step/join ([accum accum] [todo front] [front ∅] [∆ '()])
-                  (match (for/first ([c (in-set todo)]) c)
-                    [#f (define σ* (update ∆ σ))
-                        (define count* (if (null? ∆) σ-count (add1 σ-count)))
-                        (loop accum front σ* count*)]
-                    [c (define-values (∆* cs*) (step (cons σ c)))
-                       (define change? (would-update? ∆* σ))
-                       (define ∆** (if change? (append ∆* ∆) ∆))
-                       (define todo* (todo . ∖1 . c))
-                       (define-values (accum* front*)
-                         (for/fold ([accum* accum] [front* front])
-                             ([c* (in-set cs*)]
-                              #:when (or change?
-                                         (not (= σ-count (hash-ref accum c* -1)))))
-                           #,@(if (syntax-parameter-value #'generate-graph?) #'((add-edge! graph c c*)) #'())
-                           (values (hash-set accum* c* σ-count) (∪1 front* c*))))
-                       (step/join accum* todo* front* ∆**)]))])))
-     ;; filter the final results
-     (values (format "State count: ~a" (unbox state-count*))
-             (format "Point count: ~a" (set-count final-cs))
-             last-σ
-             (for/set ([c (in-set final-cs)]
-                       #:when (ans^? c))
-               c)))))
+(define-simple-macro* (mk-timestamp-∆-fix^ name ans^)
+  #,(with-syntax ([ans^? (format-id #'ans^ "~a?" #'ans^)])
+      #'(define-syntax-rule (name step fst)
+          (let ()
+            (set-box! (start-time) (current-milliseconds))
+            (define state-count* (state-count))
+            (set-box! state-count* 0)
+            (define-values (∆ cs) fst)
+            #,@(if-graph #'(define graph (make-hash)))
+            (define-values (last-σ final-cs)
+              (let loop ([accum (hash)] [front cs] [σ (update ∆ (hash))] [σ-count 0])
+                (cond [(∅? front)
+                       (state-rate)
+                       #,@(if-graph #'(dump-dot graph))
+                       (values σ (for/set ([(c _) (in-hash accum)]) c))]
+                      [else
+                       ;; If a state is revisited with a different store, that counts as
+                       ;; a different state.
+                       (set-box! state-count* (+ (unbox state-count*) (set-count front)))
+                       (let step/join ([accum accum] [todo front] [front ∅] [∆ '()])
+                         (match (for/first ([c (in-set todo)]) c)
+                           [#f (define σ* (update ∆ σ))
+                               (define count* (if (null? ∆) σ-count (add1 σ-count)))
+                               (loop accum front σ* count*)]
+                           [c (define-values (∆* cs*) (step (cons σ c)))
+                              (define change? (would-update? ∆* σ))
+                              (define ∆** (if change? (append ∆* ∆) ∆))
+                              (define todo* (todo . ∖1 . c))
+                              (define-values (accum* front*)
+                                (for/fold ([accum* accum] [front* front])
+                                    ([c* (in-set cs*)]
+                                     #:when (or change?
+                                                (not (= σ-count (hash-ref accum c* -1)))))
+                                  #,@(if-graph #'(add-edge! graph c c*))
+                                  (values (hash-set accum* c* σ-count) (∪1 front* c*))))
+                              (step/join accum* todo* front* ∆**)]))])))
+            ;; filter the final results
+            (values (format "State count: ~a" (unbox state-count*))
+                    (format "Point count: ~a" (set-count final-cs))
+                    last-σ
+                    (for/set ([c (in-set final-cs)]
+                              #:when (ans^? c))
+                      c))))))
 
 (define-syntax-rule (with-σ-∆s body)
   (splicing-syntax-parameterize

@@ -158,10 +158,13 @@
      [μgetter (make-rename-transformer #'global-vector-μgetter)])
     body)))
 (mk-mk-imperative/∆s/acc^-fixpoint
-  mk-prealloc/∆s/acc^-fixpoint restrict-to-reachable/vector join! vector-set! vector-ref-ignore-third)
+  mk-prealloc/∆s/acc^-fixpoint restrict-to-reachable/vector join! vector-set! vector-ref-ignore-third μbump!)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Imperative deltas
-(mk-add-∆/s! add-∆/prealloc! add-∆s/prealloc! bind-join/∆s/prealloc bind-join*/∆s/prealloc
+(mk-add-∆/s! add-∆/prealloc!
+             add-∆s/prealloc!
+             bind-join/∆s/prealloc
+             bind-join*/∆s/prealloc
              vector-ref-ignore-third)
 
 (define-syntax-rule (with-σ-∆s/prealloc! body)
@@ -173,4 +176,4 @@
      [μgetter (make-rename-transformer #'global-vector-μgetter)])
     body)))
 (mk-mk-imperative/∆s^-fixpoint
-  mk-prealloc/∆s^-fixpoint restrict-to-reachable/vector join! vector-set! vector-ref-ignore-third)
+  mk-prealloc/∆s^-fixpoint restrict-to-reachable/vector join! vector-set! vector-ref-ignore-third μbump!)

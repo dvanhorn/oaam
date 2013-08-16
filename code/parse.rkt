@@ -33,58 +33,58 @@
                 (for/fold ([ρ ρ]) ([x xs] [x-id xs-id]) (hash-set ρ x x-id))))
       (define (parse-core sexp)
         (match sexp
-          [`(set! ,x ,e) (st! (fresh-label!) (rename x) (parse e))]
+          [`(set! ,x ,e) (st! (fresh-label!) (box #f) (rename x) (parse e))]
           [`(letrec () . ,s) (parse-seq s)]
           [`(letrec ((,xs ,es) ...) . ,s)
            (define-values (xs-id ρ) (fresh-xs xs))
-           (lrc (fresh-label!) xs-id (map (parse_ ρ) es) (parse-seq s ρ))]
+           (lrc (fresh-label!) (box #f) xs-id (map (parse_ ρ) es) (parse-seq s ρ))]
           [`(lambda (,xs ...) . ,s)
            (define-values (xs-id ρ) (fresh-xs xs))
-           (lam (fresh-label!) xs-id (parse-seq s ρ))]
+           (lam (fresh-label!) (box #f) xs-id (parse-seq s ρ))]
           [`(lambda (,xs ... . ,rest) . ,s)
            (define-values (xs-id ρ) (fresh-xs xs))
            (define r-id (fresh-variable! rest))
-           (rlm (fresh-label!) xs-id r-id (parse-seq s (hash-set ρ rest r-id)))]
+           (rlm (fresh-label!) (box #f) xs-id r-id (parse-seq s (hash-set ρ rest r-id)))]
           [`(lambda ,x . ,s)
            (define x-id (fresh-variable! x))
-           (rlm (fresh-label!) '() x-id (parse-seq s (hash-set ρ x x-id)))]
+           (rlm (fresh-label!) (box #f) '() x-id (parse-seq s (hash-set ρ x x-id)))]
           [`(if ,e0 ,e1 ,e2)
-           (ife (fresh-label!) (parse e0) (parse e1) (parse e2))]
+           (ife (fresh-label!) (box #f) (parse e0) (parse e1) (parse e2))]
           [`(if ,g ,t)
            (printf "Warning: If without else: ~a~%" sexp)
            (parse-core `(if ,g ,t (,void$)))]
           [`(let/cc ,x ,e)
            (define x-id (fresh-variable! x))
-           (lcc (fresh-label!) x-id (parse* e (hash-set ρ x x-id)))]
+           (lcc (fresh-label!) (box #f) x-id (parse* e (hash-set ρ x x-id)))]
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ;; Continuation marks forms
           [`(test (,(? symbol? Rs) ...) ,t ,e)
-           (tst (fresh-label!) (list->set Rs) (parse t) (parse e))]
+           (tst (fresh-label!) (box #f) (list->set Rs) (parse t) (parse e))]
           [`(grant (,(? symbol? Rs) ...) ,e)
-           (grt (fresh-label!) (list->set Rs) (parse e))]
-          ['(fail) (fal (fresh-label!))]
+           (grt (fresh-label!) (box #f) (list->set Rs) (parse e))]
+          ['(fail) (fal (fresh-label!) (box #f))]
           [`(frame (,(? symbol? Rs) ...) ,e)
-           (frm (fresh-label!) (list->set Rs) (parse e))]
+           (frm (fresh-label!) (box #f) (list->set Rs) (parse e))]
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ;; Contract monitoring forms
           [`(mon (quote ,(? symbol? pℓ)) (quote ,(? symbol? nℓ)) (quote ,(? symbol? cℓ)) ,s ,e)
-           (mon (fresh-label!) (fresh-label!) pℓ nℓ cℓ (parse-scon s) (parse e))]
+           (mon (fresh-label!) (box #f) (fresh-label!) pℓ nℓ cℓ (parse-scon s) (parse e))]
           [`(tmon (quote ,(? symbol? pℓ)) (quote ,(? symbol? nℓ)) (quote ,(? symbol? cℓ)) ,s ,t ,e)
-           (tmon (fresh-label!) (fresh-label!) pℓ nℓ cℓ (parse-scon s) (simple (parse-tcon t)) (parse e))]
+           (tmon (fresh-label!) (box #f) (fresh-label!) pℓ nℓ cℓ (parse-scon s) (simple (parse-tcon t)) (parse e))]
           ;; End contract monitoring forms
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           [`(,(or 'lambda 'if 'letrec 'set!
                   #;for-continuation-marks
                   'test 'grant 'fail 'frame) . ,rest)
            (error 'parse-core "Ill-formed core form ~a" sexp)]
-          [`(,(== kwote) ,d) (datum (fresh-label!) d)]
+          [`(,(== kwote) ,d) (datum (fresh-label!) (box #f) d)]
           [`(,(== define-ctx) . ,forms) (parse-seq forms)]
           [`(,s . ,es) (=> fail)
            (match (hash-ref macro-env s #f)
              [#f (fail)]
              [tf (parse (tf sexp))])]
           [`(,e . ,es)
-           (app (fresh-label!) (fresh-label!) (parse e) (map parse es))]
+           (app (fresh-label!) (box #f) (fresh-label!) (parse e) (map parse es))]
           [err (error 'parse-core "Wat ~a" err)]))
 
       (define (rassoc f2 f if-empty lst)
@@ -96,8 +96,8 @@
 
       (define (parse-scon s)
         (match s
-          [`(cons/c ,sa ,sd) (consc (fresh-label!) (parse-scon sa) (parse-scon sd))]
-          [`(and/c ,ss ...) (rassoc (λ (s₀ s₁) (andc (fresh-label!) s₀ s₁)) parse-scon anyc ss)]
+          [`(cons/c ,sa ,sd) (consc (fresh-label!) (box #f) (parse-scon sa) (parse-scon sd))]
+          [`(and/c ,ss ...) (rassoc (λ (s₀ s₁) (andc (fresh-label!) (box #f) s₀ s₁)) parse-scon anyc ss)]
           [`(or/c ,ss ...)
            (unless (let check-h/o ([ss ss])
                         (match ss
@@ -106,16 +106,16 @@
                                      `(-> ,_ ,_)) ps) #f]
                           [_ #t]))
              (error 'parse "Expected higher-order component of disjunction contract in far right ~a" s))
-           (rassoc (λ (s₀ s₁) (orc (fresh-label!) s₀ s₁)) parse-scon nonec ss)]
+           (rassoc (λ (s₀ s₁) (orc (fresh-label!) (box #f) s₀ s₁)) parse-scon nonec ss)]
           [`any anyc]
           [`none nonec]
           [(or `(,(or '-> '→) (quote ,(? symbol? name)) : ,sns ,sp)
                `((quote ,(? symbol? name)) : ,sns ... ,(or '-> '→) ,sp))
-           (arrc (fresh-label!) name (map parse-scon sns) (parse-scon sp))]
+           (arrc (fresh-label!) (box #f) name (map parse-scon sns) (parse-scon sp))]
           [(or `(-> ,sns ,sp)
                `(,sns ... ,(or '→ '->) ,sp))
-           (arrc (fresh-label!) #f (map parse-scon sns) (parse-scon sp))]
-          [e (fltc (fresh-label!) (parse e))]))
+           (arrc (fresh-label!) (box #f) #f (map parse-scon sns) (parse-scon sp))]
+          [e (fltc (fresh-label!) (box #f) (parse e))]))
 
       (define (parse-tcon t)
         (match t
@@ -142,10 +142,11 @@
           [err (error 'parse-pat "Wuh ~a" err)]))
 
       (match sexp
-        [`(,(== special) . ,s) (primr (fresh-label!) s)]
+        [`(,(== special) . ,s) (primr (fresh-label!) (box #f) s)]
         [`((,(== special) . ,s) . ,es)
          (if (primitive? s)
              (app (fresh-label!)
+                  (box #f)
                   (fresh-label!)
                   (primr (fresh-label!) s)
                   (map parse es))
@@ -153,29 +154,31 @@
         [`(,e . ,es)
          (cond [(hash-has-key? ρ e)
                 (app (fresh-label!)
+                     (box #f)
                      (fresh-label!)
-                     (var (fresh-label!) (rename e))
+                     (var (fresh-label!) (box #f) (rename e))
                      (map parse es))]               
                [else (parse-core sexp)])]
         [(? symbol? s)
-         (define (mkvar) (var (fresh-label!) (rename s)))
+         (define (mkvar) (var (fresh-label!) (box #f) (rename s)))
          (cond [(hash-has-key? ρ s) (mkvar)]
-               [(primitive? s) (primr (fresh-label!) s)]
+               [(primitive? s) (primr (fresh-label!) (box #f) s)]
                [(hash-ref prim-constants s #f) =>
-                (λ (d) (datum (fresh-label!) d))]
+                (λ (d) (datum (fresh-label!) (box #f) d))]
                [else (mkvar)])] ;; will error
-        [(? atomic? d) (datum (fresh-label!) d)]
+        [(? atomic? d) (datum (fresh-label!) (box #f) d)]
         [(? vector? d) (parse `(,quote$ ,d))] ;; ick
         [err (error 'parse "Unknown form ~a" err)])))
   (values expr open))
+
 #;
 (trace parse)
 (define (unparse e)
   (match e
-    [(or (var _ x) (datum _ x) (primr _ x)) x]
-    [(app _ _ e es) (map unparse (cons e es))]
-    [(lam _ xs body) `(λ ,xs ,(unparse body))]
-    [(ife _ g t e) `(if ,(unparse g) ,(unparse t) ,(unparse e))]
-    [(st! _ x e) `(set! ,x ,(unparse e))]
-    [(lrc _ xs es body) `(letrec ,(map list xs (map unparse es)) ,(unparse body))]
+    [(or (var _ _ x) (datum _ _ x) (primr _ _ x)) x]
+    [(app _ _ _ e es) (map unparse (cons e es))]
+    [(lam _ _ xs body) `(λ ,xs ,(unparse body))]
+    [(ife _ _ g t e) `(if ,(unparse g) ,(unparse t) ,(unparse e))]
+    [(st! _ _ x e) `(set! ,x ,(unparse e))]
+    [(lrc _ _ xs es body) `(letrec ,(map list xs (map unparse es)) ,(unparse body))]
     [_ (error 'unparse "Bad exp ~a" e)]))

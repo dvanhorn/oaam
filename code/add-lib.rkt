@@ -1,6 +1,7 @@
 #lang racket
 
-(require "parse.rkt" "ast.rkt" "notation.rkt")
+(require "parse.rkt" "ast.rkt" "notation.rkt"
+         racket/trace)
 (provide add-lib)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -373,4 +374,4 @@
   (if (null? prims)
       expr
       ;; close the program
-      (lrc (fresh-label!) prims prim-defs expr)))
+      (lrc (fresh-label!) (box #f) prims prim-defs expr)))

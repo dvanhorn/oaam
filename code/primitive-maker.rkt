@@ -357,8 +357,14 @@
                 (m arg-stx)
                 (datum->syntax arg-stx (cons m arg-stx) arg-stx)))
           (define hidden-σ (and σ-∆s? (not global-σ?) (generate-temporary #'hidden)))
-          (with-syntax ([(μ-op ...) (if (or global-σ? (not μ?)) #'() #'(pμ))]
-                        [(σ-gop ...) (if σ-passing? #'(pσ) #'())]
+          (with-syntax ([((μ-op ...) (target-μ-op ...))
+                         (if (or global-σ? (not μ?))
+                             #'(() ())
+                             #'((pμ) (target-μ)))]
+                        [((σ-gop ...) (target-σ-op ...))
+                         (if σ-passing?
+                             #'((pσ) (target-σ))
+                             #'(() ()))]
                         [(top ...) (listy hidden-σ)]
                         [topp (or hidden-σ #'pσ)]
                         [(top-op ...) (if (and σ-∆s? (not global-σ?)) #'(top-σ) #'())]
@@ -371,13 +377,13 @@
                                 [m (in-list (map ap (attribute p.meaning)))]
                                 [checker (in-list (attribute p.checker-fn))])
                        #`[(#,p)
-                          (λP (pσ pμ pτ ℓ δ k v-addrs)
+                          (λP (ℓ δ k v-addrs)
                               (with-prim-yield
                                k
                                ;; Checkers will force what they need to and keep the rest
                                ;; lazy. Forced values are exploded into possible
                                ;; argument combinations
-                               (do ([vs (#,checker σ-gop ... μ-op ... v-addrs)])
+                               (do ([vs (#,checker target-σ-op ... target-μ-op ... v-addrs)])
                                  #,(cond [w? (m #'(ℓ δ vs))]
                                          [else #;r? (m #'(vs))]))))])))
             (quasisyntax/loc stx
@@ -391,11 +397,11 @@
                            (λ (sx)
                               (syntax-parse sx
                                 [(_ v)
-                                 (yield-tr (syntax/loc sx (yield (co target-σ target-μ target-τ k v))))])))
+                                 (yield-tr (syntax/loc sx (yield (co k v))))])))
                          #`(syntax-parameterize ([yield #,new]) body)]))
                 defines ...
                 ;; λP very much like λ%
-                (define-syntax-rule (... (λP (pσ pμ pτ ℓ δ k v-addrs) body ...))
+                (define-syntax-rule (... (λP (ℓ δ k v-addrs) body ...))
                   #,(if compiled?
                         #'(λ (top ... σ-gop ... μ-op ... pτ ℓ δ-op ... k v-addrs)
                              (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
@@ -404,14 +410,11 @@
                                                    [target-τ (make-rename-transformer #'pτ)]
                                                    [top-σ? #t])
                                body (... ...)))
-                        #'(syntax-parameterize ([target-σ (make-rename-transformer #'pσ)]
-                                                [target-μ (make-rename-transformer #'pμ)]
-                                                [target-τ (make-rename-transformer #'pτ)])
-                            body (... ...))))
+                        #'(let () body (... ...))))
                 ;; Identity if not compiled.
                 (define-syntax-rule (compile o)
                   #,(if compiled? eval #'o))
-                (define-syntax-rule (mean o pσ pμ pτ ℓ δ k v-addrs)
+                (define-syntax-rule (mean o ℓ δ k v-addrs)
                   #,(if compiled?
-                        #'(o top-op ... σ-gop ... μ-op ... pτ ℓ δ-op ... k v-addrs)
+                        #'(o top-op ... target-σ-op ... target-μ-op ... target-τ ℓ δ-op ... k v-addrs)
                         eval)))))]))

@@ -42,11 +42,12 @@
     (syntax-parameterize ([target-τ (make-rename-transformer #'τ*)])
       (bind-μbump (a) . body))))
 
-(define-syntax-rule (match-state e [(head σ μ . pat) rhss ...] ... [last-pat last-e])
+(define-syntax-rule (match-state e [(head σ μ τ . pat) rhss ...] ... [last-pat last-e])
   (match e
-    [(head σ μ . pat)
+    [(head σ μ τ . pat)
      (syntax-parameterize ([target-σ (make-rename-transformer #'σ)]
-                           [target-μ (make-rename-transformer #'μ)])
+                           [target-μ (make-rename-transformer #'μ)]
+                           [target-τ (make-rename-transformer #'τ)])
        rhss ...)] ...
     [last-pat last-e]))
 

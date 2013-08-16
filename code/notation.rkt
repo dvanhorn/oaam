@@ -2,8 +2,8 @@
 
 (require (for-syntax syntax/parse))
 (provide for/append for/union for*/union for/set for*/set
-         and0 μinc
-         define-simple-macro* hash-reverse hash-add hash-union set-map
+         and0 μinc iff
+         define-simple-macro* hash-reverse hash-add hash-union set-map union-map
          ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
 
 ;; define-simple-macro does not have an implicit quasisyntax.
@@ -58,6 +58,10 @@
 
 (define (set-map f s)
   (for/set ([a (in-set s)]) (f a)))
+(define ((union-map f) l)
+  (for/union ([a (in-list l)]) (f a)))
+
+(define-syntax-rule (iff x y) (let ([v0 x] [v1 y]) (if v0 v1 (not v1))))
 
 (define/match (μinc n)
   [((== 0 eq?)) 1]

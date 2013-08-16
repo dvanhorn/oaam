@@ -1,7 +1,31 @@
 #lang racket
-(require "notation.rkt" "tcon.rkt")
+(require "notation.rkt" (for-syntax syntax/parse racket/list) racket/generic)
 (provide (all-defined-out))
 
+(struct exp (lab fvs-box) #:transparent)
+
+(define-generics binds-variables
+  [free-box binds-variables]
+  [free binds-variables #:bound [bound]]
+  #:fallbacks [(define (free e #:bound [bound ∅]) ∅)
+               (define free-box exp-fvs-box)])
+
+(define-simple-macro* (def-free e free
+                        (~or (~optional (~seq #:gfree gfree) #:defaults ([gfree #'gfree]))
+                             (~optional (~seq #:self free*))
+                             (~optional (~seq #:bound bound) #:defaults ([bound #'bound]))
+                             (~optional (~seq #:wcs wcs:exact-nonnegative-integer) #:defaults ([wcs #'1]))) ...
+                        [(struct pats ...) rhss ...])
+  (begin 
+    (define/generic gfree free)
+    (define (free e #:bound [bound ∅])
+      (or (unbox (free-box e))
+          (let ()
+            #,@(if (attribute free*) #'((define (free* e) (gfree e #:bound bound))) #'())
+            (match e [(struct #,@(make-list (syntax-e #'wcs) #'_) fvs-box pats ...)
+                      (define fvs (let () rhss ...))
+                      (set-box! fvs-box fvs)
+                      fvs]))))))
 ;; An Exp is one of:
 ;; (var Lab Exp)
 ;; (lam Lab Sym Exp)
@@ -11,90 +35,72 @@
 ;; (lcc Lab Var Exp)
 ;; (primr Lab Sym)
 ;; (datum Lab Atom)
-(struct exp (lab)             #:transparent)
-(struct var exp (name)        #:transparent)
-(struct lrc exp (xs es e)     #:transparent)
-(struct lam exp (xs exp)      #:transparent)
-(struct rlm exp (xs rest exp) #:transparent)
-(struct app exp (ℓchk rator rand)  #:transparent)
-(struct ife exp (t c a)       #:transparent)
-(struct st! exp (x e)         #:transparent)
-(struct lcc exp (x e)         #:transparent)
+(define-simple-macro* (exp-struct name (fields ...) [methods ...])
+  (struct name exp (fields ...) #:transparent #:methods #,(syntax-local-introduce #'gen:binds-variables) [methods ...]))
+(exp-struct var (name)
+        [(def-free e free #:bound bound [(var x) (if (x . ∈ . bound) ∅ (set x))])])
+(exp-struct lrc (xs es e)
+            [(def-free e free #:gfree gfree #:bound bound 
+              [(lrc xs es e)
+               (define bound* (∪/l bound xs))
+               (define (free* v) (gfree v #:bound bound*))
+               (∪ ((union-map free*) es) (free* e))])])
+(exp-struct lam (xs exp)
+        [(def-free e free #:gfree gfree #:bound bound [(lam xs e) (gfree e #:bound (∪/l bound xs))])])
+(exp-struct rlm (xs rest exp)
+        [(def-free e free #:gfree gfree #:bound bound
+           [(rlm xs rest e) (gfree e #:bound (∪/l bound (cons rest xs)))])])
+(exp-struct app (ℓchk rator rand)
+        [(def-free e free #:self free* #:bound bound [(app _ e0 es) (∪ (free* e0) ((union-map free*) es))])])
+(exp-struct ife (t c a)
+        [(def-free e free #:self free* [(ife g t e) (∪ (free* g) (free* e) (free* e))])])
+(exp-struct st! (x e)
+        [(def-free e free #:self free* #:bound bound
+           [(st! x e) (∪ (free* e) (if (x . ∈ . bound) ∅ (set x)))])])
+(exp-struct lcc (x e)
+        [(def-free e free #:gfree gfree #:bound bound [(lcc x e) (gfree e #:bound (∪1 bound x))])])
 ;; Stack inspection forms
-(struct grt exp (r e)         #:transparent) ;; Grant
-(struct fal exp ()            #:transparent) ;; Fail
-(struct frm exp (r e)         #:transparent) ;; Frame
-(struct tst exp (r t e)       #:transparent) ;; Test
+(exp-struct grt (r e)
+        [(def-free e free #:self free* [(grt _ e) (free* e)])])
+(exp-struct fal () [])
+(exp-struct frm (r e)
+        [(def-free e free #:self free* [(frm _ e) (free* e)])])
+(exp-struct tst (r t e)
+        [(def-free e free #:self free* [(tst _ t e) (∪ (free* t) (free* e))])])
 ;; Contract monitoring forms
-(struct mon exp (ℓchk pℓ nℓ sℓ s e) #:transparent) ;; Structural contract
-(struct tmon exp (ℓchk pℓ nℓ sℓ s t e) #:transparent) ;; Temporal contract attached to structural contract.
+(exp-struct mon (ℓchk pℓ nℓ sℓ s e)
+        [(def-free e free #:self free* [(mon _ _ _ _ s e) (∪ (free* s) (free* e))])])
+(exp-struct tmon (ℓchk pℓ nℓ sℓ s t e)
+        [(def-free e free #:self free* [(tmon _ _ _ _ s _ e) (∪ (free* s) (free* e))])])
 ;; Structural contract constructors
-(struct consc exp (ca cd)     #:transparent)
-(struct andc exp (c₀ c₁)      #:transparent)
-(struct orc exp (c₀ c₁)       #:transparent) ;; Only rightmost may be higher-order
-(struct fltc exp (e)          #:transparent)
-(struct -anyc exp ()          #:transparent) (define anyc (-anyc -1))
-(struct -nonec exp ()         #:transparent) (define nonec (-nonec -1))
-(struct arrc exp (name ncs pc) #:transparent)
+(exp-struct consc (ca cd)
+        [(def-free e free #:self free* [(consc ca cd) (∪ (free* ca) (free* cd))])])
+(exp-struct andc (c₀ c₁)
+        [(def-free e free #:self free* [(andc c₀ c₁)  (∪ (free* c₀) (free* c₁))])])
+(exp-struct orc (c₀ c₁)
+        [(def-free e free #:self free* [(orc c₀ c₁)  (∪ (free* c₀) (free* c₁))])])
+(exp-struct fltc (e)
+        [(def-free e free #:self free* [(fltc e) (free* e)])])
+(exp-struct arrc (name ncs pc)
+            [(def-free e free #:self free* [(arrc _ ncs pc) (∪ ((union-map free*) ncs) (free* pc))])])
+(struct -anyc () #:methods gen:binds-variables [])
+(struct -nonec () #:methods gen:binds-variables [])
+(define anyc (-anyc))
+(define nonec (-nonec))
+
 ;; Note: Temporal contract constructors from tcon
 ;; Top level timeline
 (struct -Λη ()) (define Λη (-Λη))
 
-(struct primr exp (which)    #:transparent)
+(exp-struct primr (which) [])
 ;; (dst Lab Sym List[Pair[Sym Boolean]] Exp)
 ;; Define struct form that should die after we go to real Racket.
-(struct dst exp (name fields e) #:transparent)
+(exp-struct dst (name fields e) [])
 
 ;; Unmerged data.
-(struct datum exp (val) #:transparent)
+(exp-struct datum (val) [])
 ;; Merged versions of data that must be evaluated specially.
-(struct mk-list^ exp (vals) #:transparent)
-(struct mk-improper^ exp (vals last) #:transparent)
-(struct mk-vector^ exp (vals) #:transparent)
-(struct mk-hash^ exp (keys vals) #:transparent)
-
-(define (free e)
-  (define (expr-free e bound)
-    (define (loop e) (expr-free e bound))
-    (match e
-      [(var _ name) (if (name . ∈ . bound) ∅ (set name))]
-      [(lrc _ xs es e)
-       (define bound* (∪/l bound xs))
-       (for/union #:initial (expr-free e bound*)
-                  ([e (in-list es)])
-         (expr-free e bound*))]
-      [(lam _ vars body) (expr-free body (∪/l bound vars))]
-      [(rlm _ vars rest body) (expr-free body (∪1 (∪/l bound vars) rest))]
-      [(app _ _ rator rands) (for/union #:initial (loop rator)
-                                      ([rand (in-list rands)])
-                             (loop rand))]
-      [(ife _ t c a) (∪ (loop t) (loop c) (loop a))]
-      [(st! _ x e)
-       (define efs (loop e))
-       (if (x . ∈ . bound) efs (∪1 efs x))]
-      [(lcc _ x e) (expr-free e (∪1 bound x))]
-      [(primr _ _) ∅]
-      [(datum _ _) ∅]
-      ;; Continuation mark forms
-      [(grt _ _ e) (loop e)]
-      [(frm _ _ e) (loop e)]
-      [(fal _) ∅]
-      [(tst _ _ t e) (∪ (loop t) (loop e))]
-      ;; Monitoring forms
-      [(or (mon _ _ _ _ _ s e)
-           (tmon _ _ _ _ _ s _ e))
-       (∪ (scon-free s bound) (loop e))]
-      [_ (error 'free "Bad expr ~a" e)]))
-  (define (scon-free s bound)
-    (define (loop s) (scon-free s bound))
-    (match s
-      [(or (consc _ s₀ s₁)
-           (orc _ s₀ s₁)
-           (andc _ s₀ s₁))
-       (∪ (loop s₀) (loop s₁))]
-      [(fltc _ e) (expr-free e bound)]
-      [(arrc _ _ ncs pc)
-       (for/union #:initial (loop pc) ([nc (in-list ncs)]) (loop nc))]
-      [(or (== anyc eq?) (== nonec eq?)) ∅]
-      [_ (error 'scon-free "Bad scon ~a" s)]))
-  (expr-free e ∅))
+(exp-struct mk-list^ (vals) [])
+(exp-struct mk-improper^ (vals last) [])
+(exp-struct mk-vector^ (vals) [])
+(exp-struct mk-hash^ (keys vals) [])

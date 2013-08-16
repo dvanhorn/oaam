@@ -1,7 +1,7 @@
 #lang racket
 (require "ast.rkt" "notation.rkt" (for-syntax syntax/parse racket/syntax)
          racket/stxparam)
-(provide define-nonce mk-touches mk-flatten-value cons-limit
+(provide define-nonce mk-flatten-value cons-limit
          ;; abstract values
          number^;;integer^ rational^
          number^?
@@ -178,37 +178,4 @@
       (null? x)
       (eof-object? x)))
 
-(define-simple-macro* (mk-touches touches:id clos:id rlos:id blclos:id promise:id 0cfa?:boolean)
-  (define (touches v)
-    (match v
-      [(or (clos xs e ρ fvs)
-           (rlos xs _ e ρ fvs))
-       #,(if (syntax-e #'0cfa?)
-             #'fvs
-             #'(for/set ([x (in-set fvs)])
-                 (hash-ref ρ x
-                           (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ)))))]      
-      [(blclos vaddr ncs pc _ _ _)
-       (∪1 (∪ (for/union ([nc (in-list ncs)]) (touches nc))
-              (touches pc))
-           vaddr)]
-      [(or (ccons ca cd)
-           (cand ca cd)
-           (cor ca cd)) (∪ (touches ca) (touches cd))]
-      [(cblarr _ ncs pc _ _)
-       (for/union #:initial (touches pc) ([nc (in-list ncs)])
-                  (touches nc))]
-      [(consv a d) (set a d)]
-      [(or (vectorv _ l)
-           (vectorv-immutable _ l)) (list->set l)]
-      [(or (vectorv^ _ a)
-           (vectorv-immutable^ _ a)) (set a)]
-      [(? set? s) (for/union ([v (in-set s)]) (touches v))]
-      [(promise e ρ)
-       #,(if (syntax-e #'0cfa?)
-             #'(free e)
-             #'(for/hash ([x (in-set (free e))])
-                 (hash-ref ρ x
-                           (λ () (error 'touches "Free identifier (~a) not in env ~a" x ρ)))))]
-      [_ (set)])))
 
