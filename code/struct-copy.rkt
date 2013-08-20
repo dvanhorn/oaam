@@ -2,8 +2,7 @@
 (require racket/match
          (for-syntax racket/base
                      syntax/parse racket/syntax racket/struct-info
-                     racket/list
-                     racket/pretty))
+                     racket/list))
 (provide struct-copy/inherit)
 
 (define-syntax (struct-copy/inherit stx)
@@ -18,7 +17,6 @@
      #:fail-unless (null? bad-children)
      (format "No struct-info attached to children ~a" bad-children)
      #:do [(define parent-info (extract-struct-info parent-v))
-           (pretty-print parent-info)
            (define children-parents (reverse
                                      (for/fold ([acc '()]) ([c (in-list children-v)]
                                                             [c-id (in-list childrenl)])

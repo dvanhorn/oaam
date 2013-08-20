@@ -20,7 +20,7 @@
 
 (define (test e)
   (parameterize ([current-logger (make-logger 'stuck-states)])
-    #;#;
+
     (log-thread 'info)
     (log-thread 'debug)
     ;; we want to make sure that we are testing the implementation and not
@@ -31,7 +31,7 @@
     (with-limit-handler ;; Prints state rate even if timeout/oom
      (with-limits (* 30 #;run-for-30-minutes
                      60 #;seconds-in-minutes)
-                  1024  ;; Max memory: 1GiB
+                  2048  ;; Max memory: 1GiB
                   (call-with-values (λ ()
                                        (begin0 (time ((aval) e))
                                                (void)
@@ -55,12 +55,10 @@
                    (aval 0cfa^/t)]
                   [("--sdt") "Benchmark specialized fixpoint with timestamps and store deltas"
                    (aval 0cfa^-∆s/t)]
-|#
                   [("--ls") "Benchmark specialized lazy non-determinism"
                    (aval lazy-0cfa^)]
                   [("--lc") "Benchmark compiled specialized lazy non-determinism"
                    (aval lazy-0cfa^/c)]
-#|
                   [("--lst") "Benchmark specialized lazy non-determinism with timestamps"
                    (aval lazy-0cfa^-∆s/t)]
 
@@ -88,6 +86,9 @@
                    "Benchmark compiled preallocated store-diff lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/prealloc!)]
 |#
+                  [("--lcg")
+                   "Benchmark compiled GCd abs-counted lazy non-determinism"
+                   (aval lazy-0cfa/c/Γ/μ/∆s)]
                   [("--ps")
                    "Benchmark compiled preallocated stacked store lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/prealloc/stacked!)]

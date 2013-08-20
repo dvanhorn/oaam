@@ -100,35 +100,37 @@
          [(_ t e) (if (eq? 0 (attribute K))
                       t
                       e)]))
-     (with-syntax ([((ρ-op ...) (δ-op ...) (l-op ...))
-                    (if (zero? (attribute K)) #'(() () ()) #'((ρ) (δ) (l)))]
-                   ;; INVARIANT: All instances of mk-abs will use a global μ if widened.
-                   [((μ-op ...) (target-μ-op ...))
-                    (if (and μ? (not (given wide?)))
-                        #'((μ) (target-μ))
-                        #'(() ()))]
-                   [(ev: co: ans: ap: cc: chk:)
-                    (colonize #'(ev co ans ap cc chk))]
-                   [co? (format-id #'co "~a?" #'co)]
-                   [clos? (format-id #'clos "~a?" #'clos)]
-                   [rlos? (format-id #'rlos "~a?" #'rlos)]
-                   [blclos? (format-id #'blclos "~a?" #'blclos)]
-                   [primop: (format-id #'primop "~a:" #'primop)]
-                   [primop? (format-id #'primop "~a?" #'primop)]
-                   [((locals local-implicits) ...) #'((τ target-τ))]
-                   ;; represent rσ explicitly in all states?
-                   [(σ-op ...) (if (given wide?) #'() #'(rσ))]
-                   ;; explicitly pass σ/∆ to compiled forms?
-                   [((σ-gop ...) (target-σ-op ...))
-                    (if σ-passing?* #'((gσ) (target-σ)) #'(() ()))]
-                   ;; If rσ not part of state and not global, it is passed
-                   ;; in as (cons rσ state), so expand accordingly.
-                   [(expander-flags ...)
-                    (append
-                     (cond [(and (given wide?) (not (given global-σ?)))
-                            '(#:expander #:with-first-cons)]
-                           [else '()]))]
-                   [inj-σ (if σ-∆sv? #''() #'(hash))])
+     (with-syntax* ([((ρ-op ...) (δ-op ...) (l-op ...))
+                     (if (zero? (attribute K)) #'(() () ()) #'((ρ) (δ) (l)))]
+                    ;; INVARIANT: All instances of mk-abs will use a global μ if widened.
+                    [((μ-op ...) (target-μ-op ...))
+                     (if (and μ? (not (given wide?)))
+                         #'((μ) (target-μ))
+                         #'(() ()))]
+                    [(ev: co: ans: ap: cc: chk:)
+                     (colonize #'(ev co ans ap cc chk))]
+                    [co? (format-id #'co "~a?" #'co)]
+                    [clos? (format-id #'clos "~a?" #'clos)]
+                    [rlos? (format-id #'rlos "~a?" #'rlos)]
+                    [blclos? (format-id #'blclos "~a?" #'blclos)]
+                    [primop: (format-id #'primop "~a:" #'primop)]
+                    [primop? (format-id #'primop "~a?" #'primop)]
+                    [((locals local-implicits) ...)
+                     #'([μ target-μ] [τ target-τ])]
+                    [(locals-op ...) #'(μ-op ... τ)]
+                    ;; represent rσ explicitly in all states?
+                    [(σ-op ...) (if (given wide?) #'() #'(rσ))]
+                    ;; explicitly pass σ/∆ to compiled forms?
+                    [((σ-gop ...) (target-σ-op ...))
+                     (if σ-passing?* #'((gσ) (target-σ)) #'(() ()))]
+                    ;; If rσ not part of state and not global, it is passed
+                    ;; in as (cons rσ state), so expand accordingly.
+                    [(expander-flags ...)
+                     (append
+                      (cond [(and (given wide?) (not (given global-σ?)))
+                             '(#:expander #:with-first-cons)]
+                            [else '()]))]
+                    [inj-σ (if σ-∆sv? #''() #'(hash))])
        (define yield-ev
          (if compiledv?
              #'(λ (syn)
@@ -348,11 +350,11 @@
 
          (quasisyntax/loc stx
            (begin ;; specialize representation given that 0cfa needs less
-             (mk-op-struct state-base ([rσ #:mutable] [μ #:mutable] #;τ pnt)
-                           (σ-op ... μ-op ... #;τ pnt) expander-flags ...
-                           #:implicit ([rσ target-σ] [μ target-μ] #;[τ target-τ]
+             (mk-op-struct state-base ([rσ #:mutable] #;μ #;τ pnt)
+                           (σ-op ... #;μ-op... #;τ pnt) expander-flags ...
+                           #:implicit ([rσ target-σ] #;[μ target-μ] #;[τ target-τ]
                                        ))
-             (mk-op-struct point (locals ... conf) (locals ... conf) #:implicit ([locals local-implicits] ...))
+             (mk-op-struct point (locals ... conf) (locals-op ... conf) #:implicit ([locals local-implicits] ...))
              (mk-op-struct co (state-base point) (k v) (k v) expander-flags ...)
              ;; Variable dereference causes problems with strict/compiled
              ;; instantiations because store changes are delayed a step.
@@ -485,7 +487,7 @@
                  [(? set? s) (for/union ([v (in-set s)]) (touches v))]
                  [(addr a) (set a)]
                  [_ ∅]))
-             
+
              (define (touches-con c)
                (match c
                  [(or (ccons c₀ c₁)
@@ -529,7 +531,7 @@
                  [(mt: cm) ∅]
                  [(frame+: cm f k)
                   (∪1 (match f
-                        [(sk!: a) (set a)] 
+                        [(sk!: a) (set a)]
                         [(ifk: t e ρ δ) (touches-ρ ρ t e)]
                         [(lrk: x xs es e ρ δ)
                          (touches-ρ ρ (cons e es) #:variables (cons x xs))]

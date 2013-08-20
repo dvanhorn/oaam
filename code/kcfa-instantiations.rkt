@@ -125,6 +125,7 @@ Welcome to Racket v5.3.3.
                    #:σ-passing #:wide #:set-monad)))))))
 (provide 0cfa^/t)
 
+#;#;#;
 ;; The baseline in the paper
 ;; "sp"
 (mk-special2-set-fixpoint^ fix 0cfa-set-fixpoint^ 0cfa-ans^ 0ev^ 0co^ #f)
@@ -155,6 +156,7 @@ Welcome to Racket v5.3.3.
                    #:σ-passing #:σ-∆s #:wide #:set-monad)))))))
 (provide 0cfa^-∆s/t)
 
+#;#;#;
 ;; "ls"
 (mk-special2-set-fixpoint^ fix lazy-0cfa-set-fixpoint^ lazy-0cfa-ans^ l-0ev l-0co #f)
 (with-nonsparse
@@ -183,6 +185,7 @@ Welcome to Racket v5.3.3.
                    #:σ-passing #:σ-∆s #:wide #:set-monad)))))))
 (provide lazy-0cfa^-∆s/t)
 
+#;
 ;; "lc"
 (splicing-syntax-parameterize ([generate-graph? #t])
  (mk-special2-set-fixpoint^ fix 0cfa-set-fixpoint^/c 0cfa-ans^/c levc lcoc #t)
@@ -197,7 +200,7 @@ Welcome to Racket v5.3.3.
                     #:σ-passing
                     #:compiled #:wide #:set-monad
                     #:ev levc #:co lcoc))))))))
- (provide lazy-0cfa^/c)
+#; (provide lazy-0cfa^/c)
 
 #;#;#;
 ;; "lct"
@@ -283,7 +286,7 @@ Welcome to Racket v5.3.3.
 ;;  (with-lazy
 ;;   (with-0-ctx
 ;;    (with-mutable-store/stacked
-;;     (with-mutable-worklist/stacked
+;;     (with-mutable-worklist/stacked^
 ;;     (with-abstract
 ;;       (mk-analysis #:aval lazy-0cfa^/c/∆s/stacked!
 ;;                    #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
@@ -330,27 +333,60 @@ Welcome to Racket v5.3.3.
 
 
 ;; "ps"
-(mk-prealloc/timestamp^-fixpoint/stacked
- prealloc/∆s-fixpoint/stacked/c
- prealloc/∆s-ans/stacked/c
- prealloc/∆s-touches-0/stacked/c)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx/prealloc
-   (with-prealloc/timestamp-store/stacked
-    (with-mutable-worklist/stacked
-    (with-abstract
-     (define ps-e (box #f))
-      (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc/stacked!
-                   #:prepare (λ (sexp)
-                                (define e* (prepare-prealloc/stacked parse-prog sexp))
-                                (set-box! ps-e e*)
-                                e*)
-                   #:ans prealloc/∆s-ans/stacked/c
-                   #:touches prealloc/∆s-touches-0/stacked/c
-                   #:fixpoint prealloc/∆s-fixpoint/stacked/c
-                   #:global-σ #:compiled #:wide)))))))
+(splicing-syntax-parameterize ([generate-graph? #f]
+                               [abs-count? #t])
+ (mk-prealloc/timestamp^-fixpoint/stacked
+  prealloc/∆s-fixpoint/stacked/c
+  prealloc/∆s-state-base/stacked/c
+  prealloc/∆s-point/stacked/c
+  prealloc/∆s-ans/stacked/c
+  prealloc/∆s-touches-0/stacked/c
+  #:ev psev
+  #:co psco #:compiled)
+ (with-nonsparse
+  (with-lazy
+   (with-0-ctx/prealloc
+    (with-prealloc/timestamp-store/stacked
+     (with-mutable-worklist/stacked^
+      (with-abstract
+       (define ps-e (box #f))
+       (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc/stacked!
+                    #:prepare (λ (sexp)
+                                 (define e* (prepare-prealloc/stacked parse-prog sexp))
+                                 (set-box! ps-e e*)
+                                 e*)
+                    #:state-base prealloc/∆s-state-base/stacked/c
+                    #:point prealloc/∆s-point/stacked/c
+                    #:ans prealloc/∆s-ans/stacked/c
+                    #:touches prealloc/∆s-touches-0/stacked/c
+                    #:fixpoint prealloc/∆s-fixpoint/stacked/c
+                    #:co psco #:compiled ;#:ev psev
+                    #:global-σ #:wide))))))))
 (provide lazy-0cfa^/c/∆s/prealloc/stacked!)
+
+;; "lcg"
+(splicing-syntax-parameterize ([generate-graph? #f]
+                               [abs-count? #t]
+                               [compiled? #t])
+ (with-timestamp-∆-fix/Γ
+  [lcgsb
+   lcgpnt
+   (lcgco lcgdr lcgchk lcgans lcgap lcgcc lcgev)
+   lcgtouches
+   lcgroot]
+  (with-nonsparse
+  (with-lazy
+   (with-0-ctx
+    (with-σ-∆s
+     (with-abstract
+       (mk-analysis #:aval lazy-0cfa/c/Γ/μ/∆s
+                    #:state-base lcgsb
+                    #:point lcgpnt
+                    #:touches lcgtouches
+                    #:root lcgroot
+                    #:co lcgco #:dr lcgdr #:chk lcgchk #:ans lcgans #:ap lcgap #:cc lcgcc #:ev lcgev
+                    #:σ-passing))))))))
+(provide lazy-0cfa/c/Γ/μ/∆s)
 
 #;#;#;
 ;; "ps1"
@@ -359,7 +395,7 @@ Welcome to Racket v5.3.3.
  (with-lazy
   (with-1-ctx/prealloc
    (with-prealloc/timestamp-store/stacked
-    (with-mutable-worklist/stacked
+    (with-mutable-worklist/stacked^
     (with-abstract
      (define ps-e-1 (box #f))
       (mk-analysis #:aval lazy-1cfa^/c/∆s/prealloc/stacked!
@@ -380,7 +416,7 @@ Welcome to Racket v5.3.3.
 ;;  (with-lazy
 ;;   (with-0-ctx
 ;;    (with-mutable-store
-;;     (with-mutable-worklist
+;;     (with-mutable-worklist^
 ;;      (with-abstract
 ;;       (mk-analysis #:aval lazy-0cfa^/c/timestamp!
 ;;                    #:prepare (λ (sexp) (prepare-imperative parse-prog sexp))
@@ -396,7 +432,7 @@ Welcome to Racket v5.3.3.
 ;;  (with-lazy
 ;;   (with-0-ctx/prealloc
 ;;    (with-prealloc/timestamp-store
-;;     (with-mutable-worklist
+;;     (with-mutable-worklist^
 ;;      (with-abstract
 ;;       (mk-analysis #:aval lazy-0cfa^/c/prealloc/timestamp!
 ;;                    #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
@@ -468,7 +504,7 @@ Welcome to Racket v5.3.3.
   (with-lazy
    (with-0-ctx/prealloc
     (with-prealloc/timestamp-store
-     (with-mutable-worklist
+     (with-mutable-worklist^
       (with-abstract
        (mk-analysis #:aval lazy-0cfa^/prealloc/timestamp!
                     #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))

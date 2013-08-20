@@ -1,5 +1,5 @@
 #lang racket
-(provide extend extend* join join* join-store
+(provide extend extend* join join* join-store join-store/change
          restrict-to-set reach
          update update/change would-update? restrict-to-reachable restrict-to-reachable/vector)
 (require "data.rkt" "ast.rkt" "notation.rkt")
@@ -28,6 +28,12 @@
   (for/fold ([eσ eσ1])
       ([(k v) (in-hash eσ2)])
     (join eσ k v)))
+
+(define (join-store/change eσ1 eσ2)
+  (for/fold ([eσ eσ1] [same? #t])
+      ([(k v) (in-hash eσ2)])
+    (define-values (eσ* same?*) (join/change eσ k v))
+    (values eσ* (and same? same?*))))
 
 (define (update ∆s eσ)
   (for/fold ([eσ eσ]) ([a×vs (in-list ∆s)])
