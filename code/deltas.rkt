@@ -22,9 +22,6 @@
 (define-simple-macro* (bind-join*-∆s (as vss) body)
   (let ([∆s* (map2-append cons target-σ as vss)]) #,(bind-rest #'∆s* #'body)))
 
-(define-syntax-rule (top-hash-getter a)
-  (hash-ref top-σ a (λ () (error 'top-hash-getter "Unbound address ~a in store ~a" a top-σ))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Wide fixpoint for σ-∆s
 
@@ -141,6 +138,8 @@
   (splicing-syntax-parameterize
    ([bind-join (make-rename-transformer #'bind-join-∆s)]
     [bind-join* (make-rename-transformer #'bind-join*-∆s)]
-    [getter (make-rename-transformer #'top-hash-getter)]
-    [μgetter (syntax-rules () [(_ a) (hash-ref target-μ a 0)])])
+    [bind-μbump (make-rename-transformer #'bind-μbump-whole)]
+    [getter (make-rename-transformer #'target-hash-top-getter)]
+    [μgetter (make-rename-transformer #'target-hash-μgetter)]
+    [σ-∆s? #t])
    body))

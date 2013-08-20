@@ -1,17 +1,18 @@
 #lang racket
-(require racket/unit 
+(require racket/unit
          "ast.rkt"
          (except-in "notation.rkt" ∪ ∩))
 (require racket/trace)
 
 (provide TCon-deriv^ TCon-deriv@ weak-eq^
-         may must for/∧ for*/∧ ⊕
+         may must for/∧ for*/∧ ⊕ ∨ ∧
          ¬ · kl bind ε
          call ret !call !ret
          $ □ Any label
          (rename-out [∪ tor] [∩ tand])
          simple
-         (struct-out tl)         
+         (struct-out tl)
+         Γτ
          M⊥)
 
 (define ρ₀ #hasheq())
@@ -19,7 +20,7 @@
 
 (define (default-free-box e) (error 'free-box "Tcons don't have fvs, so no box ~a" e))
 (define-simple-macro* (tcon-struct name (fields ...))
-  (struct name (fields ...) #:transparent 
+  (struct name (fields ...) #:transparent
          ;; #:methods #,(syntax-local-introduce #'gen:binds-variables)
           ;;[(define free-box default-free-box)]
           ))
@@ -64,6 +65,7 @@
 (struct constructed (c data) #:transparent)
 (struct !constructed (c data) #:transparent)
 (struct -Any () #:transparent) (define Any (-Any))
+(struct -None () #:transparent) (define None (-None))
 (struct $ (x) #:transparent)
 (struct □ (x) #:transparent)
 (struct label (ℓ) #:transparent)
@@ -121,6 +123,15 @@
   [((· T₀₀ T₀₁) T₁) (·simpl T₀₀ (·simpl T₀₁ T₁))]
   ;; No simplifications
   [(T₀ T₁) (· T₀ T₁)])
+
+(define/match (klsimpl T)
+  [((or (? ε?) (? T⊥?))) ε]
+  [((or (? Tε?) (? ST⊥?))) Tε]
+  [((kl T)) (klsimpl T)]
+  [((? Σ̂*?)) Σ̂*]
+  [((? SΣ̂*?)) SΣ̂*]
+  [((closed T ρ)) (closed (klsimpl T) ρ)] ;; TODO: restrict bindings
+  [(T) (kl T)])
 
 (define/match (¬simpl T)
   [((¬ T)) T]
@@ -227,6 +238,7 @@
           (⨅/lst matches2 pats data)]
          [_ #f])]
       [(== Any eq?) (mres must γ)]
+      [(== None eq?) #f]
       [(label ℓ)
        (and (matchℓ? A ℓ)
             (mres must γ))]
@@ -242,6 +254,67 @@
                  [else (≃ v A)]))
          (and t (mres t γ))]))
   matches)
+
+;; References
+(define (refers-to ρkill event)
+  (let build ([event event] [ρnew ρkill])
+    (define (build/l pats)
+      (let/ec found-none
+         (let loop ([pats pats] [ρnew* ρnew])
+           (match pats
+             ['() (values ρnew* '())]
+             [(cons pat pats)
+              (define-values (ρnew** pat*) (build pat ρnew*))
+              (cond [(eq? pat* None) (found-none ρnew None)]
+                    [else
+                     (define-values (ρnew*** pats*) (loop pats ρnew**))
+                     (values ρnew*** (cons pat* pats*))])]))))
+    (match event
+      [(constructed kind pats)
+       (define-values (ρnew* pats*) (build/l pats))
+       (if (eq? pats* None)
+           (values ρnew None)
+           (values ρnew* (constructed kind pats*)))]
+      [(!constructed kind pats)
+       (define-values (ρnew* pats*) (build/l pats))
+       (if (eq? pats* None)
+           (values ρnew Any) ;; A pattern can't match, so obviously whole thing can't match
+           ;; ρ doesn't bind.
+           (values ρnew (!constructed kind pats*)))]
+      [($ x) (values ρnew (if (hash-has-key? ρkill x) None event))]
+      [(□ x) (values (hash-remove ρnew x) event)]
+      [_ (values ρnew event)])))
+
+(define (Γτ reachable touches τ)
+  (define (touches-unreachable ρ)
+    (for/hasheq ([(x v) (in-hash ρ)]
+                 #:unless (subset? (touches v) reachable))
+      (values x #t)))
+  (for/hash ([(η Ts) (in-hash τ)]
+             #:when (η . ∈ . reachable))
+    (values η (for/set ([T (in-set Ts)])
+                (let Γsimpl* ([T T] [ρ ρ₀] [ρkill ρ₀])
+                     (define (Γsimpl T) (Γsimpl* T ρ ρkill))
+                     (match T
+                       [(∪ Ts) (∪simpl (set-map Γsimpl Ts))]
+                       [(∩ Ts) (∩simpl (set-map Γsimpl Ts))]
+                       [(¬ T) (¬simpl (Γsimpl T))]
+                       [(kl T) (klsimpl (Γsimpl T))] ;; TODO
+                       [(· T₀ T₁) (·simpl (Γsimpl T₀) (Γsimpl T₁))]
+                       [(bind B T)
+                        (define-values (ρkill* B*) (refers-to ρkill B))
+                        (if B* (bind B* (Γsimpl* T ρkill*)) ST⊥)]
+                       [(closed T ρ)
+                        (define T* (Γsimpl* T ρ (ρkill . ◃ . (touches-unreachable ρ))))
+                        (if (T⊥? T*)
+                            ST⊥
+                            (closed T* ρ))]
+                       [(? ε?) ε]
+                       [_
+                        (define-values (ρkill* A) (refers-to ρkill T))
+                        (cond [(eq? A None) (if (eq? ρ₀ ρ) T⊥ ST⊥)]
+                              [(eq? ρ₀ ρ) A]
+                              [else (closed A ρ)])]))))))
 
 (define-unit TCon-deriv@
   (import weak-eq^)
@@ -264,7 +337,7 @@
               M⊥)
             (tl (¬simpl T′) must))]
        [(tl T′ t′) (tl (¬simpl T′) (if (ν? T′)
-                                       (begin 
+                                       (begin
                                          (printf "May fail state!~%")
                                          may)
                                        (begin
@@ -274,7 +347,7 @@
 
    ;; ð_A (· T₀ T₁) = ð_A T₀ + ν(T₀)·ð_A T₁
    ;; ∂_A (· T₀ T₁) ρ = ∂_A T₀,ρ + ν(T₀)·∂_A T₁,ρ
-   (define (·p νT₀ ∂T₀ ∂T₁-promise T₁ bin)     
+   (define (·p νT₀ ∂T₀ ∂T₁-promise T₁ bin)
      (define-values (left t)
        (match ∂T₀
          [(? M⊥?) (values ST⊥ must)]
@@ -311,13 +384,13 @@
        [#f M⊥]
        [(mres t′ ρ′) (tl (closed T ρ′) t′)]
        [M (error '∂ "oops10 ~a" M)]))
-   
+
    (define (patp pat A ρ)
      (match (matches pat A ρ)
        [#f M⊥]
        [(mres t ρ′) (tl Tε t)]
        [M (error '∂ "oops11 ~a" M)]))
- 
+
    ;; Top level temporal contracts with distributed ρs.
    (define (ð* A T)
      (let ð± ([T T] [± #t])
@@ -334,7 +407,7 @@
          [(closed T ρ) (∂ A T ρ ±)] ;; TODO: Add fvs to Tcons and restrict ρ
          [_ (error 'ð "Bad Tcon ~a" T)])))
    (define ð ð*)
- 
+
    ;; Treat T as if each component of T is closed by ρ (down to bind)
    (define (∂ A T ρ ±)
      (define (∂1 T) (∂ A T ρ ±))
@@ -357,7 +430,7 @@
    (define (run* Tt π)
      (match π
        ['() Tt]
-       [(cons A π) 
+       [(cons A π)
         (match Tt
           [(tl T t) (run* (ð A T) π)]
           [(? M⊥?) M⊥]

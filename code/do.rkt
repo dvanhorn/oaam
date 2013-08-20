@@ -29,13 +29,19 @@
                       bind bind-rest do make-var-contour
                       target-σ? target-μ target-τ
                       target-cs? target-cs target-actions? target-actions
-                      top-σ top-σ?)
+                      top-σ)
 (define-syntax-parameter target-σ
   (λ (stx) (raise-syntax-error #f (format "To be used within proper scope ~a:~a"
                                           (syntax-source-file-name stx)
                                           (syntax-line stx))
                                stx)))
-(provide target-σ)
+(define-syntax-parameter abs-count? #f)
+(define-syntax-parameter σ-∆s? #f)
+(define-syntax-parameter imperative? #f)
+(define-syntax-parameter compiled? #f)
+(define-syntax-parameter fixpoint #f)
+(provide target-σ abs-count? compiled? fixpoint σ-∆s? imperative?)
+
 
 (define-syntax-rule (bind-τ-join (a τs) . body)
   (let ([τ* (join target-τ a τs)])
@@ -45,10 +51,14 @@
 (define-syntax-rule (match-state e [(head σ μ τ . pat) rhss ...] ... [last-pat last-e])
   (match e
     [(head σ μ τ . pat)
-     (syntax-parameterize ([target-σ (make-rename-transformer #'σ)]
-                           [target-μ (make-rename-transformer #'μ)]
-                           [target-τ (make-rename-transformer #'τ)])
-       rhss ...)] ...
+     (let ([σ* '()])
+      (syntax-parameterize ([top-σ (make-rename-transformer #'σ)]
+                            [target-σ (if (syntax-parameter-value #'σ-∆s?)
+                                          (make-rename-transformer #'σ*)
+                                          (make-rename-transformer #'σ))]
+                            [target-μ (make-rename-transformer #'μ)]
+                            [target-τ (make-rename-transformer #'τ)])
+        rhss ...))] ...
     [last-pat last-e]))
 
 ;; default: do nothing to the body of a do.
@@ -62,16 +72,18 @@
 (define-syntax-rule (bind-alias (alias to-alias) body)
   (bind-get (res to-alias) (bind-join (alias res) body)))
 
-(define-for-syntax ((mk-do σ-∆s? set-monad? global-σ? generators? μ?) stx)
+(define-for-syntax ((mk-do set-monad? global-σ? generators?) stx)
   ;; Construct the values tuple given the previously bound σ and cs
+  (define σ-∆sv? (syntax-parameter-value #'σ-∆s?))
+  (define μ? (syntax-parameter-value #'abs-count?))
   (define tσ (syntax-parameter-value #'target-σ?))
   (define tcs (syntax-parameter-value #'target-cs?))
   (define tas (syntax-parameter-value #'target-actions?))
   (define gen-wrap
     (cond [(not generators?) values]
-          [(and global-σ? (not σ-∆s?)) (λ (stx) #`(begin #,stx 'done))]
+          [(and global-σ? (not σ-∆sv?)) (λ (stx) #`(begin #,stx 'done))]
           [else (λ (stx) #`(begin (yield #,stx) 'done))]))
-  (define add-void? (and global-σ? (not σ-∆s?) (not tas)))
+  (define add-void? (syntax-parameter-value #'imperative?))
 
   (define-syntax-class join-clause
     #:attributes (clause)

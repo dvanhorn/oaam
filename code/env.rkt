@@ -1,6 +1,6 @@
 #lang racket
 (provide extend extend* join join* join-store
-         restrict-to-set
+         restrict-to-set reach
          update update/change would-update? restrict-to-reachable restrict-to-reachable/vector)
 (require "data.rkt" "ast.rkt" "notation.rkt")
 

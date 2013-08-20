@@ -1,10 +1,12 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
-         (for-syntax racket/syntax syntax/parse)
+         (for-syntax racket/syntax syntax/parse "notation.rkt")
          (only-in "store-passing.rkt" bind-rest) "data.rkt" "deltas.rkt" "add-lib.rkt"
          (only-in "ast.rkt" var?)
          "handle-limits.rkt"
+         (only-in "tcon.rkt" Γτ)
          "graph.rkt"
+         "struct-copy.rkt"
          racket/unsafe/ops)
 (provide reset-globals! reset-todo! add-todo! inc-unions! set-global-σ! set-global-μ!
          saw-change!
@@ -16,6 +18,7 @@
          mk-imperative/timestamp^-fixpoint/stacked
          mk-imperative/∆s/acc^-fixpoint
          mk-imperative/∆s^-fixpoint
+         with-timestamp-∆-fix/Γ
          mk-add-∆/s
          mk-add-∆/s!
          mk-join* mk-joiner mk-μbump mk-μbump/stacked mk-bind-μbump
@@ -30,15 +33,15 @@
          unions todo seen global-σ global-μ
          with-mutable-store
          with-mutable-store/stacked
-         with-mutable-worklist
-         with-mutable-worklist/stacked
+         with-mutable-worklist^
+         with-mutable-worklist/stacked^
          with-σ-∆s/acc!
          with-σ-∆s!)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mutable global store and worklist.
 (define todo #f) (define todo-num 0)
-(define seen #f)
+(define seen #f) (define (set-seen! v) (set! seen v))
 (define global-σ #f)
 (define global-μ #f)
 (define ∆? #f)
@@ -50,6 +53,49 @@
 (define (add-todo! c)
   (set! todo (cons c todo))
   (set! todo-num (add1 todo-num)))
+(define-simple-macro* (mk-add-todo/guard name state-base point (co dr chk ans ap ev cc) touches root reach*)
+  #,(let ()
+      (define μ? (syntax-parameter-value #'abs-count?))
+      (define compiledv? (syntax-parameter-value #'compiled?))
+      (define-syntax ifμ
+        (syntax-rules ()
+          [(_ t) (if μ? (list t) '())]
+          [(_ t e) (if μ? t e)]))
+      (head*
+       define/with-syntax
+       [state-base-rσ (format-id #'state-base "~a-rσ" #'state-base)]
+       [state-base-μ (format-id #'state-base "~a-μ" #'state-base)]
+       [state-base-pnt (format-id #'state-base "~a-pnt" #'state-base)]
+       [point-τ (format-id #'point "~a-τ" #'point)]
+       [point-conf (format-id #'point "~a-conf" #'point)]
+       [(μ-op ...) (if μ? #'(μ*) #'())])
+      #`(define (name c)
+          (define σ (or (and current-state (state-base-rσ current-state)) σ₀))
+          #,@(if-μ #'(define μ (state-base-μ c)))
+          (define-values (∆s μ-op ... pnt)
+            (values (state-base-rσ c)
+                    #,@(if-μ #'(state-base-μ c))
+                    (state-base-pnt c)))
+          (define-values (τ conf) (values (point-τ pnt) (point-conf pnt)))
+          (define-values (σ* τ* #,@(if-μ #'μ**))
+            #,(if-μ
+               #'(cond
+                  [(for/or ([p (in-list ∆s)]) (not (eq? 0 (hash-ref μ (car p) 0))))
+                   (define reachable-addresses (reach* σ (root c)))
+                   (values (update ∆s (restrict-to-set σ reachable-addresses))
+                           (Γτ reachable-addresses touches τ)
+                           (restrict-to-set μ* reachable-addresses))]
+                  [else (values (update ∆s σ) τ μ*)])
+               #'(values (update ∆s σ) τ μ*)))
+          (define c*
+            (syntax-parameterize ([target-τ (make-rename-transformer #'τ*)]
+                                  [target-σ (make-rename-transformer #'σ*)]
+                                  [target-μ (make-rename-transformer #'μ**)])
+             (state-base (point conf))))
+          (unless (hash-has-key? seen c*)
+            (add-todo! c*)
+            (hash-set! seen c* #t)))))
+
 (define-syntax in-todo (make-rename-transformer #'in-list))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -57,7 +103,7 @@
 (define unions #f)
 (define (inc-unions!) (set! unions (add1 unions)))
 
-(define (do-yield! c)
+(define (do-yield^! c)
   (unless (= unions (hash-ref seen c -1))
     (hash-set! seen c unions)
     (add-todo! c)))
@@ -94,8 +140,11 @@
 (define-syntax (emit-edge! stx)
   (syntax-case stx ()
     [(_ e) #`(begin #,@(if-graph #'(add-edge! graph current-state e)))]))
-(define-for-syntax yield! (syntax-rules () [(_ e) (let ([s e]) (emit-edge! s) (reset-kind!) (do-yield! s))]))
-(define-for-syntax yield/stacked! (syntax-rules () [(_ e) (let ([s e]) (emit-edge! s) (reset-kind!) (do-yield/stacked! s))]))
+(define-for-syntax ((mk-yield yielder) stx)
+  (syntax-case stx () [(_ e) #`(let ([s e]) (emit-edge! s) (reset-kind!) (#,yielder s))]))
+(define-for-syntax yield^! (mk-yield #'do-yield^!))
+(define-for-syntax yield! (mk-yield #'add-todo/guard!))
+(define-for-syntax yield/stacked! (mk-yield #'do-yield/stacked!))
 
 (define-simple-macro* (mk-bind-joiner name joiner)
   (define-syntax-rule (name (a vs) . body)
@@ -167,10 +216,11 @@
 (define-syntax-rule (mk-mk-imperative/timestamp^-fixpoint mk-name cleaner extra-reset)
   (define-syntax (mk-name stx)
     (syntax-parse stx
-      [(_ name state-base ans^ touches #:ev ev #:co co (~optional (~and #:compiled compiled?)))
+      [(_ name state-base point ans^ touches #:ev ev #:co co (~optional (~and #:compiled compiled?)))
        (with-syntax ([ans^? (format-id #'ans^ "~a?" #'ans^)]
                      [ans^-v (format-id #'ans^ "~a-v" #'ans^)]
-                     [state-base-τ (format-id #'state-base "~a-τ" #'state-base)]
+                     [state-base-pnt (format-id #'state-base "~a-pnt" #'state-base)]
+                     [point-τ (format-id #'point "~a-τ" #'point)]
                      [ev? (format-id #'ev "~a?" #'ev)]
                      [ev-e (format-id #'ev "~a-e" #'ev)]
                      [co? (format-id #'co "~a?" #'co)])
@@ -196,7 +246,7 @@
                         (define vs
                           (for*/set ([(c at-unions) (in-hash seen)]
                                      #:when (ans^? c))
-                            (cons (ans^-v c) (state-base-τ c))))
+                            (cons (ans^-v c) (point-τ (state-base-pnt c)))))
                         (values (format "State count: ~a" (unbox state-count*))
                                 (format "Point count: ~a" (hash-count seen))
                                 (with-output-to-string
@@ -233,13 +283,15 @@
 (mk-mk-imperative/timestamp^-fixpoint
  mk-imperative/timestamp^-fixpoint/stacked restrict-to-reachable/stacked (reset-∆?!))
 
-(define-syntax-rule (with-mutable-worklist body)
+(define-syntax-rule (with-mutable-worklist^ body)
   (splicing-syntax-parameterize
-   ([yield-meaning yield!])
+   ([yield-meaning yield^!]
+    [imperative? #t])
    body))
-(define-syntax-rule (with-mutable-worklist/stacked body)
+(define-syntax-rule (with-mutable-worklist/stacked^ body)
   (splicing-syntax-parameterize
-   ([yield-meaning yield/stacked!])
+   ([yield-meaning yield/stacked!]
+    [imperative? #t])
    body))
 (define-syntax-rule (mk-with-store name join join* μbump get μget)
   (define-syntax-rule (name . body)
@@ -307,10 +359,11 @@
 (define-syntax-rule (mk-mk-imperative/∆s/acc^-fixpoint mk-name cleaner joiner set-σ! get-σ μbump)
   (define-syntax (mk-name stx)
     (syntax-case stx ()
-      [(_ name state-base ans^ touches)
+      [(_ name state-base point ans^ touches)
        (with-syntax ([ans^? (format-id #'ans^ "~a?" #'ans^)]
                      [ans^-v (format-id #'ans^ "~a-v" #'ans^)]
-                     [state-base (format-id #'state-base "~a-τ" #'state-base)])
+                     [state-base-pnt (format-id #'state-base "~a-pnt" #'state-base)]
+                     [point-τ (format-id #'point "~a-τ" #'point)])
          #'(define-syntax-rule (name step fst)
              (let ()        
                (set-box! (start-time) (current-milliseconds))
@@ -326,7 +379,7 @@
                         (define vs
                           (for*/set ([(c at-unions) (in-hash seen)]
                                      #:when (ans^? c))
-                            (cons (ans^-v c) (state-base-τ c))))
+                            (cons (ans^-v c) (point-τ (state-base-pnt c)))))
                         (values (format "State count: ~a" (unbox state-count*))
                                 (format "Point count: ~a" (hash-count seen))
                                 #;
@@ -388,16 +441,18 @@
                                          (add-todo! c)))])]
     [bind-join (make-rename-transformer #'bind-join-∆s!)]
     [bind-join* (make-rename-transformer #'bind-join*-∆s!)]
-    [getter (make-rename-transformer #'global-hash-getter)])
+    [getter (make-rename-transformer #'global-hash-getter)]
+    [imperative? #t])
    body))
 
 (define-syntax-rule (mk-mk-imperative/∆s^-fixpoint mk-name cleaner joiner set-σ! get-σ μbump)
   (define-syntax (mk-name stx)
     (syntax-case stx ()
-      [(_ name state-base ans^ touches)
+      [(_ name state-base point ans^ touches)
        (with-syntax ([ans^? (format-id #'ans^ "~a?" #'ans^)]
                      [ans^-v (format-id #'ans^ "~a-v" #'ans^)]
-                     [state-base-τ (format-id #'state-base "~a-τ" #'state-base)])
+                     [state-base-pnt (format-id #'state-base "~a-pnt" #'state-base)]
+                     [point-τ (format-id #'point "~a-τ" #'point)])
          #'(define-syntax-rule (name step fst)
              (let ()
                ;; fst contains all the ∆s from the first step(s)
@@ -414,7 +469,7 @@
                         (define vs
                           (for*/set ([(c at-unions) (in-hash seen)]
                                      #:when (ans^? c))
-                            (cons (ans^-v c) (state-base-τ c))))
+                            (cons (ans^-v c) (point-τ (state-base-pnt c)))))
                         (values (format "State count: ~a" (unbox state-count*))
                                 (format "Point count: ~a" (hash-count seen))
                                 #;
@@ -454,46 +509,51 @@
 
 (define (reset-∆s!) (set! global-∆s '()))
 
+(define σ₀ (hash))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Imperative narrow deltas with GC
-(define-simple-macro* (mk-timestamp-∆-fix/Γ name state-base (co dr chk ans ap cc ev) touches
-                                     (~optional (~and #:compiled compiled?)))
+(define-simple-macro* (with-timestamp-∆-fix/Γ [state-base point (co dr chk ans ap cc ev) touches root
+                                                          (~optional (~and #:compiled compiled?))]
+                                       body ...)
   #,(with-syntax ([ans? (format-id #'ans "~a?" #'ans)]
-                  [state-base-rσ (format-id #'state-base "~a-rσ" #'state-base)]
-                  [state-base-μ (format-id #'state-base "~a-μ" #'state-base)]
-                  [state-base-τ (format-id #'state-base "~a-τ" #'state-base)]
-                  [(μ-op ...) (if-μ #'μ)])
-      #`(define-syntax-rule (name step fst)
-          (let ()
-            (set-box! (start-time) (current-milliseconds))
-            (define state-count* (state-count))
-            (set-box! state-count* 0)
-            (let loop ()
-              (cond [(empty-todo? todo)
-                     (state-rate)
-                     ;; TODO: Some report here
-                     ]
-                    [else
-                     (define todo-old todo)
-                     (set-box! state-count* (+ (unbox state-count*) todo-num))
-                     (reset-todo!)
-                     (for ([c (in-todo todo-old)])
-                       (step c))
-                     (set! todo
-                           (for/list ([c (in-todo todo)])
-                             (define-values (σ μ-op ... τ)
-                               (values (state-base-rσ c)
-                                       #,@(if-μ #'(state-base-rσ c))
-                                       (state-base-τ c)))
-                             (touches c)))
-                     (for* ([a×vs (in-list global-∆s)])
-                       (define a (car a×vs))
-                       #,@(if-μ #'(μbump a))
-                       (set-σ! global-σ a (⊓ (get-σ global-σ a nothing) (cdr a×vs))))
-                     ;; Only one inc needed since all updates are synced.
-                     (unless (null? global-∆s) (inc-unions!))
-                     (reset-∆s!)
-                     (loop)]))))))
+                  [(μ-op ...) (if-μ #'μ*)])
+      #`(begin
+          (define-syntax-rule (internal-fixpoint step fst)
+            (let ()             
+             (set-box! (start-time) (current-milliseconds))
+             (define state-count* (state-count))
+             (define states-last 0)
+             (set-box! state-count* 0)
+             (reset-todo!) ;; → '()
+             (set-seen! (make-hash))
+ ;            (printf "Frist~%")
+             fst
+             (let loop ()
+               (cond [(empty-todo? todo)
+                      (set-box! state-count* (hash-count seen))
+                      (state-rate)
+                      ;; TODO: Some report here
+                      ]
+                     [else
+                      (define todo-old todo)
+                      (define new-state-count* (+ (unbox state-count*) todo-num))
+                      (set-box! state-count* new-state-count*)
+                      (when (> (- new-state-count* states-last) 1000)
+                        (printf "States: ~a~%" new-state-count*)
+                        (set! states-last new-state-count*))
+                      (reset-todo!)
+                      (for ([c (in-todo todo-old)])
+                        (current-state! c)
+;                        (printf "Stepping ~a~%" c)
+                        (step c))
+                      (loop)]))))
+          (mk-add-todo/guard internal-yielder state-base point (co dr chk ans ap cc ev) touches root reach*)
+          (splicing-syntax-parameterize
+           ([fixpoint (make-rename-transformer #'internal-fixpoint)]
+            [yield-meaning (mk-yield #'internal-yielder)]
+            [imperative? #t])
+            body ...
+            (define reach* (reach touches))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Common functionality
@@ -511,6 +571,7 @@
 (define (reset-todo!)
   (set! todo empty-todo)
   (set! todo-num 0))
+(define (set-todo! v) (set! todo v))
 
 (define (prepare-imperative parser sexp)
   (define-values (e renaming) (parser sexp gensym gensym))

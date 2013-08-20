@@ -5,13 +5,12 @@
                      racket/match racket/list racket/base)
          (for-meta 2 racket/base)
          racket/stxparam)
-(provide getter μgetter force widen delay yield yield-meaning snull abs-count?
+(provide getter μgetter force widen delay yield yield-meaning snull         
          mk-primitive-meaning mk-static-primitive-functions
          (for-syntax if-μ))
 
 (define-syntax-parameter getter #f)
 (define-syntax-parameter μgetter #f)
-(define-syntax-parameter abs-count? #f)
 (define-syntax-parameter force #f)
 (define-syntax-parameter widen #f)
 (define-syntax-parameter delay #f)
@@ -344,19 +343,19 @@
 
 (define-syntax (mk-primitive-meaning stx)
   (syntax-parse stx
-         [(_ gb?:boolean σpb?:boolean σdb?:boolean μb?:boolean cb?:boolean 0b?:boolean
+         [(_ gb?:boolean σpb?:boolean 0b?:boolean
              mean:id compile:id co:id defines ... ((~var p (prim-entry (syntax-e #'gb?))) ...))
           (define global-σ? (syntax-e #'gb?))
           (define σ-passing? (syntax-e #'σpb?))
-          (define σ-∆s? (syntax-e #'σdb?))
-          (define μ? (syntax-e #'μb?))
-          (define compiled? (syntax-e #'cb?))
+          (define σ-∆sv? (syntax-parameter-value #'σ-∆s?))
+          (define compiledv? (syntax-parameter-value #'compiled?))
+          (define μ? (syntax-parameter-value #'abs-count?))
           (define 0cfa? (syntax-e #'0b?))          
           (define ((ap m) arg-stx)
             (if (procedure? m)
                 (m arg-stx)
                 (datum->syntax arg-stx (cons m arg-stx) arg-stx)))
-          (define hidden-σ (and σ-∆s? (not global-σ?) (generate-temporary #'hidden)))
+          (define hidden-σ (and σ-∆sv? (not global-σ?) (generate-temporary #'hidden)))
           (with-syntax ([((μ-op ...) (target-μ-op ...))
                          (if (or global-σ? (not μ?))
                              #'(() ())
@@ -367,23 +366,23 @@
                              #'(() ()))]
                         [(top ...) (listy hidden-σ)]
                         [topp (or hidden-σ #'pσ)]
-                        [(top-op ...) (if (and σ-∆s? (not global-σ?)) #'(top-σ) #'())]
+                        [(top-op ...) (if (and σ-∆sv? (not global-σ?)) #'(top-σ) #'())]
                         [(δ-op ...) (if 0cfa? #'() #'(δ))])
             (define eval
               #`(case o
-                  #,@(for/list ([p (in-list (syntax->list #'(p.prim ...)))]
+                  #,@(for/list ([pid (in-list (syntax->list #'(p.prim ...)))]
                                 [w? (in-list (syntax->datum #'(p.write-store? ...)))]
                                 [r? (in-list (syntax->datum #'(p.read-store? ...)))]
                                 [m (in-list (map ap (attribute p.meaning)))]
                                 [checker (in-list (attribute p.checker-fn))])
-                       #`[(#,p)
-                          (λP (ℓ δ k v-addrs)
+                       #`[(#,pid)
+                          (λP #,pid (ℓ δ k v-addrs)
                               (with-prim-yield
                                k
                                ;; Checkers will force what they need to and keep the rest
                                ;; lazy. Forced values are exploded into possible
                                ;; argument combinations
-                               (do ([vs (#,checker target-σ-op ... target-μ-op ... v-addrs)])
+                               (do ([vs (#,checker target-σ-op ... v-addrs)])
                                  #,(cond [w? (m #'(ℓ δ vs))]
                                          [else #;r? (m #'(vs))]))))])))
             (quasisyntax/loc stx
@@ -401,20 +400,21 @@
                          #`(syntax-parameterize ([yield #,new]) body)]))
                 defines ...
                 ;; λP very much like λ%
-                (define-syntax-rule (... (λP (ℓ δ k v-addrs) body ...))
-                  #,(if compiled?
-                        #'(λ (top ... σ-gop ... μ-op ... pτ ℓ δ-op ... k v-addrs)
-                             (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
-                                                   [target-σ (make-rename-transformer #'pσ)]
-                                                   [target-μ (make-rename-transformer #'pμ)]
-                                                   [target-τ (make-rename-transformer #'pτ)]
-                                                   [top-σ? #t])
-                               body (... ...)))
+                (define-syntax-rule (... (λP f (ℓ δ k v-addrs) body ...))
+                  #,(if compiledv?
+                        #'(procedure-rename
+                           (λ (top ... σ-gop ... μ-op ... pτ ℓ δ-op ... k v-addrs)
+                              (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
+                                                    [target-σ (make-rename-transformer #'pσ)]
+                                                    [target-μ (make-rename-transformer #'pμ)]
+                                                    [target-τ (make-rename-transformer #'pτ)])
+                                body (... ...)))
+                           'f)
                         #'(let () body (... ...))))
                 ;; Identity if not compiled.
                 (define-syntax-rule (compile o)
-                  #,(if compiled? eval #'o))
+                  #,(if compiledv? eval #'o))
                 (define-syntax-rule (mean o ℓ δ k v-addrs)
-                  #,(if compiled?
+                  #,(if compiledv?
                         #'(o top-op ... target-σ-op ... target-μ-op ... target-τ ℓ δ-op ... k v-addrs)
                         eval)))))]))

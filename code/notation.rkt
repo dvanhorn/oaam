@@ -2,7 +2,7 @@
 
 (require (for-syntax syntax/parse))
 (provide for/append for/union for*/union for/set for*/set
-         and0 μinc iff
+         and0 μinc iff head*
          define-simple-macro* hash-reverse hash-add hash-union set-map union-map
          ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
 
@@ -34,6 +34,8 @@
 
 (define-simple-macro* (for/append (~var o (ops #''())) guards body ...+)
   (for/fold ([o.res o.init]) guards (append (let () body ...) o.res)))
+
+(define-syntax-rule (head* head [lhs rhss ...] ...) (begin (head lhs rhss ...) ...))
 
 ;; Set notations
 (define-values (∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)

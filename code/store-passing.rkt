@@ -6,13 +6,16 @@
          (for-syntax racket/syntax syntax/parse))
 (provide bind-join-whole bind-join*-whole
          (for-syntax bind-rest) ;; common helper
-         wide-step hash-getter
+         wide-step
          mk-set-fixpoint^
          mk-special-set-fixpoint^
          mk-special2-set-fixpoint^
          mk-special3-set-fixpoint^
          with-narrow-set-monad
          with-σ-passing-set-monad
+         bind-μbump-whole
+         target-hash-top-getter
+         target-hash-μgetter
          with-whole-σ)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -222,12 +225,20 @@
 (define-simple-macro* (bind-join*-whole (as vss) body)
   (let ([σjoin* (join* target-σ as vss)]) #,(bind-rest #'σjoin* #'body)))
 
-(define (hash-getter hgσ a)
-  (hash-ref hgσ a (λ () (error 'getter "Unbound address ~a in store ~a" a hgσ))))
+(define ((hash-getter origin) hgσ a)
+  (unless (hash? hgσ) (error origin "bad hash ~a" hgσ))
+  (hash-ref hgσ a (λ () (error origin "Unbound address ~a in store ~a" a hgσ))))
 (define-syntax-rule (mk-target-getter name target getter)
-  (define-syntax-rule (name a) (getter target a)))
-(mk-target-getter target-hash-getter target-σ hash-getter)
-(mk-target-getter target-hash-μgetter target-μ hash-getter)
+  (define-syntax (name stx)
+    (syntax-case stx ()
+      [(_ a) #'(getter target a)]
+      [_ #'(λ (a) (getter target a))])))
+(mk-target-getter target-hash-top-getter top-σ (hash-getter 'top))
+(mk-target-getter target-hash-getter target-σ (hash-getter 'σ))
+(define-syntax (target-hash-μgetter stx)
+  (syntax-case stx ()
+    [(_ a) #'(hash-ref target-μ a 0)]
+    [_ #'(λ (a) (hash-ref target-μ a))]))
 
 (define-syntax-rule (with-σ-passing-set-monad body)
   (splicing-syntax-parameterize
@@ -242,7 +253,7 @@
    body))
 
 (define-simple-macro* (bind-μbump-whole (a) . body)
-  #,(if-μ #'(let ([μ* (μinc target-μ a)])
+  #,(if-μ #'(let ([μ* (hash-set target-μ a (μinc (μgetter a)))])
               (syntax-parameterize ([target-μ (make-rename-transformer #'μ*)])
                 . body))
           #'(let () . body)))
