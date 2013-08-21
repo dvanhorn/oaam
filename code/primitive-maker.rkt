@@ -343,10 +343,10 @@
 
 (define-syntax (mk-primitive-meaning stx)
   (syntax-parse stx
-         [(_ gb?:boolean σpb?:boolean 0b?:boolean
-             mean:id compile:id co:id defines ... ((~var p (prim-entry (syntax-e #'gb?))) ...))
-          (define global-σ? (syntax-e #'gb?))
-          (define σ-passing? (syntax-e #'σpb?))
+         [(_ σpb?:boolean 0b?:boolean
+             (~do (define global-σ?* (syntax-parameter-value #'global-σ?)))
+             mean:id compile:id co:id defines ... ((~var p (prim-entry global-σ?*)) ...))
+          (define σ-passing? (syntax-e #'σpb?))          
           (define σ-∆sv? (syntax-parameter-value #'σ-∆s?))
           (define compiledv? (syntax-parameter-value #'compiled?))
           (define μ? (syntax-parameter-value #'abs-count?))
@@ -355,9 +355,9 @@
             (if (procedure? m)
                 (m arg-stx)
                 (datum->syntax arg-stx (cons m arg-stx) arg-stx)))
-          (define hidden-σ (and σ-∆sv? (not global-σ?) (generate-temporary #'hidden)))
+          (define hidden-σ (and σ-∆sv? (not global-σ?*) (generate-temporary #'hidden)))
           (with-syntax ([((μ-op ...) (target-μ-op ...))
-                         (if (or global-σ? (not μ?))
+                         (if (or global-σ?* (not μ?))
                              #'(() ())
                              #'((pμ) (target-μ)))]
                         [((σ-gop ...) (target-σ-op ...))
@@ -366,7 +366,7 @@
                              #'(() ()))]
                         [(top ...) (listy hidden-σ)]
                         [topp (or hidden-σ #'pσ)]
-                        [(top-op ...) (if (and σ-∆sv? (not global-σ?)) #'(top-σ) #'())]
+                        [(top-op ...) (if (and σ-∆sv? (not global-σ?*)) #'(top-σ) #'())]
                         [(δ-op ...) (if 0cfa? #'() #'(δ))])
             (define eval
               #`(case o

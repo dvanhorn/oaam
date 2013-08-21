@@ -48,11 +48,11 @@
   (not (for/and ([a×vs (in-list ∆s)]) (no-change? eσ (car a×vs) (cdr a×vs)))))
 
 (define (((mk-reach ref) touches) eσ root)
-  (define seen ∅)
+  (define seen (make-hasheq))
   (let loop ([as root])
     (for/union #:res acc ([a (in-set as)]
-                          #:unless (a . ∈ . seen))
-               (set! seen (∪1 seen a))
+                          #:unless (hash-has-key? seen a))
+               (hash-set! seen a #t)
                (for/union #:initial (∪1 acc a)
                           ([v (in-set (ref eσ a))])
                           (loop (touches v))))))

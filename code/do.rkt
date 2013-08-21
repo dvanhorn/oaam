@@ -23,13 +23,29 @@
 (define-syntax-rule (mk-syntax-parameters id ...)
   (begin (define-syntax-parameter id #f) ... (provide id ...)))
 
-(mk-syntax-parameters bind-join bind-join* bind-μbump
-                      bind-alias* bind-big-alias
-                      bind-get bind-force bind-delay
-                      bind bind-rest do make-var-contour
-                      target-σ? target-μ target-τ
-                      target-cs? target-cs target-actions? target-actions
-                      top-σ)
+(mk-syntax-parameters 
+ ;; change ∨ access σ
+ bind-join bind-join*
+ bind-alias* bind-big-alias bind-push
+ bind bind-rest
+ ;; change μ
+ bind-μbump
+ ;; change Ξ, access M
+ bind-calling-context
+ ;; access Ξ
+ bind-get-ctx
+ ;; change M
+ bind-memoize
+ ;; access σ
+ bind-get bind-get-kont bind-force bind-delay 
+ ;; Implicits / should use implicits?
+ target-σ? target-μ target-τ target-σ-token
+ target-cs? target-cs target-actions? target-actions
+ top-σ
+ ;; alloc
+ make-var-contour
+ ;; self
+ do)
 (define-syntax-parameter target-σ
   (λ (stx) (raise-syntax-error #f (format "To be used within proper scope ~a:~a"
                                           (syntax-source-file-name stx)
@@ -38,9 +54,11 @@
 (define-syntax-parameter abs-count? #f)
 (define-syntax-parameter σ-∆s? #f)
 (define-syntax-parameter imperative? #f)
+(define-syntax-parameter global-σ? #f)
+(define-syntax-parameter pushdown? #f)
 (define-syntax-parameter compiled? #f)
 (define-syntax-parameter fixpoint #f)
-(provide target-σ abs-count? compiled? fixpoint σ-∆s? imperative?)
+(provide target-σ abs-count? compiled? fixpoint σ-∆s? global-σ? imperative? pushdown?)
 
 
 (define-syntax-rule (bind-τ-join (a τs) . body)
@@ -65,23 +83,20 @@
 (define-syntax-parameter do-body-transformer (syntax-rules () [(_ e) e]))
 (provide do-body-transformer)
 
-(define-syntax-rule (bind-push (a* l δ k) body)
-  (let ([a* (make-var-contour l δ)])
-    (bind-join (a* (singleton k)) body)))
-
 (define-syntax-rule (bind-alias (alias to-alias) body)
   (bind-get (res to-alias) (bind-join (alias res) body)))
 
-(define-for-syntax ((mk-do set-monad? global-σ? generators?) stx)
+(define-for-syntax ((mk-do set-monad? generators?) stx)
   ;; Construct the values tuple given the previously bound σ and cs
   (define σ-∆sv? (syntax-parameter-value #'σ-∆s?))
   (define μ? (syntax-parameter-value #'abs-count?))
   (define tσ (syntax-parameter-value #'target-σ?))
   (define tcs (syntax-parameter-value #'target-cs?))
   (define tas (syntax-parameter-value #'target-actions?))
+  (define global-σ?* (syntax-parameter-value #'global-σ?))
   (define gen-wrap
     (cond [(not generators?) values]
-          [(and global-σ? (not σ-∆sv?)) (λ (stx) #`(begin #,stx 'done))]
+          [(and global-σ?* (not σ-∆sv?)) (λ (stx) #`(begin #,stx 'done))]
           [else (λ (stx) #`(begin (yield #,stx) 'done))]))
   (define add-void? (syntax-parameter-value #'imperative?))
 
@@ -107,17 +122,23 @@
     (pattern [a*:id #:push l δ k]
              #:attr clause
              (λ (rest) #`(bind-push (a* l δ k) #,rest)))
+    (pattern [k*:id #:calling-context ctx:expr k:expr]
+             #:attr clause (λ (rest) #`(bind-calling-context (k* ctx k) #,rest)))
     ;; a couple shorthands
-    (pattern [#:join-forcing a:expr v:expr]
+    (pattern [(~or (~and #:join-forcing (~bind [bindf #'bind-join]))
+                   (~and #:memoize-forcing (~bind [bindf #'bind-memoize]))) a:expr v:expr]
              #:attr clause
-             (λ (rest) #`(do ([fs #:force v])
-                           (bind-join (a fs) #,rest))))
+             (λ (rest) #`(do ([fs #:force v]) (bindf (a fs) #,rest))))
+    (pattern [res:id #:in-kont k]
+             #:attr clause (λ (rest) #`(bind-get-kont (res-tmp comprehension k)
+                                         (do ([res (comprehension res-tmp)])
+                                           #,rest))))
     (pattern [res:id (~or (~and #:in-get (~bind [bindf #'bind-get]))
+                          (~and #:in-context (~bind [bindf #'bind-get-ctx]))
                           (~and #:in-force (~bind [bindf #'bind-force]))
                           (~and #:in-delay (~bind [bindf #'bind-delay]))) a:expr]
              #:attr clause (λ (rest) #`(bindf (res-tmp a)
-                                         (do ([res (in-set res-tmp)])
-                                           #,rest)))))
+                                         (do ([res (in-set res-tmp)]) #,rest)))))
 
   (define-splicing-syntax-class comp-clauses
     #:attributes ((guards 1))
