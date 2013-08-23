@@ -18,9 +18,11 @@
               ls0 ls1)])))
 
 (define-simple-macro* (bind-join-∆s (a vs) body)
-  (let ([∆s* (cons (cons a vs) target-σ)]) #,(bind-rest #'∆s* #'body)))
+  (let ([∆s* (cons (cons a vs) target-σ)])
+    (bind-μbump (a) #,(bind-rest #'∆s* #'body))))
 (define-simple-macro* (bind-join*-∆s (as vss) body)
-  (let ([∆s* (map2-append cons target-σ as vss)]) #,(bind-rest #'∆s* #'body)))
+  (let ([∆s* (map2-append cons target-σ as vss)])
+    (bind-μbump* (as) #,(bind-rest #'∆s* #'body))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Wide fixpoint for σ-∆s
@@ -134,12 +136,17 @@
                               #:when (ans^? c))
                       c))))))
 
+(define-syntax-parameter commit-σ-∆s #f)
+(define-syntax-rule (flat-commit . body)
+  (let ([σ* (update target-σ top-σ)])
+    (syntax-parameterize ([target-σ (make-rename-transformer #'σ*)])
+      . body)))
+
 (define-syntax-rule (with-σ-∆s body)
   (splicing-syntax-parameterize
    ([bind-join (make-rename-transformer #'bind-join-∆s)]
     [bind-join* (make-rename-transformer #'bind-join*-∆s)]
-    [bind-μbump (make-rename-transformer #'bind-μbump-whole)]
     [getter (make-rename-transformer #'target-hash-top-getter)]
-    [μgetter (make-rename-transformer #'target-hash-μgetter)]
     [σ-∆s? #t])
-   body))
+   (with-whole-μ
+    body)))

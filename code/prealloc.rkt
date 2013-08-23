@@ -97,7 +97,7 @@
 (mk-join* join*! join!)
 (mk-bind-joiner bind-join! join!)
 (mk-bind-joiner bind-join*! join*!)
-(mk-bind-μbump bind-μbump! μbump!)
+(mk-bind-μbump bind-μbump! bind-μbump*! μbump!)
 
 (mk-mk-imperative/timestamp^-fixpoint
  mk-prealloc/timestamp^-fixpoint restrict-to-reachable/vector (void))
@@ -106,6 +106,7 @@
                bind-join!
                bind-join*!
                bind-μbump!
+               bind-μbump*!
                global-vector-getter
                global-vector-μgetter)
 
@@ -114,16 +115,17 @@
 (mk-μbump/stacked μbump/stacked! vector-ref-ignore-third vector-set!)
 (mk-global-store-getter/stacked global-vector-getter/stacked global-σ vector-ref-ignore-third)
 (mk-global-μ-getter/stacked global-vector-μgetter/stacked global-μ vector-ref-ignore-third)
-(mk-joiner/stacked join/stacked! vector-ref-ignore-third vector-set! μbump/stacked!)
+(mk-joiner/stacked join/stacked! vector-ref-ignore-third vector-set!)
 (mk-join* join*/stacked! join/stacked!)
 (mk-bind-joiner bind-join/stacked! join/stacked!)
 (mk-bind-joiner bind-join*/stacked! join*/stacked!)
-(mk-bind-μbump bind-μbump/stacked! μbump/stacked!)
+(mk-bind-μbump bind-μbump/stacked! bind-μbump*/stacked! μbump/stacked!)
 
 (mk-with-store with-prealloc/timestamp-store/stacked
                bind-join/stacked!
                bind-join*/stacked!
                bind-μbump/stacked!
+               bind-μbump*/stacked!
                global-vector-getter/stacked
                global-vector-μgetter/stacked)
 
@@ -158,7 +160,7 @@
      [μgetter (make-rename-transformer #'global-vector-μgetter)])
     body)))
 (mk-mk-imperative/∆s/acc^-fixpoint
-  mk-prealloc/∆s/acc^-fixpoint restrict-to-reachable/vector join! vector-set! vector-ref-ignore-third μbump!)
+  mk-prealloc/∆s/acc^-fixpoint restrict-to-reachable/vector join! vector-set! vector-ref-ignore-third)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Imperative deltas
 (mk-add-∆/s! add-∆/prealloc!
@@ -176,4 +178,4 @@
      [μgetter (make-rename-transformer #'global-vector-μgetter)])
     body)))
 (mk-mk-imperative/∆s^-fixpoint
-  mk-prealloc/∆s^-fixpoint restrict-to-reachable/vector join! vector-set! vector-ref-ignore-third μbump!)
+  mk-prealloc/∆s^-fixpoint restrict-to-reachable/vector join! vector-set! vector-ref-ignore-third)

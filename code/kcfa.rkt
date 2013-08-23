@@ -2,8 +2,9 @@
 
 (require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt" "primitives.rkt" "parse.rkt"
          "notation.rkt" "op-struct.rkt" "do.rkt" "add-lib.rkt"
-         (only-in "tcon.rkt" call ret weak-eq^ TCon-deriv^ TCon-deriv@ for*/∧ may must ⊕ tl M⊥)
+         (only-in "tcon.rkt" call ret weak-eq^ TCon-deriv^ TCon-deriv@ for*/∧ may must ⊕ tl M⊥ Σ̂*)
          "graph.rkt"
+         (only-in "macros.rkt" igensym)
          racket/unit
          racket/generic
          (rename-in racket/generator
@@ -22,14 +23,13 @@
 ;; Machine maker
 
 (define free/l (union-map free))
-(define (free-w/o-vars es vars) ((free/l es) . ∖/l . vars))
 (struct compiled-w/free (fn v) #:transparent
         #:property prop:procedure (struct-field-index fn)
         #:methods gen:binds-variables
         [(define/generic gfree-box free-box)
          (define/generic gfree free)
          (define (free-box e) (gfree-box (compiled-w/free-v e)))
-         (define (free e #:bound [bound ∅]) (gfree (compiled-w/free-v e) #:bound bound))])
+         (define (free e) (gfree (compiled-w/free-v e)))])
 
 (define-syntax (mk-analysis stx)
   (syntax-parse stx
@@ -150,7 +150,7 @@
                                 [(_ e:expr) (syntax/loc syn (yield-meaning e))]))))
 
        (define eval ;; what does ev mean?
-         (syntax/loc stx
+         (quasisyntax/loc stx
            (match e
              [(var l _ x)
               (λ% e (ρ k δ)
@@ -163,6 +163,9 @@
                   (do ()
                   (yield (dr target-σ target-μ k (lookup-env ρ x)))))]
               [(datum l _ d) (λ% e (ρ k δ)
+                                 (when (memv d '(here))
+                                   (printf "Got to ~a~%  τ: ~a~%  μ: ~a~%"
+                                           d target-τ #,(if (and μ? (not (given wide?))) #'target-μ #'#f)))
                                  (do () (yield (co k d))))]
               [(primr l _ which)
                (define p (primop (compile-primop which)))
@@ -170,7 +173,9 @@
                    (do () (yield (co k p))))]
               [(lam l _ x e*)
                (define c (compile e*))
+#;               (trace-free!)
                (define fv (free e))
+  #;             (untrace-free!)
                (λ% e (ρ k δ)
                    (do () (yield (co k (clos x c ρ fv)))))]
               [(rlm l _ x r e*)
@@ -182,15 +187,13 @@
                (define c (compile (first es)))
                (define cs (map compile (rest es)))
                (define cb (compile b))
-               (define x (first xs))
-               (define xs* (rest xs))
                (define ss (map (λ _ nothing) xs))
                (λ% e (ρ k δ)
                    (define as (map (λ (x) (make-var-contour x δ)) xs))
                    (define/ρ ρ* (extend* ρ xs as))
                    (do ([a #:push l δ k]
                         [#:join* as ss])
-                       (yield (ev c ρ* (frame+ (kont-cm k) (lrk x xs* cs cb ρ* δ) a) δ))))]
+                       (yield (ev c ρ* (frame+ (kont-cm k) (lrk (car as) (cdr as) cs cb ρ* δ) a) δ))))]
               [(app l _ lchk e0 es)
                (define c (compile e0))
                (define cs (map compile es))
@@ -245,16 +248,15 @@
                (define ℓs (list pℓ nℓ cℓ))
                (λ% e (ρ k δ)
                    (do ([a #:push l δ k])
-                       (yield (cc cs ρ Λη ℓs (frame+ (kont-cm k) (stmonk l lchk c ρ ℓs δ) a) δ))))]
+                       (yield (cc cs ρ Λη ℓs (frame+ (kont-cm k) (stmonk l lchk c ρ Λη Σ̂* ℓs δ) a) δ))))]
               [(tmon l _ lchk pℓ nℓ cℓ s t e*)
                (define c (compile e*))
                (define cs (scon-compile s))
                (define ℓs (list pℓ nℓ cℓ))
                (λ% e (ρ k δ)
                    (define η (make-var-contour `(η . ,l) δ))
-                   (do ([a #:push l δ k]
-                        [#:τ-join η (set t)])
-                       (yield (cc cs ρ η ℓs (frame+ (kont-cm k) (stmonk l lchk c ρ ℓs δ) a) δ))))]
+                   (do ([a #:push l δ k])
+                       (yield (cc cs ρ η ℓs (frame+ (kont-cm k) (stmonk l lchk c ρ η t ℓs δ) a) δ))))]
               [_ (error 'eval "Bad expr ~a" e)])))
 
        ;; Flat contracts have arbitrary expressions in them which need to be compiled.
@@ -386,13 +388,14 @@
 
              (mk-op-struct sk! (a) (a))
              (mk-op-struct ifk (t e ρ δ) (t e ρ-op ... δ-op ...))
-             (mk-op-struct lrk (x xs es e ρ δ) (x xs es e ρ-op ... δ-op ...))
+             (mk-op-struct lrk (a as es e ρ δ) (a as es e ρ-op ... δ-op ...))
              (mk-op-struct ls (l lchk n es vs ρ δ) (l lchk n es vs ρ-op ... δ-op ...))
              ;; Keep positive party in case wrapping the value leads to a contract violation.
-             (mk-op-struct stmonk (l lchk e ρ ℓs δ) (l lchk e ρ-op ... ℓs δ-op ...))
+             (mk-op-struct stmonk (l lchk e ρ η t ℓs δ) (l lchk e ρ-op ... η t ℓs δ-op ...))
+             (mk-op-struct initτk (η t) (η t))
 
              ;; Contract checking continuation frames
-             (mk-op-struct chkk (v l lchk ℓs δ) (v l lchk ℓs δ-op ...))
+             (mk-op-struct chkk (v l lchk η t ℓs δ) (v l lchk η t ℓs δ-op ...))
              (mk-op-struct chkargs (l lchk i ℓs nc-todo arg-addrs done-addrs fnv δ)
                            (l lchk i ℓs nc-todo arg-addrs done-addrs fnv δ-op ...))
              (mk-op-struct postretk (l lchk fnv δ) (l lchk fnv δ-op ...))
@@ -484,76 +487,87 @@
                       (rlos: xs _ e ρ fvs))
                   (touches-ρ ρ #:fvs fvs)]
                  [(blclos: vaddr ncs pc _ η _)
-                  (∪ (for/union #:initial (set vaddr η) ([nc (in-list ncs)]) (touches nc))
-                     (touches pc))]
-                 [(or (ccons ca cd)
-                      (cand ca cd)
-                      (cor ca cd))
-                  (∪ (touches ca) (touches cd))]
+                  (∪ (touches/l ncs)
+                     (touches pc)
+                     (set vaddr η))]
                  [(consv a d) (set a d)]
                  [(or (vectorv _ l)
                       (vectorv-immutable _ l)) (list->set l)]
                  [(or (vectorv^ _ a)
                       (vectorv-immutable^ _ a)) (set a)]
-                 [(? set? s) (for/union ([v (in-set s)]) (touches v))]
+                 [(? set-immutable? s) (for/union ([v (in-set s)]) (touches v))]
                  [(addr a) (set a)]
-                 [_ ∅]))
-
-             (define (touches-con c)
-               (match c
                  [(or (ccons c₀ c₁)
                       (cand c₀ c₁)
-                      (cor c₀ c₁)) (∪ (touches-con c₀) (touches-con c₁))]
-                 [(cblarr _ ncs pc _ η)
-                  (for/union #:initial (∪1 (touches-con pc) η) ([nc (in-list ncs)])
-                             (touches-con nc))]
-                 [v (touches v)])) ;; must be a flat contract
+                      (cor c₀ c₁)) (∪ (touches c₀) (touches c₁))]
+                 [(cblarr _ ncs pc _ η) (∪ (touches/l ncs) (touches pc))]
+                 [(or (== number^)
+                      (== string^)
+                      (== symbol^)
+                      (== char^)
+                      (== cons^)
+                      (== vector^)
+                      (== vector-immutable^)
+                      (== qvector^)
+                      (== qcons^)
+                      (== vec0)
+                      (== open@)
+                      (== closed@)
+                      (== ●)
+                      (== ⊥)
+                      (? atomic?)
+                      (? primop?)) ∅]
+                 [_ (error 'touches "Missed case ~a" v)]))
+
 
              (define-syntax (touches-ρ syn)
                (syntax-parse syn
-                 [(_ ρ (~or (~optional (~seq #:variables vars) #:defaults ([vars #''()]))
-                            (~optional (~seq #:fvs fvs))
-                            (~optional (~and #:many many?))) (... ...)
-                            (~optional (~seq e (... ...) es)))
-                  #:fail-unless (iff (attribute fvs) (not (or (attribute e) (attribute es))))
+                 [(_ ρ (~or (~optional (~seq #:fvs fvs))
+                            (~optional (~and #:many many?))
+                            e:expr)
+                     (... ...))
+                  #:fail-unless (iff (attribute fvs) (null? (attribute e)))
                   "Must supply either (exclusively) free variables or values containing free variables"
+                  (define is-list?
+                    (or (attribute many?)
+                        (not (= (length (syntax->list #'(e (... ...)))) 1))))
                   (with-syntax ([es* (cond
                                       [(attribute fvs) #'ignore]
-                                      [(not (or (null? (syntax->list #'(e (... ...))))
+                                      [(not (or (= (length (syntax->list #'(e (... ...)))) 1)
                                                 (attribute many?)))
-                                       #'(list e (... ...) es)]
-                                      [(attribute many?) #'(list* e (... ...) es)]
-                                      [else #'es])])
+                                       #'(list e (... ...))]
+                                      [(attribute many?) #'(list* e (... ...))]
+                                      [(= (length (syntax->list #'(e (... ...)))) 1)
+                                       (car (syntax-e #'(e (... ...))))]
+                                      [else (raise-syntax-error
+                                             #f
+                                             "need at least one argument for variable source"
+                                             syn)])])
                     (#,#'quasisyntax
                      (let ([fvs* (#,#'unsyntax
                                   (cond [(attribute fvs) #'fvs]
-                                        [(eq? #'es #'es*)
-                                         (if (attribute vars)
-                                             #'((free es) . ∖/l . vars)
-                                             #'(free es))]
-                                        [(attribute vars) #'(free-w/o-vars es* vars) ]
-                                        [else #'(free/l es*)]))])
+                                        [is-list? #'(free/l es*)]
+                                        [else #'(free es*)]))])
                        #,(if0 #'fvs* #`(restrict-to-set ρ fvs*)))))]))
              (define touches/l (union-map touches))
-             (define touches-con/l (union-map touches-con))
 
              (define (touches-frame f)
                (match f
                  [(sk!: a) (set a)]
                  [(ifk: t e ρ δ) (touches-ρ ρ t e)]
-                 [(lrk: x xs es e ρ δ)
-                  (touches-ρ ρ (cons e es) #:variables (cons x xs))]
-                 [(ls: l lchk n es vs ρ δ)
-                  (∪ (touches/l vs) (touches-ρ ρ es))]
-                 [(stmonk: l lchk e ρ ℓs δ) (touches-ρ ρ e)]
+                 [(lrk: a as es e ρ δ)
+                  (∪/l (touches-ρ ρ #:many (cons e es)) (cons a as))]
+                 [(ls: l lchk n es v-addrs ρ δ)
+                  (∪/l (touches-ρ ρ #:many es) v-addrs)]
+                 [(stmonk: l lchk e ρ η t ℓs δ) (∪1 (touches-ρ ρ e) η)]
+                 [(initτk: η t) (set η)]
 
-                 [(chkk: v l lchk ℓs δ) (touches v)]
+                 [(chkk: v l lchk η t ℓs δ) (∪1 (touches v) η)]
                  [(chkargs: l lchk i ℓs nc-todo arg-addrs done-addrs fnv δ)
-                  (∪/l (∪/l (touches/l nc-todo) arg-addrs) done-addrs)]
+                  (∪/l (∪/l (∪ (touches/l nc-todo) (touches fnv)) arg-addrs) done-addrs)]
                  [(postretk: l lchk fnv δ) (touches fnv)]
                  [(retk: a) (set a)]
-                 [(blcons: res-addr aa ad)
-                  (set res-addr aa ad)]
+                 [(blcons: res-addr aa ad) (set res-addr aa ad)]
                  [(or (chkor₀: l lchk ℓs c v res-addr δ)
                       (chkand₀: l lchk ℓs c v res-addr δ))
                   (∪1 (∪ (touches c) (touches v)) res-addr)]
@@ -562,22 +576,23 @@
                  [(chkflt: tempFn tmpArg ℓs) (set tempFn tmpArg)]
 
                  [(domk: η ℓs todo done pos ρ name δ)
-                  (∪1 (∪ (touches-con pos) (touches-con/l done) (touches-ρ ρ todo)))]
+                  (∪1 (∪ (touches/l done) (touches-ρ ρ #:many pos todo)) η)]
                  [(rngk: η ℓs ncs name δ)
-                  (∪1 (touches-con/l ncs) η)]
+                  (∪1 (touches/l ncs) η)]
                  [(cak: η ℓs cd ρ δ)
                   (∪1 (touches-ρ ρ cd) η)]
-                 [(cdk: cv) (touches-con cv)]
                  [(or (or0k: η ℓs cc ρ δ)
                       (and0k: η ℓs cc ρ δ))
                   (∪1 (touches-ρ ρ cc) η)]
-                 [(or (and1k: cv)
+                 [(or (cdk: cv)
+                      (and1k: cv)
                       (or1k: cv))
-                  (touches-con cv)]))
+                  (touches cv)]))
 
              (define (touches-κ κ)
                (define visited? (make-hasheq))
                (let touches-κ ([κ κ])
+#;                 (trace touches-κ)
                  (match κ
                    [(mt: cm) ∅]
                    [(frame+: cm f k)
@@ -591,7 +606,7 @@
                       (hash-set! visited? κ #t)
                       (bind-get-ctx (ctxs ctx)
                        (for/union ([k (in-set ctxs)]) (touches-κ k)))])])))
-             (trace touches-κ)
+#;             (trace touches-κ)
 
              (define (root state)
                (match state
@@ -599,10 +614,11 @@
                  [(ap: σ μ τ l lchk fn-a arg-addrs k δ)
                   (∪/l (touches-κ k) (cons fn-a arg-addrs))]
                  [(chk: σ μ τ l lchk vc v res-addr ℓs k δ)
-                  (∪1 (∪ (touches-κ k) (touches-con vc) (touches v)) res-addr)]
+                  (∪1 (∪ (touches-κ k) (touches vc) (touches v)) res-addr)]
                  [(ans: σ μ τ cm v) (touches v)]
                  [(cc: σ μ τ s ρ η ℓs k δ) (∪1 (∪ (touches k) (touches-ρ ρ s)) η)]
                  [(ev: σ μ τ e ρ k δ) (∪ (touches-κ k) (touches-ρ ρ e))]))
+             #;
              (trace root)
 
              (splicing-syntax-parameterize
@@ -640,12 +656,19 @@
                          (define-match-expander ev: ;; inert, but introduces bindings
                            (syntax-rules () [(_ . args) (list . args)]))
                          (define-match-expander cc:
-                           (syntax-rules () [(_ . args) (list . args)]))))
+                           (syntax-rules () [(_ . args) (list . args)]))
+                         #,@(if (syntax-parameter-value #'pushdown?)
+                               #'((mk-op-struct enter (e ρ k δ) (e ρ-op ... k δ-op ...) expander-flags ...))
+                               #'((define-syntax enter (make-rename-transformer #'ev))
+                                  (define-syntax enter: (make-rename-transformer #'ev:))))))
                       (quasisyntax/loc stx
                         ((mk-op-struct ev state-base (e ρ k δ) (e ρ-op ... k δ-op ...)
                                        expander-flags ...)
                          (mk-op-struct cc state-base (sc ρ η ℓs k δ) (sc ρ-op ... η ℓs k δ-op ...)
-                                       expander-flags ...))))
+                                       expander-flags ...)
+                         (define-syntax enter (make-rename-transformer #'ev))
+                         (define-match-expander enter:
+                           (syntax-rules () [(_ . args) (list . args)])))))
 
                (define-syntax-rule (define/ρ ρ body)
                  #,(if0 #'(void)
@@ -691,8 +714,8 @@
                                                                              #,(if (eq? (attribute K) +inf.0)
                                                                                    #'+inf.0
                                                                                    #'(cons-limit))])
-                                                               (define-values (e* r) (parse-prog e gensym gensym))
-                                                               (add-lib e* r gensym gensym))))])
+                                                               (define-values (e* r) (parse-prog e igensym igensym))
+                                                               (add-lib e* r igensym igensym))))])
                  (pfixpoint step (inj (prepare e))))
 
                #,@compile-def
@@ -794,15 +817,15 @@
                               (do ([k* #:in-kont a]
                                    [v #:in-force v])
                                   (yield (ev (if v t e) ρ k* δ))))]
-                         [(lrk: x '() '() e ρ δ)
+                         [(lrk: addr '() '() e ρ δ)
                           (generator
-                              (do ([#:join-forcing (lookup-env ρ x) v]
+                              (do ([#:join-forcing addr v]
                                    [k* #:in-kont a])
                                   (yield (ev e ρ k* δ))))]
-                         [(lrk: x (cons y xs) (cons e es) b ρ δ)
+                         [(lrk: a (cons a* as) (cons e es) b ρ δ)
                           (generator
-                              (do ([#:join-forcing (lookup-env ρ x) v])
-                                  (yield (ev e ρ (push (lrk y xs es b ρ δ)) δ))))]
+                              (do ([#:join-forcing a v])
+                                  (yield (ev e ρ (push (lrk a* as es b ρ δ)) δ))))]
                          [(sk!: addr)
                           (generator
                               (do ([#:join-forcing addr v]
@@ -847,17 +870,23 @@
                                              (push (domk η ℓs ncs-todo (cons v ncs-done) cpc ρ name δ)) δ))))]
 
                          ;; Contract attachment
-                         [(stmonk: l lchk e ρ ℓs δ)
+                         [(stmonk: l lchk e ρ η t ℓs δ)
                           (generator
-                              (do () (yield (ev e ρ (push (chkk v l lchk ℓs δ)) δ))))]
+                              (do () (yield (ev e ρ (push (chkk v l lchk η t ℓs δ)) δ))))]
+
+                         ;; Create temporal monitor around blessed value
+                         [(initτk: η t)
+                          (generator
+                              (do ([#:τ-join η (set t)]
+                                   [k* #:in-kont a])
+                                (yield (co k* v))))]
 
                          ;; Contract checking
-                         [(chkk: vc l lchk ℓs δ)
+                         [(chkk: vc l lchk η t ℓs δ)
                           (define res-addr (make-var-contour `(res . ,lchk) δ))
                           (generator
-                              (do ([k* #:in-kont a]
-                                   [vchk #:in-force v])
-                                  (yield (chk l lchk vc vchk res-addr ℓs k* δ))))]
+                              (do ([vchk #:in-force v])
+                                  (yield (chk l lchk vc vchk res-addr ℓs (push (initτk η t)) δ))))]
 
                          [(chkand₀: l lchk ℓs c₁ v res-addr δ)
                           (generator
@@ -998,9 +1027,18 @@
                             (match f
                               [(clos: xs e ρ _)
                                (cond [(= (length xs) (length arg-addrs))
+#|
+Calling contexts, store counting, per-point stores, and abstract compilation do not play nicely together.
+If we want to get the count associated with the point we're yielding, we're going to have a bad time, since
+ (ev e ...) is a function application that can manipulate the continuation and yield more states.
+Instead, we need to force the entry of a function to be an entirely new point - one we know won't change the
+store - so we can grab the store count associated with the point to store in the context for summarization.
+|#
                                       (do ([(ρ* δ*) #:bind ρ l δ xs arg-addrs]
                                            [k* #:calling-context (ctx e ρ* δ*) k])
-                                          (yield (ev e ρ* k* δ*)))]
+                                          (yield (ev e ρ* k* δ*))
+                                          #;
+                                        (yield (enter e ρ* k δ*)))]
                                      ;; Yield the same state to signal "stuckness".
                                      [else
                                       (log-info "Arity error on ~a at ~a" f l)
@@ -1009,7 +1047,9 @@
                                (cond [(<= (length xs) (length arg-addrs))
                                       (do ([(ρ* δ*) #:bind-rest ρ l δ xs r arg-addrs]
                                            [k* #:calling-context (ctx e ρ* δ*) k])
-                                          (yield (ev e ρ* k* δ*)))]
+                                          (yield (ev e ρ* k* δ*))
+                                          #;
+                                         (yield (enter e ρ* k δ*)))]
                                      ;; Yield the same state to signal "stuckness".
                                      [else
                                       (log-info "Arity error on ~a at ~a" f l)
@@ -1067,6 +1107,12 @@
                           #'(generator (do () (yield (ev e ρ k δ))))
                           eval)]
 
+                   ;; Only for compiled pushdown
+#;
+                   [(enter: en-σ en-μ en-τ e ρ k δ)
+                    (do ([k* #:calling-context (ctx (state-base-pnt state)) k])
+                        (yield (ev e ρ k* δ)))]
+
                    [(cc: cc-σ cc-μ cc-τ s ρ η ℓs k δ)
                     #,(if compiled?*
                           #'(generator (do () (yield (cc s ρ η ℓs k δ))))
@@ -1075,7 +1121,7 @@
                    [(ans: ans-σ ans-μ ans-τ cm v) (generator (do () (yield (ans cm v))))]
                    [_ (error 'step "Bad state ~a" state)]))
 
-               #;
+#;
                  (trace step)
 
                  )))))]))

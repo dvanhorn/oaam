@@ -6,7 +6,7 @@
          define-simple-macro* hash-reverse
          hash-add hash-add! hash-union hash-union!
          set-map union-map
-         ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
+         ∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈ ∉)
 
 ;; define-simple-macro does not have an implicit quasisyntax.
 (define-syntax (define-simple-macro* stx)
@@ -40,16 +40,17 @@
 (define-syntax-rule (head* head [lhs rhss ...] ...) (begin (head lhs rhss ...) ...))
 
 ;; Set notations
-(define-values (∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈)
+(define-values (∅ ∅? ¬∅? ∪ ∩ ⊆? ∖ ∪1 ∪/l ∖1 ∖/l ∈ ∉)
   (let ([set-add*
          (λ (s xs) (for/fold ([s s]) ([x (in-list xs)]) (set-add s x)))]
         [set-remove*
          (λ (s xs) (for/fold ([s s]) ([x (in-list xs)]) (set-remove s x)))]
-        [in? (λ (x s) (set-member? s x))])
+        [in? (λ (x s) (set-member? s x))]
+        [notin? (λ (x s) (not (set-member? s x)))])
     (values (set) set-empty? (λ (s) (not (set-empty? s)))
             set-union set-intersect subset? set-subtract
             set-add set-add*
-            set-remove set-remove* in?)))
+            set-remove set-remove* in? notin?)))
 
 (define (hash-reverse h)
   (for/hash ([(k v) (in-hash h)])

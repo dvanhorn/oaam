@@ -139,22 +139,38 @@
          (~optional (~seq #:expander
                           (~or (~and #:with-first-cons
                                      (~bind [expander
-                                             #`(syntax-rules ()
+                                             #`(λ (stx)
+                                               (syntax-case stx ()
                                                  [(_ fσ #,@(cdr (syntax->list #'(allfields ...))))
-                                                  #,(if (attribute tail)
+                                                  #'#,(if (attribute tail)
                                                         #`(cons fσ
                                                                 (parent #,@(drop-right all-parent-subfields 1)
                                                                         (tail: #,@tail-implicits
                                                                                (container #,@subfieldsl))))
-                                                        #`(cons fσ (container #,@all-subfields)))])]))
+                                                        #`(cons fσ (container #,@all-subfields)))]
+                                                 [stx
+                                                  (raise-syntax-error
+                                                   #f
+                                                   (format "Expected pattern ~a"
+                                                           (syntax->datum
+                                                            #'(_ fσ #,@(cdr (syntax->list #'(allfields ...))))))
+                                                   #'stx)]))]))
                                expander:expr)) ;; want a different match expander?
                     #:defaults ([expander
-                                 #`(syntax-rules ()
+                                 #`(λ (stx)
+                                   (syntax-case stx ()
                                      [(_ allfields ...)
-                                      #,(if (attribute tail)
+                                      #'#,(if (attribute tail)
                                             #`(parent #,@(drop-right all-parent-subfields 1)
                                                       (tail: #,@tail-implicits (container #,@subfieldsl)))
-                                            #`(container #,@all-subfields))])]))
+                                            #`(container #,@all-subfields))]
+                                     [stx
+                                      (raise-syntax-error
+                                       #f
+                                       (format "Expected pattern ~a"
+                                               (syntax->datum
+                                                #'(_ allfields ...)))
+                                       #'stx)]))]))
          (~optional (~seq #:expander-id name-ex:id)
                     #:defaults ([name-ex (format-id #'name "~a:" #'name)]))) ...)
      #:do [(match-define (list-rest _ _ name? get/sets)

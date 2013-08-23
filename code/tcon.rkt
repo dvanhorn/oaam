@@ -5,7 +5,7 @@
 (require racket/trace)
 
 (provide TCon-deriv^ TCon-deriv@ weak-eq^
-         may must for/∧ for*/∧ ⊕ ∨ ∧
+         may must for/∧ for*/∧ ⊕ ∨ ∧ Σ̂*
          ¬ · kl bind ε
          call ret !call !ret
          $ □ Any label
@@ -118,7 +118,9 @@
   [((? ST⊥?) _) T⊥]
   [(_ (? ST⊥?)) T⊥]
   [((closed T₀ ρ₀) (closed T₁ (== ρ₀ eq?)))
-   (closed (·simpl T₀ T₁) ρ₀)]
+   (define T* (·simpl T₀ T₁))
+   (unless (open? T*) (error '·simpl "Introduced closed (· ~a ~a) → ~a" T₀ T₁ T*))
+   (closed T* ρ₀)]
   ;; Right-associate simple tcons
   [((· T₀₀ T₀₁) T₁) (·simpl T₀₀ (·simpl T₀₁ T₁))]
   ;; No simplifications
@@ -130,15 +132,22 @@
   [((kl T)) (klsimpl T)]
   [((? Σ̂*?)) Σ̂*]
   [((? SΣ̂*?)) SΣ̂*]
-  [((closed T ρ)) (closed (klsimpl T) ρ)] ;; TODO: restrict bindings
+  [((closed T ρ))
+   (define T* (klsimpl T))
+   (unless (open? T*) (error 'klsimpl "Introduced closed ~a → ~a" T T*))
+   (closed T* ρ)] ;; TODO: restrict bindings
   [(T) (kl T)])
 
 (define/match (¬simpl T)
   [((¬ T)) T]
-  [((closed T ρ)) (closed (¬simpl T) ρ)]
+  [((closed T ρ))
+   (define T* (¬simpl T))
+   (unless (open? T*) (error '¬simpl "Introduced closed ~a → ~a" T T*))
+   (closed T* ρ)]
   [(T) (¬ T)])
 
-;; Flatten ∪s and ∪s into one (or two) big ∪ or ∩. simple and not.
+;; Flatten ∪s and ∩s into one big ∪ or ∩.
+;; All closed Ts with the same environment are collated.
 (define (flat-collect pred extract ⊥? ⊤? Ts)
   (let/ec found⊤
     (define-values (sTs Tρs)
@@ -156,9 +165,12 @@
                         (values simples (set-add a T)))]))
           (do T Tρ))))
     (values #f sTs Tρs)))
+
 (define (close-hash f h)
   (for/set ([(ρ Ts) (in-hash h)])
-    (closed (f Ts) ρ)))
+    (define T* (f Ts))
+    (unless (open? T*) (error 'close-hash "Introduced closed ~a → ~a" Ts T*))
+    (closed T* ρ)))
 
 (define ((simpled b f) sTs)
   (cond
@@ -173,8 +185,8 @@
         [(set-empty? Tρs) (∪∩s (close-hash ∪∩s sTs))]
         [(eq? 0 (hash-count sTs)) (∪∩s Tρs)]
         [else (∪∩ (set-union Tρs (close-hash ∪∩s sTs)))]))
-(define ∪simpl (∪∩-simpl ST⊥ T⊥? Σ̂* Σ̂*? ∪ ∪? ∪-Ts))
-(define ∩simpl (∪∩-simpl SΣ̂* Σ̂*? T⊥ T⊥? ∩ ∩? ∩-Ts))
+(define ∪simpl (∪∩-simpl T⊥ T⊥? Σ̂* Σ̂*? ∪ ∪? ∪-Ts))
+(define ∩simpl (∪∩-simpl Σ̂* Σ̂*? T⊥ T⊥? ∩ ∩? ∩-Ts))
 
 ;; Combine bindings giving preference to the right hash.
 (define (◃ ρ₀ ρ₁)
@@ -217,6 +229,14 @@
     [(closed T ρ) (ν? T)]
     [_ #f])) ;; bind, event, nonevent
 
+(define (open? T)
+  (match T
+    [(· T₀ T₁) (and (open? T₀) (open? T₁))]
+    [(or (∪ Ts) (∩ Ts)) (for/and ([T (in-set Ts)]) (open? T))]
+    [(or (¬ T) (kl T) (bind _ T)) (open? T)]
+    [(closed T ρ) #f]
+    [_ #t]))
+
 (define-signature weak-eq^ (≃ matchℓ?))
 (define-signature TCon-deriv^ (run ð))
 
@@ -225,7 +245,7 @@
     (define (matches1 P) (matches P A γ))
     (define (matches2 P A) (matches P A γ))
     (match P
-      [(? set?) (⨅ P matches1)]
+      [(? set-immutable?) (⨅ P matches1)]
       [(!constructed kind pats)
        (match (matches1 (constructed kind pats))
          [(mres (== must eq?) _) #f]
@@ -255,7 +275,10 @@
          (and t (mres t γ))]))
   matches)
 
-;; References
+;; References to variables in ρkill get rewritten to None
+;; Any bindings we come across that shadow names in ρkill get removed.
+;; Constructed data containing None becomes None.
+;; Negated matching on constructed data containing None becomes Any.
 (define (refers-to ρkill event)
   (let build ([event event] [ρnew ρkill])
     (define (build/l pats)
@@ -287,34 +310,60 @@
 
 (define (Γτ reachable touches τ)
   (define (touches-unreachable ρ)
-    (for/hasheq ([(x v) (in-hash ρ)]
-                 #:unless (subset? (touches v) reachable))
-      (values x #t)))
+    (if ρ
+        (for/hasheq ([(x v) (in-hash ρ)]
+                     #:unless (subset? (touches v) reachable))
+          (values x #t))
+        #hasheq()))
   (for/hash ([(η Ts) (in-hash τ)]
              #:when (η . ∈ . reachable))
     (values η (for/set ([T (in-set Ts)])
-                (let Γsimpl* ([T T] [ρ ρ₀] [ρkill ρ₀])
+                (define start-T T)
+                (let Γsimpl* ([T T] [ρ #f] [ρkill ρ₀])
                      (define (Γsimpl T) (Γsimpl* T ρ ρkill))
                      (match T
-                       [(∪ Ts) (∪simpl (set-map Γsimpl Ts))]
-                       [(∩ Ts) (∩simpl (set-map Γsimpl Ts))]
+                       [(∪ Ts)
+                        (define T* (∪simpl (set-map Γsimpl Ts)))
+                        (when (and ρ (not (open? T*)))
+                          (error 'Γτ "∪s introduced closed ~a → ~a" T T*))
+                        T*]
+                       [(∩ Ts)
+                        (define T* (∩simpl (set-map Γsimpl Ts)))
+                        (when (and ρ (not (open? T*)))
+                          (error 'Γτ "∩s introduced closed ~a → ~a" T T*))
+                        T*]
                        [(¬ T) (¬simpl (Γsimpl T))]
-                       [(kl T) (klsimpl (Γsimpl T))] ;; TODO
-                       [(· T₀ T₁) (·simpl (Γsimpl T₀) (Γsimpl T₁))]
-                       [(bind B T)
+                       [(kl T) 
+                        (define T* (klsimpl (Γsimpl T)))
+                        (when (and ρ (not (open? T*)))
+                          (error 'Γτ "kl introduced closed ~a → ~a" T T*))
+                        T*]
+                       [(· T₀ T₁)
+                        (define T* (·simpl (Γsimpl T₀) (Γsimpl T₁)))
+                        (when (and ρ (not (open? T*)))
+                          (error 'Γτ "· introduced closed ~a → ~a" T T*))
+                        T*]
+                       [(bind B T) ;; FIXME
                         (define-values (ρkill* B*) (refers-to ρkill B))
-                        (if B* (bind B* (Γsimpl* T ρkill*)) ST⊥)]
+                        (cond [(eq? B* None) T⊥]
+                              [else
+                               (define T* (Γsimpl* T ρ ρkill*))
+                               (when (and ρ (not (open? T*)))
+                                 (error 'Γτ "bind introduced closed ~a → ~a" T T*))
+                               (bind B* T*)])]
                        [(closed T ρ)
                         (define T* (Γsimpl* T ρ (ρkill . ◃ . (touches-unreachable ρ))))
-                        (if (T⊥? T*)
-                            ST⊥
-                            (closed T* ρ))]
+                        (cond [(eq? T* T⊥) ST⊥]
+                              [(eq? T* Σ̂*) SΣ̂*]
+                              [else
+                               (unless (open? T*) (error 'Γτ "WTF not open? ~a" T*))
+                               (closed T* ρ)])]
                        [(? ε?) ε]
-                       [_
-                        (define-values (ρkill* A) (refers-to ρkill T))
-                        (cond [(eq? A None) (if (eq? ρ₀ ρ) T⊥ ST⊥)]
-                              [(eq? ρ₀ ρ) A]
-                              [else (closed A ρ)])]))))))
+                       [_ (define-values (ρkill* A) (refers-to ρkill T))
+                          (match A
+                            [(== None eq?) T⊥]
+                            [(== Any eq?) Σ̂*]
+                            [_ A])]))))))
 
 (define-unit TCon-deriv@
   (import weak-eq^)
@@ -382,7 +431,9 @@
    (define (bindp B A T ρ)
      (match (matches B A ρ)
        [#f M⊥]
-       [(mres t′ ρ′) (tl (closed T ρ′) t′)]
+       [(mres t′ ρ′)
+        (unless (open? T) (error 'bindp "Bad T ~a" T))
+        (tl (closed T ρ′) t′)]
        [M (error '∂ "oops10 ~a" M)]))
 
    (define (patp pat A ρ)
@@ -405,11 +456,13 @@
          [(∪ Ts) (u (set-map ð1 Ts))]
          [(∩ Ts) (∩p (set-map ð1 Ts))]
          [(closed T ρ) (∂ A T ρ ±)] ;; TODO: Add fvs to Tcons and restrict ρ
+         [A* (∂ A A* ρ₀ ±)]
          [_ (error 'ð "Bad Tcon ~a" T)])))
    (define ð ð*)
 
    ;; Treat T as if each component of T is closed by ρ (down to bind)
    (define (∂ A T ρ ±)
+     (unless (open? T) (error '∂ "Bad T ~a" T))
      (define (∂1 T) (∂ A T ρ ±))
      (define (∂± T ±) (∂ A T ρ ±))
      (define-values (u v) (if ± (values ∪p+ ∨) (values ∪p- ⊕)))

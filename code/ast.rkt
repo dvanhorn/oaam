@@ -1,31 +1,33 @@
 #lang racket
-(require "notation.rkt" (for-syntax syntax/parse racket/list) racket/generic)
+(require "notation.rkt" (for-syntax syntax/parse racket/list) racket/generic
+         racket/trace)
 (provide (all-defined-out))
 
 (struct exp (lab fvs-box) #:transparent)
 
+(struct opaque-box ([v #:mutable]))
 (define-generics binds-variables
   [free-box binds-variables]
-  [free binds-variables #:bound [bound]]
-  #:fallbacks [(define (free e #:bound [bound ∅]) ∅)
+  [free binds-variables]
+  #:fallbacks [(define (free e) ∅)
                (define free-box exp-fvs-box)])
+(define (trace-free!) (trace free))
+(define (untrace-free!) (untrace free))
 
-(define-simple-macro* (def-free e free
+(define-simple-macro* (def-free free
                         (~or (~optional (~seq #:gfree gfree) #:defaults ([gfree #'gfree]))
-                             (~optional (~seq #:self free*))
-                             (~optional (~seq #:bound bound) #:defaults ([bound #'bound]))
                              (~optional (~seq #:wcs wcs:exact-nonnegative-integer) #:defaults ([wcs #'1]))) ...
                         [(struct pats ...) rhss ...])
   (begin 
     (define/generic gfree free)
-    (define (free e #:bound [bound ∅])
-      (or (unbox (free-box e))
+    (define (free e)
+      (or (opaque-box-v (free-box e))
           (let ()
-            #,@(if (attribute free*) #'((define (free* e) (gfree e #:bound bound))) #'())
             (match e [(struct #,@(make-list (syntax-e #'wcs) #'_) fvs-box pats ...)
                       (define fvs (let () rhss ...))
-                      (set-box! fvs-box fvs)
+                      (set-opaque-box-v! fvs-box fvs)
                       fvs]))))))
+
 ;; An Exp is one of:
 ;; (var Lab Exp)
 ;; (lam Lab Sym Exp)
@@ -36,53 +38,52 @@
 ;; (primr Lab Sym)
 ;; (datum Lab Atom)
 (define-simple-macro* (exp-struct name (fields ...) [methods ...])
-  (struct name exp (fields ...) #:transparent #:methods #,(syntax-local-introduce #'gen:binds-variables) [methods ...]))
+  (struct name exp (fields ...) #:transparent
+          #:methods #,(syntax-local-introduce #'gen:binds-variables) [methods ...]))
 (exp-struct var (name)
-        [(def-free e free #:bound bound [(var x) (if (x . ∈ . bound) ∅ (set x))])])
+        [(def-free free [(var x) (set x)])])
 (exp-struct lrc (xs es e)
-            [(def-free e free #:gfree gfree #:bound bound 
+            [(def-free free #:gfree gfree
               [(lrc xs es e)
-               (define bound* (∪/l bound xs))
-               (define (free* v) (gfree v #:bound bound*))
-               (∪ ((union-map free*) es) (free* e))])])
+               ((∪ ((union-map gfree) es) (gfree e)) . ∖/l . xs)])])
 (exp-struct lam (xs exp)
-        [(def-free e free #:gfree gfree #:bound bound [(lam xs e) (gfree e #:bound (∪/l bound xs))])])
+        [(def-free free #:gfree gfree [(lam xs e) ((gfree e) . ∖/l . xs)])])
 (exp-struct rlm (xs rest exp)
-        [(def-free e free #:gfree gfree #:bound bound
-           [(rlm xs rest e) (gfree e #:bound (∪/l bound (cons rest xs)))])])
+        [(def-free free #:gfree gfree
+           [(rlm xs rest e) ((gfree e) . ∖/l . (cons rest xs))])])
 (exp-struct app (ℓchk rator rand)
-        [(def-free e free #:self free* #:bound bound [(app _ e0 es) (∪ (free* e0) ((union-map free*) es))])])
+        [(def-free free #:gfree gfree [(app _ e0 es) (∪ (gfree e0) ((union-map gfree) es))])])
 (exp-struct ife (t c a)
-        [(def-free e free #:self free* [(ife g t e) (∪ (free* g) (free* e) (free* e))])])
+        [(def-free free #:gfree gfree [(ife g t e) (∪ (gfree g) (gfree t) (gfree e))])])
 (exp-struct st! (x e)
-        [(def-free e free #:self free* #:bound bound
-           [(st! x e) (∪ (free* e) (if (x . ∈ . bound) ∅ (set x)))])])
+        [(def-free free #:gfree gfree
+           [(st! x e) (∪1 (gfree e) x)])])
 (exp-struct lcc (x e)
-        [(def-free e free #:gfree gfree #:bound bound [(lcc x e) (gfree e #:bound (∪1 bound x))])])
+        [(def-free free #:gfree gfree [(lcc x e) ((gfree e) . ∖1 . x)])])
 ;; Stack inspection forms
 (exp-struct grt (r e)
-        [(def-free e free #:self free* [(grt _ e) (free* e)])])
+        [(def-free free #:gfree gfree [(grt _ e) (gfree e)])])
 (exp-struct fal () [])
 (exp-struct frm (r e)
-        [(def-free e free #:self free* [(frm _ e) (free* e)])])
+        [(def-free free #:gfree gfree [(frm _ e) (gfree e)])])
 (exp-struct tst (r t e)
-        [(def-free e free #:self free* [(tst _ t e) (∪ (free* t) (free* e))])])
+        [(def-free free #:gfree gfree [(tst _ t e) (∪ (gfree t) (gfree e))])])
 ;; Contract monitoring forms
 (exp-struct mon (ℓchk pℓ nℓ sℓ s e)
-        [(def-free e free #:self free* [(mon _ _ _ _ s e) (∪ (free* s) (free* e))])])
+        [(def-free free #:gfree gfree [(mon _ _ _ _ s e) (∪ (gfree s) (gfree e))])])
 (exp-struct tmon (ℓchk pℓ nℓ sℓ s t e)
-        [(def-free e free #:self free* [(tmon _ _ _ _ s _ e) (∪ (free* s) (free* e))])])
+        [(def-free free #:gfree gfree [(tmon _ _ _ _ s _ e) (∪ (gfree s) (gfree e))])])
 ;; Structural contract constructors
 (exp-struct consc (ca cd)
-        [(def-free e free #:self free* [(consc ca cd) (∪ (free* ca) (free* cd))])])
+        [(def-free free #:gfree gfree [(consc ca cd) (∪ (gfree ca) (gfree cd))])])
 (exp-struct andc (c₀ c₁)
-        [(def-free e free #:self free* [(andc c₀ c₁)  (∪ (free* c₀) (free* c₁))])])
+        [(def-free free #:gfree gfree [(andc c₀ c₁)  (∪ (gfree c₀) (gfree c₁))])])
 (exp-struct orc (c₀ c₁)
-        [(def-free e free #:self free* [(orc c₀ c₁)  (∪ (free* c₀) (free* c₁))])])
+        [(def-free free #:gfree gfree [(orc c₀ c₁)  (∪ (gfree c₀) (gfree c₁))])])
 (exp-struct fltc (e)
-        [(def-free e free #:self free* [(fltc e) (free* e)])])
+        [(def-free free #:gfree gfree [(fltc e) (gfree e)])])
 (exp-struct arrc (name ncs pc)
-            [(def-free e free #:self free* [(arrc _ ncs pc) (∪ ((union-map free*) ncs) (free* pc))])])
+            [(def-free free #:gfree gfree [(arrc _ ncs pc) (∪ ((union-map gfree) ncs) (gfree pc))])])
 (struct -anyc () #:methods gen:binds-variables [])
 (struct -nonec () #:methods gen:binds-variables [])
 (define anyc (-anyc))
@@ -99,8 +100,4 @@
 
 ;; Unmerged data.
 (exp-struct datum (val) [])
-;; Merged versions of data that must be evaluated specially.
-(exp-struct mk-list^ (vals) [])
-(exp-struct mk-improper^ (vals last) [])
-(exp-struct mk-vector^ (vals) [])
-(exp-struct mk-hash^ (keys vals) [])
+

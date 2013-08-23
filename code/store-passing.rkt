@@ -14,9 +14,11 @@
          with-narrow-set-monad
          with-σ-passing-set-monad
          bind-μbump-whole
+         bind-μbump*-whole
          target-hash-top-getter
          target-hash-μgetter
-         with-whole-σ)
+         with-whole-σ
+         with-whole-μ)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Widen set-monad fixpoint
@@ -223,7 +225,9 @@
 (define-simple-macro* (bind-join-whole (a vs) body)
   (let ([σjoin (join target-σ a vs)]) #,(bind-rest #'σjoin #'body)))
 (define-simple-macro* (bind-join*-whole (as vss) body)
-  (let ([σjoin* (join* target-σ as vss)]) #,(bind-rest #'σjoin* #'body)))
+  (let ([σjoin* (join* target-σ as vss)])
+    (bind-μbump* (as)
+     #,(bind-rest #'σjoin* #'body))))
 
 (define ((hash-getter origin) hgσ a)
   (unless (hash? hgσ) (error origin "bad hash ~a" hgσ))
@@ -258,11 +262,23 @@
                 . body))
           #'(let () . body)))
 
-(define-syntax-rule (with-whole-σ body)
+(define-simple-macro* (bind-μbump*-whole (as) . body)
+  #,(if-μ #'(let ([μ* (for/fold ([μ target-μ]) ([a (in-list as)])
+                        (hash-set μ a (μinc (hash-ref μ a 0))))])
+              (syntax-parameterize ([target-μ (make-rename-transformer #'μ*)])
+                . body))
+          #'(let () . body)))
+
+(define-syntax-rule (with-whole-μ . body)
+  (splicing-syntax-parameterize
+   ([bind-μbump (make-rename-transformer #'bind-μbump-whole)]
+    [bind-μbump* (make-rename-transformer #'bind-μbump*-whole)]
+    [μgetter (make-rename-transformer #'target-hash-μgetter)])
+   . body))
+
+(define-syntax-rule (with-whole-σ . body)
   (splicing-syntax-parameterize
    ([bind-join (make-rename-transformer #'bind-join-whole)]
     [bind-join* (make-rename-transformer #'bind-join*-whole)]
-    [bind-μbump (make-rename-transformer #'bind-μbump-whole)]
-    [getter (make-rename-transformer #'target-hash-getter)]
-    [μgetter (make-rename-transformer #'target-hash-μgetter)])
-   body))
+    [getter (make-rename-transformer #'target-hash-getter)])
+   (with-whole-μ . body)))

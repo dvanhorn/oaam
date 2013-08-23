@@ -29,7 +29,7 @@
  bind-alias* bind-big-alias bind-push
  bind bind-rest
  ;; change μ
- bind-μbump
+ bind-μbump bind-μbump*
  ;; change Ξ, access M
  bind-calling-context
  ;; access Ξ

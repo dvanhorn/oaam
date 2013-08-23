@@ -54,7 +54,7 @@
                           #:unless (hash-has-key? seen a))
                (hash-set! seen a #t)
                (for/union #:initial (∪1 acc a)
-                          ([v (in-set (ref eσ a))])
+                          ([v (in-set (ref eσ a ∅))])
                           (loop (touches v))))))
 
 (define (restrict-to-set ρ S)

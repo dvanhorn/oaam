@@ -376,9 +376,10 @@ Welcome to Racket v5.3.3.
    lcgpnt
    (lcgco lcgdr lcgchk lcgans lcgap lcgcc lcgev)
    lcgtouches
-   lcgroot]
+   lcgroot
+   #:narrow]
   (with-nonsparse
-   (with-σ-∆s
+   (with-whole-σ #;with-σ-∆s
     (with-pushdown
      #:rtk lcgrtk #:kont lcgkont #:co lcgco
      (with-lazy
