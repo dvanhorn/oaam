@@ -1,0 +1,37 @@
+(define (good malloc free)
+  (define a (malloc))
+  (free a)
+  (define e (malloc))
+  (define f (malloc))
+  (free e)
+  (free f)
+  (define c (malloc))
+  (define d (malloc))
+  (free d)
+  (free c))
+
+(define (bad malloc free)
+  (define b (malloc))
+  (free b)
+  (free b))
+
+(define addr? number?)
+
+(define i 0)
+(define MallocFreeImpl
+    (cons (λ () (let ([x i])
+                  (set! i (add1 i))
+                  x))
+          (λ (a) (void))))
+(define MallocFreeProt
+  (tmon 'user 'context 'contract
+        (cons/c ('malloc : -> addr?)
+                ('free : addr? -> void?))
+        (not (seq _ (dseq (call 'free (? x))
+                            (seq (kl (not (ret 'malloc ($ x))))
+                                 (call 'free ($ x))))))
+        MallocFreeImpl))
+(define malloc (car MallocFreeProt))
+(define free (cdr MallocFreeProt))
+(good malloc free)
+(bad malloc free)

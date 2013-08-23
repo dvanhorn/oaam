@@ -20,10 +20,10 @@
        (and (f (car lst)) ((listof f) (cdr lst))))))
 (define csort 
   (tmon 'user 'context 'contract
-        ('sort : ('cmp : integer? integer? -> boolean?)
-               (listof integer?)
+        ('sort : ('cmp : number? number? -> boolean?)
+               (listof number?)
                ->
-                                       #;(listof integer?) any
+               any
                )
         (and (not (seq ... (call 'sort _ _) (star (!ret 'sort _)) (call 'sort _ _)))
            
