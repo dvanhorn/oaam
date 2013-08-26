@@ -7,6 +7,7 @@
          "handle-limits.rkt"
          (only-in "tcon.rkt" Γτ)
          "graph.rkt"
+         "goedel-hash.rkt"
          "struct-copy.rkt"
          racket/unsafe/ops
          racket/trace)
@@ -73,6 +74,7 @@
                         kind)))
     (define μ? (syntax-parameter-value #'abs-count?))
     (define compiledv? (syntax-parameter-value #'compiled?))
+    (define kindv (and (attribute kind) (syntax-e #'kind)))
     (define-syntax ifμ
       (syntax-rules ()
         [(_ t) (if μ? (list t) '())]
@@ -95,7 +97,7 @@
     (quasisyntax/loc stx
      (begin
        (define (name c)
-         (define σ (or (and current-state (state-base-rσ current-state)) σ₀))
+         (define σ (or (and current-state (state-base-rσ current-state)) empty-σ))
          #,@(if-μ #'(define μ (point-μ (state-base-pnt c))))
          (define-values (∆s pnt)
            (values (state-base-rσ c) (state-base-pnt c)))
@@ -118,7 +120,7 @@
                        k))
                        (when (`(A . g80) . ∈ . killed) (pretty-print global-Ξ))
                        (printf "Killed addresses ~a~%" killed)
-                       (values (update ∆s (restrict-to-set σ reachable-addresses))
+                       (values (update ∆s (restrict-σ σ reachable-addresses))
                                (Γτ reachable-addresses touches τ)
                                #,@(if-μ (syntax/loc stx (restrict-to-set μ* reachable-addresses))))))
                     (if-μ
@@ -146,17 +148,17 @@
                         (pretty-print reachable-addresses)
                         (pretty-print c)
                         (error 'Γ "Killed monitor"))
-                      (values (restrict-to-set ∆s reachable-addresses)
+                      (values (restrict-σ ∆s reachable-addresses)
                               (Γτ reachable-addresses touches τ)
                               #,@(if-μ (syntax/loc stx (restrict-to-set μ* reachable-addresses))))))])))
            (define pnt*
              (syntax-parameterize ([target-τ (make-rename-transformer #'τ*)]
                                    [target-μ (make-rename-transformer #'μ**)])
                (point conf)))
-           (printf "Point ~a~%Store ~a~%" pnt* σ*)
-           #,@(match (attribute kind)
-                [#f (raise-syntax-error #f "Wide GC? What are you, nuts?" stx)]
-                [(? (λ (s) (eq? (syntax-e s) '#:husky)))
+           #;(printf "Point ~a~%Store ~a~%" pnt* σ*)
+           #,@(case kindv
+                [(#f) (raise-syntax-error #f "Wide GC? What are you, nuts?" stx)]
+                [(#:husky)
                  (quasisyntax/loc stx
                    ((match (hash-ref seen pnt* #f)
                       [#f #,def-c*
@@ -182,7 +184,7 @@
                        (unless same?
                          (set-state-base-rσ! sb σ**)
                          (add-todo/set! sb))])))]
-                [(? (λ (s) (eq? (syntax-e s) '#:narrow)))
+                [(#:narrow)
                  ;; Narrow
                  (quasisyntax/loc stx
                    (#,def-c*
@@ -618,8 +620,6 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
 
    (define (reset-∆s!) (set! global-∆s '()))
 
-   (define σ₀ (hash))
-   (define (hash-μbump μ a) (hash-set μ a (μinc (hash-ref μ a 0))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Imperative husky deltas with GC (not wide, but not narrow)
 (define-syntax (with-timestamp-∆-fix/Γ stx)
@@ -630,6 +630,7 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
                                      kind
                                      (~or #:narrow #:husky)))) ...]
         body ...)
+     (define kindv (and (attribute kind) (syntax-e #'kind)))
      (head*
       define/with-syntax
       [ans? (format-id #'ans "~a?" #'ans)]
@@ -647,6 +648,7 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
              (define states-last 0)
              (set-box! state-count* 0)
              (reset-todo/set!)
+             (init-GH!)
              (reset-pushdown!)
              (set-seen! (make-hash)) ;; point → (state-base σ μ (point τ conf))
              fst
@@ -654,12 +656,10 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
                (cond [(empty-todo/set? todo)
                       (set-box! state-count* (hash-count seen))
                       (state-rate)
-                      (for*/set (#,(match (attribute kind)
-                                     [#f (raise-syntax-error #f "Wide GC?" stx)]
-                                     [(? (λ (s) (eq? (syntax-e s) '#:husky)))
-                                      #'[c (in-hash-values seen)]]
-                                     [(? (λ (s) (eq? (syntax-e s) '#:narrow)))
-                                      #'[c (in-hash-keys seen)]])
+                      (for*/set (#,(case kindv
+                                     [(#f) (raise-syntax-error #f "Wide GC?" stx)]
+                                     [(#:husky) #'[c (in-hash-values seen)]]
+                                     [(#:narrow) #'[c (in-hash-keys seen)]])
                                  [pnt (in-value (state-base-pnt c))]
                                  [conf (in-value (point-conf pnt))]
                                  #:when (ans? conf))
@@ -679,12 +679,11 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
            [yield-meaning (mk-yield #'internal-yielder)]
            [imperative? #t]
            [global-σ? #f])
-          (with-whole-μ
-           body ...
-           (mk-add-todo/guard internal-yielder state-base point (co dr chk ans ap cc ev) touches root reach*
-                              #,@(if (attribute kind) #'(kind) '()))
-           ;; must be down here so that touches is defined.
-           (define reach* (reach touches))))))]))
+          body ...
+          (mk-add-todo/guard internal-yielder state-base point (co dr chk ans ap cc ev) touches root reach*
+                             #,@(if (attribute kind) #'(kind) '()))
+          ;; must be down here so that touches is defined.
+          (define reach* (reach touches)))))]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Common functionality

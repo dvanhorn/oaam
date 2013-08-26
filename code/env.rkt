@@ -1,8 +1,8 @@
 #lang racket
-(provide extend extend* join join* join-store join-store/change
-         restrict-to-set reach
+(provide extend extend* join join* join-GH join*-GH join-store join-store/change
+         restrict-to-set restrict-to-set-GH reach
          update update/change would-update? restrict-to-reachable restrict-to-reachable/vector)
-(require "data.rkt" "ast.rkt" "notation.rkt")
+(require "data.rkt" "ast.rkt" "notation.rkt" "goedel-hash.rkt")
 
 (define (extend ρ x v)
   (hash-set ρ x v))
@@ -13,7 +13,10 @@
   (hash-set eσ a (⊓ s (hash-ref eσ a ∅))))
 (define (join* eσ as ss)
   (for/fold ([eσ eσ]) ([a as] [s ss]) (join eσ a s)))
-
+(define (join-GH eσ a s)
+  (dict-set eσ a (⊓ s (dict-ref eσ a ∅))))
+(define (join*-GH eσ as ss)
+  (for/fold ([eσ eσ]) ([a as] [s ss]) (join-GH eσ a s)))
 ;; Perform join and return if the join was idempotent
 (define (join/change eσ a s)
   (define prev (hash-ref eσ a ∅))
@@ -61,13 +64,17 @@
   (for/hash ([(x a) (in-hash ρ)]
              #:when (x . ∈ . S))
     (values x a)))
+(define (restrict-to-set-GH ρ S)
+  (for/GH-hash ([(x a) (in-dict ρ)]
+             #:when (x . ∈ . S))
+    (values x a)))
 (define ((mk-restrict-to-reachable ref) touches)
   (define reach ((mk-reach ref) touches))
   (λ (eσ v)
      (for/hash ([a (in-set (reach eσ (touches v)))])
        (values a (ref eσ a)))))
 
-(define reach (mk-reach hash-ref))
+(define reach (mk-reach dict-ref))
 (define reach/vec (mk-reach vector-ref))
 
 (define restrict-to-reachable (mk-restrict-to-reachable hash-ref))

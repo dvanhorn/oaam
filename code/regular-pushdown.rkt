@@ -43,7 +43,7 @@
           [target-σ-token #,(cond
                              [(syntax-parameter-value #'σ-∆s?)
                               #'(λ (stx) #'(update target-σ top-σ))]
-                             [(syntax-parameter-value #'imperative?)
+                             [(syntax-parameter-value #'global-σ?)
                               #'(λ (stx) #`(if saw-change? (add1 unions) unions))]
                              [else #'(make-rename-transformer #'target-σ)])]
           [bind-memoize (syntax-rules () [(_ (ctx vs) . body) (begin (memo! ctx vs) . body)])]

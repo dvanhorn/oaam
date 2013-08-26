@@ -132,8 +132,7 @@
                      (append
                       (cond [(and (given wide?) (not global-σ?*))
                              '(#:expander #:with-first-cons)]
-                            [else '()]))]
-                    [inj-σ (if σ-∆sv? #''() #'(hash))])
+                            [else '()]))])
        
        (define yield-ev
          (if compiled?*
@@ -519,7 +518,6 @@
                       (? primop?)) ∅]
                  [_ (error 'touches "Missed case ~a" v)]))
 
-
              (define-syntax (touches-ρ syn)
                (syntax-parse syn
                  [(_ ρ (~or (~optional (~seq #:fvs fvs))
@@ -692,7 +690,7 @@
                                     (... (begin body ...)))])))])))
 
                (define (inj e)
-                 (define σ₀ (hash))
+                 (define σ₀ empty-σ)
                  (define ∆s₀ '())
                  (define μ₀ (hash))
                  (define τ₀ (hash))
@@ -924,6 +922,8 @@
                          [(chkargs: l lchk i ℓs (cons nc ncs) (cons arga arg-addrs) done-addrs fnv δ)
                           (define chkA (make-var-contour `(chk ,i ,l) δ))
                           (generator
+                              ;; XXX: UNSOUND! We diverge in the narrow case for
+                              ;; '() verses a=(cons _ a), when we really need both together.
                               (do ([argv #:in-get arga])
                                   (yield (chk l lchk nc argv chkA ℓs
                                               (push (chkargs l lchk (add1 i) ℓs ncs arg-addrs (cons chkA done-addrs) fnv δ)) δ))))]
@@ -1009,11 +1009,11 @@
                        (define templ (make-var-contour `(flt-tmp-l . ,lchk) δ))
                        (define tempChk (make-var-contour `(flt-tmp-chk . ,lchk) δ))
                        (define tempChk2 (make-var-contour `(flt-tmp-chk2 . ,lchk) δ))
-                       (define ltmpArg (list res-addr))
                        (generator
-                           (do ([#:join* (cons tempFn ltmpArg) (list (singleton vc) (singleton v))]
+                           (do ([#:join tempFn (singleton vc)]
+                                [#:join res-addr (singleton v)]
                                 [a #:push tempChk δ k])
-                               (yield (ap templ tempChk2 tempFn ltmpArg
+                               (yield (ap templ tempChk2 tempFn (list res-addr)
                                           (frame+ (kont-cm k) (chkflt tempFn res-addr ℓs) a) δ))))]
                       [_
                        (log-info "Bad contract to check ~a on ~a" vc v)

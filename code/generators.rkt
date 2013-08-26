@@ -32,7 +32,7 @@
       (define wide-step (σ-∆s/generator/wide-step-specialized step ans?))
       (define clean-σ (restrict-to-reachable touches))
       (define-values (cs ∆) (pull fst '() ∅))
-      (define fst-s (cons (update ∆ (hash)) cs))
+      (define fst-s (cons (update ∆ empty-σ) cs))
       (define snd (wide-step fst-s))
       (let loop ((next snd) (prev fst-s))
         (cond [(equal? next prev)

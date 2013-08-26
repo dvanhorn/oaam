@@ -1,6 +1,7 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
-         "fix.rkt" "handle-limits.rkt" "ast.rkt"
+         "fix.rkt" "handle-limits.rkt" "ast.rkt" 
+         "goedel-hash.rkt"
          "graph.rkt" racket/stxparam
          racket/trace
          (for-syntax racket/syntax syntax/parse))
@@ -18,6 +19,7 @@
          target-hash-top-getter
          target-hash-μgetter
          with-whole-σ
+         with-whole-GH-σ
          with-whole-μ)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -73,7 +75,7 @@
           [(cons wsσ cs)
            (define initial (for/set ([c (in-set cs)]) (cons wsσ c)))
            (define-values (σ* cs*)
-             (for/fold ([σ (hash)] [cs ∅]) ([s (in-set initial)])
+             (for/fold ([σ empty-σ] [cs ∅]) ([s (in-set initial)])
                (define-values (σ* cs*) (step s))
                (values (join-store σ σ*) (∪ cs cs*))))
            (set-box! state-count (+ (unbox state-count)
@@ -199,7 +201,7 @@
      (define ss (fix step^ (set (cons f^σ cs))))
      (state-rate)
      (define-values (last-σ final-cs)
-       (for/fold ([last-σ (hash)] [final-cs ∅]) ([s ss])
+       (for/fold ([last-σ empty-σ] [final-cs ∅]) ([s ss])
          (match s
            [(cons fsσ cs)
             (values (join-store last-σ fsσ)
@@ -228,10 +230,19 @@
   (let ([σjoin* (join* target-σ as vss)])
     (bind-μbump* (as)
      #,(bind-rest #'σjoin* #'body))))
+(define-simple-macro* (bind-join-whole-GH (a vs) body)
+  (let ([σjoin (join-GH target-σ a vs)]) #,(bind-rest #'σjoin #'body)))
+(define-simple-macro* (bind-join*-whole-GH (as vss) body)
+  (let ([σjoin* (join*-GH target-σ as vss)])
+    (bind-μbump* (as)
+     #,(bind-rest #'σjoin* #'body))))
 
 (define ((hash-getter origin) hgσ a)
   (unless (hash? hgσ) (error origin "bad hash ~a" hgσ))
   (hash-ref hgσ a (λ () (error origin "Unbound address ~a in store ~a" a hgσ))))
+(define ((GH-hash-getter origin) hgσ a)
+  (unless (GH? hgσ) (error origin "bad hash ~a (other argument: ~a)" hgσ a))
+  (dict-ref hgσ a (λ () (error origin "Unbound address ~a in store ~a" a hgσ))))
 (define-syntax-rule (mk-target-getter name target getter)
   (define-syntax (name stx)
     (syntax-case stx ()
@@ -239,6 +250,7 @@
       [_ #'(λ (a) (getter target a))])))
 (mk-target-getter target-hash-top-getter top-σ (hash-getter 'top))
 (mk-target-getter target-hash-getter target-σ (hash-getter 'σ))
+(mk-target-getter target-hash-GH-getter target-σ (GH-hash-getter 'σ))
 (define-syntax (target-hash-μgetter stx)
   (syntax-case stx ()
     [(_ a) #'(hash-ref target-μ a 0)]
@@ -281,4 +293,13 @@
    ([bind-join (make-rename-transformer #'bind-join-whole)]
     [bind-join* (make-rename-transformer #'bind-join*-whole)]
     [getter (make-rename-transformer #'target-hash-getter)])
+   (with-whole-μ . body)))
+
+(define-syntax-rule (with-whole-GH-σ . body)
+  (splicing-syntax-parameterize
+   ([bind-join (make-rename-transformer #'bind-join-whole-GH)]
+    [bind-join* (make-rename-transformer #'bind-join*-whole-GH)]
+    [getter (make-rename-transformer #'target-hash-GH-getter)]
+    [empty-σ (make-rename-transformer #'empty-GH)]
+    [restrict-σ (make-rename-transformer #'restrict-to-set-GH)])
    (with-whole-μ . body)))
