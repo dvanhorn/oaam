@@ -53,8 +53,8 @@
 (define (set-∆?!) (set! ∆? #t))
 (define (reset-∆?!) (when ∆? (inc-unions!) (set! ∆? #f)))
 (define (reset-pushdown!) (set! global-Ξ (make-hash)) (set! global-M (make-hash)))
-(define (push-Ξ! ctx k) (hash-add! global-Ξ ctx k))
-(define (memo! ctx vs) (hash-union! global-M ctx vs))
+(define (push-Ξ! ctx k) (hash-join1! global-Ξ ctx k))
+(define (memo! ctx vs) (hash-join! global-M ctx vs))
 
 (define empty-todo '())
 (define empty-todo/set ∅)
@@ -120,9 +120,9 @@
                        k))
                        (when (`(A . g80) . ∈ . killed) (pretty-print global-Ξ))
                        (printf "Killed addresses ~a~%" killed)
-                       (values (update ∆s (restrict-σ σ reachable-addresses))
+                       (values (update ∆s (restrict-σ-to-set σ reachable-addresses))
                                (Γτ reachable-addresses touches τ)
-                               #,@(if-μ (syntax/loc stx (restrict-to-set μ* reachable-addresses))))))
+                               #,@(if-μ (syntax/loc stx (restrict-hash-to-set μ* reachable-addresses))))))
                     (if-μ
                      (quasisyntax/loc stx
                        ((cond
@@ -148,14 +148,14 @@
                         (pretty-print reachable-addresses)
                         (pretty-print c)
                         (error 'Γ "Killed monitor"))
-                      (values (restrict-σ ∆s reachable-addresses)
+                      (values (restrict-σ-to-set ∆s reachable-addresses)
                               (Γτ reachable-addresses touches τ)
-                              #,@(if-μ (syntax/loc stx (restrict-to-set μ* reachable-addresses))))))])))
+                              #,@(if-μ (syntax/loc stx (restrict-hash-to-set μ* reachable-addresses))))))])))
            (define pnt*
              (syntax-parameterize ([target-τ (make-rename-transformer #'τ*)]
                                    [target-μ (make-rename-transformer #'μ**)])
                (point conf)))
-           #;(printf "Point ~a~%Store ~a~%" pnt* σ*)
+#;           (printf "Point ~a~%Store ~a~%" pnt* σ*)
            #,@(case kindv
                 [(#f) (raise-syntax-error #f "Wide GC? What are you, nuts?" stx)]
                 [(#:husky)
@@ -256,7 +256,7 @@
     (let () #,@(if-μ #'(for-each μbump as)) . body))))
    (define-simple-macro* (mk-joiner name getter setter μbump)
 (define (name a vs)
-  (define prev (getter global-σ a ∅))
+  (define prev (getter global-σ a nothing))
   (define upd (⊓ vs prev))
   #,@(if-μ #'(μbump a))
   (unless (≡ prev upd)
@@ -350,7 +350,7 @@
                                    [pnt (in-value (state-base-pnt c))]
                                    [conf (in-value (point-conf pnt))]
                                    #:when (ans^? conf))
-                          (cons (ans^-v conf) (point-τ pnt))))
+                          (list (ans^-v conf) (point-τ pnt))))
                       (values (format "State count: ~a" (unbox state-count*))
                               (format "Point count: ~a" (hash-count seen))
                               (with-output-to-string
@@ -382,7 +382,7 @@ mk-imperative/timestamp^-fixpoint restrict-to-reachable (void))
       (match stack
         [(cons (cons t vs) stack)
          (values a vs)]
-        [_ (values a ∅)]))
+        [_ (values a nothing)]))
     v)))
    (mk-mk-imperative/timestamp^-fixpoint
 mk-imperative/timestamp^-fixpoint/stacked restrict-to-reachable/stacked (reset-∆?!))
@@ -489,7 +489,7 @@ global-hash-μgetter/stacked)
                                    [pnt (in-value (state-base-pnt c))]
                                    [conf (in-value (point-conf pnt))]
                                    #:when (ans^? conf))
-                          (cons (ans^-v conf) (point-τ pnt))))
+                          (list (ans^-v conf) (point-τ pnt))))
                       (values (format "State count: ~a" (unbox state-count*))
                               (format "Point count: ~a" (hash-count seen))
                               #;
@@ -581,7 +581,7 @@ mk-imperative/∆s/acc^-fixpoint restrict-to-reachable join-h! hash-set! hash-re
                                    [pnt (in-value (state-base-pnt c))]
                                    [conf (in-value (point-conf pnt))]
                                    #:when (ans^? conf))
-                          (cons (ans^-v conf) (point-τ pnt))))
+                          (list (ans^-v conf) (point-τ pnt))))
                       (values (format "State count: ~a" (unbox state-count*))
                               (format "Point count: ~a" (hash-count seen))
                               #;
@@ -648,6 +648,7 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
              (define states-last 0)
              (set-box! state-count* 0)
              (reset-todo/set!)
+             (printf "Init~%")
              (init-GH!)
              (reset-pushdown!)
              (set-seen! (make-hash)) ;; point → (state-base σ μ (point τ conf))
@@ -663,7 +664,7 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
                                  [pnt (in-value (state-base-pnt c))]
                                  [conf (in-value (point-conf pnt))]
                                  #:when (ans? conf))
-                        (cons (state-base-rσ c)
+                        (list (state-base-rσ c)
                               (ans-v conf)))]
                      [else
                       (define todo-old todo)

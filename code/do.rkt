@@ -61,7 +61,9 @@
 (define hash₀ (hash))
 (define-syntax-parameter empty-σ (make-rename-transformer #'hash₀))
 (define-syntax-parameter restrict-σ (make-rename-transformer #'restrict-to-set))
-(provide target-σ abs-count? compiled? fixpoint σ-∆s? global-σ? imperative? pushdown? empty-σ restrict-σ)
+(define-syntax-parameter Gödel? #f)
+(provide target-σ abs-count? compiled? fixpoint empty-σ restrict-σ 
+         σ-∆s? global-σ? imperative? pushdown? Gödel?)
 
 
 (define-syntax-rule (bind-τ-join (a τs) . body)

@@ -28,7 +28,7 @@
      (define abs-r
        #`(let* ([ra sr]
                 [rA (make-var-contour `(A . ,sr) sδ*)]
-                [rvs (if (null? vrest) snull (⊓1 snull (consv rA ra)))]
+                [rvs (if (null? vrest) (singleton '()) (⊓1 (singleton '()) (consv rA ra)))]
                 #,@(if (zero? K) #'() #'([νρ (extend sρ r rA)])))
            (bind-join (ra rvs)
                       (bind-big-alias (rA vrest) body*))))
@@ -39,7 +39,7 @@
            (do loop ([as vrest] [last ra] [count 0])
                (match as
                  ['()
-                  (do  ([#:join last snull])
+                  (do  ([#:join last (singleton '())])
                     body*)]
                  [(cons a as)
                   (define rnextA `((,sr A . ,count) . ,sδ*))

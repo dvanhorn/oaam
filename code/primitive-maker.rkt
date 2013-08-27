@@ -5,7 +5,7 @@
                      racket/match racket/list racket/base)
          (for-meta 2 racket/base)
          racket/stxparam)
-(provide getter μgetter force widen delay yield yield-meaning snull         
+(provide getter μgetter force widen delay yield yield-meaning
          mk-primitive-meaning mk-static-primitive-functions
          (for-syntax if-μ))
 
@@ -32,16 +32,13 @@
 (define-syntax-parameter yield-meaning
   (λ (stx) (raise-syntax-error #f "Must parameterize for mk-analysis" stx)))
 
-(define snull (singleton '()))
-
 ;; Combinatorial combination of arguments
-(define (toSetOfLists list-of-sets)
-  (match list-of-sets
-    ['() snull]
-    [(cons hdS tail)
-     (for*/set ([hd (in-set hdS)]
+(define/match (toSetOfLists list-of-value-sets)
+  [('()) (singleton '())]
+  [((cons hdS tail))
+     (for*/set ([hd (in-value-set hdS)]
                 [restlist (in-set (toSetOfLists tail))])
-       (cons hd restlist))]))
+       (cons hd restlist))])
 
 (define-syntax-rule (νlits set-name lits ...)
   (begin (define lits #f) ...
@@ -142,7 +139,7 @@
        (let-syntax ([good
                      (syntax-rules ()
                        [(_ v pred)
-                        (for/set ([v (in-set (getter addr))] ;; uses target-σ
+                        (for/value-set ([v (in-set (getter addr))] ;; uses target-σ
                                   #:when pred)
                           v)])])
          #,(if (eq? t 'any)

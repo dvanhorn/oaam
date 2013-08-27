@@ -10,7 +10,7 @@
          (for-syntax mk-mk-prims)
          define/read define/basic define/write yield-both
          ;; reprovide
-         snull yield yield-meaning force getter μgetter widen delay
+         yield yield-meaning force getter μgetter widen delay
          abs-count? compiled? fixpoint σ-∆s? (for-syntax if-μ))
 
 (define-simple-macro* (define/read (name:id v:id ...) body ...+)
@@ -473,7 +473,7 @@
             (define D-addr (make-var-contour `(D . ,l) δ))
             (define val (consv A-addr D-addr))
             (do ([#:alias A-addr addr]
-                 [#:join D-addr (⊓1 snull val)])
+                 [#:join D-addr (⊓1 (singleton '()) val)])
                 (yield val))]
            [(or (? vectorv^?) (== vector-immutable^))
             (do ([out (in-list (list cons^ '()))])
@@ -536,7 +536,7 @@
          (let ([A-addr (make-var-contour `(A . ,l) δ)]
                [D-addr (make-var-contour `(D . ,l) δ)])
            (define val (consv A-addr D-addr))
-           (do ([#:join D-addr (⊓1 snull val)])
+           (do ([#:join D-addr (⊓1 (singleton '()) val)])
                (do loop ([v vs] [J ⊥])
                  (match v
                    ['()

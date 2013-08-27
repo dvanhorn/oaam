@@ -1,6 +1,8 @@
 #lang racket
 (require "ast.rkt" "notation.rkt" (for-syntax syntax/parse racket/syntax)
-         racket/stxparam)
+         "goedel-hash.rkt"
+         racket/stxparam
+         racket/trace)
 (provide define-nonce mk-flatten-value cons-limit
          ;; abstract values
          number^;;integer^ rational^
@@ -32,7 +34,8 @@
          (struct-out cand)
          (struct-out cor)
          atomic?
-         nothing singleton
+         nothing singleton value-set? in-value-set for/value-set
+         hash-join1! hash-join! for/σ in-σ σ? σ-ref σ-set join join*
          ≡ ⊑? big⊓ ⊓ ⊓1)
 
 (define-syntax (define-nonce stx)
@@ -108,10 +111,38 @@
       [else (error "Unknown base value" v)])))
 
 ;; Everything is all heterogeneous
-(define nothing ∅)
-(define singleton set)
 (define ⊓ set-union)
 (define ⊓1 set-add)
+(define (join* eσ as ss)
+  (for/fold ([eσ eσ]) ([a as] [s ss]) (join eσ a s)))
+
+(define (hash-join1! h k v) (hash-set! h k (∪1 (hash-ref h k nothing) v)))
+(define (hash-join! h k v) (hash-set! h k (∪ (hash-ref h k nothing) v)))
+
+ (define nothing GH-set₀)
+ (define singleton GH-singleton-set)
+ (define value-set? GH-set?) ;; otherwise set-immutable?
+ (define-syntax in-value-set (make-rename-transformer #'in-GH-set))
+ (define-syntax for/value-set (make-rename-transformer #'for/GH-set))
+ (define-syntax for/σ (make-rename-transformer #'for/GH-hash))
+ (define-syntax σ? (make-rename-transformer #'GH-hash?))
+ (define-syntax in-σ (make-rename-transformer #'in-dict))
+ (define-syntax σ-ref (make-rename-transformer #'dict-ref))
+ (define-syntax σ-set (make-rename-transformer #'dict-set))
+ (define (join eσ a s) (GH-hash-union eσ a s))
+#|
+ (define nothing ∅)
+ (define singleton set)
+ (define value-set? set-immutable?)
+ (define-syntax in-value-set (make-rename-transformer #'in-set))
+ (define-syntax for/value-set (make-rename-transformer #'for/set))
+ (define-syntax for/σ (make-rename-transformer #'for/hash))
+ (define-syntax σ? (make-rename-transformer #'hash?))
+ (define-syntax in-σ (make-rename-transformer #'in-hash))
+ (define-syntax σ-ref (make-rename-transformer #'hash-ref))
+ (define-syntax σ-set (make-rename-transformer #'hash-set))
+ (define (join eσ a s) (hash-union eσ a s))
+|#
 
 (define ⊑? subset?)
 (define (≡ vs0 vs1) (= (set-count vs0) (set-count vs1)))

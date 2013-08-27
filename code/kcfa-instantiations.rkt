@@ -334,6 +334,7 @@ Welcome to Racket v5.3.3.
 
 
 ;; "ps"
+#;#;
 (splicing-syntax-parameterize ([generate-graph? #f]
                                [abs-count? #t]
                                [global-σ? #t])
@@ -371,15 +372,15 @@ Welcome to Racket v5.3.3.
 (splicing-syntax-parameterize ([generate-graph? #f]
                                [abs-count? #t]
                                [compiled? #t])
- (with-timestamp-∆-fix/Γ
-  [lcgsb
-   lcgpnt
-   (lcgco lcgdr lcgchk lcgans lcgap lcgcc lcgev)
-   lcgtouches
-   lcgroot
-   #:narrow]
-  (with-nonsparse
-   (with-whole-σ #;with-σ-∆s
+ (with-whole-GH-σ #;with-σ-∆s
+  (with-timestamp-∆-fix/Γ
+    [lcgsb
+     lcgpnt
+     (lcgco lcgdr lcgchk lcgans lcgap lcgcc lcgev)
+     lcgtouches
+     lcgroot
+     #:narrow]
+   (with-nonsparse
     (with-pushdown
      #:rtk lcgrtk #:kont lcgkont #:co lcgco
      (with-lazy

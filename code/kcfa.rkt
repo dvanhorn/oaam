@@ -133,7 +133,7 @@
                       (cond [(and (given wide?) (not global-σ?*))
                              '(#:expander #:with-first-cons)]
                             [else '()]))])
-       
+
        (define yield-ev
          (if compiled?*
              #'(λ (syn)
@@ -162,6 +162,7 @@
                   (do ()
                   (yield (dr target-σ target-μ k (lookup-env ρ x)))))]
               [(datum l _ d) (λ% e (ρ k δ)
+                                 #;
                                  (when (memv d '(here))
                                    (printf "Got to ~a~%  τ: ~a~%  μ: ~a~%"
                                            d target-τ #,(if (and μ? (not (given wide?))) #'target-μ #'#f)))
@@ -494,7 +495,7 @@
                       (vectorv-immutable _ l)) (list->set l)]
                  [(or (vectorv^ _ a)
                       (vectorv-immutable^ _ a)) (set a)]
-                 [(? set-immutable? s) (for/union ([v (in-set s)]) (touches v))]
+                 [(? value-set? s) (for/union ([v (in-value-set s)]) (touches v))]
                  [(addr a) (set a)]
                  [(or (ccons c₀ c₁)
                       (cand c₀ c₁)
@@ -515,7 +516,9 @@
                       (== ●)
                       (== ⊥)
                       (? atomic?)
-                      (? primop?)) ∅]
+                      (? primop?)
+                      (== anyc)
+                      (== nonec)) ∅]
                  [_ (error 'touches "Missed case ~a" v)]))
 
              (define-syntax (touches-ρ syn)
@@ -551,7 +554,8 @@
 
              (define (touches-frame f)
                (match f
-                 [(sk!: a) (set a)]
+                 [(or (sk!: a)
+                      (retk: a)) (set a)]
                  [(ifk: t e ρ δ) (touches-ρ ρ t e)]
                  [(lrk: a as es e ρ δ)
                   (∪/l (touches-ρ ρ #:many (cons e es)) (cons a as))]
@@ -564,7 +568,6 @@
                  [(chkargs: l lchk i ℓs nc-todo arg-addrs done-addrs fnv δ)
                   (∪/l (∪/l (∪ (touches/l nc-todo) (touches fnv)) arg-addrs) done-addrs)]
                  [(postretk: l lchk fnv δ) (touches fnv)]
-                 [(retk: a) (set a)]
                  [(blcons: res-addr aa ad) (set res-addr aa ad)]
                  [(or (chkor₀: l lchk ℓs c v res-addr δ)
                       (chkand₀: l lchk ℓs c v res-addr δ))
@@ -725,18 +728,18 @@
                  (if (eq? η Λη)
                      (values τ #f)
                      (let-values ([(stepped-ts cause-blame?)
-                                   (for/fold ([ts* ∅] [cause-blame? #f])
-                                       ([T (in-set (hash-ref τ η (λ () (error 'step "Unbound η ~a" η))))])
+                                   (for/fold ([ts* nothing] [cause-blame? #f])
+                                       ([T (in-value-set (σ-ref τ η (λ () (error 'step "Unbound η ~a" η))))])
                                      (match (ð event T)
                                        [(== M⊥ eq?) (values ts* (or cause-blame? must))] ;; must > #f but must < may
                                        [(tl T* t)
-                                        (values (set-add ts* T*)
+                                        (values (⊓1 ts* T*)
                                                 (or (and (eq? may t) t) ;; Jump up to may, if may.
                                                     ;; Otherwise, use whatever else we had.
                                                     cause-blame?))]))])
                        (values (if single-η?
-                                   (hash-set τ η stepped-ts)
-                                   (hash-union τ η stepped-ts))
+                                   (σ-set τ η stepped-ts)
+                                   (join τ η stepped-ts))
                                (if (set-empty? stepped-ts)
                                    must
                                    cause-blame?))))) ;; may or #f
@@ -875,7 +878,7 @@
                          ;; Create temporal monitor around blessed value
                          [(initτk: η t)
                           (generator
-                              (do ([#:τ-join η (set t)]
+                              (do ([#:τ-join η (singleton t)]
                                    [k* #:in-kont a])
                                 (yield (co k* v))))]
 
@@ -922,7 +925,7 @@
                          [(chkargs: l lchk i ℓs (cons nc ncs) (cons arga arg-addrs) done-addrs fnv δ)
                           (define chkA (make-var-contour `(chk ,i ,l) δ))
                           (generator
-                              ;; XXX: UNSOUND! We diverge in the narrow case for
+                              ;; XXX: unsound? We diverge in the narrow case for
                               ;; '() verses a=(cons _ a), when we really need both together.
                               (do ([argv #:in-get arga])
                                   (yield (chk l lchk nc argv chkA ℓs
@@ -1022,6 +1025,7 @@
                    ;; v is not a value here. It is an address.
                    [(ap: ap-σ ap-μ ap-τ l lchk fn-addr arg-addrs k δ)
                     (import-ð)
+;                    (display "Target ap ") (pretty-print target-σ)
                     (generator
                         (do ([f #:in-get fn-addr])
                             (match f
@@ -1034,6 +1038,10 @@ If we want to get the count associated with the point we're yielding, we're goin
 Instead, we need to force the entry of a function to be an entirely new point - one we know won't change the
 store - so we can grab the store count associated with the point to store in the context for summarization.
 |#
+
+;; mflatt: removing this print statement will cause the output value of the analysis to change.
+;; If we change pretty-print to display it will also change
+                                      (pretty-print target-σ)
                                       (do ([(ρ* δ*) #:bind ρ l δ xs arg-addrs]
                                            [k* #:calling-context (ctx e ρ* δ*) k])
                                           (yield (ev e ρ* k* δ*))
@@ -1120,7 +1128,6 @@ store - so we can grab the store count associated with the point to store in the
 
                    [(ans: ans-σ ans-μ ans-τ cm v) (generator (do () (yield (ans cm v))))]
                    [_ (error 'step "Bad state ~a" state)]))
-
 #;
                  (trace step)
 

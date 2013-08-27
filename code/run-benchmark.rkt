@@ -89,7 +89,7 @@
                   [("--lcg")
                    "Benchmark compiled GCd abs-counted lazy non-determinism"
                    (aval lazy-0cfa/c/Γ/μ/∆s)]
-                  [("--ps")
+#;                  [("--ps")
                    "Benchmark compiled preallocated stacked store lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/prealloc/stacked!)]
 #;                  [("--ps1")

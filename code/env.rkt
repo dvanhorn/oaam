@@ -1,6 +1,7 @@
 #lang racket
-(provide extend extend* join join* join-GH join*-GH join-store join-store/change
-         restrict-to-set restrict-to-set-GH reach
+(provide extend extend* join-store join-store/change
+         set-join
+         restrict-σ-to-set restrict-hasheq-to-set restrict-hash-to-set reach
          update update/change would-update? restrict-to-reachable restrict-to-reachable/vector)
 (require "data.rkt" "ast.rkt" "notation.rkt" "goedel-hash.rkt")
 
@@ -9,17 +10,11 @@
 (define (extend* ρ xs vs)
   (for/fold ([ρ ρ]) ([x (in-list xs)] [v (in-list vs)])
     (hash-set ρ x v)))
-(define (join eσ a s)
-  (hash-set eσ a (⊓ s (hash-ref eσ a ∅))))
-(define (join* eσ as ss)
-  (for/fold ([eσ eσ]) ([a as] [s ss]) (join eσ a s)))
-(define (join-GH eσ a s)
-  (dict-set eσ a (⊓ s (dict-ref eσ a ∅))))
-(define (join*-GH eσ as ss)
-  (for/fold ([eσ eσ]) ([a as] [s ss]) (join-GH eσ a s)))
+(define (set-join eσ a s)
+  (hash-set eσ a (∪ s (hash-ref eσ a ∅))))
 ;; Perform join and return if the join was idempotent
 (define (join/change eσ a s)
-  (define prev (hash-ref eσ a ∅))
+  (define prev (hash-ref eσ a nothing))
   (define s* (⊓ s prev))
   (values (hash-set eσ a s*) (≡ prev s*)))
 
@@ -57,15 +52,20 @@
                           #:unless (hash-has-key? seen a))
                (hash-set! seen a #t)
                (for/union #:initial (∪1 acc a)
-                          ([v (in-set (ref eσ a ∅))])
+                          ([v (in-set (ref eσ a nothing))])
                           (loop (touches v))))))
 
-(define (restrict-to-set ρ S)
-  (for/hash ([(x a) (in-hash ρ)]
-             #:when (x . ∈ . S))
+(define (restrict-σ-to-set ρ S)
+  (for/σ ([(x a) (in-σ ρ)]
+          #:when (x . ∈ . S))
     (values x a)))
-(define (restrict-to-set-GH ρ S)
-  (for/GH-hash ([(x a) (in-dict ρ)]
+
+(define (restrict-hasheq-to-set ρ S)
+  (for/hasheq ([(x a) (in-hash ρ)]
+               #:when (x . ∈ . S))
+    (values x a)))
+(define (restrict-hash-to-set ρ S)
+  (for/hash ([(x a) (in-hash ρ)]
              #:when (x . ∈ . S))
     (values x a)))
 (define ((mk-restrict-to-reachable ref) touches)

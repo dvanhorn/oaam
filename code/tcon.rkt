@@ -1,6 +1,7 @@
 #lang racket
 (require racket/unit
          "ast.rkt"
+         "data.rkt"
          (except-in "notation.rkt" ∪ ∩))
 (require racket/trace)
 
@@ -268,7 +269,7 @@
          [(== unmapped eq?) #f]
          [v (matches2 v A)])]
       [v (define t
-           (cond [(set? A)
+           (cond [(set-immutable? A)
                   (for/fold ([t #f]) ([v′ (in-set A)])
                     (⊕ (≃ v v′) t))]
                  [else (≃ v A)]))
@@ -315,9 +316,9 @@
                      #:unless (subset? (touches v) reachable))
           (values x #t))
         #hasheq()))
-  (for/hash ([(η Ts) (in-hash τ)]
-             #:when (η . ∈ . reachable))
-    (values η (for/set ([T (in-set Ts)])
+  (for/σ ([(η Ts) (in-σ τ)]
+          #:when (η . ∈ . reachable))
+    (values η (for/value-set ([T (in-value-set Ts)])
                 (define start-T T)
                 (let Γsimpl* ([T T] [ρ #f] [ρkill ρ₀])
                      (define (Γsimpl T) (Γsimpl* T ρ ρkill))

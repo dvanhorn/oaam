@@ -1,6 +1,7 @@
 #lang racket
 (require "do.rkt" "imperative.rkt" racket/stxparam racket/splicing
          "env.rkt" "notation.rkt" "data.rkt" (only-in "primitives.rkt" yield)
+         "goedel-hash.rkt"
          (for-syntax racket/syntax syntax/parse))
 (provide with-regular with-pushdown)
 
@@ -23,6 +24,7 @@
 (define ((bad-ctx ctx))
   (error 'in-context "Bad context ~a" ctx))
 
+
 (define-simple-macro* (with-pushdown (~or (~once (~seq #:rtk rtk:id)) (~once (~seq #:kont kont:id)) (~once (~seq #:co co:id))) ... . body*)
   #,(with-syntax ([kont-cm (format-id #'kont "~a-cm" #'kont)])
       #`(splicing-syntax-parameterize
@@ -40,12 +42,21 @@
           [bind-get-ctx (syntax-rules () [(_ (ks ctx) . body)
                                           (let ([ks (hash-ref global-Ξ ctx (bad-ctx ctx))])
                                             . body)])]
-          [target-σ-token #,(cond
-                             [(syntax-parameter-value #'σ-∆s?)
-                              #'(λ (stx) #'(update target-σ top-σ))]
-                             [(syntax-parameter-value #'global-σ?)
-                              #'(λ (stx) #`(if saw-change? (add1 unions) unions))]
-                             [else #'(make-rename-transformer #'target-σ)])]
+          [target-σ-token #,(let ([simple (cond
+                                           [(syntax-parameter-value #'σ-∆s?)
+                                            #'(λ (stx) #'(update target-σ top-σ))]
+                                           [(syntax-parameter-value #'global-σ?)
+                                            #'(λ (stx) #`(if saw-change? (add1 unions) unions))]
+                                           [else #'(make-rename-transformer #'target-σ)])])
+                              (if (syntax-parameter-value #'Gödel?)
+                                  #`(λ (stx) 
+                                       (define simple #,simple)
+                                       (#,#'quasisyntax
+                                        (GH-gh (#,#'unsyntax 
+                                                (if (rename-transformer? simple)
+                                                    (rename-transformer-target simple)
+                                                    (simple stx))))))
+                                  simple))]
           [bind-memoize (syntax-rules () [(_ (ctx vs) . body) (begin (memo! ctx vs) . body)])]
           [pushdown? #t])
          . body*)))

@@ -1,7 +1,7 @@
 #lang racket
 (require "do.rkt" "env.rkt" "notation.rkt" "primitives.rkt" racket/splicing racket/stxparam
          "fix.rkt" "handle-limits.rkt" "ast.rkt" 
-         "goedel-hash.rkt"
+         "goedel-hash.rkt" "data.rkt"
          "graph.rkt" racket/stxparam
          racket/trace
          (for-syntax racket/syntax syntax/parse))
@@ -230,27 +230,19 @@
   (let ([σjoin* (join* target-σ as vss)])
     (bind-μbump* (as)
      #,(bind-rest #'σjoin* #'body))))
-(define-simple-macro* (bind-join-whole-GH (a vs) body)
-  (let ([σjoin (join-GH target-σ a vs)]) #,(bind-rest #'σjoin #'body)))
-(define-simple-macro* (bind-join*-whole-GH (as vss) body)
-  (let ([σjoin* (join*-GH target-σ as vss)])
-    (bind-μbump* (as)
-     #,(bind-rest #'σjoin* #'body))))
 
-(define ((hash-getter origin) hgσ a)
-  (unless (hash? hgσ) (error origin "bad hash ~a" hgσ))
-  (hash-ref hgσ a (λ () (error origin "Unbound address ~a in store ~a" a hgσ))))
-(define ((GH-hash-getter origin) hgσ a)
-  (unless (GH? hgσ) (error origin "bad hash ~a (other argument: ~a)" hgσ a))
-  (dict-ref hgσ a (λ () (error origin "Unbound address ~a in store ~a" a hgσ))))
+(define ((σ-getter origin) hgσ a)
+  (unless (σ? hgσ) (error origin "bad store ~a" hgσ))
+  ;; XXX: Unsoundness in GC leads to error?
+  (σ-ref hgσ a ∅ #;(λ () (error origin "Unbound address ~a in store ~a" a hgσ))
+            ))
 (define-syntax-rule (mk-target-getter name target getter)
   (define-syntax (name stx)
     (syntax-case stx ()
       [(_ a) #'(getter target a)]
       [_ #'(λ (a) (getter target a))])))
-(mk-target-getter target-hash-top-getter top-σ (hash-getter 'top))
-(mk-target-getter target-hash-getter target-σ (hash-getter 'σ))
-(mk-target-getter target-hash-GH-getter target-σ (GH-hash-getter 'σ))
+(mk-target-getter target-hash-top-getter top-σ (σ-getter 'top))
+(mk-target-getter target-hash-getter target-σ (σ-getter 'σ))
 (define-syntax (target-hash-μgetter stx)
   (syntax-case stx ()
     [(_ a) #'(hash-ref target-μ a 0)]
@@ -297,9 +289,6 @@
 
 (define-syntax-rule (with-whole-GH-σ . body)
   (splicing-syntax-parameterize
-   ([bind-join (make-rename-transformer #'bind-join-whole-GH)]
-    [bind-join* (make-rename-transformer #'bind-join*-whole-GH)]
-    [getter (make-rename-transformer #'target-hash-GH-getter)]
-    [empty-σ (make-rename-transformer #'empty-GH)]
-    [restrict-σ (make-rename-transformer #'restrict-to-set-GH)])
-   (with-whole-μ . body)))
+   ([empty-σ (make-rename-transformer #'empty-GH-hash)]
+    [Gödel? #t])
+   (with-whole-σ . body)))

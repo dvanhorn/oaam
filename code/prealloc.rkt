@@ -138,7 +138,7 @@
         (match stack
           [(cons (cons t vs) stack)
            (values i vs)]
-          [_ (values i ∅)]))
+          [_ (values i nothing)]))
       v)))
 
 (mk-mk-imperative/timestamp^-fixpoint
