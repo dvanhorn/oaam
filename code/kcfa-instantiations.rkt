@@ -381,8 +381,8 @@ Welcome to Racket v5.3.3.
      lcgroot
      #:narrow]
    (with-nonsparse
-    (with-pushdown
-     #:rtk lcgrtk #:kont lcgkont #:co lcgco
+    (;with-regular
+     with-pushdown #:rtk lcgrtk #:kont lcgkont #:co lcgco #:ctx lcgctx #:root lcgroot #:touches lcgtouches #:state-base lcgsb #:point lcgpnt #:narrow
      (with-lazy
       (with-0-ctx
        (with-abstract
@@ -392,7 +392,7 @@ Welcome to Racket v5.3.3.
                      #:touches lcgtouches
                      #:root lcgroot
                      #:co lcgco #:dr lcgdr #:chk lcgchk #:ans lcgans #:ap lcgap #:cc lcgcc #:ev lcgev
-                     #:rtk lcgrtk #:kont lcgkont
+                     #:rtk lcgrtk #:kont lcgkont #:ctx lcgctx
                      #:σ-passing)))))))))
 (provide lazy-0cfa/c/Γ/μ/∆s)
 

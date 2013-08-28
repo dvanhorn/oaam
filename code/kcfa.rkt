@@ -51,6 +51,8 @@
          (~optional (~seq #:cc cc:id) #:defaults ([cc (generate-temporary #'cc)]))
          (~optional (~seq #:chk chk:id) #:defaults ([chk (generate-temporary #'chk)]))
          (~optional (~seq #:ap ap:id) #:defaults ([ap (generate-temporary #'ap)]))
+         ;;
+         (~optional (~seq #:ctx ctx:id) #:defaults ([ctx (generate-temporary #'ctx)]))
          ;; Continuation/frame constructors
          (~optional (~seq #:rtk rtk:id) #:defaults ([rtk (generate-temporary #'rtk)]))
          (~optional (~seq #:kont kont:id) #:defaults ([kont (generate-temporary #'kont)]))
@@ -519,6 +521,9 @@
                       (? primop?)
                       (== anyc)
                       (== nonec)) ∅]
+                 ;; only possible in regular
+                 [(? kont?) (touches-κ v)]
+                 [(? blame?) ∅]
                  [_ (error 'touches "Missed case ~a" v)]))
 
              (define-syntax (touches-ρ syn)
@@ -617,7 +622,7 @@
                  [(chk: σ μ τ l lchk vc v res-addr ℓs k δ)
                   (∪1 (∪ (touches-κ k) (touches vc) (touches v)) res-addr)]
                  [(ans: σ μ τ cm v) (touches v)]
-                 [(cc: σ μ τ s ρ η ℓs k δ) (∪1 (∪ (touches k) (touches-ρ ρ s)) η)]
+                 [(cc: σ μ τ s ρ η ℓs k δ) (∪1 (∪ (touches-κ k) (touches-ρ ρ s)) η)]
                  [(ev: σ μ τ e ρ k δ) (∪ (touches-κ k) (touches-ρ ρ e))]))
              #;
              (trace root)
@@ -1041,7 +1046,7 @@ store - so we can grab the store count associated with the point to store in the
 
 ;; mflatt: removing this print statement will cause the output value of the analysis to change.
 ;; If we change pretty-print to display it will also change
-                                      (pretty-print target-σ)
+                                      #;(pretty-print target-σ)
                                       (do ([(ρ* δ*) #:bind ρ l δ xs arg-addrs]
                                            [k* #:calling-context (ctx e ρ* δ*) k])
                                           (yield (ev e ρ* k* δ*))

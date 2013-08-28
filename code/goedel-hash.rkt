@@ -66,6 +66,13 @@
          (define (hash-proc x rec) (rec (GH-gh x)))
          (define (hash2-proc x rec) (rec (GH-gh x)))])
 (struct GH-set GH (s)
+        #:methods gen:equal+hash
+        [(define (equal-proc x y rec)
+           (match* (x y)
+             [((GH-set ghx _) (GH-set ghy _)) (= ghx ghy)]
+             [(_ _) #f]))
+         (define (hash-proc x rec) (rec (GH-set-s x)))
+         (define (hash2-proc x rec) (rec (GH-set-s x)))]
         #:methods gen:set
         [(define (set-empty? g) (= 1 (GH-gh g)))
          (define (set-member? g x) (eq? 0 (remainder (GH-gh g) (P x))))
@@ -158,6 +165,13 @@
 
 (define GH-set₀ (GH-set 1 (set)))
 (struct GH-hash GH (h)
+        #:methods gen:equal+hash
+        [(define (equal-proc x y rec)
+           (match* (x y)
+             [((GH-hash ghx _) (GH-hash ghy _)) (= ghx ghy)]
+             [(_ _) #f]))
+         (define (hash-proc x rec) (rec (GH-hash-h x)))
+         (define (hash2-proc x rec) (rec (GH-hash-h x)))]
         #:methods gen:dict
         [(define (dict-ref lh k [default (bad-key k)])
            (hash-ref (GH-hash-h lh) k default))

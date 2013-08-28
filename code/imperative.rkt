@@ -66,131 +66,158 @@
 (define (add-todo/set! c)
   (set! todo (∪1 todo c))
   (set! todo-num (add1 todo-num)))
+
+(define-syntax (bind-Γ stx)
+  (define σ-∆s?* (syntax-parameter-value #'σ-∆s?))
+  (define (id id-stx fmt) (format-id id-stx fmt id-stx))
+  (define (base touches-stx reach*-stx sb-stx point-stx kind μ*-stx τ-stx σ*/∆s-stx root-stx body...)
+    (define/with-syntax touches touches-stx)
+    (define/with-syntax (touches-ρ touches-κ) (list (id touches-stx "~a-ρ") (id touches-stx "~a-κ")))
+    (define/with-syntax (state-base-rσ state-base-pnt) (list (id sb-stx "~a-rσ") (id sb-stx "~a-pnt")))
+    (define/with-syntax (point-μ point-τ) (list (id #'point "~a-μ") (id #'point "~a-τ")))
+    (define/with-syntax reach* reach*-stx)
+    (if (syntax-parameter-value #'Γd?)
+        #`(let () #,@body...)
+        #`(let ()
+            #,@(if σ-∆s?* #`((define-values (σ #,@(if-μ #'μ))
+                               (if current-state
+                                    (values (state-base-rσ current-state)
+                                            #,@(if-μ #'(point-μ (state-base-pnt current-state))))
+                                    (values empty-σ #,@(if-μ #'#hash()))))) #'())
+            #,@(if-μ #`(define μ*-internal #,μ*-stx))
+            (define τ-internal #,τ-stx)
+            (define σ*/∆s #,σ*/∆s-stx)
+            (define-values (σ* τ* #,@(if-μ #'μ**))
+              (let ()
+                #,@(cond
+                    [σ-∆s?*
+                        (define do-Γ
+                          #`( ;; It is possible that we add values that reference addresses that only
+                             ;; are 
+                             ;;(define root-σ (update ∆s σ))
+                             (define reachable-addresses (reach* σ (∪ #,root-stx
+                                                                      (for/union ([p (in-list σ*/∆s)])
+                                                                        (touches (cdr p))))))
+                             (values (update target-σ (restrict-σ-to-set σ reachable-addresses))
+                                     (Γτ reachable-addresses touches τ-internal)
+                                     #,@(if-μ (syntax/loc stx (restrict-hash-to-set μ*-internal reachable-addresses))))))
+                        (if-μ
+                         (quasisyntax/loc stx
+                           ((cond
+                             ;; If before updating the address, the count is > 0, try to GC.
+                             [(for/or ([p (in-list σ*/∆s)]) (not (eq? 0 (hash-ref μ (car p) 0))))
+                              #,@do-Γ]
+                             [else (values (update σ*/∆s σ) τ-internal μ*-internal)])))
+                         do-Γ)]
+                    [(eq? '#:husky kind)
+                     (raise-syntax-error 'mk-add-todo/guard "Todo" stx)]
+                    [else
+                     (quasisyntax/loc stx
+                       ((define reachable-addresses (reach* σ*/∆s #,root-stx))
+                        (define σ-next (restrict-σ-to-set σ*/∆s reachable-addresses))
+                        (define killed (for/set ([(a _) (in-σ σ*/∆s)]
+                                                 #:when (a . ∉ . reachable-addresses))
+                                         a))
+#;#;#;#;                        (printf "Reachable: ") (pretty-print reachable-addresses)
+                        (printf "Killed: ") (pretty-print killed)
+                        (when (for/or ([a (in-set killed)]) (and (pair? a) (eq? 'η (car a))))
+                          (pretty-print σ*/∆s)
+                          (error 'Γ "Killed monitor"))
+                        (values σ-next
+                                (Γτ reachable-addresses touches τ-internal)
+                                #,@(if-μ (syntax/loc stx (restrict-hash-to-set μ*-internal reachable-addresses))))))])))
+            (syntax-parameterize ([target-σ (make-rename-transformer #'σ*)]
+                                  [target-μ (make-rename-transformer #'μ**)]
+                                  [target-τ (make-rename-transformer #'τ*)]
+                                  [Γd? #t])
+              #,@body...))))
+  (syntax-parse stx
+    [(_ touches reach* root state-base point (~optional (~and kind (~or #:narrow #:husky)))
+        (~or (e ρ δ k) ;; collecting for calling-context
+             (c)) . body)
+     (define sb-stx #'state-base)
+     (define/with-syntax (state-base-rσ state-base-pnt) (list (id sb-stx "~a-rσ") (id sb-stx "~a-pnt")))
+     (define/with-syntax (point-μ point-τ) (list (id #'point "~a-μ") (id #'point "~a-τ")))
+     (if (attribute c)
+         #`(let* ([cv c]
+                  [σ*-internal (state-base-rσ cv)]
+                  [pnt (state-base-pnt cv)])
+             #,(base #'touches #'reach*
+                     sb-stx
+                     #'point
+                      (and (attribute kind) (syntax-e #'kind))
+                      #'(point-μ pnt)
+                      #'(point-τ pnt)
+                      #'σ*-internal
+                      #'(root cv)
+                      #'body))
+         (base #'touches #'reach*
+               sb-stx
+                (and (attribute kind) (syntax-e #'kind))
+                #'target-μ
+                #'target-τ
+                #'target-σ
+                #'(∪ (touches-κ k) (touches-ρ ρ e))
+                #'body))]))
+
 (define-syntax (mk-add-todo/guard stx)
   (syntax-parse stx
    [(_ name state-base point (co dr chk ans ap ev cc)
        touches root reach*
        (~optional (~and (~or #:husky #:narrow)
                         kind)))
-    (define μ? (syntax-parameter-value #'abs-count?))
-    (define compiledv? (syntax-parameter-value #'compiled?))
     (define kindv (and (attribute kind) (syntax-e #'kind)))
-    (define-syntax ifμ
-      (syntax-rules ()
-        [(_ t) (if μ? (list t) '())]
-        [(_ t e) (if μ? t e)]))
     (head*
      define/with-syntax
      [state-base: (format-id #'state-base "~a:" #'state-base)]
-     [state-base-rσ (format-id #'state-base "~a-rσ" #'state-base)]
      [state-base-pnt (format-id #'state-base "~a-pnt" #'state-base)]
      [set-state-base-rσ! (format-id #'state-base "set-~a-rσ!" #'state-base)]
-     [point-τ (format-id #'point "~a-τ" #'point)]
-     [point-μ (format-id #'point "~a-μ" #'point)]
-     [point-conf (format-id #'point "~a-conf" #'point)]
-     [(μ-op ...) (if μ? #'(μ*) #'())])
-    (define def-c*
-      (syntax/loc stx
-        (define c*
-          (syntax-parameterize ([target-σ (make-rename-transformer #'σ*)])
-            (state-base pnt*)))))
+     [point-conf (format-id #'point "~a-conf" #'point)])
     (quasisyntax/loc stx
      (begin
        (define (name c)
-         (define σ (or (and current-state (state-base-rσ current-state)) empty-σ))
-         #,@(if-μ #'(define μ (point-μ (state-base-pnt c))))
-         (define-values (∆s pnt)
-           (values (state-base-rσ c) (state-base-pnt c)))
-         #,@(if-μ #'(define μ* (point-μ pnt)))
-         (define-values (τ conf) (values (point-τ pnt) (point-conf pnt)))
-         (define-values (σ* τ* #,@(if-μ #'μ**))
-           (let ()
-             #,@(cond
-                 [(syntax-parameter-value #'σ-∆s?)
-                  (define do-Γ
-                    #`( ;; It is possible that we add values that reference addresses that only
-                       ;; are 
-                       ;;(define root-σ (update ∆s σ))
-                       (define reachable-addresses (reach* σ (∪ (root c)
-                                                                (for/union ([p (in-list ∆s)])
-                                                                  (touches (cdr p))))))
-                       #;#;#;#;(printf "Reachable addresses ~a~%" reachable-addresses)
-                       (define killed (for/set ([k (in-hash-keys σ)]
-                       #:unless (k . ∈ . reachable-addresses))
-                       k))
-                       (when (`(A . g80) . ∈ . killed) (pretty-print global-Ξ))
-                       (printf "Killed addresses ~a~%" killed)
-                       (values (update ∆s (restrict-σ-to-set σ reachable-addresses))
-                               (Γτ reachable-addresses touches τ)
-                               #,@(if-μ (syntax/loc stx (restrict-hash-to-set μ* reachable-addresses))))))
-                    (if-μ
-                     (quasisyntax/loc stx
-                       ((cond
-                         ;; If before updating the address, the count is > 0, try to GC.
-                         [(for/or ([p (in-list ∆s)]) (not (eq? 0 (hash-ref μ (car p) 0))))
-                          #,@do-Γ]
-                         [else
-                          (printf "Skipping GC ~a~%" ∆s)
-                          (values (update ∆s σ) τ μ*)])))
-                     do-Γ)]
-                  [(and (attribute kind)
-                        (eq? '#:husky (syntax-e #'kind)))
-                   (raise-syntax-error 'mk-add-todo/guard "Todo" stx)]
-                  [else
-                   (quasisyntax/loc stx
-                     ((define reachable-addresses (reach* ∆s (root c)))
-                      #;
-                      (when (for/or ([a (in-hash-keys τ)]
-                                     #:when (a . ∉ . reachable-addresses))
-                              (and (pair? a) (eq? 'η (car a))))
-                        (pretty-print global-Ξ)
-                        (newline)
-                        (pretty-print reachable-addresses)
-                        (pretty-print c)
-                        (error 'Γ "Killed monitor"))
-                      (values (restrict-σ-to-set ∆s reachable-addresses)
-                              (Γτ reachable-addresses touches τ)
-                              #,@(if-μ (syntax/loc stx (restrict-hash-to-set μ* reachable-addresses))))))])))
-           (define pnt*
-             (syntax-parameterize ([target-τ (make-rename-transformer #'τ*)]
-                                   [target-μ (make-rename-transformer #'μ**)])
-               (point conf)))
-#;           (printf "Point ~a~%Store ~a~%" pnt* σ*)
-           #,@(case kindv
-                [(#f) (raise-syntax-error #f "Wide GC? What are you, nuts?" stx)]
-                [(#:husky)
-                 (quasisyntax/loc stx
-                   ((match (hash-ref seen pnt* #f)
-                      [#f #,def-c*
-                          (add-todo/set! c*)
-                          (hash-set! seen pnt* c* #;(cons 0 c*)
-                                     )] ;; start a new store count since this is a new point.
-                      [(and sb (state-base: σ _)) #;(cons σt (and sb (state-base: σ _)))
-                       ;; We add σ* to σ (crucially in this order)
-                       ;; If there are any changes since last visit,
-                       ;; we re-add the state to process and continue propagating
-                       ;; TODO: Is this sound for abstract counting?
-                       (define-values (σ** same?) (join-store/change σ σ*))
-                       (define rng (for/union ([vs (in-hash-values σ**)]) (touches vs)))
-                       (define rng* (for/union ([vs (in-hash-values σ*)]) (touches vs)))
-                       (define zombies (for/set ([a (in-set (set-subtract rng (list->set (hash-keys σ**))))]
+         (bind-Γ
+          touches reach* root state-base point #,@(if (attribute kind) #'(kind) #'()) (c)
+          (define pnt* (point (point-conf (state-base-pnt c))))
+          #;(printf "Point ~a~%Store ~a~%" pnt* target-σ)
+          #,@(case kindv
+               [(#f) (raise-syntax-error #f "Wide GC? What are you, nuts?" stx)]
+               [(#:husky)
+                (quasisyntax/loc stx
+                  ((match (hash-ref seen pnt* #f)
+                     [#f (define c* (state-base pnt*))
+                         (add-todo/set! c*)
+                         (hash-set! seen pnt* c* #;(cons 0 c*)
+                                    )] ;; start a new store count since this is a new point.
+                     [(and sb (state-base: σ _)) #;(cons σt (and sb (state-base: σ _)))
+                      ;; We add σ* to σ (crucially in this order)
+                      ;; If there are any changes since last visit,
+                      ;; we re-add the state to process and continue propagating
+                      ;; XXX: unsound for abstract counting
+                      (define-values (σ** same?) (join-store/change σ target-σ))
+                      (define rng (for/union ([vs (in-hash-values σ**)]) (touches vs)))
+                      (define rng* (for/union ([vs (in-hash-values target-σ)]) (touches vs)))
+                      (define zombies (for/set ([a (in-set (set-subtract rng (list->set (hash-keys σ**))))]
+                                                #:unless (and (pair? a) (eq? (car a) 'η)))
+                                        a))
+                      (define zombies* (for/set ([a (in-set (set-subtract rng* (list->set (hash-keys target-σ))))]
                                                  #:unless (and (pair? a) (eq? (car a) 'η)))
                                          a))
-                       (define zombies* (for/set ([a (in-set (set-subtract rng* (list->set (hash-keys σ*))))]
-                                                  #:unless (and (pair? a) (eq? (car a) 'η)))
-                                          a))
-                       (unless (and (∅? zombies) (∅? zombies*))
-                         (error 'Γ "Zombies! ~a, ~a" zombies zombies*))
-                       (unless same?
-                         (set-state-base-rσ! sb σ**)
-                         (add-todo/set! sb))])))]
-                [(#:narrow)
-                 ;; Narrow
-                 (quasisyntax/loc stx
-                   (#,def-c*
-                     (unless (hash-has-key? seen c*)
-                       (add-todo/set! c*)
-                       (hash-set! seen c* #t))))]))
+                      (unless (and (∅? zombies) (∅? zombies*))
+                        (error 'Γ "Zombies! ~a, ~a" zombies zombies*))
+                      (unless same?
+                        (set-state-base-rσ! sb σ**)
+                        (add-todo/set! sb))])))]
+               [(#:narrow)
+                ;; Narrow
+                (quasisyntax/loc stx
+                  ((define c* (state-base pnt*))
+                    (cond
+                     [(hash-has-key? seen c*) #;(printf "Seen~%")
+                      (void)]
+                     [else
+                      (add-todo/set! c*)
+                      (hash-set! seen c* #t)])))])))
        #;
          (trace name)))]))
 
@@ -637,8 +664,7 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
       [ans-v (format-id #'ans "~a-v" #'ans)]
       [state-base-rσ (format-id #'state-base "~a-rσ" #'state-base)]
       [state-base-pnt (format-id #'state-base "~a-pnt" #'state-base)]
-      [point-conf (format-id #'point "~a-conf" #'point)]
-      [(μ-op ...) (if-μ #'μ*)])
+      [point-conf (format-id #'point "~a-conf" #'point)])
      (quasisyntax/loc stx
        (begin
          (define-syntax-rule (internal-fixpoint step fst)

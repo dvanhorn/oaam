@@ -269,8 +269,8 @@
          [(== unmapped eq?) #f]
          [v (matches2 v A)])]
       [v (define t
-           (cond [(set-immutable? A)
-                  (for/fold ([t #f]) ([v′ (in-set A)])
+           (cond [(value-set? A)
+                  (for/fold ([t #f]) ([v′ (in-value-set A)])
                     (⊕ (≃ v v′) t))]
                  [else (≃ v A)]))
          (and t (mres t γ))]))

@@ -5,9 +5,9 @@
 (define-syntax-rule (lazy-force x)
   (match x
     [(addr a) (getter a)]
-    [(? set-immutable?) x]
+    [(? value-set?) x]
     [v (singleton v)]))
-(define-syntax-rule (strict-force x) (let ([v x]) (if (set-immutable? v) v (singleton v))))
+(define-syntax-rule (strict-force x) (let ([v x]) (if (value-set? v) v (singleton v))))
 
 (define-syntax-rule (lazy-delay a) (singleton (addr a)))
 (define-syntax-rule (strict-delay a) (getter a))

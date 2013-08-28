@@ -55,6 +55,8 @@
 (define-syntax-parameter σ-∆s? #f)
 (define-syntax-parameter imperative? #f)
 (define-syntax-parameter global-σ? #f)
+(define-syntax-parameter Γ? #f)
+(define-syntax-parameter Γd? #f)
 (define-syntax-parameter pushdown? #f)
 (define-syntax-parameter compiled? #f)
 (define-syntax-parameter fixpoint #f)
@@ -63,7 +65,7 @@
 (define-syntax-parameter restrict-σ (make-rename-transformer #'restrict-to-set))
 (define-syntax-parameter Gödel? #f)
 (provide target-σ abs-count? compiled? fixpoint empty-σ restrict-σ 
-         σ-∆s? global-σ? imperative? pushdown? Gödel?)
+         σ-∆s? global-σ? imperative? pushdown? Gödel? Γ? Γd?)
 
 
 (define-syntax-rule (bind-τ-join (a τs) . body)
