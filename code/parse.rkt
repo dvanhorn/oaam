@@ -136,10 +136,11 @@
           [`(ret ,nf ,vp) (ret (parse-pat nf) (parse-pat vp))]
           [`(!ret ,nf ,vp) (!ret (parse-pat nf) (parse-pat vp))]
           ['_ Any]
-          [`(quote ,ℓ) (label ℓ)]
+          [`(label ,ℓ) (label ℓ)]
           [`($ ,(? symbol? x)) ($ x)]
           [`(? ,(? symbol? x)) (□ x)]
-          [err (error 'parse-pat "Wuh ~a" err)]))
+          [`(quote ,symbol) symbol]
+          [v v])) ;; Everything else is a value. TODO: allow delayed expression evaluation and predicates
 
       (match sexp
         [`(,(== special) . ,s) (primr (fresh-label!) (opaque-box #f) s)]

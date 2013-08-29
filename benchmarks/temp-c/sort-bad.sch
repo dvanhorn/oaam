@@ -25,10 +25,10 @@
                ->
                any
                )
-        (and (not (seq ... (call 'sort _ _) (star (!ret 'sort _)) (call 'sort _ _)))
+        (and (not (seq ... (call (label sort) _ _) (star (!ret (label sort) _)) (call (label sort) _ _)))
            
-         (not (seq ... (bind (call 'sort (? cmp) _)
-                             (seq ... (ret 'sort _)
+         (not (seq ... (bind (call (label sort) (? cmp) _)
+                             (seq ... (ret (label sort) _)
                                   ... (call ($ cmp) _ _))))))
         sort))
 (define lst (list 1 2 3 4))

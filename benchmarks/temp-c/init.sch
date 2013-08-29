@@ -7,10 +7,10 @@
         (cons/c ('fst : any -> any)
                 (cons/c ('foo : any -> any)
                         ('bar : any -> any)))
-        (not (· (* (!ret 'fst _))
+        (not (· (* (!ret (label fst) _))
                 ;; Don't call foo or bar if haven't returned from fst yet.
-                (∪ (call 'foo _)
-                   (call 'bar _))))
+                (∪ (call (label foo) _)
+                   (call (label bar) _))))
         (cons call-me-first (cons foo bar))))
 (define cfirst (car all))
 (define cfoo (car (cdr all)))
