@@ -1,6 +1,6 @@
 #lang racket
 
-(require "data.rkt" "notation.rkt" "do.rkt" (only-in "tcon.rkt" may must ⊕ ∧ ∨)
+(require "data.rkt" "notation.rkt" "do.rkt" (only-in "tcon.rkt" may must ∧ ∨+ ∨-)
          "primitive-maker.rkt"
          (for-syntax syntax/parse racket/syntax) ;; for core syntax-classes
          racket/unsafe/ops
@@ -264,7 +264,7 @@
                                                  [d₀v (in-set (getter d))]
                                                  [a₁v (in-set (getter a₁))]
                                                  [d₁v (in-set (getter d₁))])
-                            (⊕ t
+                            (∨- t
                                (∧ (name a₀v a₁v)
                                   (name d₀v d₁v))))]
                          [_ #f])))

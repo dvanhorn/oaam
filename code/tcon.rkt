@@ -1,12 +1,12 @@
 #lang racket
 (require racket/unit
          "ast.rkt"
-         "data.rkt"
+         (except-in "data.rkt" ⊥)
          (except-in "notation.rkt" ∪ ∩))
 (require racket/trace)
 
 (provide TCon-deriv^ TCon-deriv@ weak-eq^
-         may must for/∧ for*/∧ ⊕ ∨ ∧ Σ̂*
+         may must for/∧ for*/∧ ∨+ ∨- ∧ Σ̂*
          ¬ · kl bind ε
          call ret !call !ret
          $ □ Any label
@@ -83,19 +83,21 @@
   [((!constructed 'call (list-rest _ _))) #t]
   [(_) #f])
 
-(define/match (∧ t₀ t₁)
-  [((== must eq?) (== must eq?)) must]
-  [(#f _) #f]
-  [(_ #f) #f]
-  [(_ _) may])
+;; named δ since it's like Kronecker's δ
+(define (δ t₀ t₁)
+  (cond [(eq? t₀ 'doesnt-count) t₁]
+        [(eq? t₀ t₁) t₀]
+        [else may]))
 
-(define/match (∨ t₀ t₁)
+(define (∧ t₀ t₁) (and t₀ t₁ (δ t₀ t₁)))
+
+(define/match (∨+ t₀ t₁)
   [(#f #f) #f]
   [((== must eq?) _) must]
   [(_ (== must eq?)) must]
   [(_ _) may])
 
-(define/match (⊕ t₀ t₁)
+(define/match (∨- t₀ t₁)
   [(#f #f) #f]
   [((== may eq?) _) may]
   [(_ (== may eq?)) may]
@@ -106,8 +108,9 @@
 (define-syntax-rule (for*/∧ guards body)
   (for*/fold ([res must]) guards (∧ res (let () body))))
 
-;; valuations with updated bindings
-(struct mres (t ρ) #:transparent)
+;; valuations with set of possible updated bindings
+(struct mres (t ρs) #:transparent)
+(define ⊥ (mres #f ∅)) (define (⊥? x) (eq? x ⊥))
 
 (define/match (·simpl T₀ T₁)
   [((? ε?) T₁) T₁]
@@ -194,30 +197,39 @@
   (for/fold ([ρ ρ₀]) ([(k v) (in-hash ρ₁)])
     (hash-set ρ k v)))
 
+(define (⋈ ρs₀ ρs₁)
+  (for*/set ([ρ (in-set ρs₀)]
+             [ρ′ (in-set ρs₁)])
+    (ρ . ◃ . ρ′)))
+
 ;; Match every pattern in S via f
 (define (⨅ S f)
   (let/ec break
-    (define-values (t ρ)
+    (define-values (t ρs)
       (for/fold ([t must]
-                 [ρ #hasheq()])
+                 [ρs (set #hasheq())])
           ([s (in-set S)])
         (match (f s)
-          [#f (break #f)]
-          [(mres t′ ρ′) (values (∧ t t′) (ρ . ◃ . ρ′))]
+          [(mres t′ ρs′)
+           (if t′
+               (values (∧ t t′) (ρs . ⋈ . ρs′))
+               (break ⊥))]
           [err (error '⨅ "Bad res ~a" err)])))
-    (mres t ρ)))
+    (mres t ρs)))
 
 ;; Match patterns in L with corresponding values in R via f.
 (define (⨅/lst f L R)
-  (let matchlst ([L L] [R R] [t must] [ρ #hasheq()])
+  (let matchlst ([L L] [R R] [t must] [ρs (set #hasheq())])
     (match* (L R)
-      [('() '()) (mres t ρ)]
+      [('() '()) (mres t ρs)]
       [((cons l L) (cons r R))
        (match (f l r)
-         [#f #f]
-         [(mres t′ ρ′) (matchlst L R (∧ t t′) (ρ . ◃ . ρ′))]
+         [(mres t′ ρs′)
+          (if t′
+              (matchlst L R (∧ t t′) (ρs . ⋈ . ρs′))
+              ⊥)]
          [err (error '⨅ "Bad res ~a" err)])]
-      [(_ _) #f])))
+      [(_ _) ⊥])))
 
 ;; Is the contract nullable?
 (define (ν? T)
@@ -249,31 +261,47 @@
       [(? set-immutable?) (⨅ P matches1)]
       [(!constructed kind pats)
        (match (matches1 (constructed kind pats))
-         [(mres (== must eq?) _) #f]
-         [#f (mres must γ)]
-         [(mres _ γ′) (mres may γ)]
-         [err (error 'matches "Bad ! ~a" err)])]
+         [(mres t _) (if (eq? must t)
+                         ⊥
+                         (mres (¬ t) (set γ)))])]
       [(constructed kind pats)
        (match A
          [(constructed (== kind eq?) data)
           (⨅/lst matches2 pats data)]
-         [_ #f])]
-      [(== Any eq?) (mres must γ)]
-      [(== None eq?) #f]
+         [(? value-set?)
+          (define-values (t γs)
+            (for/fold ([t 'doesnt-count] [γs ∅])
+                ([v (in-value-set A)])
+              (match (matches2 P v)
+                ;; One value doesn't match, so we have to consider the
+                ;; whole match to only possibly match.
+                ;; If none match, then γs must stay ∅.
+                ;; #f is bumped to may so that later musts are kept at may.
+                [(mres t′ γs′)
+                 (values (δ t t′) (∪ γs γs′))])))
+          (if (∅? γs)
+              ⊥ ;; get pointer equality
+              (mres t γs))]
+         [_ ⊥])]
+      [(== Any eq?) (mres must (set γ))]
+      [(== None eq?) ⊥]
       [(label ℓ)
-       (and (matchℓ? A ℓ)
-            (mres must γ))]
-      [(□ x) (mres must (hash-set γ x A))]
+       (if (matchℓ? A ℓ)
+           (mres must (set γ))
+           ⊥)]
+      [(□ x) (mres must (set (hash-set γ x A)))]
       [($ x)
        (match (hash-ref γ x unmapped)
-         [(== unmapped eq?) #f]
+         [(== unmapped eq?) ⊥]
          [v (matches2 v A)])]
       [v (define t
            (cond [(value-set? A)
                   (for/fold ([t #f]) ([v′ (in-value-set A)])
-                    (⊕ (≃ v v′) t))]
+                    (∨- (≃ v v′) t))]
                  [else (≃ v A)]))
-         (and t (mres t γ))]))
+         (if t
+             (mres t (set γ))
+             ⊥)]))
   matches)
 
 ;; References to variables in ρkill get rewritten to None
@@ -425,29 +453,30 @@
           [(tl T′ t′) (values (set-add acc T′) (bin t t′))])))
      (tl (simpl Ts′) t′))
 
-   (define ∪p+ (∪∩p #f ∨ ∪simpl))
-   (define ∪p- (∪∩p #f ⊕ ∪simpl))
+   (define ∪p+ (∪∩p #f ∨+ ∪simpl))
+   (define ∪p- (∪∩p #f ∨- ∪simpl))
    (define ∩p (∪∩p must ∧ ∩simpl))
 
    (define (bindp B A T ρ)
      (match (matches B A ρ)
-       [#f M⊥]
-       [(mres t′ ρ′)
-        (unless (open? T) (error 'bindp "Bad T ~a" T))
-        (tl (closed T ρ′) t′)]
-       [M (error '∂ "oops10 ~a" M)]))
+       [(mres t′ ρs′)
+        (cond [t′
+               #;(unless (open? T) (error 'bindp "Bad T ~a" T))
+               (tl (∪simpl (for/set ([ρ′ (in-set ρs′)])
+                             (closed T ρ′)))
+                   t′)]
+              [else M⊥])]))
 
    (define (patp pat A ρ)
      (match (matches pat A ρ)
-       [#f M⊥]
-       [(mres t ρ′) (tl Tε t)]
-       [M (error '∂ "oops11 ~a" M)]))
+       [(mres t ρs′)
+        (if t (tl Tε t) M⊥)]))
 
    ;; Top level temporal contracts with distributed ρs.
    (define (ð* A T)
      (let ð± ([T T] [± #t])
        (define (ð1 T) (ð± T ±))
-       (define-values (u v) (if ± (values ∪p+ ∨) (values ∪p- ⊕)))
+       (define-values (u v) (if ± (values ∪p+ ∨+) (values ∪p- ∨-)))
        (match T
          [(? SΣ̂*?) Σ*]
          [(or (? ST⊥?) (? Tε?)) M⊥]
@@ -466,7 +495,7 @@
      (unless (open? T) (error '∂ "Bad T ~a" T))
      (define (∂1 T) (∂ A T ρ ±))
      (define (∂± T ±) (∂ A T ρ ±))
-     (define-values (u v) (if ± (values ∪p+ ∨) (values ∪p- ⊕)))
+     (define-values (u v) (if ± (values ∪p+ ∨+) (values ∪p- ∨-)))
      (match T
        [(? Σ̂*?) Σ*]
        [(or (? T⊥?) (? ε?)) M⊥]

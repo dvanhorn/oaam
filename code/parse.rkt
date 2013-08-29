@@ -123,7 +123,7 @@
           [`(,(or '∪ 'or) ,ts ...) (tor (for/set ([t (in-list ts)]) (parse-tcon t)))]
           [`(,(or '∩ 'and) ,ts ...) (tand (for/set ([t (in-list ts)]) (parse-tcon t)))]
           [(or 'ε 'empty) ε]
-          [`(,(or 'kl 'star) ,t) (kl (parse-tcon t))]
+          [`(,(or 'kl 'star '*) ,t) (kl (parse-tcon t))]
           [`(,(or 'not '¬) ,t) (¬ (parse-tcon t))]
           [`(,(or 'dseq 'bind) ,pat ,t) (bind (parse-pat pat) (parse-tcon t))]
           ['... (tand ∅)]

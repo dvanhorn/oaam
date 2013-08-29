@@ -121,8 +121,8 @@
 
  (define nothing GH-set₀)
  (define singleton GH-singleton-set)
- (define value-set? GH-set?) ;; otherwise set-immutable?
- (define-syntax in-value-set (make-rename-transformer #'in-GH-set))
+ (define value-set? GH-set?)
+ (define-syntax in-value-set (make-rename-transformer #'in-set))
  (define-syntax for/value-set (make-rename-transformer #'for/GH-set))
  (define-syntax for/σ (make-rename-transformer #'for/GH-hash))
  (define-syntax σ? (make-rename-transformer #'GH-hash?))

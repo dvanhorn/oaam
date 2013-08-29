@@ -2,7 +2,7 @@
 
 (require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt" "primitives.rkt" "parse.rkt"
          "notation.rkt" "op-struct.rkt" "do.rkt" "add-lib.rkt"
-         (only-in "tcon.rkt" call ret weak-eq^ TCon-deriv^ TCon-deriv@ for*/∧ may must ⊕ tl M⊥ Σ̂*)
+         (only-in "tcon.rkt" call ret weak-eq^ TCon-deriv^ TCon-deriv@ for*/∧ may must tl M⊥ Σ̂*)
          "graph.rkt"
          (only-in "macros.rkt" igensym)
          racket/unit
@@ -369,7 +369,7 @@
              ;; instantiations because store changes are delayed a step.
              ;; We fix this by making variable dereference a new kind of state.
              (mk-op-struct dr (state-base point) (k a) (k a) expander-flags ...)
-             (mk-op-struct chk (state-base point) (l lchk vc v res-addr ℓs k δ) (l lchk vc v res-addr ℓs k δ-op ...)
+             (mk-op-struct chk (state-base point) (l lchk π vc v res-addr ℓs k δ) (l lchk π vc v res-addr ℓs k δ-op ...)
                            expander-flags ...)
              (mk-op-struct ans (state-base point) (cm v) (cm-op ... v) expander-flags ...)
              (mk-op-struct ap (state-base point) (l lchk fn-addr v-addrs k δ)
@@ -403,9 +403,9 @@
              (mk-op-struct postretk (l lchk fnv δ) (l lchk fnv δ-op ...))
              (mk-op-struct retk (a) (a))
              (mk-op-struct blcons (res-addr aa ad) (res-addr aa ad))
-             (mk-op-struct chkor₀ (l lchk ℓs c v res-addr δ) (l lchk ℓs c v res-addr δ-op ...))
-             (mk-op-struct chkand₀ (l lchk ℓs c v res-addr δ) (l lchk ℓs c v res-addr δ-op ...))
-             (mk-op-struct chkcdr (l lchk ℓs res-addr ara ard cd ad δ) (l lchk ℓs res-addr ara ard cd ad δ-op ...))
+             (mk-op-struct chkor₀ (l lchk ℓs π c v res-addr δ) (l lchk ℓs π c v res-addr δ-op ...))
+             (mk-op-struct chkand₀ (l lchk ℓs π c v res-addr δ) (l lchk ℓs π c v res-addr δ-op ...))
+             (mk-op-struct chkcdr (l lchk ℓs π res-addr ara ard cd ad δ) (l lchk ℓs π res-addr ara ard cd ad δ-op ...))
              (mk-op-struct chkflt (tempFn tmpArg ℓs) (tempFn tmpArg ℓs))
 
              ;; Contract construction continuation frames
@@ -574,10 +574,10 @@
                   (∪/l (∪/l (∪ (touches/l nc-todo) (touches fnv)) arg-addrs) done-addrs)]
                  [(postretk: l lchk fnv δ) (touches fnv)]
                  [(blcons: res-addr aa ad) (set res-addr aa ad)]
-                 [(or (chkor₀: l lchk ℓs c v res-addr δ)
-                      (chkand₀: l lchk ℓs c v res-addr δ))
+                 [(or (chkor₀: l lchk ℓs π c v res-addr δ)
+                      (chkand₀: l lchk ℓs π c v res-addr δ))
                   (∪1 (∪ (touches c) (touches v)) res-addr)]
-                 [(chkcdr: l lchk ℓs res-addr ara ard cd ad δ)
+                 [(chkcdr: l lchk ℓs π res-addr ara ard cd ad δ)
                   (∪ (touches cd) (set res-addr ara ard ad))]
                  [(chkflt: tempFn tmpArg ℓs) (set tempFn tmpArg)]
 
@@ -619,7 +619,7 @@
                  [(co: σ μ τ k v) (∪ (touches-κ k) (touches v))]
                  [(ap: σ μ τ l lchk fn-a arg-addrs k δ)
                   (∪/l (touches-κ k) (cons fn-a arg-addrs))]
-                 [(chk: σ μ τ l lchk vc v res-addr ℓs k δ)
+                 [(chk: σ μ τ l lchk π vc v res-addr ℓs k δ)
                   (∪1 (∪ (touches-κ k) (touches vc) (touches v)) res-addr)]
                  [(ans: σ μ τ cm v) (touches v)]
                  [(cc: σ μ τ s ρ η ℓs k δ) (∪1 (∪ (touches-κ k) (touches-ρ ρ s)) η)]
@@ -748,6 +748,7 @@
                                (if (set-empty? stepped-ts)
                                    must
                                    cause-blame?))))) ;; may or #f
+               (trace step-event)
 
                (define-syntax-rule (blamer wrap cause-blame? good bad)
                  (cond
@@ -892,18 +893,18 @@
                           (define res-addr (make-var-contour `(res . ,lchk) δ))
                           (generator
                               (do ([vchk #:in-force v])
-                                  (yield (chk l lchk vc vchk res-addr ℓs (push (initτk η t)) δ))))]
+                                  (yield (chk l lchk '() vc vchk res-addr ℓs (push (initτk η t)) δ))))]
 
-                         [(chkand₀: l lchk ℓs c₁ v res-addr δ)
+                         [(chkand₀: l lchk ℓs π c₁ v res-addr δ)
                           (generator
                               (do ([k* #:in-kont a])
-                                  (yield (chk l lchk c₁ v res-addr ℓs k* δ))))]
-                         [(chkor₀: l lchk ℓs c₁ v res-addr δ) (error 'todo "or contracts")]
+                                  (yield (chk l lchk π c₁ v res-addr ℓs k* δ))))]
+                         [(chkor₀: l lchk ℓs π c₁ v res-addr δ) (error 'todo "or contracts")]
 
-                         [(chkcdr: l lchk ℓs res-addr aca acd cd ad δ)
+                         [(chkcdr: l lchk ℓs π res-addr aca acd cd ad δ)
                           (generator
                               (do ([vd #:in-get ad])
-                                  (yield (chk l lchk cd vd acd ℓs (push (blcons res-addr aca acd)) δ))))]
+                                  (yield (chk l lchk `(D . ,π) cd vd acd ℓs (push (blcons res-addr aca acd)) δ))))]
                          [(blcons: res-addr aca acd)
                           (generator
                               (do ([#:join res-addr (singleton (consv aca acd))]
@@ -913,13 +914,16 @@
 
                          [(chkargs: l lchk i ℓs '() '() done-addrs (and fnv (blclos: vaddr _ _ _ η (list pℓ _ cℓ))) δ)
                           (define arg-addrs (reverse done-addrs))
+                          (define pre-step (σ-ref target-τ η))
                           (define-syntax-rule (good)
                             (do ()
                                 (ap-after-call-state!)
                               (yield (ap l lchk vaddr arg-addrs (push (postretk l lchk fnv δ)) δ))))
                           (define-syntax-rule (bad)
                             (do ()
-                                (yield (ans cm (blame pℓ cℓ "Violated timeline contract at call" η event)))))
+                                (yield (ans cm (blame pℓ cℓ "Violated timeline contract at call"
+                                                      η (cons event
+                                                              pre-step))))))
                           ;; Finished validating arguments, so send call event.
                           (define event (call fnv (map getter arg-addrs)))
                           (define single-η?
@@ -933,20 +937,21 @@
                               ;; XXX: unsound? We diverge in the narrow case for
                               ;; '() verses a=(cons _ a), when we really need both together.
                               (do ([argv #:in-get arga])
-                                  (yield (chk l lchk nc argv chkA ℓs
+                                  (yield (chk l lchk '() nc argv chkA ℓs
                                               (push (chkargs l lchk (add1 i) ℓs ncs arg-addrs (cons chkA done-addrs) fnv δ)) δ))))]
 
                          [(postretk: l lchk (and fnv (blclos: vaddr ncs pc name η (and ℓs (list pℓ nℓ cℓ)))) δ)
                           (define event (ret fnv (force v)))
                           (define ret-addr (make-var-contour `(ret . ,lchk) δ))
                           (define ret-cont (make-var-contour `(retk . ,lchk) δ))
+                          (printf "RETURN~%")
                           (define-syntax-rule (bad)
                             (do ()
                                 (yield (ans cm (blame pℓ cℓ "Violated timeline contract at return" η event)))))
                           (define-syntax-rule (good)
                             (do ([rv #:in-force v])
                                 (chk-after-ret-state!)
-                              (yield (chk l ret-cont pc rv ret-addr ℓs (push (retk ret-addr)) δ))))
+                              (yield (chk l ret-cont '() pc rv ret-addr ℓs (push (retk ret-addr)) δ))))
                           (define single-η?
                             #,(if μ? #'(eq? 1 (μgetter η)) #'#f))
                           (define-values (τ* cause-blame?) (step-event ð target-τ η single-η? event))
@@ -965,18 +970,21 @@
                                       (yield (ans cm (blame pℓ cℓ "Flat contract failed" (getter tempFn) (getter tmpArg)))))))]
                          [_ (error 'step "Bad continuation ~a" k)])])]
 
-                   [(chk: ch-σ ch-μ ch-τ l lchk vc v res-addr (and ℓs (list pℓ nℓ cℓ)) k δ)
+                   
+
+                   [(chk: ch-σ ch-μ ch-τ l lchk π vc v res-addr (and ℓs (list pℓ nℓ cℓ)) k δ)
                     (match vc
                       [(ccons ca cd)
                        (match v
                          [(consv aa ad)
-                          (define aca (make-var-contour `(A . ,lchk) δ))
-                          (define acd (make-var-contour `(D . ,lchk) δ))
+                          ;; Need full path through contract for precise enough addressing.
+                          (define aca (make-var-contour `(A ,π . ,lchk) δ))
+                          (define acd (make-var-contour `(D ,π . ,lchk) δ))
                           (generator
                               (do ([a #:push lchk δ k]
                                    [va #:in-get aa])
-                                  (yield (chk l lchk ca va aca ℓs
-                                              (frame+ (kont-cm k) (chkcdr l lchk ℓs res-addr aca acd cd ad δ) a) δ))))]
+                                  (yield (chk l lchk `(A . ,π) ca va aca ℓs
+                                              (frame+ (kont-cm k) (chkcdr l lchk ℓs π res-addr aca acd cd ad δ) a) δ))))]
                          [(or (? cons^?) (? qcons^?)) (error 'todo "contract •")]
                          [_ (generator (do () (yield (ans (kont-cm k) (blame pℓ cℓ "Not a cons" vc v)))))])]
                       [(== nonec eq?)
@@ -988,13 +996,13 @@
                       [(cor c₀ c₁)
                        (generator
                            (do ([a #:push lchk δ k])
-                               (yield (chk l lchk c₀ v res-addr ℓs
-                                           (frame+ (kont-cm k) (chkor₀ l lchk ℓs c₁ v res-addr δ) a) δ))))]
+                               (yield (chk l lchk π c₀ v res-addr ℓs
+                                           (frame+ (kont-cm k) (chkor₀ l lchk ℓs π c₁ v res-addr δ) a) δ))))]
                       [(cand c₀ c₁)
                        (generator
                            (do ([a #:push lchk δ k])
-                               (yield (chk l lchk c₀ v res-addr ℓs
-                                           (frame+ (kont-cm k) (chkand₀ l lchk ℓs c₁ v res-addr δ) a) δ))))]
+                               (yield (chk l lchk π c₀ v res-addr ℓs
+                                           (frame+ (kont-cm k) (chkand₀ l lchk ℓs π c₁ v res-addr δ) a) δ))))]
                       [(cblarr ℓs′ ncs pc name η)
                        (define (wrap-if-arity= n)
                          (cond
@@ -1025,7 +1033,7 @@
                                           (frame+ (kont-cm k) (chkflt tempFn res-addr ℓs) a) δ))))]
                       [_
                        (log-info "Bad contract to check ~a on ~a" vc v)
-                       (generator (do () (yield (chk l lchk vc v res-addr ℓs k δ))))])]
+                       (generator (do () (yield (chk l lchk π vc v res-addr ℓs k δ))))])]
 
                    ;; v is not a value here. It is an address.
                    [(ap: ap-σ ap-μ ap-τ l lchk fn-addr arg-addrs k δ)
@@ -1093,7 +1101,7 @@ store - so we can grab the store count associated with the point to store in the
                                  (define chkA (make-var-contour `(chk 0 ,l) δ))
                                  (do ([a #:push lchk δ k]
                                       [va #:in-get (car arg-addrs)])
-                                     (yield (chk l lchk (car ncs) va chkA ℓs′
+                                     (yield (chk l lchk '() (car ncs) va chkA ℓs′
                                                  (frame+ (kont-cm k) (chkargs l lchk 1 ℓs′ (cdr ncs) (cdr arg-addrs) (list chkA) f δ) a) δ)))]
                                 [else (bad)])]
 
@@ -1133,7 +1141,7 @@ store - so we can grab the store count associated with the point to store in the
 
                    [(ans: ans-σ ans-μ ans-τ cm v) (generator (do () (yield (ans cm v))))]
                    [_ (error 'step "Bad state ~a" state)]))
-#;
+
                  (trace step)
 
                  )))))]))
