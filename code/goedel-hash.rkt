@@ -4,12 +4,12 @@
          (for-syntax racket/base syntax/parse racket/syntax)
          racket/trace)
 (provide GH? GH-gh
-         GH-hash-add GH-hash-union GH-hash? for/GH-hash empty-GH-hash
-         GH-set? GH-set₀ GH-singleton-set for/GH-set
+         GH-hash-add GH-hash-union GH-hash? for/GH-hash for*/GH-hash empty-GH-hash
+         GH-set? GH-set₀ GH-singleton-set for/GH-set for*/GH-set
          init-GH!
          ;; For testing purposes only
-         GHT-hash-add GHT-hash-union GHT-hash? for/GHT-hash empty-GHT-hash
-         GHT-set? GHT-set₀ GHT-singleton-set for/GHT-set)
+         GHT-hash-add GHT-hash-union GHT-hash? for/GHT-hash for*/GHT-hash empty-GHT-hash
+         GHT-set? GHT-set₀ GHT-singleton-set for/GHT-set for*/GHT-set)
 
 (struct -unmapped ()) (define unmapped (-unmapped))
 
@@ -20,8 +20,8 @@
   (begin0 current-prime
     (set! current-prime (next-prime current-prime))))
 (define (init-GH!)
-  (set! element-hash (make-hash))
-  (set! gh-cache (make-hash))
+  (set! element-hash (make-weak-hash))
+  (set! gh-cache (make-weak-hash))
   (set! current-prime 2))
 
 ;; injection ℕ² → ℕ
@@ -59,10 +59,43 @@
          (define (hash-proc x rec) (rec (GH-gh x)))
          (define (hash2-proc x rec) (rec (GH-gh x)))])
 
+;; XXX: Assumes each iteration produces unique keys
+(define-syntax (for/hash-acc stx)
+  (syntax-case stx ()
+    [(_ folder hash-name clauses body ...)
+     (quasisyntax/loc stx
+       (let-values
+           ([(gh h)
+             (folder #,stx
+                     ([gh 1] [h (hash)])
+                     clauses
+                     (define-values (k v) (let () body ...))
+                     (values (* gh (C₂ (P k) (P v)))
+                             (hash-set h k v)))])
+         (hash-name gh h)))]))
+
+;; Does not assume values produced are unique.
+(define-syntax (for/set-acc stx)
+  (syntax-case stx ()
+    [(_ folder set-name clauses body ...)
+     (quasisyntax/loc stx
+       (let-values
+           ([(gh s)
+             (for/fold/derived #,stx
+                               ([gh 1] [s (set)])
+                               clauses
+                               (define v (let () body ...))
+                               (define Pv (P v))
+                               (if (eq? 0 (remainder gh Pv))
+                                   (values gh s)
+                                   (values (* gh (P v))
+                                           (set-add s v))))])
+         (set-name gh s)))]))
+
 (define-syntax (mk-GH-set/hash stx)
   (syntax-parse stx
-    [(_ (~or (~once (~seq #:set-names set-name empty-set-name singleton-set-name for/set-name))
-             (~once (~seq #:hash-names hash-name empty-hash-name hash-add-name hash-union-name for/hash-name)))
+    [(_ (~or (~once (~seq #:set-names set-name empty-set-name singleton-set-name for/set-name for*/set-name))
+             (~once (~seq #:hash-names hash-name empty-hash-name hash-add-name hash-union-name for/hash-name for*/hash-name)))
         ...
         (~bind [set-name-s (format-id #'set-name "~a-s" #'set-name)]
                [hash-name-h (format-id #'hash-name "~a-h" #'hash-name)])
@@ -225,40 +258,12 @@
         (define-GH-op hash-add-name set set-add)
         (define-GH-op hash-union-name values set-union)
 
-        ;; XXX: Assumes each iteration produces unique keys
-        (define-syntax (for/hash-name stx)
-          (syntax-case stx ()
-            [(_ clauses body (... ...))
-             (quasisyntax/loc stx
-               (let-values
-                   ([(gh h)
-                     (for/fold/derived #,stx
-                                       ([gh 1] [h (hash)])
-                                       clauses
-                                       (define-values (k v) (let () body (... ...)))
-                                       (values (* gh (C₂ (P k) (P v)))
-                                               (hash-set h k v)))])
-                 (hash-name gh h)))]))
-
-        ;; Does not assume values produced are unique.
-        (define-syntax (for/set-name stx)
-          (syntax-case stx ()
-            [(_ clauses body (... ...))
-             (quasisyntax/loc stx
-               (let-values
-                   ([(gh s)
-                     (for/fold/derived #,stx
-                                       ([gh 1] [s (set)])
-                                       clauses
-                                       (define v (let () body (... ...)))
-                                       (define Pv (P v))
-                                       (if (eq? 0 (remainder gh Pv))
-                                           (values gh s)
-                                           (values (* gh (P v))
-                                                   (set-add s v))))])
-                 (set-name gh s)))]))))]))
-(mk-GH-set/hash #:set-names GH-set GH-set₀ GH-singleton-set for/GH-set
-                #:hash-names GH-hash empty-GH-hash GH-hash-add GH-hash-union for/GH-hash
+        (define-syntax-rule (for/hash-name . in) (for/hash-acc for/fold/derived hash-name . in))
+        (define-syntax-rule (for*/hash-name . in) (for/hash-acc for*/fold/derived hash-name . in))
+        (define-syntax-rule (for/set-name . in) (for/set-acc for/fold/derived set-name . in))
+        (define-syntax-rule (for*/set-name . in) (for/set-acc for*/fold/derived set-name . in))))]))
+(mk-GH-set/hash #:set-names GH-set GH-set₀ GH-singleton-set for/GH-set for*/GH-set
+                #:hash-names GH-hash empty-GH-hash GH-hash-add GH-hash-union for/GH-hash for*/GH-hash
                 #:eqs)
-(mk-GH-set/hash #:set-names GHT-set GHT-set₀ GHT-singleton-set for/GHT-set
-                #:hash-names GHT-hash empty-GHT-hash GHT-hash-add GHT-hash-union for/GHT-hash)
+(mk-GH-set/hash #:set-names GHT-set GHT-set₀ GHT-singleton-set for/GHT-set for*/GHT-set
+                #:hash-names GHT-hash empty-GHT-hash GHT-hash-add GHT-hash-union for/GHT-hash for*/GHT-hash)

@@ -2,7 +2,7 @@
 
 (require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt" "primitives.rkt" "parse.rkt"
          "notation.rkt" "op-struct.rkt" "do.rkt" "add-lib.rkt"
-         (only-in "tcon.rkt" call ret weak-eq^ TCon-deriv^ TCon-deriv@ for*/∧ may must tl M⊥ Σ̂*)
+         (only-in "tcon.rkt" call ret weak-eq^ TCon-deriv^ TCon-deriv@ for*/δ may must ∧ tl M⊥ Σ̂*)
          "graph.rkt"
          (only-in "macros.rkt" igensym)
          racket/unit
@@ -732,22 +732,20 @@
                (define (step-event ð τ η single-η? event)
                  (if (eq? η Λη)
                      (values τ #f)
-                     (let-values ([(stepped-ts cause-blame?)
-                                   (for/fold ([ts* nothing] [cause-blame? #f])
+                     (let-values ([(stepped-ts no-blame?)
+                                   (for/fold ([ts* nothing] [no-blame? must])
                                        ([T (in-value-set (σ-ref τ η (λ () (error 'step "Unbound η ~a" η))))])
                                      (match (ð event T)
-                                       [(== M⊥ eq?) (values ts* (or cause-blame? must))] ;; must > #f but must < may
-                                       [(tl T* t)
-                                        (values (⊓1 ts* T*)
-                                                (or (and (eq? may t) t) ;; Jump up to may, if may.
-                                                    ;; Otherwise, use whatever else we had.
-                                                    cause-blame?))]))])
+                                       [(tl Ts* t)
+                                        (values (⊓ ts* Ts*)
+                                                (∧ no-blame? t))]))])
                        (values (if single-η?
                                    (σ-set τ η stepped-ts)
                                    (join τ η stepped-ts))
-                               (if (set-empty? stepped-ts)
-                                   must
-                                   cause-blame?))))) ;; may or #f
+                               (cond
+                                [(nothing? stepped-ts) must]
+                                [(eq? no-blame? may) may]
+                                [else #f])))))
                (trace step-event)
 
                (define-syntax-rule (blamer wrap cause-blame? good bad)
@@ -770,7 +768,7 @@
                         (define-unit weak-eq@
                           (import) (export weak-eq^)
                           (define (≃ v0 v1)
-                            (for*/∧ ([v0 (in-set (force v0))]
+                            (for*/δ ([v0 (in-set (force v0))]
                                      [v1 (in-set (force v1))])
                                     (prim-eq v0 v1)))
                           (define matchℓ? -matchℓ?))
@@ -1141,7 +1139,7 @@ store - so we can grab the store count associated with the point to store in the
 
                    [(ans: ans-σ ans-μ ans-τ cm v) (generator (do () (yield (ans cm v))))]
                    [_ (error 'step "Bad state ~a" state)]))
-
+#;
                  (trace step)
 
                  )))))]))

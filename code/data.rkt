@@ -34,7 +34,7 @@
          (struct-out cand)
          (struct-out cor)
          atomic?
-         nothing singleton value-set? in-value-set for/value-set
+         nothing nothing? singleton value-set? in-value-set for/value-set for*/value-set
          hash-join1! hash-join! for/σ in-σ σ? σ-ref σ-set join join*
          ≡ ⊑? big⊓ ⊓ ⊓1)
 
@@ -120,10 +120,12 @@
 (define (hash-join! h k v) (hash-set! h k (∪ (hash-ref h k nothing) v)))
 
  (define nothing GH-set₀)
+ (define (nothing? x) (equal? x GH-set₀))
  (define singleton GH-singleton-set)
  (define value-set? GH-set?)
  (define-syntax in-value-set (make-rename-transformer #'in-set))
  (define-syntax for/value-set (make-rename-transformer #'for/GH-set))
+ (define-syntax for*/value-set (make-rename-transformer #'for*/GH-set))
  (define-syntax for/σ (make-rename-transformer #'for/GH-hash))
  (define-syntax σ? (make-rename-transformer #'GH-hash?))
  (define-syntax in-σ (make-rename-transformer #'in-dict))
@@ -132,10 +134,12 @@
  (define (join eσ a s) (GH-hash-union eσ a s))
 #|
  (define nothing ∅)
+ (define-syntax nothing? (make-rename-transformer #'set-empty?))
  (define singleton set)
  (define value-set? set-immutable?)
  (define-syntax in-value-set (make-rename-transformer #'in-set))
  (define-syntax for/value-set (make-rename-transformer #'for/set))
+ (define-syntax for*/value-set (make-rename-transformer #'for*/set))
  (define-syntax for/σ (make-rename-transformer #'for/hash))
  (define-syntax σ? (make-rename-transformer #'hash?))
  (define-syntax in-σ (make-rename-transformer #'in-hash))

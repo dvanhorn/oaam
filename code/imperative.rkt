@@ -7,7 +7,7 @@
          "handle-limits.rkt"
          (only-in "tcon.rkt" Γτ)
          "graph.rkt"
-         "goedel-hash.rkt"
+         "goedel-hash.rkt" (only-in "tcon.rkt" init-tcon!)
          "struct-copy.rkt"
          racket/unsafe/ops
          racket/trace)
@@ -676,6 +676,7 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
              (reset-todo/set!)
              (printf "Init~%")
              (init-GH!)
+             (init-tcon!)
              (reset-pushdown!)
              (set-seen! (make-hash)) ;; point → (state-base σ μ (point τ conf))
              fst

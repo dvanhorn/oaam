@@ -1,6 +1,6 @@
 #lang racket
 
-(require "data.rkt" "notation.rkt" "do.rkt" (only-in "tcon.rkt" may must ∧ ∨+ ∨-)
+(require "data.rkt" "notation.rkt" "do.rkt" (only-in "tcon.rkt" may must ∧ [δ δτ])
          "primitive-maker.rkt"
          (for-syntax syntax/parse racket/syntax) ;; for core syntax-classes
          racket/unsafe/ops
@@ -260,13 +260,14 @@
                          [_ #f])
                      #'(match v1
                          [(consv a₁ d₁)
-                          (for*/fold ([t must]) ([a₀v (in-set (getter a))]
-                                                 [d₀v (in-set (getter d))]
-                                                 [a₁v (in-set (getter a₁))]
-                                                 [d₁v (in-set (getter d₁))])
-                            (∨- t
-                               (∧ (name a₀v a₁v)
-                                  (name d₀v d₁v))))]
+                          (for*/fold ([t 'doesnt-count])
+                              ([a₀v (in-set (getter a))]
+                               [d₀v (in-set (getter d))]
+                               [a₁v (in-set (getter a₁))]
+                               [d₁v (in-set (getter d₁))])
+                            (δτ t
+                                (∧ (name a₀v a₁v)
+                                   (name d₀v d₁v))))]
                          [_ #f])))
                 (and (or (consv? v1) (eq? v1 cons^) (eq? v1 qcons^)) may)] ;; FIXME: overapproximate for concrete
                [(_ (or (== cons^) (? consv?))) #f] ;; first not a cons
