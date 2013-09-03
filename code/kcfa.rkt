@@ -401,7 +401,7 @@
              (mk-op-struct chkargs (l lchk i ℓs nc-todo arg-addrs done-addrs fnv δ)
                            (l lchk i ℓs nc-todo arg-addrs done-addrs fnv δ-op ...))
              (mk-op-struct postretk (l lchk fnv δ) (l lchk fnv δ-op ...))
-             (mk-op-struct retk (a) (a))
+             (mk-op-struct retk (a fnv) (a fnv))
              (mk-op-struct blcons (res-addr aa ad) (res-addr aa ad))
              (mk-op-struct chkor₀ (l lchk ℓs π c v res-addr δ) (l lchk ℓs π c v res-addr δ-op ...))
              (mk-op-struct chkand₀ (l lchk ℓs π c v res-addr δ) (l lchk ℓs π c v res-addr δ-op ...))
@@ -559,8 +559,7 @@
 
              (define (touches-frame f)
                (match f
-                 [(or (sk!: a)
-                      (retk: a)) (set a)]
+                 [(sk!: a) (set a)]
                  [(ifk: t e ρ δ) (touches-ρ ρ t e)]
                  [(lrk: a as es e ρ δ)
                   (∪/l (touches-ρ ρ #:many (cons e es)) (cons a as))]
@@ -580,6 +579,7 @@
                  [(chkcdr: l lchk ℓs π res-addr ara ard cd ad δ)
                   (∪ (touches cd) (set res-addr ara ard ad))]
                  [(chkflt: tempFn tmpArg ℓs) (set tempFn tmpArg)]
+                 [(retk: a fnv) (∪1 (touches fnv) a)]
 
                  [(domk: η ℓs todo done pos ρ name δ)
                   (∪1 (∪ (touches/l done) (touches-ρ ρ #:many pos todo)) η)]
@@ -938,26 +938,25 @@
                                   (yield (chk l lchk '() nc argv chkA ℓs
                                               (push (chkargs l lchk (add1 i) ℓs ncs arg-addrs (cons chkA done-addrs) fnv δ)) δ))))]
 
-                         [(postretk: l lchk (and fnv (blclos: vaddr ncs pc name η (and ℓs (list pℓ nℓ cℓ)))) δ)
-                          (define event (ret fnv (force v)))
+                         [(postretk: l lchk (and fnv (blclos: vaddr ncs pc name η ℓs)) δ)
                           (define ret-addr (make-var-contour `(ret . ,lchk) δ))
                           (define ret-cont (make-var-contour `(retk . ,lchk) δ))
-                          (printf "RETURN~%")
+                          (generator
+                            (do ([rv #:in-force v])
+                                (chk-after-ret-state!)
+                              (yield (chk l ret-cont '() pc rv ret-addr ℓs (push (retk ret-addr fnv)) δ))))]
+                         [(retk: ret-addr (and fnv (blclos: vaddr ncs pc name η (and ℓs (list pℓ nℓ cℓ)))))
+                          (define event (ret fnv (getter ret-addr)))
                           (define-syntax-rule (bad)
                             (do ()
                                 (yield (ans cm (blame pℓ cℓ "Violated timeline contract at return" η event)))))
                           (define-syntax-rule (good)
-                            (do ([rv #:in-force v])
-                                (chk-after-ret-state!)
-                              (yield (chk l ret-cont '() pc rv ret-addr ℓs (push (retk ret-addr)) δ))))
+                            (do ([k* #:in-kont a]) (yield (co k* (addr ret-addr)))))
                           (define single-η?
                             #,(if μ? #'(eq? 1 (μgetter η)) #'#f))
                           (define-values (τ* cause-blame?) (step-event ð target-τ η single-η? event))
                           (syntax-parameterize ([target-τ (make-rename-transformer #'τ*)])
                             (blamer generator cause-blame? good bad))]
-                         [(retk: ret-addr)
-                          (generator
-                              (do ([k* #:in-kont a]) (yield (co k* (addr ret-addr)))))]
 
                          [(chkflt: tempFn tmpArg (list pℓ nℓ cℓ))
                           (generator
