@@ -144,7 +144,6 @@
   [((? SΣ̂*?)) SΣ̂*]
   [((closed T ρ))
    (define T* (klsimpl T))
-   (unless (open? T*) (error 'klsimpl "Introduced closed ~a → ~a" T T*))
    (closed T* ρ)] ;; TODO: restrict bindings
   [(T) (kl T)])
 
@@ -152,7 +151,6 @@
   [((¬ T)) T]
   [((closed T ρ))
    (define T* (¬simpl T))
-   (unless (open? T*) (error '¬simpl "Introduced closed ~a → ~a" T T*))
    (closed T* ρ)]
   [(T) (¬ T)])
 
@@ -314,7 +312,7 @@
 ;; Any bindings we come across that shadow names in ρkill get removed.
 ;; Constructed data containing None becomes None.
 ;; Negated matching on constructed data containing None becomes Any.
-(define (refers-to ρkill event)
+(define (Γpattern ρkill event)
   (let build ([event event] [ρnew ρkill])
     (define (build/l pats)
       (let/ec found-none
@@ -344,57 +342,56 @@
       [_ (values ρnew event)])))
 
 (define (Γτ reachable touches τ)
-  (define (touches-unreachable ρ)
-    (if ρ
-        (for/hasheq ([(x v) (in-hash ρ)]
-                     #:unless (subset? (touches v) reachable))
-          (values x #t))
-        #hasheq()))
+  (define (remove-unreachable ρ)
+    ;; Bindings that refer to nothing are removed so that has-key? is
+    ;; sufficient to change references into None
+    (for/fold ([ρ* #hasheq()]
+               [ρkill #hasheq()])
+        ([(x vs) (in-hash ρ)])
+      (define vs*
+        (for/fold ([vs* nothing])
+            ([v (in-value-set vs)]
+             #:when (subset? (touches v) reachable))
+          (⊓1 vs* v)))
+      (if (nothing? vs*)
+          (values ρ* (hash-set ρkill x #t))
+          (values (hash-set ρ* x vs*) ρkill))))
   (for/σ ([(η Ts) (in-σ τ)]
           #:when (η . ∈ . reachable))
     (values η (for/value-set ([T (in-value-set Ts)])
                 (define start-T T)
-                (let Γsimpl* ([T T] [ρ #f] [ρkill ρ₀])
-                     (define (Γsimpl T) (Γsimpl* T ρ ρkill))
+                (let Γsimpl* ([T T] [ρkill #hasheq()])
+                     (define (Γsimpl T) (Γsimpl* T ρkill))
                      (match T
                        [(∪ Ts)
                         (define T* (∪simpl (for/set ([T (in-set Ts)]) (Γsimpl T))))
-                        (when (and ρ (not (open? T*)))
-                          (error 'Γτ "∪s introduced closed ~a → ~a" T T*))
                         T*]
                        [(∩ Ts)
                         (define T* (∩simpl (for/set ([T (in-set Ts)]) (Γsimpl T))))
-                        (when (and ρ (not (open? T*)))
-                          (error 'Γτ "∩s introduced closed ~a → ~a" T T*))
                         T*]
                        [(¬ T) (¬simpl (Γsimpl T))]
                        [(kl T) 
                         (define T* (klsimpl (Γsimpl T)))
-                        (when (and ρ (not (open? T*)))
-                          (error 'Γτ "kl introduced closed ~a → ~a" T T*))
                         T*]
                        [(· T₀ T₁)
                         (define T* (·simpl (Γsimpl T₀) (Γsimpl T₁)))
-                        (when (and ρ (not (open? T*)))
-                          (error 'Γτ "· introduced closed ~a → ~a" T T*))
                         T*]
                        [(bind B T) ;; FIXME
-                        (define-values (ρkill* B*) (refers-to ρkill B))
+                        (define-values (ρkill* B*) (Γpattern ρkill B))
                         (cond [(eq? B* None) T⊥]
                               [else
-                               (define T* (Γsimpl* T ρ ρkill*))
-                               (when (and ρ (not (open? T*)))
-                                 (error 'Γτ "bind introduced closed ~a → ~a" T T*))
-                               (bind B* T*)])]
+                               (define T* (Γsimpl* T ρkill*))
+                               (cond [(eq? T* T⊥) (¬simpl B*)]
+                                     [else (bind B* T*)])])]
                        [(closed T ρ)
-                        (define T* (Γsimpl* T ρ (ρkill . ◃ . (touches-unreachable ρ))))
+                        ;; ρkill gets created here and only made smaller.
+                        (define-values (ρ* ρkill*) (remove-unreachable ρ))
+                        (define T* (Γsimpl* T ρkill*))
                         (cond [(eq? T* T⊥) ST⊥]
                               [(eq? T* Σ̂*) SΣ̂*]
-                              [else
-                               (unless (open? T*) (error 'Γτ "WTF not open? ~a" T*))
-                               (closed T* ρ)])]
+                              [else (closed T* ρ*)])]
                        [(? ε?) ε]
-                       [_ (define-values (ρkill* A) (refers-to ρkill T))
+                       [_ (define-values (ρkill* A) (Γpattern ρkill T))
                           (match A
                             [(== None eq?) T⊥]
                             [(== Any eq?) Σ̂*]
@@ -410,7 +407,6 @@
    ;; Negation differs because it waits until we have a /full/ match.
    ;; Thus, we do a nullability check to see if it is satisfied.
    ;; If a may state, we stay may only if the contract is nullable.
-   ;; FIXME: Need a may fail (#f)
    (define (¬p T)
      (match T
        [(? M⊥?) Σ*]
