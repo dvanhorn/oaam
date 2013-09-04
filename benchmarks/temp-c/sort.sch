@@ -25,11 +25,17 @@
                ->
                any
                )
-        (and (not (seq ... (call (label sort) _ _) (star (!ret (label sort) _)) (call (label sort) _ _)))
+        (and (not (seq (kl (!call (label sort) _ _)) ;; ...
+                       (call (label sort) _ _)
+                       (star (!ret (label sort) _))
+                       (call (label sort) _ _)))
            
-         (not (seq ... (bind (call (label sort) (? cmp) _)
-                             (seq ... (ret (label sort) _)
-                                  ... (call ($ cmp) _ _))))))
+         (not (seq (* (!call (label sort) _ _)) ;; ...
+                   (bind (call (label sort) (? cmp) _)
+                         (seq (* (!ret (label sort) _)) ;; ...
+                              (ret (label sort) _)
+                              (* (!call ($ cmp) _ _)) ;; ...
+                              (call ($ cmp) _ _))))))
         sort))
 (define lst (list 1 2 3 4))
 (csort (λ (x y) (<= x y)) lst)

@@ -52,6 +52,7 @@
                                           (syntax-line stx))
                                stx)))
 (define-syntax-parameter abs-count? #f)
+(define-syntax-parameter μ-equality? #f) ;; Use μ for better equality checking when abs-count?
 (define-syntax-parameter σ-∆s? #f)
 (define-syntax-parameter imperative? #f)
 (define-syntax-parameter global-σ? #f)
@@ -64,7 +65,7 @@
 (define-syntax-parameter empty-σ (make-rename-transformer #'hash₀))
 (define-syntax-parameter restrict-σ (make-rename-transformer #'restrict-to-set))
 (define-syntax-parameter Gödel? #f)
-(provide target-σ abs-count? compiled? fixpoint empty-σ restrict-σ 
+(provide target-σ abs-count? compiled? fixpoint empty-σ restrict-σ μ-equality?
          σ-∆s? global-σ? imperative? pushdown? Gödel? Γ? Γd?)
 
 

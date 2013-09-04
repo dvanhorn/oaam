@@ -51,6 +51,7 @@
 
 (define-for-syntax (prim-defines clos? rlos? blclos? clos: rlos: blclos: σ-passing? K prim-equal)
   (define concrete? (= K +inf.0))
+  (define μ-equality (syntax-parameter-value #'μ-equality?))
   (define 0cfa? (eq? K 0))
   (define σ-∆sv? (syntax-parameter-value #'σ-∆s?))
   (define-syntax if0
@@ -163,43 +164,46 @@
 
        (define singleton-addr?
          (absλ singleton-addr? (a)
-               #,(if concrete?
-                     #'#t
-                     #`(and (= 1 (μgetter a))
-                            (appλ singleton-value? (set-first (getter a)))))))
+               #,(cond [concrete? #'#t]
+                       [μ-equality
+                        #`(and (= 1 (μgetter a))
+                               (appλ singleton-value? (set-first (getter a))))]
+                       [else #'#f])))
 
        (define singleton-value?
          (absλ singleton-value? (v)
-           #,(if concrete?
-                 #'#t
-                 #`(match v
-                     [(or (? atomic?)
-                          (== vec0)
-                          (? primop?))
-                      #t]
-                     [(consv a d) (and (appλ singleton-addr? a) (appλ singleton-addr? d))]
-                     [(or (clos: _ _ ρ fvs)
-                          (rlos: _ _ _ ρ fvs))
-                      (for/and ([a #,(if0 #'(in-set fvs) #'(in-hash-values ρ))])
-                        (appλ singleton-addr? a))]
-                     [(blclos: vaddr ncs pc name η ℓs)
-                      (and (= 1 (μgetter η))
-                           (appλ singleton-addr? vaddr)
-                           (appλ singleton-value? pc)
-                           (for/and ([nc (in-list ncs)]) (appλ singleton-value? nc)))]
-                     [(or (output-port^ a) (input-port^ a)) (= 1 (μgetter a))]
-                     [(or (vectorv (? number?) (? list? as))
-                          (vectorv-immutable (? number?) (? list? as)))
-                      (for/and ([a (in-list as)]) (appλ singleton-addr? a))]
-                     [(or (ccons c₀ c₁)
-                          (cand c₀ c₁)
-                          (cor c₀ c₁)) (and (appλ singleton-value? c₀)
-                          (appλ singleton-value? c₁))]
-                     [(cblarr ℓs ncs pc name η)
-                      (and (= 1 (μgetter η))
-                           (appλ singleton-value? pc)
-                           (for/and ([nc (in-list ncs)]) (appλ singleton-value? nc)))]
-                     [_ #f]))))
+           #,(cond
+              [concrete? #'#t]
+              [μ-equality
+               #`(match v
+                   [(or (? atomic?)
+                        (== vec0)
+                        (? primop?))
+                    #t]
+                   [(consv a d) (and (appλ singleton-addr? a) (appλ singleton-addr? d))]
+                   [(or (clos: _ _ ρ fvs)
+                        (rlos: _ _ _ ρ fvs))
+                    (for/and ([a #,(if0 #'(in-set fvs) #'(in-hash-values ρ))])
+                      (appλ singleton-addr? a))]
+                   [(blclos: vaddr ncs pc name η ℓs)
+                    (and (= 1 (μgetter η))
+                         (appλ singleton-addr? vaddr)
+                         (appλ singleton-value? pc)
+                         (for/and ([nc (in-list ncs)]) (appλ singleton-value? nc)))]
+                   [(or (output-port^ a) (input-port^ a)) (= 1 (μgetter a))]
+                   [(or (vectorv (? number?) (? list? as))
+                        (vectorv-immutable (? number?) (? list? as)))
+                    (for/and ([a (in-list as)]) (appλ singleton-addr? a))]
+                   [(or (ccons c₀ c₁)
+                        (cand c₀ c₁)
+                        (cor c₀ c₁)) (and (appλ singleton-value? c₀)
+                        (appλ singleton-value? c₁))]
+                   [(cblarr ℓs ncs pc name η)
+                    (and (= 1 (μgetter η))
+                         (appλ singleton-value? pc)
+                         (for/and ([nc (in-list ncs)]) (appλ singleton-value? nc)))]
+                   [_ #f])]
+              [else #'#f])))
 
        (define-simple-macro* (mk-prim-eq name:id is-eq?:boolean)
          (define-syntax-rule (name v0 v1)

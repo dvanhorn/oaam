@@ -746,7 +746,7 @@
                                 [(nothing? stepped-ts) must]
                                 [(eq? no-blame? may) may]
                                 [else #f])))))
-               (trace step-event)
+               #;(trace step-event)
 
                (define-syntax-rule (blamer wrap cause-blame? good bad)
                  (cond
@@ -821,8 +821,8 @@
                          [(ifk: t e ρ δ)
                           (generator
                               (do ([k* #:in-kont a]
-                                   [v #:in-force v])
-                                  (yield (ev (if v t e) ρ k* δ))))]
+                                   [fv #:in-force v])
+                                  (yield (ev (if fv t e) ρ k* δ))))]
                          [(lrk: addr '() '() e ρ δ)
                           (generator
                               (do ([#:join-forcing addr v]
@@ -862,18 +862,19 @@
                                   (yield (co k* (cor vl v)))))]
                          [(rngk: η ℓs ncs name δ)
                           (generator
-                              (do ([k* #:in-kont a])
-                                  (yield (co k* (cblarr ℓs ncs v name η)))))]
+                              (do ([k* #:in-kont a]
+                                   [pc #:in-force v])
+                                  (yield (co k* (cblarr ℓs ncs pc name η)))))]
                          [(domk: η ℓs '() ncs-done cpc ρ name δ)
                           (generator
-                              (do ()
+                              (do ([ncc #:in-force v])
                                   (yield (cc cpc ρ η ℓs
-                                             (push (rngk η ℓs (reverse (cons v ncs-done)) name δ)) δ))))]
+                                             (push (rngk η ℓs (reverse (cons ncc ncs-done)) name δ)) δ))))]
                          [(domk: η ℓs (cons nc ncs-todo) ncs-done cpc ρ name δ)
                           (generator
-                              (do ()
+                              (do ([ncc #:in-force v])
                                   (yield (cc nc ρ η ℓs
-                                             (push (domk η ℓs ncs-todo (cons v ncs-done) cpc ρ name δ)) δ))))]
+                                             (push (domk η ℓs ncs-todo (cons ncc ncs-done) cpc ρ name δ)) δ))))]
 
                          ;; Contract attachment
                          [(stmonk: l lchk e ρ η t ℓs δ)
@@ -962,8 +963,8 @@
                          [(chkflt: tempFn tmpArg (list pℓ nℓ cℓ))
                           (generator
                               (do ([k* #:in-kont a]
-                                   [v #:in-force v])
-                                  (if v ;; contract check successful.
+                                   [fv #:in-force v])
+                                  (if fv ;; contract check successful.
                                       (yield (co k* (addr tmpArg)))
                                       (yield (ans cm (blame pℓ cℓ "Flat contract failed" (getter tempFn) (getter tmpArg)))))))]
                          [_ (error 'step "Bad continuation ~a" k)])])]
@@ -1005,7 +1006,7 @@
                        (define (wrap-if-arity= n)
                          (cond
                           [(= (length ncs) n)
-                           (define bladdr (make-var-contour `(bl . ,lchk) δ))
+                           (define bladdr (make-var-contour `(bl ,π . ,lchk) δ))
                            (generator
                                (do ([#:join bladdr (singleton v)]
                                     [#:join res-addr (singleton (blclos bladdr ncs pc name η ℓs′))])
@@ -1019,10 +1020,10 @@
                          [(primop o) (error 'todo "Wrap primops")]
                          [_ (generator (do () (yield (ans (kont-cm k) (blame pℓ cℓ "Not a function" vc v)))))])]
                       [(or (? blclos?) (? clos?) (? rlos?) (? primop?)) ;; Must be a flat contract.
-                       (define tempFn (make-var-contour `(flt-tmp-fn . ,lchk) δ))
-                       (define templ (make-var-contour `(flt-tmp-l . ,lchk) δ))
-                       (define tempChk (make-var-contour `(flt-tmp-chk . ,lchk) δ))
-                       (define tempChk2 (make-var-contour `(flt-tmp-chk2 . ,lchk) δ))
+                       (define tempFn (make-var-contour `(flt-tmp-fn ,π . ,lchk) δ))
+                       (define templ (make-var-contour `(flt-tmp-l ,π . ,lchk) δ))
+                       (define tempChk (make-var-contour `(flt-tmp-chk ,π . ,lchk) δ))
+                       (define tempChk2 (make-var-contour `(flt-tmp-chk2 ,π . ,lchk) δ))
                        (generator
                            (do ([#:join tempFn (singleton vc)]
                                 [#:join res-addr (singleton v)]
@@ -1060,7 +1061,7 @@ store - so we can grab the store count associated with the point to store in the
                                         (yield (enter e ρ* k δ*)))]
                                      ;; Yield the same state to signal "stuckness".
                                      [else
-                                      (log-info "Arity error on ~a at ~a" f l)
+                                      (log-info "Arity error on ~a at ~a (got ~a)" f l (map getter arg-addrs))
                                       (yield (ap l lchk fn-addr arg-addrs k δ))])]
                               [(rlos: xs r e ρ _)
                                (cond [(<= (length xs) (length arg-addrs))

@@ -139,20 +139,26 @@
     [_ (error 'cond-tf "Bad input ~a" inp)]))
 
 (define (define-ctx-tf inp)
-  (define (parse-defns ds)
-    (match ds
-      ['() '()]
-      [`((define (,f . ,xs) . ,b) . ,ds)
-       (parse-defns `((define ,f (lambda ,xs . ,b)) . ,ds))]
-      [`((define ,f ,e) . ,ds)
-       (cons (list f e)
-             (parse-defns ds))]))
-  (match inp
-    [(list e) e]
-    [(list (and ds `(define ,_ . ,_)) ... es ...)
-     (when (null? es)
-       (error 'define-ctx "expected at least one expression after defines ~a" inp))
-     `(,letrec$ ,(parse-defns ds) (,begin$ ,@es))]))
+  (let loop ([ds inp] [rev-bindings '()])
+    (cond
+     [(for/or ([d (in-list ds)]) (and (pair? d) (eq? (car d) 'define)))
+      (match ds
+        [`((define (,f . ,xs) . ,b) . ,ds)
+         (loop `((define ,f (lambda ,xs . ,b)) . ,ds) rev-bindings)]
+        [`((define ,f ,e) . ,ds)
+         (loop ds (cons (list f e) rev-bindings))]
+        [(cons e ds) (loop ds (cons (list (gensym 'dummy) e) rev-bindings))])]
+     [else
+      (define body
+        (match ds
+          ['() (error 'define-ctx "Expected expression at end ~a" inp)]
+          [(list e) e]
+          [es `(,begin$ ,@es)]))
+      (if (null? rev-bindings)
+          body
+          `(,letrec$
+            ,(reverse rev-bindings)
+            ,body))])))
 
 (define (do-tf inp)
   (let loop ([e (cdr inp)])

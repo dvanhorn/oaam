@@ -347,7 +347,7 @@ Welcome to Racket v5.3.3.
   #:ev psev
   #:co psco #:compiled)
  (with-nonsparse
-  (with-regular
+  (with-regular ;; tunable
    (with-lazy
     (with-0-ctx/prealloc
      (with-prealloc/timestamp-store/stacked
@@ -370,8 +370,11 @@ Welcome to Racket v5.3.3.
 
 ;; "lcg"
 (splicing-syntax-parameterize ([generate-graph? #f]
+                               [compiled? #t]
+                               ;; tunables for paper evaluation
                                [abs-count? #t]
-                               [compiled? #t])
+                               [μ-equality? #t]
+                               [Γτ? #t])
  (with-whole-GH-σ #;with-σ-∆s
   (with-timestamp-∆-fix/Γ
     [lcgsb

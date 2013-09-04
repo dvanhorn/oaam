@@ -139,8 +139,8 @@
        (let-syntax ([good
                      (syntax-rules ()
                        [(_ v pred)
-                        (for/value-set ([v (in-set (getter addr))] ;; uses target-σ
-                                  #:when pred)
+                        (for/value-set ([v (in-value-set (getter addr))] ;; uses target-σ
+                                        #:when pred)
                           v)])])
          #,(if (eq? t 'any)
                #`(delay addr) ;; uses target-σ
@@ -379,7 +379,7 @@
                                ;; Checkers will force what they need to and keep the rest
                                ;; lazy. Forced values are exploded into possible
                                ;; argument combinations
-                               (do ([vs (#,checker target-σ-op ... v-addrs)])
+                               (do ([vs (in-set (#,checker target-σ-op ... v-addrs))])
                                  #,(cond [w? (m #'(ℓ δ vs))]
                                          [else #;r? (m #'(vs))]))))])))
             (quasisyntax/loc stx

@@ -17,7 +17,7 @@
          ● ⊥
          open@ closed@
          fail ;; for continuation marks
-         flatten-value
+         flatten-value Γτ?
          (struct-out vectorv^)
          (struct-out vectorv-immutable^)
          (struct-out input-port^)
@@ -89,6 +89,7 @@
 (define-nonce fail)
 
 (define-syntax-parameter flatten-value #f)
+(define-syntax-parameter Γτ? #f)
 (define-simple-macro* (mk-flatten-value name clos rlos blclos kont?)
   (define (name v)
     (match v

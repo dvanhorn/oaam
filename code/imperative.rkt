@@ -5,7 +5,7 @@
          "data.rkt" "deltas.rkt" "add-lib.rkt"
          (only-in "ast.rkt" var?)
          "handle-limits.rkt"
-         (only-in "tcon.rkt" Γτ)
+         (only-in "tcon.rkt" mk-Γτ)
          "graph.rkt"
          "goedel-hash.rkt" (only-in "tcon.rkt" init-tcon!)
          "struct-copy.rkt"
@@ -70,7 +70,8 @@
 (define-syntax (bind-Γ stx)
   (define σ-∆s?* (syntax-parameter-value #'σ-∆s?))
   (define (id id-stx fmt) (format-id id-stx fmt id-stx))
-  (define (base touches-stx reach*-stx sb-stx point-stx kind μ*-stx τ-stx σ*/∆s-stx root-stx body...)
+  (define (base Γτ-stx touches-stx reach*-stx sb-stx point-stx kind μ*-stx τ-stx σ*/∆s-stx root-stx body...)
+    (define/with-syntax Γτ Γτ-stx)
     (define/with-syntax touches touches-stx)
     (define/with-syntax (touches-ρ touches-κ) (list (id touches-stx "~a-ρ") (id touches-stx "~a-κ")))
     (define/with-syntax (state-base-rσ state-base-pnt) (list (id sb-stx "~a-rσ") (id sb-stx "~a-pnt")))
@@ -132,7 +133,7 @@
                                   [Γd? #t])
               #,@body...))))
   (syntax-parse stx
-    [(_ touches reach* root state-base point (~optional (~and kind (~or #:narrow #:husky)))
+    [(_ Γτ touches reach* root state-base point (~optional (~and kind (~or #:narrow #:husky)))
         (~or (e ρ δ k) ;; collecting for calling-context
              (c)) . body)
      (define sb-stx #'state-base)
@@ -142,7 +143,7 @@
          #`(let* ([cv c]
                   [σ*-internal (state-base-rσ cv)]
                   [pnt (state-base-pnt cv)])
-             #,(base #'touches #'reach*
+             #,(base #'Γτ #'touches #'reach*
                      sb-stx
                      #'point
                       (and (attribute kind) (syntax-e #'kind))
@@ -151,7 +152,7 @@
                       #'σ*-internal
                       #'(root cv)
                       #'body))
-         (base #'touches #'reach*
+         (base #'Γτ #'touches #'reach*
                sb-stx
                 (and (attribute kind) (syntax-e #'kind))
                 #'target-μ
@@ -175,8 +176,9 @@
      [point-conf (format-id #'point "~a-conf" #'point)])
     (quasisyntax/loc stx
      (begin
+       (mk-Γτ Γτ)
        (define (name c)
-         (bind-Γ
+         (bind-Γ Γτ
           touches reach* root state-base point #,@(if (attribute kind) #'(kind) #'()) (c)
           (define pnt* (point (point-conf (state-base-pnt c))))
           #;(printf "Point ~a~%Store ~a~%" pnt* target-σ)
