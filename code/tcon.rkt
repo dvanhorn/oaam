@@ -8,7 +8,7 @@
 (provide TCon-deriv^ TCon-deriv@ weak-eq^
          may must for*/δ ∨ ⊕ ∧ δ Σ̂*
          ¬ · kl bind ε
-         call ret !call !ret
+         call ret !call !ret pcons
          $ □ Any label
          (rename-out [∪ tor] [∩ tand])
          simple
@@ -84,6 +84,7 @@
 (define (ret nf pv) (constructed 'ret (list nf pv)))
 (define (!call nf pas) (!constructed 'call (cons nf pas)))
 (define (!ret nf pv) (!constructed 'ret (list nf pv)))
+(define (pcons pa pd) (constructed 'cons (list pa pd)))
 (define/match (event? x)
   [((constructed 'ret (list _ _))) #t]
   [((!constructed 'ret (list _ _))) #t]
@@ -255,10 +256,10 @@
     [(closed T ρ) #f]
     [_ #t]))
 
-(define-signature weak-eq^ (≃ matchℓ?))
+(define-signature weak-eq^ (≃ matchℓ? σgetter))
 (define-signature TCon-deriv^ (ð))
 
-(define (matches≃ ≃ matchℓ?)
+(define (matches≃ ≃ matchℓ? σgetter)
   (define (matches P A γ)
     (define (matches1 P) (matches P A γ))
     (define (matches2 P A) (matches P A γ))
@@ -273,7 +274,13 @@
        (match A
          [(constructed (== kind eq?) data)
           (⨅/lst matches2 pats data)]
+         ;; constructed, but also data
+         [(consv a d) ;; INVARIANT: pats ≡ (list pata patd)
+          (cond
+           [(eq? kind 'cons) (⨅/lst matches2 pats (list (σgetter a) (σgetter d)))]
+           [else ⊥])]
          [(? value-set?)
+          ;; implements Δ from paper
           (define-values (t γs)
             (for/fold ([t 'doesnt-count] [γs ∅])
                 ([v (in-value-set A)])
@@ -287,6 +294,8 @@
           (if (∅? γs)
               ⊥ ;; get pointer equality
               (mres t γs))]
+         [(or (? vectorv?) (? vectorv-immutable?) (? vectorv^?) (? vectorv-immutable^?))
+          (error 'todo "Match on vectors")]
          [_ ⊥])]
       [(== Any eq?) (mres must (set γ))]
       [(== None eq?) ⊥]
@@ -400,7 +409,7 @@
 (define-unit TCon-deriv@
   (import weak-eq^)
    (export TCon-deriv^)
-   (define matches (matches≃ ≃ matchℓ?))
+   (define matches (matches≃ ≃ matchℓ? σgetter))
 
    ;; The following *p operations perform their respective derivitive operations as well as simplify
 
@@ -520,10 +529,3 @@
          [(? event? Aor!A) (patp Aor!A A ρ)]
          [_ (error '∂ "Bad Tcon ~a" T)]))))
 
-(define-unit concrete@
-  (import)
-   (export weak-eq^)
-   (define (≃ x y) (and (equal? x y) must))
-   (define matchℓ? eq?))
-
-(define-values/invoke-unit/infer (export TCon-deriv^) (link concrete@ TCon-deriv@))

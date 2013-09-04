@@ -87,17 +87,18 @@
            (app (fresh-label!) (opaque-box #f) (fresh-label!) (parse e) (map parse es))]
           [err (error 'parse-core "Wat ~a" err)]))
 
-      (define (rassoc f2 f if-empty lst)
+      (define (rassoc f2 f f1 if-empty lst)
         (let loop ([lst lst])
          (match lst
            ['() if-empty]
-           [(list c) (f c)]
+           [(list c) (f1 (f c))]
            [(cons s ss) (f2 (f s) (loop ss))])))
 
       (define (parse-scon s)
         (match s
           [`(cons/c ,sa ,sd) (consc (fresh-label!) (opaque-box #f) (parse-scon sa) (parse-scon sd))]
-          [`(and/c ,ss ...) (rassoc (λ (s₀ s₁) (andc (fresh-label!) (opaque-box #f) s₀ s₁)) parse-scon anyc ss)]
+          [`(and/c ,ss ...)
+           (rassoc (λ (s₀ s₁) (andc (fresh-label!) (opaque-box #f) s₀ s₁)) parse-scon values anyc ss)]
           [`(or/c ,ss ...)
            (unless (let check-h/o ([ss ss])
                         (match ss
@@ -106,7 +107,7 @@
                                      `(-> ,_ ,_)) ps) #f]
                           [_ #t]))
              (error 'parse "Expected higher-order component of disjunction contract in far right ~a" s))
-           (rassoc (λ (s₀ s₁) (orc (fresh-label!) (opaque-box #f) s₀ s₁)) parse-scon nonec ss)]
+           (rassoc (λ (s₀ s₁) (orc (fresh-label!) (opaque-box #f) s₀ s₁)) parse-scon values nonec ss)]
           [`any anyc]
           [`none nonec]
           [(or `(,(or '-> '→) (quote ,(? symbol? name)) : ,sns ,sp)
@@ -119,7 +120,7 @@
 
       (define (parse-tcon t)
         (match t
-          [`(,(or 'seq '·) ,ts ...) (rassoc · parse-tcon ε ts)]
+          [`(,(or 'seq '·) ,ts ...) (rassoc · parse-tcon values ε ts)]
           [`(,(or '∪ 'or) ,ts ...) (tor (for/set ([t (in-list ts)]) (parse-tcon t)))]
           [`(,(or '∩ 'and) ,ts ...) (tand (for/set ([t (in-list ts)]) (parse-tcon t)))]
           [(or 'ε 'empty) ε]
@@ -139,6 +140,8 @@
           [`(label ,ℓ) (label ℓ)]
           [`($ ,(? symbol? x)) ($ x)]
           [`(? ,(? symbol? x)) (□ x)]
+          [`(cons ,pa ,pd) (pcons (parse-pat pa) (parse-pat pd))]
+          [`(list ,ps ...) (rassoc pcons parse-pat (λ (p) (pcons p '())) '() ps)]
           [`(quote ,symbol) symbol]
           [v v])) ;; Everything else is a value. TODO: allow delayed expression evaluation and predicates
 

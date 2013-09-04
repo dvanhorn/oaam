@@ -771,7 +771,8 @@
                             (for*/δ ([v0 (in-set (force v0))]
                                      [v1 (in-set (force v1))])
                                     (prim-eq v0 v1)))
-                          (define matchℓ? -matchℓ?))
+                          (define matchℓ? -matchℓ?)
+                          (define σgetter getter))
                         (define-values/invoke-unit/infer
                           (export #,(syntax-local-introduce #'TCon-deriv^))
                           (link weak-eq@ TCon-deriv@)))]))
