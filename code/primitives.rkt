@@ -589,16 +589,37 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
        ;; I/O
-       (define-simple-macro* (mk-port-open name port^ open-port)
+       (define-simple-macro* (mk-port-open name port^ open-port addr-tag)
          (define/write (name l δ s)
            (match (widen s)
              [(? string^?)
-              (define status-addr (make-var-contour `(Port . ,l) δ))
+              (define status-addr (make-var-contour `(addr-tag . ,l) δ))
               (do ([#:join status-addr (singleton open@)])
                   (yield (port^ status-addr)))]
              [s (yield (open-port s))])))
-       (mk-port-open open-input-filev input-port^ open-input-file)
-       (mk-port-open open-output-filev output-port^ open-output-file)
+       (mk-port-open open-input-filev input-port^ open-input-file IPort)
+       (mk-port-open open-output-filev output-port^ open-output-file OPort)
+
+       (define/write (open-input-output-filev l δ s)
+         (define ipA (make-var-contour `(ipA . ,l) δ))
+         (define opD (make-var-contour `(opD . ,l) δ))
+         (match (widen s)
+           [(? string^?)
+            (define ip-status (make-var-contour `(IPort . ,l) δ))
+            (define op-status (make-var-contour `(OPort . ,l) δ))
+            (do ([#:join* (list ip-status op-status ipA opD)
+                          (list (singleton open@)
+                                (singleton open@)
+                                (singleton (input-port^ ip-status))
+                                (singleton (output-port^ ip-status)))])
+                (yield (consv ipA opD)))]
+           [s
+            (define-values (ip op) (open-input-output-file s))
+            (do ([#:join* (list ipA opD)
+                          (list (singleton ip)
+                                (singleton op))])
+                (yield (consv ipA opD)))]))
+       
 
        (define-simple-macro* (mk-port-close name port^ close-port)
          (define/write (name l δ ip)
@@ -652,6 +673,11 @@
                                    number^ string^ char^ symbol^
                                    #t #f '() eof (void)))])
                 (yield v))]))
+
+       (define/read (read-stringv n p)
+         (match p
+           [(input-port^ a) (do () (yield string^))]
+           [(? input-port?) (do () (yield (read-string n p)))]))
 
        (define-simple-macro* (newlinev vs)
          (match vs
@@ -863,6 +889,7 @@
      [output-port? #:predicate op]
      [open-input-file #f #t open-input-filev (s -> ip)]
      [open-output-file #f #t open-output-filev (s -> op)]
+     [open-input-output-file #f #t open-input-output-filev (s -> p)]
      [close-input-port #f #t close-input-portv (ip -> !)]
      [close-output-port #f #t close-output-portv (op -> !)]
      [port-closed? #t #f port-closed?v (prt -> b)]
@@ -871,6 +898,7 @@
      [current-output-port #f #f current-input-portv (-> op)]
      [read #t #f readv ((-> lst) ;; XXX: impoverished read
                         (ip -> lst))]
+     [read-string #t #f read-stringv (z ip -> s)]
      [write #t #f writev ((any -> !)
                           (any op -> !))]
      [display #t #f displayv ((any -> !)

@@ -40,7 +40,7 @@
        [(== unmapped eq?)
         (define res
           (match v
-            [(? set-immutable? vs) (for/product ([v (in-set vs)]) (P v))]
+            [(? set? vs) (for/product ([v (in-set vs)]) (P v))]
             [(? dict? m) (for/product ([(k v) (in-dict m)])
                            (C₂ (P k) (P v)))]
             [_ (hash-ref! element-hash v next-prime!)]))
@@ -81,15 +81,15 @@
      (quasisyntax/loc stx
        (let-values
            ([(gh s)
-             (for/fold/derived #,stx
-                               ([gh 1] [s (set)])
-                               clauses
-                               (define v (let () body ...))
-                               (define Pv (P v))
-                               (if (eq? 0 (remainder gh Pv))
-                                   (values gh s)
-                                   (values (* gh (P v))
-                                           (set-add s v))))])
+             (folder #,stx
+                     ([gh 1] [s (set)])
+                     clauses
+                     (define v (let () body ...))
+                     (define Pv (P v))
+                     (if (eq? 0 (remainder gh Pv))
+                         (values gh s)
+                         (values (* gh (P v))
+                                 (set-add s v))))])
          (set-name gh s)))]))
 
 (define-syntax (mk-GH-set/hash stx)

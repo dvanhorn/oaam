@@ -1,5 +1,6 @@
 #lang racket
-(require racket/unit
+(require racket/unit (for-syntax syntax/parse)
+         racket/generic
          "ast.rkt"
          racket/stxparam
          (except-in "data.rkt" ⊥)
@@ -7,40 +8,68 @@
 (require racket/trace)
 
 (provide TCon-deriv^ TCon-deriv@ weak-eq^
-         may must for*/δ ∨ ⊕ ∧ δ Σ̂*
-         ¬ · kl bind ε
-         call ret !call !ret pcons
-         $ □ Any label
-         (rename-out [∪ tor] [∩ tand])
+         tcon? tconv?
+         may must for*/δ ∨ ⊕ ∧ δ Σ̂* Σ̂*e
+         ¬ · kl ε
+         ¬e ·e kle εe
+         constructede constructed
+         call ret pcons
+         $ □ Any label !pat
+         $e □e Anye labele !pate
+         (rename-out [∪ tor] [∩ tand] [∪e tore] [∩e tande] [bind 〈bind〉] [binde 〈binde〉])
          simple
          (struct-out tl)
          mk-Γτ
-         M⊥
+         M⊥ T⊥
          init-tcon!)
 
 (define ρ₀ #hasheq())
 (struct -unmapped ()) (define unmapped (-unmapped))
 
-(define (default-free-box e) (error 'free-box "Tcons don't have fvs, so no box ~a" e))
-(define-simple-macro* (tcon-struct name (fields ...))
-  (struct name (fields ...) #:transparent
-         ;; #:methods #,(syntax-local-introduce #'gen:binds-variables)
-          ;;[(define free-box default-free-box)]
-          ))
-;; Temporal contracts
-(tcon-struct closed (T ρ))
+(struct tcon (fvs-box) #:transparent)
+(define (tconv? x)
+  (or ($? x) (□? x) (eq? x Any) (eq? x None) (!pat? x) (label? x) (constructed? x)
+      (¬? x) (·? x) (kl? x) (eq? x ε) (∪? x) (∩? x) (bind? x)))
+(define-simple-macro* (tcon-struct name ename (fields ...)
+                                   (~optional
+                                    (~or
+                                     (~seq #:collect gfree*:id collect:expr)
+                                     (sub-fields ...))
+                                    #:defaults ([(sub-fields 1)
+                                                 (syntax->list #'(fields ...))])))
+  (begin 
+    (struct name (fields ...) #:transparent)
+    (struct ename tcon (fields ...) #:transparent
+            #:methods gen:binds-variables
+            [(define free-box tcon-fvs-box)
+             (define/generic gfree free)
+             (define (free t)
+               (or (opaque-box-v (free-box t))
+                   (match t
+                     [(ename fvs-box fields ...)
+                      (define fvs
+                       #,(cond
+                          [(attribute gfree*)
+                           #'(let ([gfree* gfree]) collect)]
+                          [(null? (attribute sub-fields)) #'∅]
+                          [else #'(set-union (gfree sub-fields) ...)]))
+                      (set-opaque-box-v! fvs-box fvs)
+                      fvs])))])))
+;; Temporal contracts (syntactic and value)
+(tcon-struct closed closede (T ρ) (T))
 (define (simple T) (closed T ρ₀))
-(tcon-struct ¬ (T))
-(tcon-struct · (T₀ T₁))
-(tcon-struct kl (T))
-(tcon-struct bind (B T))
-(tcon-struct ∪ (Ts))
-(tcon-struct ∩ (Ts))
-(tcon-struct -ε ())
+(tcon-struct ¬ ¬e (T))
+(tcon-struct · ·e (T₀ T₁))
+(tcon-struct kl kle (T))
+(tcon-struct bind binde (B T))
+(tcon-struct ∪ ∪e (Ts) #:collect free ((union-map free) Ts))
+(tcon-struct ∩ ∩e (Ts) #:collect free ((union-map free) Ts))
+(tcon-struct -ε -εe ())
 
 (define ε (-ε)) (define (ε? x) (eq? x ε))
+(define εe (-εe (opaque-box ∅))) (define (εe? x) (eq? x εe))
 (define T⊥ (∪ ∅)) (define (T⊥? x) (eq? x T⊥))
-(define Σ̂* (∩ ∅)) (define (Σ̂*? x) (eq? x Σ̂*))
+(define Σ̂* (∩ ∅)) (define (Σ̂*? x) (eq? x Σ̂*)) (define Σ̂*e (∩e (opaque-box ∅) '()))
 (define Tε (simple ε)) (define (Tε? x) (equal? x Tε))
 (define ST⊥ (simple T⊥)) (define (ST⊥? x) (eq? x ST⊥)) ;; empty contract
 (define SΣ̂* (simple Σ̂*)) (define (SΣ̂*? x) (eq? x SΣ̂*))
@@ -72,25 +101,22 @@
     [(or (∪ Ts) (∩ Ts)) (for/and ([T (in-set Ts)]) (ð? T))]
     [_ #f]))
 
-(struct constructed (c data) #:transparent)
-(struct !constructed (c data) #:transparent)
-(struct -Any () #:transparent) (define Any (-Any))
-(struct -None () #:transparent) (define None (-None))
-(struct $ (x) #:transparent)
-(struct □ (x) #:transparent)
-(struct label (ℓ) #:transparent)
+(tcon-struct constructed constructede (c data) #:collect free ((union-map free) data))
+(tcon-struct !pat !pate (pat))
+(tcon-struct -Any -Anye ()) (define Any (-Any)) (define Anye (-Anye (opaque-box ∅)))
+(tcon-struct -None -Nonee ()) (define None (-None))
+(tcon-struct $ $e (x) ())
+(tcon-struct □ □e (x) ())
+(tcon-struct label labele (ℓ) ())
 
 ;; Niceties for writing temporal contracts using the general language of patterns.
 (define (call nf pas) (constructed 'call (cons nf pas)))
 (define (ret nf pv) (constructed 'ret (list nf pv)))
-(define (!call nf pas) (!constructed 'call (cons nf pas)))
-(define (!ret nf pv) (!constructed 'ret (list nf pv)))
 (define (pcons pa pd) (constructed 'cons (list pa pd)))
 (define/match (event? x)
   [((constructed 'ret (list _ _))) #t]
-  [((!constructed 'ret (list _ _))) #t]
   [((constructed 'call (list-rest _ _))) #t]
-  [((!constructed 'call (list-rest _ _))) #t]
+  [((!pat (? event? p))) #t]
   [(_) #f])
 
 ;; named δ since it's like Kronecker's δ
@@ -278,16 +304,21 @@
   (Δ-like lst nothing tl ⊓ in-list nothing? M⊥ values))
 
 (define (matches≃ ≃ matchℓ? σgetter)
+  (define (force* v)
+    (match v
+      [(addr a) (σgetter a)]
+      [(? value-set?) v]
+      [else (singleton v)]))
   (define (matches P A γ)
     (define (matches1 P) (matches P A γ))
     (define (matches2 P A) (matches P A γ))
     (match P
-      [(? set-immutable?) (⨅ P matches1)]
-      [(!constructed kind pats)
-       (match (matches1 (constructed kind pats))
-         [(mres _ t) (if (eq? must t)
-                         ⊥
-                         (mres (set γ) (¬t t)))])]
+      [(and (? generic-set?) (not (? list?))) (⨅ P matches1)]
+      [(!pat pat)
+       (match-define (mres _ t) (matches1 pat))
+       (if (eq? must t)
+           ⊥
+           (mres (set γ) (¬t t)))]
       [(constructed kind pats)
        (match A
          [(constructed (== kind eq?) data)
@@ -297,9 +328,10 @@
           (cond
            [(eq? kind 'cons) (⨅/lst matches2 pats (list (σgetter a) (σgetter d)))]
            [else ⊥])]
+         [(addr a) (matches2 P (σgetter a))]
          [(? value-set?)
           (define-syntax-rule (op v) (matches2 P v))
-          (Δ-like A ∅ mres ∪ in-value-set ∅? ⊥ op)]
+          (Δ-like A ∅ mres set-union in-value-set ∅? ⊥ op)]
          [(or (? vectorv?) (? vectorv-immutable?) (? vectorv^?) (? vectorv-immutable^?))
           (error 'todo "Match on vectors")]
          [_ ⊥])]
@@ -314,10 +346,13 @@
        (match (hash-ref γ x unmapped)
          [(== unmapped eq?) ⊥]
          [v (matches2 v A)])]
-      [v (define t
-           (cond [(value-set? A)
-                  (for*/δ ([v′ (in-value-set A)]) (≃ v v′))]
-                 [else (≃ v A)]))
+      [v
+       (define v* (force* v))
+       (define A* (force* A))
+       (define t
+         (for*/δ ([v (in-value-set v*)]
+                  [v′ (in-value-set A*)])
+           (≃ v v′)))
          (if t
              (mres (set γ) t)
              ⊥)]))
@@ -328,37 +363,47 @@
 ;; Any bindings we come across that shadow names in ρkill get removed.
 ;; Constructed data containing None becomes None.
 ;; Negated matching on constructed data containing None becomes Any.
-(define (Γpattern ρkill event)
+(define ((Γpattern touches reachable) ρkill event)
   (let build ([event event] [ρnew ρkill])
     (define (build/l pats)
       (let/ec found-none
-         (let loop ([pats pats] [ρnew* ρnew])
-           (match pats
-             ['() (values ρnew* '())]
-             [(cons pat pats)
-              (define-values (ρnew** pat*) (build pat ρnew*))
-              (cond [(eq? pat* None) (found-none ρnew None)]
-                    [else
-                     (define-values (ρnew*** pats*) (loop pats ρnew**))
-                     (values ρnew*** (cons pat* pats*))])]))))
+        (let loop ([pats pats] [ρnew* ρnew])
+          (match pats
+            ['() (values ρnew* '())]
+            [(cons pat pats)
+             (define-values (ρnew** pat*) (build pat ρnew*))
+             (cond [(eq? pat* None) (found-none ρnew None)]
+                   [else
+                    (define-values (ρnew*** pats*) (loop pats ρnew**))
+                    (values ρnew*** (cons pat* pats*))])]))))
     (match event
       [(constructed kind pats)
        (define-values (ρnew* pats*) (build/l pats))
        (if (eq? pats* None)
            (values ρnew None)
            (values ρnew* (constructed kind pats*)))]
-      [(!constructed kind pats)
-       (define-values (ρnew* pats*) (build/l pats))
-       (if (eq? pats* None)
-           (values ρnew Any) ;; A pattern can't match, so obviously whole thing can't match
-           ;; ρ doesn't bind.
-           (values ρnew (!constructed kind pats*)))]
+      [(!pat pat)
+       (define-values (drop pat*) (build pat ρnew))
+       (values ρnew
+               (cond [(eq? pat* None) Any]
+                     [(eq? pat* Any) None]
+                     [else (!pat pat*)]))]
       [($ x) (values ρnew (if (hash-has-key? ρkill x) None event))]
       [(□ x) (values (hash-remove ρnew x) event)]
-      [_ (values ρnew event)])))
+      [(or (? label?) (== Any eq?) (== None eq?)) (values ρnew event)]
+      [(? value-set? vs)
+       (values ρnew
+               (for*/value-set ([v (in-value-set vs)]
+                                [v* (in-value (let-values ([(drop v*) (build v ρnew)]) v*))]
+                                #:unless (eq? v* None))
+                 v*))]
+      [v (if (subset? (touches v) reachable)
+             (values ρnew v)
+             (values ρnew None))])))
 
 (define-simple-macro* (mk-Γτ name)
  (define (name reachable touches τ)
+   (define Γpattern* (Γpattern touches reachable))
    (define (remove-unreachable ρ)
      ;; Bindings that refer to nothing are removed so that has-key? is
      ;; sufficient to change references into None
@@ -389,7 +434,7 @@
                          [(kl T) (klsimpl (Γsimpl T))]
                          [(· T₀ T₁) (·simpl (Γsimpl T₀) (Γsimpl T₁))]
                          [(bind B T)
-                          (define-values (ρkill* B*) (Γpattern ρkill B))
+                          (define-values (ρkill* B*) (Γpattern* ρkill B))
                           (cond [(eq? B* None) T⊥]
                                 [else
                                  (define T* (Γsimpl* T ρkill*))
@@ -403,7 +448,7 @@
                                 [(eq? T* Σ̂*) SΣ̂*]
                                 [else (closed T* ρ*)])]
                          [(? ε?) ε]
-                         [_ (define-values (ρkill* A) (Γpattern ρkill T))
+                         [_ (define-values (ρkill* A) (Γpattern* ρkill T))
                             (match A
                               [(== None eq?) T⊥]
                               [(== Any eq?) Σ̂*]
@@ -515,7 +560,7 @@
          [(kl T′) (klp (ð T′) T)]
          ;; Instead of performing a cross-product, just output the set of possibilities.
          [(∪ Ts) #;(∪p (for/set ([T (in-set Ts)]) (ð T)))
-          (Δ (set-map ð Ts))
+          (Δ (set-map Ts ð))
           ]
          [(∩ Ts) (∩p (for/set ([T (in-set Ts)]) (ð T)))]
          [(closed T ρ) (∂ A T ρ)] ;; TODO: Add fvs to Tcons and restrict ρ
@@ -536,7 +581,7 @@
          [(¬ T) (¬p (∂ T))]
          [(kl T′) (klp (∂ T′) T)]
          [(∪ Ts) #;(∪p (for/set ([T (in-set Ts)]) (∂ T)))
-          (Δ (set-map ∂ Ts))
+          (Δ (set-map Ts ∂))
           ]
          [(∩ Ts) (∩p (for/set ([T (in-set Ts)]) (∂ T)))]
          ;; dseq

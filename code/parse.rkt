@@ -70,14 +70,14 @@
           [`(mon (quote ,(? symbol? pℓ)) (quote ,(? symbol? nℓ)) (quote ,(? symbol? cℓ)) ,s ,e)
            (mon (fresh-label!) (opaque-box #f) (fresh-label!) pℓ nℓ cℓ (parse-scon s) (parse e))]
           [`(tmon (quote ,(? symbol? pℓ)) (quote ,(? symbol? nℓ)) (quote ,(? symbol? cℓ)) ,s ,t ,e)
-           (tmon (fresh-label!) (opaque-box #f) (fresh-label!) pℓ nℓ cℓ (parse-scon s) (simple (parse-tcon t)) (parse e))]
+           (tmon (fresh-label!) (opaque-box #f) (fresh-label!) pℓ nℓ cℓ (parse-scon s) (parse-tcon t) (parse e))]
           ;; End contract monitoring forms
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           [`(,(or 'lambda 'if 'letrec 'set!
                   #;for-continuation-marks
                   'test 'grant 'fail 'frame) . ,rest)
            (error 'parse-core "Ill-formed core form ~a" sexp)]
-          [`(,(== kwote) ,d) (datum (fresh-label!) (opaque-box #f) d)]
+          [`(,(== kwote) ,d) (datum (fresh-label!) (opaque-box ∅) d)]
           [`(,(== define-ctx) . ,forms) (parse-seq forms)]
           [`(,s . ,es) (=> fail)
            (match (hash-ref macro-env s #f)
@@ -120,33 +120,40 @@
 
       (define (parse-tcon t)
         (match t
-          [`(,(or 'seq '·) ,ts ...) (rassoc · parse-tcon values ε ts)]
-          [`(,(or '∪ 'or) ,ts ...) (tor (for/set ([t (in-list ts)]) (parse-tcon t)))]
-          [`(,(or '∩ 'and) ,ts ...) (tand (for/set ([t (in-list ts)]) (parse-tcon t)))]
-          [(or 'ε 'empty) ε]
-          [`(,(or 'kl 'star '*) ,t) (kl (parse-tcon t))]
-          [`(,(or 'not '¬) ,t) (¬ (parse-tcon t))]
-          [`(,(or 'dseq 'bind) ,pat ,t) (bind (parse-pat pat) (parse-tcon t))]
-          ['... (tand ∅)]
+          [`(,(or 'seq '·) ,ts ...) (rassoc (λ (T₀ T₁) (·e (opaque-box #f) T₀ T₁)) parse-tcon values ε ts)]
+          ;; Use lists here since we still have to evaluate all the way down,
+          ;; given expressions in patterns.
+          [`(,(or '∪ 'or) ,ts ...) (tore (opaque-box #f) (map parse-tcon ts))]
+          [`(,(or '∩ 'and) ,ts ...) (tande (opaque-box #f) (map parse-tcon ts))]
+          ['... (tande (opaque-box ∅) '())]
+          [(or 'ε 'empty) εe]
+          [`(,(or 'kl 'star '*) ,t) (kle (opaque-box #f) (parse-tcon t))]
+          [`(,(or 'not '¬) ,t) (¬e (opaque-box #f) (parse-tcon t))]
+          [`(,(or 'dseq 'bind) ,pat ,t) (〈binde〉 (opaque-box #f) (parse-pat pat) (parse-tcon t))]
           [pat (parse-pat pat)]))
 
+      (define (pcons pa pd)
+        (constructede (opaque-box #f) 'cons (list pa pd)))
       (define (parse-pat pat)
         (match pat
-          [`(call ,nf ,args ...) (call (parse-pat nf) (map parse-pat args))]
-          [`(!call ,nf ,args ...) (!call (parse-pat nf) (map parse-pat args))]
-          [`(ret ,nf ,vp) (ret (parse-pat nf) (parse-pat vp))]
-          [`(!ret ,nf ,vp) (!ret (parse-pat nf) (parse-pat vp))]
-          ['_ Any]
-          [`(label ,ℓ) (label ℓ)]
-          [`($ ,(? symbol? x)) ($ x)]
-          [`(? ,(? symbol? x)) (□ x)]
+          [`(,(and kind (or 'call 'ret)) ,nf ,args ...)
+           (constructede (opaque-box #f) kind (map parse-pat (cons nf args)))]
+          [`(!call . ,rest) (!pate (opaque-box #f) (parse-pat `(call . ,rest)))]
+          [`(!ret . ,rest)  (!pate (opaque-box #f) (parse-pat `(ret  . ,rest)))]
+          [`(,(or 'not '! '¬) ,p) (!pate (opaque-box #f) (parse-pat p))]
+          ['_ Anye]
+          [`(label ,ℓ) (labele (opaque-box ∅) ℓ)]
+          [`($ ,(? symbol? x)) ($e (opaque-box ∅) x)]
+          [`(? ,(? symbol? x)) (□e (opaque-box ∅) x)]
           [`(cons ,pa ,pd) (pcons (parse-pat pa) (parse-pat pd))]
-          [`(list ,ps ...) (rassoc pcons parse-pat (λ (p) (pcons p '())) '() ps)]
-          [`(quote ,symbol) symbol]
-          [v v])) ;; Everything else is a value. TODO: allow delayed expression evaluation and predicates
+          [`(list ,ps ...)
+           (define dnil (datum (fresh-label!) (opaque-box ∅) '()))
+           (rassoc pcons parse-pat (λ (p) (pcons p dnil)) dnil ps)]
+          ;; evaluate the expression at monitor creation time and create temporal contract with value.
+          [e (parse e)]))
 
       (match sexp
-        [`(,(== special) . ,s) (primr (fresh-label!) (opaque-box #f) s)]
+        [`(,(== special) . ,s) (primr (fresh-label!) (opaque-box ∅) s)]
         [`((,(== special) . ,s) . ,es)
          (if (primitive? s)
              (app (fresh-label!)
@@ -157,20 +164,23 @@
              (parse-core (cons s es)))]
         [`(,e . ,es)
          (cond [(hash-has-key? ρ e)
+                (define e* (rename e))
                 (app (fresh-label!)
                      (opaque-box #f)
                      (fresh-label!)
-                     (var (fresh-label!) (opaque-box #f) (rename e))
+                     (var (fresh-label!) (opaque-box (set e*)) e*)
                      (map parse es))]               
                [else (parse-core sexp)])]
         [(? symbol? s)
-         (define (mkvar) (var (fresh-label!) (opaque-box #f) (rename s)))
+         (define (mkvar)
+           (define s* (rename s))
+           (var (fresh-label!) (opaque-box (set s*)) s*))
          (cond [(hash-has-key? ρ s) (mkvar)]
-               [(primitive? s) (primr (fresh-label!) (opaque-box #f) s)]
+               [(primitive? s) (primr (fresh-label!) (opaque-box ∅) s)]
                [(hash-ref prim-constants s #f) =>
-                (λ (d) (datum (fresh-label!) (opaque-box #f) d))]
+                (λ (d) (datum (fresh-label!) (opaque-box ∅) d))]
                [else (mkvar)])] ;; will error
-        [(? atomic? d) (datum (fresh-label!) (opaque-box #f) d)]
+        [(? atomic? d) (datum (fresh-label!) (opaque-box ∅) d)]
         [(? vector? d) (parse `(,quote$ ,d))] ;; ick
         [err (error 'parse "Unknown form ~a" err)])))
   (values expr open))

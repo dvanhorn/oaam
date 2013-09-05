@@ -85,7 +85,7 @@
    (case t
      [(b) (type-union '(#t #f))]
      [(lst) (type-union '(p null))]
-     [(prt) (type-union '(ip op))]
+     [(prt) (type-union '(ip op iop))]
      [(r) (type-union '(q fl))]
      [else t]))
  (define type-abbrevs?
@@ -116,7 +116,8 @@
                     (vector-immutable^? v))]
          [(p) #'(or (consv? v) (cons^? v) (qcons^? v))]
          [(ip) #'(or (input-port? v) (input-port^? v) (and (eq? v ●) ●))]
-         [(op) #'(or (output-port? v) (output-port^? v) (and (eq? v ●) ●))]
+         [(op) #'(or (output-port? v) (output-port^? v)
+                     (and (eq? v ●) ●))]
          [(h) #'(hashv? v)]
          ;; singleton types
          [(!) #'(or (void? v) (and (eq? v ●) ●))]
@@ -127,7 +128,7 @@
          [else (error 'type->pred-stx "Not a predicate-able type ~a" t)]))
      (match t
        [(type-union (list-no-order #t #f)) #'(boolean? v)]
-       [(type-union (list-no-order 'ip 'op))
+       [(type-union (list-no-order 'ip 'op 'iop))
         #`(or (port? v) (input-port^? v) (output-port^? v))]
        [(type-union others)
         #`(or #,@(map flat-pred others))]

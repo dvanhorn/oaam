@@ -2,7 +2,7 @@
 
 (require "ast.rkt" "fix.rkt" "data.rkt" "env.rkt" "primitives.rkt" "parse.rkt"
          "notation.rkt" "op-struct.rkt" "do.rkt" "add-lib.rkt"
-         (only-in "tcon.rkt" call ret weak-eq^ TCon-deriv^ TCon-deriv@ for*/δ may must ∧ tl M⊥ Σ̂*)
+         "tcon.rkt"
          "graph.rkt"
          (only-in "macros.rkt" igensym)
          racket/unit
@@ -31,6 +31,11 @@
          (define (free-box e) (gfree-box (compiled-w/free-v e)))
          (define (free e) (gfree (compiled-w/free-v e)))])
 
+;; Temporal contract construction continuation frames that are representation-independent
+(struct -t¬k () #:prefab) (define t¬k (-t¬k))
+(struct -t!k () #:prefab) (define t!k (-t!k))
+(struct -tklk () #:prefab) (define tklk (-tklk))
+
 (define-syntax (mk-analysis stx)
   (syntax-parse stx
     [(_ (~or ;; analysis parameters
@@ -49,6 +54,7 @@
          (~optional (~seq #:ev ev:id) #:defaults ([ev (generate-temporary #'ev)]))
          (~optional (~seq #:co co:id) #:defaults ([co (generate-temporary #'co)]))
          (~optional (~seq #:cc cc:id) #:defaults ([cc (generate-temporary #'cc)]))
+         (~optional (~seq #:ct ct:id) #:defaults ([ct (generate-temporary #'ct)]))
          (~optional (~seq #:chk chk:id) #:defaults ([chk (generate-temporary #'chk)]))
          (~optional (~seq #:ap ap:id) #:defaults ([ap (generate-temporary #'ap)]))
          ;;
@@ -115,8 +121,8 @@
                      (if (and μ? (not (given wide?)))
                          #'((μ) (target-μ))
                          #'(() ()))]
-                    [(ev: co: ans: ap: cc: chk: rtk: primop:)
-                     (colonize #'(ev co ans ap cc chk rtk primop))]
+                    [(ev: co: ans: ap: cc: ct: chk: rtk: primop:)
+                     (colonize #'(ev co ans ap cc ct chk rtk primop))]
                     [(clos? rlos? blclos? primop? kont?)
                      (huhify #'(clos rlos blclos primop kont))]
                     [kont-cm (format-id #'kont "~a-cm" #'kont)]
@@ -139,8 +145,8 @@
        (define yield-ev
          (if compiled?*
              #'(λ (syn)
-                  (syntax-parse syn #:literals (ev cc)
-                                [(_ ((~and constr:id (~or ev cc)) . args))
+                  (syntax-parse syn #:literals (ev cc ct)
+                                [(_ ((~and constr:id (~or ev cc ct)) . args))
                                  (syntax/loc syn (constr . args))]
                                 [(_ e:expr)
                                  (quasisyntax/loc syn (yield-meaning e))]))
@@ -248,17 +254,19 @@
                (define c (compile e*))
                (define cs (scon-compile s))
                (define ℓs (list pℓ nℓ cℓ))
+               (define Σ̂*c (tcon-compile Σ̂*e))
                (λ% e (ρ k δ)
                    (do ([a #:push l δ k])
-                       (yield (cc cs ρ Λη ℓs (frame+ (kont-cm k) (stmonk l lchk c ρ Λη Σ̂* ℓs δ) a) δ))))]
+                       (yield (cc cs ρ Λη ℓs (frame+ (kont-cm k) (stmonk l lchk c ρ Λη Σ̂*c ℓs δ) a) δ))))]
               [(tmon l _ lchk pℓ nℓ cℓ s t e*)
                (define c (compile e*))
                (define cs (scon-compile s))
+               (define tc (tcon-compile t))
                (define ℓs (list pℓ nℓ cℓ))
                (λ% e (ρ k δ)
                    (define η (make-var-contour `(η . ,l) δ))
                    (do ([a #:push l δ k])
-                       (yield (cc cs ρ η ℓs (frame+ (kont-cm k) (stmonk l lchk c ρ η t ℓs δ) a) δ))))]
+                       (yield (cc cs ρ η ℓs (frame+ (kont-cm k) (stmonk l lchk c ρ η tc ℓs δ) a) δ))))]
               [_ (error 'eval "Bad expr ~a" e)])))
 
        ;; Flat contracts have arbitrary expressions in them which need to be compiled.
@@ -305,6 +313,67 @@
                      (do () (yield (co k s))))]
                [_ (error 'eval "Bad contract ~a" s)])))
 
+         (define teval
+           (syntax/loc stx
+             (match t
+               ;; Structural rules to build tcons around patterns.
+               ;; Simple cases first
+               [(tande _ '()) (λ% t (ρ k δ) (yield (co k Σ̂*)))]
+               [(tore _ '())  (λ% t (ρ k δ) (yield (co k T⊥)))]
+               [(== εe eq?) (λ% t (ρ k δ) (do () (yield (co k ε))))]
+               ;; Simple pattern cases
+               [(constructede _ kind '()) (λ% t (ρ k δ) (do () (yield (co k (constructed kind '())))))]
+               [($e _ x) (λ% t (ρ k δ) (do () (yield (co k ($ x)))))]
+               [(□e _ x) (λ% t (ρ k δ) (do () (yield (co k (□ x)))))]
+               [(labele _ ℓ) (λ% t (ρ k δ) (do () (yield (co k (label ℓ)))))]
+               ;; None is not available in surface syntax
+               [(== Anye eq?) (λ% t (ρ k δ) (do () (yield (co k Any))))]
+               ;; Cases that require continuation frames
+               [(tande _ (cons T Ts))
+                (define Tc (tcon-compile T))
+                (define Tsc (map tcon-compile Ts))
+                (λ% t (ρ k δ)
+                 (do ([a #:push l δ k])
+                     (yield (ct Tc ρ (frame+ (kont-cm k) (tandk Tsc ∅ ρ δ) a) δ))))]
+               [(tore _ (cons T Ts))
+                (define Tc (tcon-compile T))
+                (define Tsc (map tcon-compile Ts))
+                (λ% t (ρ k δ)
+                 (do ([a #:push l δ k])
+                     (yield (ct Tc ρ (frame+ (kont-cm k) (tork Tsc ∅ ρ δ) a) δ))))]
+               [(¬e _ T)
+                (define Tc (tcon-compile T))
+                (λ% t (ρ k δ)
+                     (do ([a #:push l δ k])
+                         (yield (ct Tc ρ (frame+ (kont-cm k) t¬k a) δ))))]
+               [(·e _ T₀ T₁)
+                (define T₀c (tcon-compile T₀))
+                (define T₁c (tcon-compile T₁))
+                (λ% t (ρ k δ)
+                     (do ([a #:push l δ k])
+                         (yield (ct T₀c ρ (frame+ (kont-cm k) (t·k T₁c ρ δ) a) δ))))]
+               [(kle _ T)
+                (define Tc (tcon-compile T))
+                (λ% t (ρ k δ) (do ([a #:push l δ k])
+                                   (yield (ct Tc ρ (frame+ (kont-cm k) tklk a) δ))))]
+               [(〈binde〉 _ pat T)
+                (define patc (tcon-compile pat))
+                (define Tc (tcon-compile T))
+                (λ% t (ρ k δ)
+                    (do ([a #:push l δ k])
+                        (yield (ct patc ρ (frame+ (kont-cm k) (tbindk Tc ρ δ) a) δ))))]
+               [(constructede _ kind (cons pat pats))
+                (define patc (tcon-compile pat))
+                (define patsc (map tcon-compile pats))
+                (λ% t (ρ k δ)
+                    (do ([a #:push l δ k])
+                        (yield (ct patc ρ (frame+ (kont-cm k) (tconsk kind patsc '() ρ δ) a) δ))))]
+               [(!pate _ p)
+                (define pc (tcon-compile p))
+                (λ% t (ρ k δ) (do ([a #:push l δ k])
+                                  (yield (ct pc ρ (frame+ (kont-cm k) t!k a) δ))))]
+               [(? exp? e) (compile e)])))
+
          (define compile-def
            (cond [compiled?*
                   (define hidden-σ (and σ-∆sv? (not global-σ?*) (generate-temporary #'hidden)))
@@ -342,10 +411,15 @@
                                  (define (scon-compile s)
                                    (define form #,seval)
                                    (hash-set! collect-hash form s)
+                                   form)
+                                 (define (tcon-compile t)
+                                   (define form #,teval)
+                                   (hash-set! collect-hash form t)
                                    form)))
                               (quasisyntax/loc stx
                                 ((define (compile e) #,eval)
                                  (define (scon-compile s) #,seval)
+                                 (define (tcon-compile t) #,teval)
                                  ))))))]
                  [else
                   ;; brittle, since other identifiers must be the same in ev: and cc:
@@ -408,7 +482,7 @@
              (mk-op-struct chkcdr (l lchk ℓs π res-addr ara ard cd ad δ) (l lchk ℓs π res-addr ara ard cd ad δ-op ...))
              (mk-op-struct chkflt (tempFn tmpArg ℓs) (tempFn tmpArg ℓs))
 
-             ;; Contract construction continuation frames
+             ;; Structural contract construction continuation frames
              (mk-op-struct domk (η ℓs todo done pos ρ name δ) (η ℓs todo done pos ρ-op ... name δ-op ...))
              (mk-op-struct rngk (η ℓs ncs name δ) (η ℓs ncs name δ-op ...))
              (mk-op-struct cak (η ℓs cd ρ δ) (η ℓs cd ρ-op ... δ-op ...))
@@ -417,6 +491,16 @@
              (mk-op-struct or0k (η ℓs cc ρ δ) (η ℓs cc ρ-op ... δ-op ...))
              (mk-op-struct and1k (cv) (cv))
              (mk-op-struct or1k (cv) (cv))
+
+             ;; Temporal contract construction continuation frames
+             (mk-op-struct tηk (sv e ρ l lchk η ℓs δ) (sv e ρ-op ... l lchk η ℓs δ-op ...))
+             (mk-op-struct tandk (todo done ρ δ) (todo done ρ-op ... δ-op ...))
+             (mk-op-struct tork (todo done ρ δ) (todo done ρ-op ... δ-op ...))
+             (mk-op-struct t·k (T₁ ρ δ) (T₁ ρ-op ... δ-op ...))
+             (mk-op-struct t·1k (T₀v) (T₀v))
+             (mk-op-struct tbindk (T ρ δ) (T ρ-op ... δ-op ...))
+             (mk-op-struct tbind1k (patv) (patv))
+             (mk-op-struct tconsk (kind todo done ρ δ) (kind todo done ρ-op ... δ-op ...))
 
              ;; Values
              (struct primop (which) #:prefab)
@@ -498,11 +582,13 @@
                  [(or (vectorv^ _ a)
                       (vectorv-immutable^ _ a)) (set a)]
                  [(? value-set? s) (for/union ([v (in-value-set s)]) (touches v))]
-                 [(addr a) (set a)]
+                 [(or (addr a) (input-port^ a) (output-port^ a)) (set a)]
                  [(or (ccons c₀ c₁)
                       (cand c₀ c₁)
                       (cor c₀ c₁)) (∪ (touches c₀) (touches c₁))]
                  [(cblarr _ ncs pc _ η) (∪ (touches/l ncs) (touches pc))]
+                 
+                 ;; Temporal contracts touch NOTHING!
                  [(or (== number^)
                       (== string^)
                       (== symbol^)
@@ -520,7 +606,8 @@
                       (? atomic?)
                       (? primop?)
                       (== anyc)
-                      (== nonec)) ∅]
+                      (== nonec)
+                      (? tconv?)) ∅]
                  ;; only possible in regular
                  [(? kont?) (touches-κ v)]
                  [(? blame?) ∅]
@@ -565,8 +652,21 @@
                   (∪/l (touches-ρ ρ #:many (cons e es)) (cons a as))]
                  [(ls: l lchk n es v-addrs ρ δ)
                   (∪/l (touches-ρ ρ #:many es) v-addrs)]
-                 [(stmonk: l lchk e ρ η t ℓs δ) (∪1 (touches-ρ ρ e) η)]
-                 [(initτk: η t) (set η)]
+                 [(stmonk: l lchk e ρ η t ℓs δ) (∪1 (touches-ρ ρ e t) η)]
+                 [(initτk: η tv) (set η)]
+
+                 [(or (== t¬k eq?) (== t!k eq?) (== tklk eq?)
+                      ;; Temporal contracts don't touch addresses
+                      (? t·1k?) (? tbind1k?))
+                  ∅]
+                 ;; don't count done due to above comment
+                 [(or (tandk: todo done ρ _)
+                      (tork: todo done ρ _)
+                      (tconsk: _ todo done ρ _))
+                  (touches-ρ ρ #:many todo)]
+                 [(tηk: sv e ρ l lchk η ℓs δ)
+                  (∪1 (∪ (touches-ρ ρ e) (touches sv)) η)]
+                 [(or (t·k: T ρ δ) (tbindk: T ρ δ)) (touches-ρ ρ T)]
 
                  [(chkk: v l lchk η t ℓs δ) (∪1 (touches v) η)]
                  [(chkargs: l lchk i ℓs nc-todo arg-addrs done-addrs fnv δ)
@@ -623,6 +723,7 @@
                   (∪1 (∪ (touches-κ k) (touches vc) (touches v)) res-addr)]
                  [(ans: σ μ τ cm v) (touches v)]
                  [(cc: σ μ τ s ρ η ℓs k δ) (∪1 (∪ (touches-κ k) (touches-ρ ρ s)) η)]
+                 [(ct: σ μ τ t ρ k δ) (∪ (touches-κ k) (touches-ρ ρ t))]
                  [(ev: σ μ τ e ρ k δ) (∪ (touches-κ k) (touches-ρ ρ e))]))
              #;
              (trace root)
@@ -640,39 +741,37 @@
                ([do (make-rename-transformer #'do-macro)]
                 [flatten-value (make-rename-transformer #'flatten-value-fn)])
 
+               (define-syntax (mk-compiled-constructor stx)
+                 (syntax-case stx ()
+                   [(_ name name: (e all-fields (... ...)) (sub-fields (... ...)))
+                    #,(if compiled?*
+                          #`(syntax/loc stx
+                              (begin
+                                (define-syntax (name syn)
+                                  (syntax-case syn ()
+                                    ;; gσ only optional if it's global
+                                    [(_ e all-fields (... ...))
+                                     #'(e #,@(listy (and σ-∆sv? (not global-σ?*) #'top-σ))
+                                          target-σ-op ...
+                                          target-μ-op ...
+                                          target-τ sub-fields (... ...))]))
+                                (define-match-expander name:
+                                  (syntax-rules () [(_ . args) (list . args)]))))
+                          #'(syntax/loc stx
+                              (mk-op-struct name state-base (e all-fields (... ...)) (e sub-fields (... ...))
+                                            expander-flags ...)))]))
                ;; ev is special since it can mean "apply the compiled version" or
                ;; make an actual ev state to later interpret.
+               (mk-compiled-constructor ev ev: (e ρ k δ) (ρ-op ... k δ-op ...))
+               (mk-compiled-constructor cc cc: (sc ρ η ℓs k δ) (ρ-op ... η ℓs k δ-op ...))
+               (mk-compiled-constructor ct ct: (tc ρ k δ) (ρ-op ... k δ-op ...))
                #,@(if compiled?*
+                      (if (syntax-parameter-value #'pushdown?)
+                          #'((mk-op-struct enter (e ρ k δ) (e ρ-op ... k δ-op ...) expander-flags ...))
+                          #'((define-syntax enter (make-rename-transformer #'ev))
+                             (define-syntax enter: (make-rename-transformer #'ev:))))
                       (quasisyntax/loc stx
-                        ((define-syntax (ev syn)
-                           (syntax-case syn ()
-                             ;; gσ only optional if it's global
-                             [(_ e ρ k δ)
-                              #'(e #,@(listy (and σ-∆sv? (not global-σ?*) #'top-σ))
-                                   target-σ-op ...
-                                   target-μ-op ...
-                                   target-τ ρ-op ... k δ-op ...)]))
-                         (define-syntax (cc syn)
-                           (syntax-case syn ()
-                             ;; gσ only optional if it's global
-                             [(_ sc ρ η ℓs k δ)
-                              #'(sc #,@(listy (and σ-∆sv? (not global-σ?*) #'top-σ))
-                                    target-σ-op ...
-                                    target-μ-op ... target-τ ρ-op ... η ℓs k δ-op ...)]))
-                         (define-match-expander ev: ;; inert, but introduces bindings
-                           (syntax-rules () [(_ . args) (list . args)]))
-                         (define-match-expander cc:
-                           (syntax-rules () [(_ . args) (list . args)]))
-                         #,@(if (syntax-parameter-value #'pushdown?)
-                               #'((mk-op-struct enter (e ρ k δ) (e ρ-op ... k δ-op ...) expander-flags ...))
-                               #'((define-syntax enter (make-rename-transformer #'ev))
-                                  (define-syntax enter: (make-rename-transformer #'ev:))))))
-                      (quasisyntax/loc stx
-                        ((mk-op-struct ev state-base (e ρ k δ) (e ρ-op ... k δ-op ...)
-                                       expander-flags ...)
-                         (mk-op-struct cc state-base (sc ρ η ℓs k δ) (sc ρ-op ... η ℓs k δ-op ...)
-                                       expander-flags ...)
-                         (define-syntax enter (make-rename-transformer #'ev))
+                        ((define-syntax enter (make-rename-transformer #'ev))
                          (define-match-expander enter:
                            (syntax-rules () [(_ . args) (list . args)])))))
 
@@ -733,12 +832,12 @@
                  (if (eq? η Λη)
                      (values τ #f)
                      (let-values ([(stepped-ts no-blame?)
-                                   (for/fold ([ts* nothing] [no-blame? must])
+                                   (for/fold ([ts* nothing] [no-blame? 'doesnt-count])
                                        ([T (in-value-set (σ-ref τ η (λ () (error 'step "Unbound η ~a" η))))])
                                      (match (ð event T)
                                        [(tl Ts* t)
                                         (values (⊓ ts* Ts*)
-                                                (∧ no-blame? t))]))])
+                                                (δ no-blame? t))]))])
                        (values (if single-η?
                                    (σ-set τ η stepped-ts)
                                    (join τ η stepped-ts))
@@ -838,7 +937,7 @@
                                    [k* #:in-kont a])
                                   (yield (co k* (void)))))]
 
-                         ;; Contract construction
+                         ;; Structural contract construction
                          [(cak: η ℓs ccd ρ δ) ;; FIXME: what if v is lazy?
                           (generator
                               (do () (yield (cc ccd ρ η ℓs (push (cdk v)) δ))))]
@@ -876,17 +975,51 @@
                                   (yield (cc nc ρ η ℓs
                                              (push (domk η ℓs ncs-todo (cons ncc ncs-done) cpc ρ name δ)) δ))))]
 
+                         ;; Temporal contract construction
+                         [(== t¬k eq?)
+                          (generator (do ([k* #:in-kont a]) (yield (co k* (¬ v)))))]
+                         [(== t!k eq?)
+                          (generator (do ([k* #:in-kont a]) (yield (co k* (!pat v)))))]
+                         [(== tklk eq?)
+                          (generator (do ([k* #:in-kont a]) (yield (co k* (kl v)))))]
+                         [(tandk: '() done ρ δ)
+                          (generator (do ([k* #:in-kont a]) (yield (co k* (tand (∪1 done v))))))]
+                         [(tork: '() done ρ δ)
+                          (generator (do ([k* #:in-kont a]) (yield (co k* (tor (∪1 done v))))))]
+                         [(tconsk: kind '() rev-done ρ δ)
+                          (define v* (constructed kind (reverse (cons (force v) rev-done))))
+                          (generator (do ([k* #:in-kont a]) (yield (co k* v*))))]
+                         ;; XXX: What if v is lazy?
+                         [(tandk: (cons T Ts) done ρ δ)
+                          (generator (do () (yield (ct T ρ (push (tandk Ts (∪1 done v) ρ δ)) δ))))]
+                         [(tork: (cons T Ts) done ρ δ)
+                          (generator (do () (yield (ct T ρ (push (tork Ts (∪1 done v) ρ δ)) δ))))]
+                         [(t·k: T ρ δ)
+                          (generator (do () (yield (ct T ρ (push (t·1k v)) δ))))]
+                         [(t·1k: T₀v)
+                          (generator (do ([k* #:in-kont a]) (yield (co k* (· T₀v v)))))]
+                         [(tbindk: T ρ δ)
+                          (generator (do () (yield (ct T ρ (push (tbind1k v)) δ))))]
+                         [(tbind1k: patv)
+                          (generator (do ([k* #:in-kont a]) (yield (co k* (〈bind〉 patv v)))))]
+                         [(tconsk: kind (cons pat pats) rev-done ρ δ)
+                          (generator
+                            (do () (yield (ct pat ρ (push (tconsk kind pats (cons (force v) rev-done) ρ δ)) δ))))]
+
                          ;; Contract attachment
                          [(stmonk: l lchk e ρ η t ℓs δ)
                           (generator
-                              (do () (yield (ev e ρ (push (chkk v l lchk η t ℓs δ)) δ))))]
+                              (do () (yield (ct t ρ (push (tηk v e ρ l lchk η ℓs δ)) δ))))]
 
                          ;; Create temporal monitor around blessed value
-                         [(initτk: η t)
+                         [(initτk: η t)                          
                           (generator
-                              (do ([#:τ-join η (singleton t)]
-                                   [k* #:in-kont a])
+                            (do ([#:τ-join-forcing η t]
+                                 [k* #:in-kont a])
                                 (yield (co k* v))))]
+                         [(tηk: sv e ρ l lchk η ℓs δ)
+                          (generator
+                            (do () (yield (ev e ρ (push (chkk sv l lchk η v ℓs δ)) δ))))]
 
                          ;; Contract checking
                          [(chkk: vc l lchk η t ℓs δ)
@@ -969,7 +1102,7 @@
                                       (yield (ans cm (blame pℓ cℓ "Flat contract failed" (getter tempFn) (getter tmpArg)))))))]
                          [_ (error 'step "Bad continuation ~a" k)])])]
 
-                   
+
 
                    [(chk: ch-σ ch-μ ch-τ l lchk π vc v res-addr (and ℓs (list pℓ nℓ cℓ)) k δ)
                     (match vc
@@ -1137,6 +1270,11 @@ store - so we can grab the store count associated with the point to store in the
                     #,(if compiled?*
                           #'(generator (do () (yield (cc s ρ η ℓs k δ))))
                           seval)]
+
+                   [(ct: ct-σ ct-μ ct-τ t ρ k δ)
+                    #,(if compiled?*
+                          #'(generator (do () (yield (ct t ρ k δ))))
+                          teval)]
 
                    [(ans: ans-σ ans-μ ans-τ cm v) (generator (do () (yield (ans cm v))))]
                    [_ (error 'step "Bad state ~a" state)]))

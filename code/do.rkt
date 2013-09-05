@@ -134,6 +134,7 @@
              #:attr clause (λ (rest) #`(bind-calling-context (k* ctx k) #,rest)))
     ;; a couple shorthands
     (pattern [(~or (~and #:join-forcing (~bind [bindf #'bind-join]))
+                   (~and #:τ-join-forcing (~bind [bindf #'bind-τ-join]))
                    (~and #:memoize-forcing (~bind [bindf #'bind-memoize]))) a:expr v:expr]
              #:attr clause
              (λ (rest) #`(do ([fs #:force v]) (bindf (a fs) #,rest))))
