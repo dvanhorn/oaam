@@ -1,5 +1,6 @@
 #lang racket
-(require (rename-in racket/generator [yield real-yield]))
+(require (rename-in racket/generator [yield real-yield])
+         (for-syntax racket/syntax))
 (require "kcfa.rkt" "data.rkt" "parse.rkt" 
          "primitives.rkt" "fix.rkt" "do.rkt"
          ;; different components of instantiantiations
@@ -333,71 +334,111 @@ Welcome to Racket v5.3.3.
 ;; (provide lazy-0cfa^/c/∆s/prealloc!)
 
 
-;; "ps"
-#;#;
-(splicing-syntax-parameterize ([generate-graph? #f]
-                               [abs-count? #t]
-                               [global-σ? #t])
- (mk-prealloc/timestamp^-fixpoint/stacked
-  prealloc/∆s-fixpoint/stacked/c
-  prealloc/∆s-state-base/stacked/c
-  prealloc/∆s-point/stacked/c
-  prealloc/∆s-ans/stacked/c
-  prealloc/∆s-touches-0/stacked/c
-  #:ev psev
-  #:co psco #:compiled)
- (with-nonsparse
-  (with-regular ;; tunable
-   (with-lazy
-    (with-0-ctx/prealloc
-     (with-prealloc/timestamp-store/stacked
-      (with-mutable-worklist/stacked^
-       (with-abstract
-        (define ps-e (box #f))
-        (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc/stacked!
-                     #:prepare (λ (sexp)
-                                  (define e* (prepare-prealloc/stacked parse-prog sexp))
-                                  (set-box! ps-e e*)
-                                  e*)
-                     #:state-base prealloc/∆s-state-base/stacked/c
-                     #:point prealloc/∆s-point/stacked/c
-                     #:ans prealloc/∆s-ans/stacked/c
-                     #:touches prealloc/∆s-touches-0/stacked/c
-                     #:fixpoint prealloc/∆s-fixpoint/stacked/c
-                     #:co psco #:compiled ;#:ev psev
-                     #:global-σ #:wide)))))))))
-(provide lazy-0cfa^/c/∆s/prealloc/stacked!)
-
-;; "lcg"
-(splicing-syntax-parameterize ([generate-graph? #f]
-                               [compiled? #t]
-                               ;; tunables for paper evaluation
-                               [abs-count? #t]
-                               [μ-equality? #t]
-                               [Γτ? #t])
- (with-whole-GH-σ #;with-σ-∆s
-  (with-timestamp-∆-fix/Γ
-    [lcgsb
-     lcgpnt
-     (lcgco lcgdr lcgchk lcgans lcgap lcgcc lcgev)
-     lcgtouches
-     lcgroot
-     #:narrow]
-   (with-nonsparse
-    (;with-regular
-     with-pushdown #:rtk lcgrtk #:kont lcgkont #:co lcgco #:ctx lcgctx #:root lcgroot #:touches lcgtouches #:state-base lcgsb #:point lcgpnt #:narrow
-     (with-lazy
-      (with-0-ctx
-       (with-abstract
-        (mk-analysis #:aval lazy-0cfa/c/Γ/μ/∆s
-                     #:state-base lcgsb
-                     #:point lcgpnt
-                     #:touches lcgtouches
-                     #:root lcgroot
-                     #:co lcgco #:dr lcgdr #:chk lcgchk #:ans lcgans #:ap lcgap #:cc lcgcc #:ev lcgev
-                     #:rtk lcgrtk #:kont lcgkont #:ctx lcgctx
-                     #:σ-passing)))))))))
-(provide lazy-0cfa/c/Γ/μ/∆s)
+;; "ps" ;; doesn't have Γ.
+(define-syntax (mk-ps-derivative stx)
+  (syntax-case stx ()
+    [(_ base μ Ξ)
+     (let ([suffix (λ (id) (format-id #'base "~a-~a" #'base id))])
+      (with-syntax ([(fixpoint state-base point ans touches aval co ev rtk kont ctx root reach*)
+                     (map suffix
+                          (syntax->list
+                           #'(fixpoint state-base point ans touches aval co ev rtk kont ctx root reach*)))])
+        (quasisyntax/loc stx
+          (splicing-syntax-parameterize
+           ([generate-graph? #f]
+            [abs-count? #t]
+            [μ-equality? μ]
+            [compiled? #t]
+            [pushdown? Ξ]
+            [global-σ? #t])
+           (mk-prealloc/timestamp^-fixpoint/stacked
+            fixpoint
+            state-base
+            point
+            ans
+            touches
+            #:ev ev
+            #:co co #:compiled)
+           (with-nonsparse
+            (#,@(if (syntax-e #'Ξ)
+                    #'(with-pushdown
+                       #:rtk rtk #:kont kont #:co co
+                       #:ctx ctx #:root root #:touches touches
+                       #:state-base state-base #:point point #:reach reach*)
+                    #'(with-regular)) ;; tunable
+             (with-lazy
+              (with-0-ctx/prealloc
+               (with-prealloc/timestamp-store/stacked
+                (with-mutable-worklist/stacked^
+                 (with-abstract
+                  (mk-analysis #:aval aval
+                               #:prepare (λ (sexp) (prepare-prealloc/stacked parse-prog sexp))
+                               #:state-base state-base
+                               #:point point
+                               #:ans ans
+                               #:touches touches
+                               #:fixpoint fixpoint
+                               #:co co #:compiled #:ev psev
+                               #:rtk rtk #:kont kont #:ctx ctx #:root root
+                               #:global-σ #:wide))))))))
+           (provide aval)))))]))
+#|
+ (mk-ps-derivative ps #f #f) ;; baseline
+ (mk-ps-derivative psp #f #t) ;; Ξ
+ (mk-ps-derivative psu #t #f) ;; μ
+|#
+(define-syntax (mk-lcg-derivative stx)
+  (syntax-case stx ()
+    [(_ base μ Ξ Γτ)
+     (let ([suffix (λ (id) (format-id #'base "~a-~a" #'base id))])
+      (with-syntax ([(fixpoint state-base point ans touches aval co ev dr ap cc rtk kont ctx root reach*)
+                     (map suffix
+                          (syntax->list
+                           #'(fixpoint state-base point ans touches aval co ev dr ap cc rtk kont ctx root reach*)))])
+        (quasisyntax/loc stx
+          (splicing-syntax-parameterize
+           ([generate-graph? #f]
+            [abs-count? #t]
+            [μ-equality? μ]
+            [pushdown? Ξ]
+            [Γ? #t]
+            [Γτ? Γτ]
+            [global-σ? #t])
+           (with-whole-GH-σ
+            #;with-σ-∆s
+            (with-timestamp-∆-fix/Γ
+              [state-base
+               point
+               (co dr chk ans ap cc ev)
+               touches
+               root
+               reach*
+               #:narrow]
+              (with-nonsparse
+               (#,@(if (syntax-e #'Ξ)
+                       #'(with-pushdown
+                          #:rtk rtk #:kont kont #:co co
+                          #:ctx ctx #:root root #:touches touches
+                          #:state-base state-base #:point point #:reach reach* #:narrow)
+                       #'(with-regular))
+                (with-lazy
+                 (with-0-ctx
+                  (with-abstract
+                   (mk-analysis #:aval aval
+                                #:state-base state-base
+                                #:point point
+                                #:touches touches
+                                #:root root
+                                #:co co #:dr dr #:chk chk #:ans ans #:ap ap #:cc cc #:ev ev
+                                #:rtk rtk #:kont kont #:ctx ctx
+                                #:σ-passing))))))))
+           (provide aval)))))]))
+#|
+ (mk-lcg-derivative lcg #f #f #f) ;; Γ
+ (mk-lcg-derivative lcgt #f #f #t) ;; Γτ
+ (mk-lcg-derivative lcgut #t #f #t) ;; μΓτ
+|#
+ (mk-lcg-derivative lcgutp #t #t #t) ;; μΓτΞ
 
 #;#;#;
 ;; "ps1"

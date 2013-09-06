@@ -374,4 +374,4 @@
   (if (null? prims)
       expr
       ;; close the program
-      (lrc (fresh-label!) (box #f) prims prim-defs expr)))
+      (lrc (fresh-label!) (opaque-box #f) prims prim-defs expr)))

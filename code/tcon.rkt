@@ -26,7 +26,7 @@
 (define ρ₀ #hasheq())
 (struct -unmapped ()) (define unmapped (-unmapped))
 
-(struct tcon (fvs-box) #:transparent)
+(struct tcon (fvs-box label) #:transparent)
 (define (tconv? x)
   (or ($? x) (□? x) (eq? x Any) (eq? x None) (!pat? x) (label? x) (constructed? x)
       (¬? x) (·? x) (kl? x) (eq? x ε) (∪? x) (∩? x) (bind? x)))
@@ -46,7 +46,7 @@
              (define (free t)
                (or (opaque-box-v (free-box t))
                    (match t
-                     [(ename fvs-box fields ...)
+                     [(ename fvs-box label fields ...)
                       (define fvs
                        #,(cond
                           [(attribute gfree*)
@@ -67,9 +67,9 @@
 (tcon-struct -ε -εe ())
 
 (define ε (-ε)) (define (ε? x) (eq? x ε))
-(define εe (-εe (opaque-box ∅))) (define (εe? x) (eq? x εe))
+(define εe (-εe (opaque-box ∅) 0)) (define (εe? x) (eq? x εe))
 (define T⊥ (∪ ∅)) (define (T⊥? x) (eq? x T⊥))
-(define Σ̂* (∩ ∅)) (define (Σ̂*? x) (eq? x Σ̂*)) (define Σ̂*e (∩e (opaque-box ∅) '()))
+(define Σ̂* (∩ ∅)) (define (Σ̂*? x) (eq? x Σ̂*)) (define Σ̂*e (∩e (opaque-box ∅) 0 '()))
 (define Tε (simple ε)) (define (Tε? x) (equal? x Tε))
 (define ST⊥ (simple T⊥)) (define (ST⊥? x) (eq? x ST⊥)) ;; empty contract
 (define SΣ̂* (simple Σ̂*)) (define (SΣ̂*? x) (eq? x SΣ̂*))
@@ -103,7 +103,7 @@
 
 (tcon-struct constructed constructede (c data) #:collect free ((union-map free) data))
 (tcon-struct !pat !pate (pat))
-(tcon-struct -Any -Anye ()) (define Any (-Any)) (define Anye (-Anye (opaque-box ∅)))
+(tcon-struct -Any -Anye ()) (define Any (-Any)) (define Anye (-Anye (opaque-box ∅) 0))
 (tcon-struct -None -Nonee ()) (define None (-None))
 (tcon-struct $ $e (x) ())
 (tcon-struct □ □e (x) ())
@@ -263,7 +263,6 @@
        (match (f l r)
          [(mres ρs′ t′)
           (if t′
-              ;; XXX: correct for both polarities?
               (matchlst L R (∧ t t′) (ρs . ⋈ . ρs′))
               ⊥)]
          [err (error '⨅ "Bad res ~a" err)])]

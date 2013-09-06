@@ -125,6 +125,9 @@
                      (colonize #'(ev co ans ap cc ct chk rtk primop))]
                     [(clos? rlos? blclos? primop? kont?)
                      (huhify #'(clos rlos blclos primop kont))]
+                    [(touches-κ touches-ρ)
+                     (list (format-id #'touches "~a-κ" #'touches)
+                           (format-id #'touches "~a-ρ" #'touches))]
                     [kont-cm (format-id #'kont "~a-cm" #'kont)]
                     [((locals local-implicits) ...)
                      #'([μ target-μ] [τ target-τ])]
@@ -318,57 +321,57 @@
              (match t
                ;; Structural rules to build tcons around patterns.
                ;; Simple cases first
-               [(tande _ '()) (λ% t (ρ k δ) (yield (co k Σ̂*)))]
-               [(tore _ '())  (λ% t (ρ k δ) (yield (co k T⊥)))]
+               [(tande _ _ '()) (λ% t (ρ k δ) (yield (co k Σ̂*)))]
+               [(tore _ _ '())  (λ% t (ρ k δ) (yield (co k T⊥)))]
                [(== εe eq?) (λ% t (ρ k δ) (do () (yield (co k ε))))]
                ;; Simple pattern cases
-               [(constructede _ kind '()) (λ% t (ρ k δ) (do () (yield (co k (constructed kind '())))))]
-               [($e _ x) (λ% t (ρ k δ) (do () (yield (co k ($ x)))))]
-               [(□e _ x) (λ% t (ρ k δ) (do () (yield (co k (□ x)))))]
-               [(labele _ ℓ) (λ% t (ρ k δ) (do () (yield (co k (label ℓ)))))]
+               [(constructede _ _ kind '()) (λ% t (ρ k δ) (do () (yield (co k (constructed kind '())))))]
+               [($e _ _ x) (λ% t (ρ k δ) (do () (yield (co k ($ x)))))]
+               [(□e _ _ x) (λ% t (ρ k δ) (do () (yield (co k (□ x)))))]
+               [(labele _ _ ℓ) (λ% t (ρ k δ) (do () (yield (co k (label ℓ)))))]
                ;; None is not available in surface syntax
                [(== Anye eq?) (λ% t (ρ k δ) (do () (yield (co k Any))))]
                ;; Cases that require continuation frames
-               [(tande _ (cons T Ts))
+               [(tande _ l (cons T Ts))
                 (define Tc (tcon-compile T))
                 (define Tsc (map tcon-compile Ts))
                 (λ% t (ρ k δ)
                  (do ([a #:push l δ k])
                      (yield (ct Tc ρ (frame+ (kont-cm k) (tandk Tsc ∅ ρ δ) a) δ))))]
-               [(tore _ (cons T Ts))
+               [(tore _ l (cons T Ts))
                 (define Tc (tcon-compile T))
                 (define Tsc (map tcon-compile Ts))
                 (λ% t (ρ k δ)
                  (do ([a #:push l δ k])
                      (yield (ct Tc ρ (frame+ (kont-cm k) (tork Tsc ∅ ρ δ) a) δ))))]
-               [(¬e _ T)
+               [(¬e _ l T)
                 (define Tc (tcon-compile T))
                 (λ% t (ρ k δ)
                      (do ([a #:push l δ k])
                          (yield (ct Tc ρ (frame+ (kont-cm k) t¬k a) δ))))]
-               [(·e _ T₀ T₁)
+               [(·e _ l T₀ T₁)
                 (define T₀c (tcon-compile T₀))
                 (define T₁c (tcon-compile T₁))
                 (λ% t (ρ k δ)
                      (do ([a #:push l δ k])
                          (yield (ct T₀c ρ (frame+ (kont-cm k) (t·k T₁c ρ δ) a) δ))))]
-               [(kle _ T)
+               [(kle _ l T)
                 (define Tc (tcon-compile T))
                 (λ% t (ρ k δ) (do ([a #:push l δ k])
                                    (yield (ct Tc ρ (frame+ (kont-cm k) tklk a) δ))))]
-               [(〈binde〉 _ pat T)
+               [(〈binde〉 _ l pat T)
                 (define patc (tcon-compile pat))
                 (define Tc (tcon-compile T))
                 (λ% t (ρ k δ)
                     (do ([a #:push l δ k])
                         (yield (ct patc ρ (frame+ (kont-cm k) (tbindk Tc ρ δ) a) δ))))]
-               [(constructede _ kind (cons pat pats))
+               [(constructede _ l kind (cons pat pats))
                 (define patc (tcon-compile pat))
                 (define patsc (map tcon-compile pats))
                 (λ% t (ρ k δ)
                     (do ([a #:push l δ k])
                         (yield (ct patc ρ (frame+ (kont-cm k) (tconsk kind patsc '() ρ δ) a) δ))))]
-               [(!pate _ p)
+               [(!pate _ l p)
                 (define pc (tcon-compile p))
                 (λ% t (ρ k δ) (do ([a #:push l δ k])
                                   (yield (ct pc ρ (frame+ (kont-cm k) t!k a) δ))))]
@@ -429,7 +432,8 @@
                      (... (define-syntax-rule (λc% s (ρ η ℓs k δ) body ...)
                             (generator body ...)))
                      (define compile values)
-                     (define scon-compile values)))]))
+                     (define scon-compile values)
+                     (define tcon-compile values)))]))
 
          (quasisyntax/loc stx
            (begin ;; specialize representation given that 0cfa needs less
@@ -758,7 +762,7 @@
                                 (define-match-expander name:
                                   (syntax-rules () [(_ . args) (list . args)]))))
                           #'(syntax/loc stx
-                              (mk-op-struct name state-base (e all-fields (... ...)) (e sub-fields (... ...))
+                              (mk-op-struct name (state-base point) (e all-fields (... ...)) (e sub-fields (... ...))
                                             expander-flags ...)))]))
                ;; ev is special since it can mean "apply the compiled version" or
                ;; make an actual ev state to later interpret.

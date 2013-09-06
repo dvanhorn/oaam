@@ -1,6 +1,7 @@
 #lang racket/base
 (require math/number-theory racket/dict racket/match racket/set
          racket/generic
+         racket/bool
          (for-syntax racket/base syntax/parse racket/syntax)
          racket/trace)
 (provide GH? GH-gh
@@ -19,9 +20,10 @@
 (define (next-prime!)
   (begin0 current-prime
     (set! current-prime (next-prime current-prime))))
+;; Can't be weak hashes because equal sets can be given different primes
 (define (init-GH!)
-  (set! element-hash (make-weak-hash))
-  (set! gh-cache (make-weak-hash))
+  (set! element-hash (make-hash))
+  (set! gh-cache (make-hash))
   (set! current-prime 2))
 
 ;; injection ℕ² → ℕ
@@ -105,7 +107,12 @@
                                    #'#:methods #'gen:equal+hash
                                    #'[(define (equal-proc x y rec)
                                         (match* (x y)
-                                          [((set-name ghx _) (set-name ghy _)) (= ghx ghy)]
+                                          [((set-name ghx sx) (set-name ghy sy))
+                                           (define res (= ghx ghy))
+                                           #;
+                                           (when (xor res (equal? sx sy))
+                                             (error 'goedel-set "Not injective ~a ~a ~a ~a ~a" ghx ghy sx sy element-hash))
+                                           res]
                                           [(_ _) #f]))
                                       (define (hash-proc x rec) (rec (set-name-s x)))
                                       (define (hash2-proc x rec) (rec (set-name-s x)))])]
@@ -114,7 +121,12 @@
                                    #'#:methods #'gen:equal+hash
                                    #'[(define (equal-proc x y rec)
                                         (match* (x y)
-                                          [((hash-name ghx _) (hash-name ghy _)) (= ghx ghy)]
+                                          [((hash-name ghx hx) (hash-name ghy hy))
+                                           (define res (= ghx ghy))
+                                           #;
+                                           (when (xor res (equal? hx hy))
+                                             (error 'goedel-hash "Not injective ~a ~a ~a ~a ~a" ghx ghy hx hy element-hash))
+                                           res]
                                           [(_ _) #f]))
                                       (define (hash-proc x rec) (rec (hash-name-h x)))
                                       (define (hash2-proc x rec) (rec (hash-name-h x)))])]))

@@ -120,31 +120,31 @@
 
       (define (parse-tcon t)
         (match t
-          [`(,(or 'seq '·) ,ts ...) (rassoc (λ (T₀ T₁) (·e (opaque-box #f) T₀ T₁)) parse-tcon values ε ts)]
+          [`(,(or 'seq '·) ,ts ...) (rassoc (λ (T₀ T₁) (·e (opaque-box #f) (fresh-label!) T₀ T₁)) parse-tcon values ε ts)]
           ;; Use lists here since we still have to evaluate all the way down,
           ;; given expressions in patterns.
-          [`(,(or '∪ 'or) ,ts ...) (tore (opaque-box #f) (map parse-tcon ts))]
-          [`(,(or '∩ 'and) ,ts ...) (tande (opaque-box #f) (map parse-tcon ts))]
-          ['... (tande (opaque-box ∅) '())]
+          [`(,(or '∪ 'or) ,ts ...) (tore (opaque-box #f) (fresh-label!) (map parse-tcon ts))]
+          [`(,(or '∩ 'and) ,ts ...) (tande (opaque-box #f) (fresh-label!) (map parse-tcon ts))]
+          ['... (tande (opaque-box ∅) (fresh-label!) '())]
           [(or 'ε 'empty) εe]
-          [`(,(or 'kl 'star '*) ,t) (kle (opaque-box #f) (parse-tcon t))]
-          [`(,(or 'not '¬) ,t) (¬e (opaque-box #f) (parse-tcon t))]
-          [`(,(or 'dseq 'bind) ,pat ,t) (〈binde〉 (opaque-box #f) (parse-pat pat) (parse-tcon t))]
+          [`(,(or 'kl 'star '*) ,t) (kle (opaque-box #f) (fresh-label!) (parse-tcon t))]
+          [`(,(or 'not '¬) ,t) (¬e (opaque-box #f) (fresh-label!) (parse-tcon t))]
+          [`(,(or 'dseq 'bind) ,pat ,t) (〈binde〉 (opaque-box #f) (fresh-label!) (parse-pat pat) (parse-tcon t))]
           [pat (parse-pat pat)]))
 
       (define (pcons pa pd)
-        (constructede (opaque-box #f) 'cons (list pa pd)))
+        (constructede (opaque-box #f) (fresh-label!) 'cons (list pa pd)))
       (define (parse-pat pat)
         (match pat
           [`(,(and kind (or 'call 'ret)) ,nf ,args ...)
-           (constructede (opaque-box #f) kind (map parse-pat (cons nf args)))]
-          [`(!call . ,rest) (!pate (opaque-box #f) (parse-pat `(call . ,rest)))]
-          [`(!ret . ,rest)  (!pate (opaque-box #f) (parse-pat `(ret  . ,rest)))]
-          [`(,(or 'not '! '¬) ,p) (!pate (opaque-box #f) (parse-pat p))]
+           (constructede (opaque-box #f) (fresh-label!) kind (map parse-pat (cons nf args)))]
+          [`(!call . ,rest) (!pate (opaque-box #f) (fresh-label!) (parse-pat `(call . ,rest)))]
+          [`(!ret . ,rest)  (!pate (opaque-box #f) (fresh-label!) (parse-pat `(ret  . ,rest)))]
+          [`(,(or 'not '! '¬) ,p) (!pate (opaque-box #f) (fresh-label!) (parse-pat p))]
           ['_ Anye]
-          [`(label ,ℓ) (labele (opaque-box ∅) ℓ)]
-          [`($ ,(? symbol? x)) ($e (opaque-box ∅) x)]
-          [`(? ,(? symbol? x)) (□e (opaque-box ∅) x)]
+          [`(label ,ℓ) (labele (opaque-box ∅) (fresh-label!) ℓ)]
+          [`($ ,(? symbol? x)) ($e (opaque-box ∅) (fresh-label!) x)]
+          [`(? ,(? symbol? x)) (□e (opaque-box ∅) (fresh-label!) x)]
           [`(cons ,pa ,pd) (pcons (parse-pat pa) (parse-pat pd))]
           [`(list ,ps ...)
            (define dnil (datum (fresh-label!) (opaque-box ∅) '()))

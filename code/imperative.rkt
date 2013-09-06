@@ -39,7 +39,8 @@
          with-mutable-worklist^
          with-mutable-worklist/stacked^
          with-σ-∆s/acc!
-         with-σ-∆s!)
+         with-σ-∆s!
+         bind-Γ)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mutable global store and worklist.
@@ -139,6 +140,7 @@
      (define sb-stx #'state-base)
      (define/with-syntax (state-base-rσ state-base-pnt) (list (id sb-stx "~a-rσ") (id sb-stx "~a-pnt")))
      (define/with-syntax (point-μ point-τ) (list (id #'point "~a-μ") (id #'point "~a-τ")))
+     (define/with-syntax (touches-κ touches-ρ) (list (id #'touches "~a-κ") (id #'touches "~a-ρ")))
      (if (attribute c)
          #`(let* ([cv c]
                   [σ*-internal (state-base-rσ cv)]
@@ -154,6 +156,7 @@
                       #'body))
          (base #'Γτ #'touches #'reach*
                sb-stx
+               #'point
                 (and (attribute kind) (syntax-e #'kind))
                 #'target-μ
                 #'target-τ
@@ -653,7 +656,7 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
 ;; Imperative husky deltas with GC (not wide, but not narrow)
 (define-syntax (with-timestamp-∆-fix/Γ stx)
   (syntax-parse stx
-    [(_ [state-base point (co dr chk ans ap cc ev) touches root
+    [(_ [state-base point (co dr chk ans ap cc ev) touches root reach*
                     (~or (~optional (~and #:compiled compiled?))
                          (~optional (~and
                                      kind

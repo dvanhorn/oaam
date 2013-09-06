@@ -13,7 +13,7 @@
 ;; and [paper/proctime.rkt] to be consistent with the number range.
 (define base-num 0)
 (define run-num 5)
-(define num-threads 11)
+(define num-threads 1)
 
 ;; In order to get consistent benchmarking numbers, each run is in a /fresh/
 ;; Racket VM, which we spin up with a shell command. The analysis statistics are
@@ -29,56 +29,26 @@
   (format "racket run-benchmark.rkt --~a ~a > bench/~a 2> bench/~a" which file outtime outmem))
 
 ;; We identify benchmarks so that we can collect stats easier in [proctime.rkt] (LOC, etc.)
-(define church "../benchmarks/church.sch")
-(define mbrotZ "../benchmarks/mbrotZ.sch")
-(define earley "../benchmarks/earley.sch")
-(define boyer "../benchmarks/toplas98/boyer.sch")
-(define graphs "../benchmarks/toplas98/graphs.sch")
-(define lattice "../benchmarks/toplas98/lattice.scm")
-(define matrix "../benchmarks/toplas98/matrix.scm")
-(define maze "../benchmarks/toplas98/maze.sch")
-(define nbody "../benchmarks/toplas98/nbody.sch")
-(define nucleic "../benchmarks/toplas98/nucleic.sch")
+(define sort1 "../benchmarks/temp-c/sort.sch")
+(define sort2 "../benchmarks/temp-c/sort-pushdown.sch")
+(define sort3 "../benchmarks/temp-c/sort-lists.sch")
+(define file "../benchmarks/temp-c/file.sch")
 (define to-test
-  (list church mbrotZ earley lattice graphs boyer matrix maze nbody nucleic))
+  (list sort1 sort2 sort3 file))
 
-(module+ data (provide church mbrotZ earley boyer graphs lattice matrix maze nbody nucleic to-test))
+(module+ data (provide sort1 sort2 sort3 file to-test))
 
 ;; Algorithm tags used to drive [run-benchmark.rkt]
-(define baseline "sp")
-(define timestamped "spt")
-(define deltat "sdt")
-(define lazy "ls")
-(define lazyt "lst")
-(define compiled "lc")
-(define compiledt "lct")
-(define deltas "ld")
-(define deltasid "id")
-(define deltasis "is")
-(define deltaspd "pd")
-(define deltasps "ps")
-;; Not in paper since insignificant or worse performance+precision
-(define deltasfd "fd")
-(define imperative "it")
-(define preallocated "pt")
-(define deltasia "ia")
-(define deltaspa "pa")
+(define baseline "ps")
+(define μ "psu")
+(define Ξ "pdcfa")
+(define Γ "psug")
+(define Γτ "psgt")
+(define μΓτ "psugt")
+(define μΓτΞ "lcg")
 
 (define which-analyses
-  (list
-   ;; deltasfd ;; like deltaspd, only purely functional. Unfortunately slow.
-;; baseline
-   timestamped
-   deltat
-   lazyt
-;; imperative   ;; timestamp approximation, not in paper.
-;; preallocated ;; timestamp approximation, not in paper.
-#|
-   deltasid
-   deltaspd
-|#
-   compiledt
-   deltasps))
+  (list baseline μ Ξ Γ Γτ μΓτ μΓτΞ))
 
 (define (run which file)
   (for ([n (in-range run-num)])

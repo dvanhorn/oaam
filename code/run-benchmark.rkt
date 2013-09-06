@@ -86,12 +86,29 @@
                    "Benchmark compiled preallocated store-diff lazy non-determinism"
                    (aval lazy-0cfa^/c/∆s/prealloc!)]
 |#
-                  [("--lcg")
-                   "Benchmark compiled GCd abs-counted lazy non-determinism"
-                   (aval lazy-0cfa/c/Γ/μ/∆s)]
-#;                  [("--ps")
+#|                  
+                  [("--ps")
                    "Benchmark compiled preallocated stacked store lazy non-determinism"
-                   (aval lazy-0cfa^/c/∆s/prealloc/stacked!)]
+                   (aval ps-aval)]
+                  [("--psp")
+                   "Benchmark compiled pushdown preallocated stacked store lazy non-determinism"
+                   (aval psp-aval)]
+                  [("--psu")
+                   "Benchmark compiled preallocated stacked store lazy non-determinism with μ equality"
+                   (aval psu-aval)]
+[("--lcg")
+                   "Benchmark compiled GCd abs-counted lazy non-determinism"
+                   (aval lcg-aval)]
+                  [("--lcgt")
+                   "Benchmark compiled GCd abs-counted lazy non-determinism and weak references in Tcons"
+                   (aval lcgt-aval)]
+                  [("--lcgut")
+                   "Benchmark compiled GCd abs-counted lazy non-determinism, weak references in Tcons and μ equality"
+                   (aval lcgut-aval)]
+|#
+                  [("--lcgutp")
+                   "Benchmark compiled pushdown GCd abs-counted lazy non-determinism, weak references in Tcons and μ equality"
+                   (aval lcgutp-aval)]
 #;                  [("--ps1")
                    "Benchmark compiled preallocated stacked store lazy non-determinism k=1"
                    (aval lazy-1cfa^/c/∆s/prealloc/stacked!)]
