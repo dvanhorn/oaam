@@ -120,6 +120,7 @@
 (define (hash-join1! h k v) (hash-set! h k (∪1 (hash-ref h k nothing) v)))
 (define (hash-join! h k v) (hash-set! h k (∪ (hash-ref h k nothing) v)))
 
+#|
  (define nothing GH-set₀)
  (define (nothing? x) (equal? x GH-set₀))
  (define singleton GH-singleton-set)
@@ -133,11 +134,11 @@
  (define-syntax σ-ref (make-rename-transformer #'dict-ref))
  (define-syntax σ-set (make-rename-transformer #'dict-set))
  (define (join eσ a s) (GH-hash-union eσ a s))
-#|
+|#
  (define nothing ∅)
  (define-syntax nothing? (make-rename-transformer #'set-empty?))
  (define singleton set)
- (define value-set? set-immutable?)
+ (define value-set? set?)
  (define-syntax in-value-set (make-rename-transformer #'in-set))
  (define-syntax for/value-set (make-rename-transformer #'for/set))
  (define-syntax for*/value-set (make-rename-transformer #'for*/set))
@@ -147,7 +148,6 @@
  (define-syntax σ-ref (make-rename-transformer #'hash-ref))
  (define-syntax σ-set (make-rename-transformer #'hash-set))
  (define (join eσ a s) (hash-union eσ a s))
-|#
 
 (define ⊑? subset?)
 (define (≡ vs0 vs1) (= (set-count vs0) (set-count vs1)))
@@ -213,5 +213,3 @@
       (symbol? x)
       (null? x)
       (eof-object? x)))
-
-

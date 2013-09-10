@@ -34,21 +34,23 @@
 (define sort3 "../benchmarks/temp-c/sort-lists.sch")
 (define file "../benchmarks/temp-c/file.sch")
 (define to-test
-  (list sort1 sort2 sort3 file))
+  (list #;#;sort1 sort2 sort3 file
+   ))
 
 (module+ data (provide sort1 sort2 sort3 file to-test))
 
 ;; Algorithm tags used to drive [run-benchmark.rkt]
 (define baseline "ps")
 (define μ "psu")
-(define Ξ "pdcfa")
-(define Γ "psug")
-(define Γτ "psgt")
-(define μΓτ "psugt")
-(define μΓτΞ "lcg")
+(define Ξ "psp")
+(define Γ "lcg")
+(define Γτ "lcgt")
+(define μΓτ "lcgut")
+(define μΓτΞ "lcgutp")
 
 (define which-analyses
-  (list baseline μ Ξ Γ Γτ μΓτ μΓτΞ))
+  (list baseline μ Ξ Γ Γτ μΓτ μΓτΞ
+        ))
 
 (define (run which file)
   (for ([n (in-range run-num)])

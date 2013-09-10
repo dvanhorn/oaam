@@ -2,7 +2,13 @@
 (require (for-syntax syntax/parse racket/syntax unstable/syntax)
          racket/stxparam "notation.rkt" "data.rkt" "env.rkt"
          racket/generator)
-(provide continue bind-alias match-state (for-syntax mk-do listy))
+(provide continue bind-alias match-state (for-syntax mk-do listy)
+         blame-sites reset-blame-sites! blame-site!)
+
+;; Stats
+(define blame-sites 0)
+(define (reset-blame-sites!) (set! blame-sites 0))
+(define (blame-site!) (set! blame-sites (add1 blame-sites)))
 
 ;; Helper for building targets
 (define-for-syntax (listy x) (if x (list x) '()))

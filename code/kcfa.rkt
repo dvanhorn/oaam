@@ -63,6 +63,8 @@
          (~optional (~seq #:rtk rtk:id) #:defaults ([rtk (generate-temporary #'rtk)]))
          (~optional (~seq #:kont kont:id) #:defaults ([kont (generate-temporary #'kont)]))
          ;; Value constructors
+         (~optional (~seq #:blame blame:id) #:defaults ([blame (generate-temporary #'blame)]))
+         (~optional (~seq #:tblame tblame:id) #:defaults ([tblame (generate-temporary #'tblame)]))
          (~optional (~seq #:clos clos:id) #:defaults ([clos (generate-temporary #'clos)]))
          (~optional (~seq #:rlos rlos:id) #:defaults ([rlos (generate-temporary #'rlos)]))
          (~optional (~seq #:blclos blclos:id) #:defaults ([blclos (generate-temporary #'blclos)]))
@@ -123,8 +125,8 @@
                          #'(() ()))]
                     [(ev: co: ans: ap: cc: ct: chk: rtk: primop:)
                      (colonize #'(ev co ans ap cc ct chk rtk primop))]
-                    [(clos? rlos? blclos? primop? kont?)
-                     (huhify #'(clos rlos blclos primop kont))]
+                    [(clos? rlos? blclos? blame? tblame? primop? kont?)
+                     (huhify #'(clos rlos blclos blame tblame primop kont))]
                     [(touches-κ touches-ρ)
                      (list (format-id #'touches "~a-κ" #'touches)
                            (format-id #'touches "~a-ρ" #'touches))]
@@ -455,6 +457,7 @@
                            expander-flags ...)
              ;; Not a state, but a special value
              (struct blame (pℓ cℓ msg c v) #:prefab)
+             (struct tblame (pℓ cℓ msg c v) #:prefab)
 
              (mk-op-struct ctx (e ρ δ σ-token locals ...)
                            (e ρ-op ... δ-op ... σ-token locals-op ...)
@@ -614,7 +617,7 @@
                       (? tconv?)) ∅]
                  ;; only possible in regular
                  [(? kont?) (touches-κ v)]
-                 [(? blame?) ∅]
+                 [(or (? blame?) (? tblame?)) ∅]
                  [_ (error 'touches "Missed case ~a" v)]))
 
              (define-syntax (touches-ρ syn)
@@ -1058,7 +1061,7 @@
                               (yield (ap l lchk vaddr arg-addrs (push (postretk l lchk fnv δ)) δ))))
                           (define-syntax-rule (bad)
                             (do ()
-                                (yield (ans cm (blame pℓ cℓ "Violated timeline contract at call"
+                                (yield (ans cm (tblame pℓ cℓ "Violated timeline contract at call"
                                                       η (cons event
                                                               pre-step))))))
                           ;; Finished validating arguments, so send call event.
@@ -1066,6 +1069,7 @@
                           (define single-η?
                             #,(if μ? #'(eq? 1 (μgetter η)) #'#f))
                           (define-values (τ* cause-blame?) (step-event ð target-τ η single-η? event))
+                          (blame-site!)
                           (syntax-parameterize ([target-τ (make-rename-transformer #'τ*)])
                             (blamer generator cause-blame? good bad))]
                          [(chkargs: l lchk i ℓs (cons nc ncs) (cons arga arg-addrs) done-addrs fnv δ)
@@ -1088,12 +1092,13 @@
                           (define event (ret fnv (getter ret-addr)))
                           (define-syntax-rule (bad)
                             (do ()
-                                (yield (ans cm (blame pℓ cℓ "Violated timeline contract at return" η event)))))
+                                (yield (ans cm (tblame pℓ cℓ "Violated timeline contract at return" η event)))))
                           (define-syntax-rule (good)
                             (do ([k* #:in-kont a]) (yield (co k* (addr ret-addr)))))
                           (define single-η?
                             #,(if μ? #'(eq? 1 (μgetter η)) #'#f))
                           (define-values (τ* cause-blame?) (step-event ð target-τ η single-η? event))
+                          (blame-site!)
                           (syntax-parameterize ([target-τ (make-rename-transformer #'τ*)])
                             (blamer generator cause-blame? good bad))]
 
@@ -1219,15 +1224,21 @@ store - so we can grab the store count associated with the point to store in the
                                 [(null? ncs) ;; unwrap if 0 arguments
                                  (cond
                                   [(null? arg-addrs)
+                                   (define event (call f '()))
+                                   (define-syntax-rule (bad)
+                                     (do ()
+                                         (yield (ans (kont-cm k)
+                                                     (tblame pℓ cℓ "Violated timeline contract at call"
+                                                             η event)))))
                                    (define-syntax-rule (good)
                                      (do ([a #:push lchk δ k])
                                          (ap-after-call-state!)
                                        (yield (ap l lchk vaddr arg-addrs
                                                   (frame+ (kont-cm k) (postretk l lchk f δ) a) δ))))
-                                   (define event (call f '()))
                                    (define single-η?
                                      #,(if μ? #'(eq? 1 (μgetter η)) #'#f))
                                    (define-values (τ* cause-blame?) (step-event ð target-τ η single-η? event))
+                                   (blame-site!)
                                    (syntax-parameterize ([target-τ (make-rename-transformer #'τ*)])
                                      (blamer begin cause-blame? good bad))]
                                   [else (bad)])]

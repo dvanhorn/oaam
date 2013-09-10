@@ -346,63 +346,70 @@
    (mk-bind-joiner bind-join*-h/stacked! join*-h/stacked!)
 
 
-   (define-syntax-rule (mk-mk-imperative/timestamp^-fixpoint mk-name cleaner extra-reset)
-(define-syntax (mk-name stx)
-  (syntax-parse stx
-    [(_ name state-base point ans^ touches #:ev ev #:co co (~optional (~and #:compiled compiled?)))
-     (with-syntax ([ans^? (format-id #'ans^ "~a?" #'ans^)]
-                   [ans^-v (format-id #'ans^ "~a-v" #'ans^)]
-                   [state-base-pnt (format-id #'state-base "~a-pnt" #'state-base)]
-                   [point-τ (format-id #'point "~a-τ" #'point)]
-                   [point-conf (format-id #'point "~a-conf" #'point)]
-                   [ev? (format-id #'ev "~a?" #'ev)]
-                   [ev-e (format-id #'ev "~a-e" #'ev)]
-                   [co? (format-id #'co "~a?" #'co)])
-       #`(define-syntax-rule (name step fst)
-           (let ()
-             #,@(if-graph #'(set-graph! (make-hash)))
-             (set-box! (start-time) (current-milliseconds))
-             fst
-             (define state-count* (state-count))
-             (set-box! state-count* 0)
-             (define clean-σ (cleaner touches))
-             (let loop ()
-               (cond [(empty-todo? todo)
-                      (state-rate)
-                      #,@(if-graph #`(dump-dot graph
-                                               #,(if (syntax-e #'compiled?)
-                                                     #'(λ _ #f)
-                                                     #'(λ (s) (and (ev? s) (var? (ev-e s)))))
-                                               #,(if (syntax-e #'compiled?)
-                                                     #'(λ _ #f)
-                                                     #'ev?)
-                                               co? compiled?))
-                      (define vs
-                        (for*/set ([(c at-unions) (in-hash seen)]
-                                   [pnt (in-value (state-base-pnt c))]
-                                   [conf (in-value (point-conf pnt))]
-                                   #:when (ans^? conf))
-                          (list (ans^-v conf) (point-τ pnt))))
-                      (values (format "State count: ~a" (unbox state-count*))
-                              (format "Point count: ~a" (hash-count seen))
-                              (with-output-to-string
-                                (λ ()
-                                   (pretty-print
-                                    (for/list ([i (in-naturals)]
-                                               [lst (in-vector global-σ)]
-                                               #:unless (null? lst))
-                                      (list i lst)))))
-                              #;           (clean-σ global-σ (set-map car vs))
-                              vs)]
-                     [else
-                      (define todo-old todo)
-                      extra-reset
-                      (set-box! state-count* (+ (unbox state-count*) todo-num))
-                      (reset-todo!)
-                      (for ([c (in-todo todo-old)])
-                        #,@(if-graph #'(current-state! c))
-                        (step c))
-                      (loop)])))))])))
+(define-syntax-rule (mk-mk-imperative/timestamp^-fixpoint mk-name cleaner extra-reset)
+  (define-syntax (mk-name stx)
+    (syntax-parse stx
+      [(_ name state-base point ans^ touches #:ev ev #:co co #:blame blame (~optional (~and #:compiled compiled?)))
+       (with-syntax ([ans^? (format-id #'ans^ "~a?" #'ans^)]
+                     [ans^-v (format-id #'ans^ "~a-v" #'ans^)]
+                     [state-base-pnt (format-id #'state-base "~a-pnt" #'state-base)]
+                     [point-τ (format-id #'point "~a-τ" #'point)]
+                     [point-conf (format-id #'point "~a-conf" #'point)]
+                     [blame? (format-id #'blame "~a?" #'blame)]
+                     [ev? (format-id #'ev "~a?" #'ev)]
+                     [ev-e (format-id #'ev "~a-e" #'ev)]
+                     [co? (format-id #'co "~a?" #'co)])
+         #`(define-syntax-rule (name step fst)
+             (let ()
+               #,@(if-graph #'(set-graph! (make-hash)))
+               (set-box! (start-time) (current-milliseconds))
+               (init-GH!)
+               (init-tcon!)
+               (reset-pushdown!)
+               fst
+               (define state-count* (state-count))
+               (set-box! state-count* 0)
+               (define clean-σ (cleaner touches))
+               (let loop ()
+                 (cond [(empty-todo? todo)
+                        (state-rate)
+                        #,@(if-graph #`(dump-dot graph
+                                                 #,(if (syntax-e #'compiled?)
+                                                       #'(λ _ #f)
+                                                       #'(λ (s) (and (ev? s) (var? (ev-e s)))))
+                                                 #,(if (syntax-e #'compiled?)
+                                                       #'(λ _ #f)
+                                                       #'ev?)
+                                                 co? compiled?))
+                        (define-values (vs blames)
+                          (for*/fold ([acc ∅] [blames 0])
+                              ([(c at-unions) (in-hash seen)]
+                               [pnt (in-value (state-base-pnt c))]
+                               [conf (in-value (point-conf pnt))]
+                               #:when (ans^? conf))
+                            (values (∪1 acc (list (ans^-v conf) (point-τ pnt)))
+                                    (if (blame? (ans^-v conf)) (add1 blames) blames))))
+                        (values (format "State count: ~a" (unbox state-count*))
+                                (format "Point count: ~a" (hash-count seen))
+                                (format "Blame sites, blames: ~a, ~a" blame-sites blames)
+                                (with-output-to-string
+                                  (λ ()
+                                     (pretty-print
+                                      (for/list ([i (in-naturals)]
+                                                 [lst (in-vector global-σ)]
+                                                 #:unless (null? lst))
+                                        (list i lst)))))
+                                #;           (clean-σ global-σ (set-map car vs))
+                                vs)]
+                       [else
+                        (define todo-old todo)
+                        extra-reset
+                        (set-box! state-count* (+ (unbox state-count*) todo-num))
+                        (reset-todo!)
+                        (for ([c (in-todo todo-old)])
+                          #,@(if-graph #'(current-state! c))
+                          (step c))
+                        (loop)])))))])))
    (mk-mk-imperative/timestamp^-fixpoint
 mk-imperative/timestamp^-fixpoint restrict-to-reachable (void))
 
@@ -656,7 +663,7 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
 ;; Imperative husky deltas with GC (not wide, but not narrow)
 (define-syntax (with-timestamp-∆-fix/Γ stx)
   (syntax-parse stx
-    [(_ [state-base point (co dr chk ans ap cc ev) touches root reach*
+    [(_ [state-base point (co dr chk ans ap cc ev blame) touches root reach*
                     (~or (~optional (~and #:compiled compiled?))
                          (~optional (~and
                                      kind
@@ -667,6 +674,7 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
       define/with-syntax
       [ans? (format-id #'ans "~a?" #'ans)]
       [ans-v (format-id #'ans "~a-v" #'ans)]
+      [blame? (format-id #'blame "~a?" #'blame)]
       [state-base-rσ (format-id #'state-base "~a-rσ" #'state-base)]
       [state-base-pnt (format-id #'state-base "~a-pnt" #'state-base)]
       [point-conf (format-id #'point "~a-conf" #'point)])
@@ -680,6 +688,7 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
              (set-box! state-count* 0)
              (reset-todo/set!)
              (printf "Init~%")
+             (reset-blame-sites!)
              (init-GH!)
              (init-tcon!)
              (reset-pushdown!)
@@ -689,15 +698,17 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
                (cond [(empty-todo/set? todo)
                       (set-box! state-count* (hash-count seen))
                       (state-rate)
-                      (for*/set (#,(case kindv
-                                     [(#f) (raise-syntax-error #f "Wide GC?" stx)]
-                                     [(#:husky) #'[c (in-hash-values seen)]]
-                                     [(#:narrow) #'[c (in-hash-keys seen)]])
-                                 [pnt (in-value (state-base-pnt c))]
-                                 [conf (in-value (point-conf pnt))]
-                                 #:when (ans? conf))
-                        (list (state-base-rσ c)
-                              (ans-v conf)))]
+                      (for*/fold ([acc ∅] [blames 0])
+                          (#,(case kindv
+                               [(#f) (raise-syntax-error #f "Wide GC?" stx)]
+                               [(#:husky) #'[c (in-hash-values seen)]]
+                               [(#:narrow) #'[c (in-hash-keys seen)]])
+                           [pnt (in-value (state-base-pnt c))]
+                           [conf (in-value (point-conf pnt))]
+                           #:when (ans? conf))
+                        (values (∪1 acc (list (state-base-rσ c)
+                                              (ans-v conf)))
+                                (if (blame? (ans-v conf)) (add1 blames) blames)))]
                      [else
                       (define todo-old todo)
                       (define new-state-count* (+ (unbox state-count*) todo-num))
@@ -720,27 +731,28 @@ mk-imperative/∆s^-fixpoint restrict-to-reachable join-h! hash-set! hash-ref)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Common functionality
-   (define (reset-globals! σ μ)
-(set! unions 0)
-(set! saw-change? #f)
-(reset-pushdown!)
-(reset-todo!)
-(set! seen (make-hash))
-(set! ∆? #f)
-(set! global-σ σ)
-(set! global-μ μ)
-(set! global-∆s '()))
-   (define (set-global-σ! v) (set! global-σ v))
-   (define (set-global-μ! v) (set! global-μ v))
-   (define (reset-todo!)
-(set! todo empty-todo)
-(set! todo-num 0))
-   (define (reset-todo/set!)
-(set! todo empty-todo/set)
-(set! todo-num 0))
-   (define (set-todo! v) (set! todo v))
+(define (reset-globals! σ μ)
+  (set! unions 0)
+  (reset-blame-sites!)
+  (set! saw-change? #f)
+  (reset-pushdown!)
+  (reset-todo!)
+  (set! seen (make-hash))
+  (set! ∆? #f)
+  (set! global-σ σ)
+  (set! global-μ μ)
+  (set! global-∆s '()))
+(define (set-global-σ! v) (set! global-σ v))
+(define (set-global-μ! v) (set! global-μ v))
+(define (reset-todo!)
+  (set! todo empty-todo)
+  (set! todo-num 0))
+(define (reset-todo/set!)
+  (set! todo empty-todo/set)
+  (set! todo-num 0))
+(define (set-todo! v) (set! todo v))
 
-   (define (prepare-imperative parser sexp)
+(define (prepare-imperative parser sexp)
 (define-values (e renaming) (parser sexp gensym gensym))
 (define e* (add-lib e renaming gensym gensym))
 ;; Start with a constant factor larger store since we are likely to

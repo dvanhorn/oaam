@@ -339,10 +339,10 @@ Welcome to Racket v5.3.3.
   (syntax-case stx ()
     [(_ base μ Ξ)
      (let ([suffix (λ (id) (format-id #'base "~a-~a" #'base id))])
-      (with-syntax ([(fixpoint state-base point ans touches aval co ev rtk kont ctx root reach*)
+      (with-syntax ([(fixpoint state-base point ans touches aval co ev blame rtk kont ctx root reach*)
                      (map suffix
                           (syntax->list
-                           #'(fixpoint state-base point ans touches aval co ev rtk kont ctx root reach*)))])
+                           #'(fixpoint state-base point ans touches aval co ev blame rtk kont ctx root reach*)))])
         (quasisyntax/loc stx
           (splicing-syntax-parameterize
            ([generate-graph? #f]
@@ -358,7 +358,8 @@ Welcome to Racket v5.3.3.
             ans
             touches
             #:ev ev
-            #:co co #:compiled)
+            #:co co
+            #:blame blame #:compiled)
            (with-nonsparse
             (#,@(if (syntax-e #'Ξ)
                     #'(with-pushdown
@@ -378,23 +379,21 @@ Welcome to Racket v5.3.3.
                                #:ans ans
                                #:touches touches
                                #:fixpoint fixpoint
-                               #:co co #:compiled #:ev psev
+                               #:co co #:compiled #:ev psev #:blame blame
                                #:rtk rtk #:kont kont #:ctx ctx #:root root
                                #:global-σ #:wide))))))))
            (provide aval)))))]))
-#|
  (mk-ps-derivative ps #f #f) ;; baseline
  (mk-ps-derivative psp #f #t) ;; Ξ
  (mk-ps-derivative psu #t #f) ;; μ
-|#
 (define-syntax (mk-lcg-derivative stx)
   (syntax-case stx ()
     [(_ base μ Ξ Γτ)
      (let ([suffix (λ (id) (format-id #'base "~a-~a" #'base id))])
-      (with-syntax ([(fixpoint state-base point ans touches aval co ev dr ap cc rtk kont ctx root reach*)
+      (with-syntax ([(fixpoint state-base point ans touches aval co ev dr ap cc blame rtk kont ctx root reach*)
                      (map suffix
                           (syntax->list
-                           #'(fixpoint state-base point ans touches aval co ev dr ap cc rtk kont ctx root reach*)))])
+                           #'(fixpoint state-base point ans touches aval co ev dr ap cc blame rtk kont ctx root reach*)))])
         (quasisyntax/loc stx
           (splicing-syntax-parameterize
            ([generate-graph? #f]
@@ -409,7 +408,7 @@ Welcome to Racket v5.3.3.
             (with-timestamp-∆-fix/Γ
               [state-base
                point
-               (co dr chk ans ap cc ev)
+               (co dr chk ans ap cc ev blame)
                touches
                root
                reach*
@@ -429,15 +428,13 @@ Welcome to Racket v5.3.3.
                                 #:point point
                                 #:touches touches
                                 #:root root
-                                #:co co #:dr dr #:chk chk #:ans ans #:ap ap #:cc cc #:ev ev
+                                #:co co #:dr dr #:chk chk #:ans ans #:ap ap #:cc cc #:ev ev #:blame blame
                                 #:rtk rtk #:kont kont #:ctx ctx
                                 #:σ-passing))))))))
            (provide aval)))))]))
-#|
  (mk-lcg-derivative lcg #f #f #f) ;; Γ
  (mk-lcg-derivative lcgt #f #f #t) ;; Γτ
  (mk-lcg-derivative lcgut #t #f #t) ;; μΓτ
-|#
  (mk-lcg-derivative lcgutp #t #t #t) ;; μΓτΞ
 
 #;#;#;

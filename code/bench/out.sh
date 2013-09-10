@@ -1,6 +1,7 @@
 #!/bin/bash
-benchmark="../../paper/benchmark"
-echo " " > $benchmark
+benchmark="$HOME/projects/current/benchmark"
+rm -f $benchmark
+touch $benchmark
 # Make sure this is ((i = base-num; i < (base-num + run-num); i+=1))
 # from ../drive-benchmarks.rkt
 for ((i = 0; i < 5; i+=1))
