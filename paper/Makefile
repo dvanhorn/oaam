@@ -83,6 +83,12 @@ reviews-pldi13.txt:
 reviews-pldi13.out:
 	openssl base64 -aes-256-cbc -salt -in reviews-pldi13.txt -out reviews-pldi13.out
 
+reviews-icfp13.txt:
+	openssl base64 -d -aes-256-cbc -in reviews-icfp13.out -out reviews-icfp13.txt
+
+reviews-icfp13.out:
+	openssl base64 -aes-256-cbc -salt -in reviews-icfp13.txt -out reviews-icfp13.out
+
 
 flush: clean
 	rm -f dvanhorn.bib
