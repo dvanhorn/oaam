@@ -231,11 +231,11 @@
     (bind-μbump* (as)
      #,(bind-rest #'σjoin* #'body))))
 
-(define ((σ-getter origin) hgσ a)
-  (unless (σ? hgσ) (error origin "bad store ~a" hgσ))
-  ;; XXX: Unsoundness in GC leads to error?
-  (σ-ref hgσ a (λ () (error origin "Unbound address ~a in store ~a" a hgσ))
-            ))
+(define-syntax-rule (σ-getter origin)
+  (λ (hgσ a)
+     (unless (σ? hgσ) (error origin "bad store ~a" hgσ))
+     ;; XXX: Unsoundness in GC leads to error?
+     (σ-ref hgσ a (λ () (error origin "Unbound address ~a in store ~a" a hgσ)))))
 (define-syntax-rule (mk-target-getter name target getter)
   (define-syntax (name stx)
     (syntax-case stx ()

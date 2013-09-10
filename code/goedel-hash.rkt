@@ -6,11 +6,11 @@
          racket/trace)
 (provide GH? GH-gh
          GH-hash-add GH-hash-union GH-hash? for/GH-hash for*/GH-hash empty-GH-hash
-         GH-set? GH-set₀ GH-singleton-set for/GH-set for*/GH-set
+         GH-set? GH-set₀ GH-set₀? GH-singleton-set for/GH-set for*/GH-set
          init-GH!
          ;; For testing purposes only
          GHT-hash-add GHT-hash-union GHT-hash? for/GHT-hash for*/GHT-hash empty-GHT-hash
-         GHT-set? GHT-set₀ GHT-singleton-set for/GHT-set for*/GHT-set)
+         GHT-set? GHT-set₀ GHT-set₀? GHT-singleton-set for/GHT-set for*/GHT-set)
 
 (struct -unmapped ()) (define unmapped (-unmapped))
 
@@ -96,7 +96,7 @@
 
 (define-syntax (mk-GH-set/hash stx)
   (syntax-parse stx
-    [(_ (~or (~once (~seq #:set-names set-name empty-set-name singleton-set-name for/set-name for*/set-name))
+    [(_ (~or (~once (~seq #:set-names set-name empty-set-name empty-set?-name singleton-set-name for/set-name for*/set-name))
              (~once (~seq #:hash-names hash-name empty-hash-name hash-add-name hash-union-name for/hash-name for*/hash-name)))
         ...
         (~bind [set-name-s (format-id #'set-name "~a-s" #'set-name)]
@@ -250,6 +250,7 @@
 
         (define empty-hash-name (hash-name 1 #hash()))
         (define empty-set-name (set-name 1 (set)))
+        (define (empty-set?-name x) (equal? x empty-set-name))
         (define (singleton-set-name v) (set-name (P v) (set v)))
 
         (define-syntax-rule (define-GH-op name mk-set set-op)
@@ -274,8 +275,8 @@
         (define-syntax-rule (for*/hash-name . in) (for/hash-acc for*/fold/derived hash-name . in))
         (define-syntax-rule (for/set-name . in) (for/set-acc for/fold/derived set-name . in))
         (define-syntax-rule (for*/set-name . in) (for/set-acc for*/fold/derived set-name . in))))]))
-(mk-GH-set/hash #:set-names GH-set GH-set₀ GH-singleton-set for/GH-set for*/GH-set
+(mk-GH-set/hash #:set-names GH-set GH-set₀ GH-set₀? GH-singleton-set for/GH-set for*/GH-set
                 #:hash-names GH-hash empty-GH-hash GH-hash-add GH-hash-union for/GH-hash for*/GH-hash
                 #:eqs)
-(mk-GH-set/hash #:set-names GHT-set GHT-set₀ GHT-singleton-set for/GHT-set for*/GHT-set
+(mk-GH-set/hash #:set-names GHT-set GHT-set₀ GHT-set₀? GHT-singleton-set for/GHT-set for*/GHT-set
                 #:hash-names GHT-hash empty-GHT-hash GHT-hash-add GHT-hash-union for/GHT-hash for*/GHT-hash)

@@ -1,7 +1,7 @@
 #lang racket
 (require "ast.rkt" "notation.rkt" (for-syntax syntax/parse racket/syntax)
          "goedel-hash.rkt"
-         racket/stxparam
+         racket/stxparam racket/splicing
          racket/trace)
 (provide define-nonce mk-flatten-value cons-limit
          ;; abstract values
@@ -34,6 +34,7 @@
          (struct-out cand)
          (struct-out cor)
          atomic?
+         with-simple-data with-goedel-data
          nothing nothing? singleton value-set? in-value-set for/value-set for*/value-set
          hash-join1! hash-join! for/σ in-σ σ? σ-ref σ-set join join*
          ≡ ⊑? big⊓ ⊓ ⊓1)
@@ -112,45 +113,79 @@
       [else (error "Unknown base value" v)])))
 
 ;; Everything is all heterogeneous
-(define ⊓ set-union)
-(define ⊓1 set-add)
-(define (join* eσ as ss)
-  (for/fold ([eσ eσ]) ([a as] [s ss]) (join eσ a s)))
+(define-for-syntax (bad-data-parameterization stx)
+  (raise-syntax-error #f "For use within the parameterization of a data representation" stx))
+(define-syntax-parameter nothing bad-data-parameterization)
+(define-syntax-parameter nothing? bad-data-parameterization)
+(define-syntax-parameter singleton bad-data-parameterization)
+(define-syntax-parameter value-set? bad-data-parameterization)
+(define-syntax-parameter in-value-set bad-data-parameterization)
+(define-syntax-parameter for/value-set bad-data-parameterization)
+(define-syntax-parameter for*/value-set bad-data-parameterization)
+(define-syntax-parameter for/σ bad-data-parameterization)
+(define-syntax-parameter σ? bad-data-parameterization)
+(define-syntax-parameter in-σ bad-data-parameterization)
+(define-syntax-parameter σ-ref bad-data-parameterization)
+(define-syntax-parameter σ-set bad-data-parameterization)
+(define-syntax-parameter join bad-data-parameterization) ;; of hashes
+(define-syntax-parameter join* bad-data-parameterization)
+(define-syntax-parameter hash-join! bad-data-parameterization)
+(define-syntax-parameter hash-join1! bad-data-parameterization)
+(define-syntax-parameter ⊓ bad-data-parameterization) ;; of sets
+(define-syntax-parameter ⊓1 bad-data-parameterization)
+(define-syntax-parameter ⊑? bad-data-parameterization)
+(define-syntax-parameter ≡ bad-data-parameterization)
 
-(define (hash-join1! h k v) (hash-set! h k (∪1 (hash-ref h k nothing) v)))
-(define (hash-join! h k v) (hash-set! h k (∪ (hash-ref h k nothing) v)))
+(define-syntax-rule (with-common-between-simple-and-goedel . body)
+  (begin
+    (define (-join* eσ as ss)
+      (for/fold ([eσ eσ]) ([a as] [s ss]) (join eσ a s)))
+    (define (-hash-join1! h k v) (hash-set! h k (∪1 (hash-ref h k nothing) v)))
+    (define (-hash-join! h k v) (hash-set! h k (∪ (hash-ref h k nothing) v)))
+    (splicing-syntax-parameterize
+     ([⊑? (make-rename-transformer #'subset?)]
+      [in-value-set (make-rename-transformer #'in-set)]
+      [⊓ (make-rename-transformer #'set-union)]
+      [⊓1 (make-rename-transformer #'set-add)]
+      [join* (make-rename-transformer #'-join*)]
+      [hash-join1! (make-rename-transformer #'-hash-join1!)]
+      [hash-join! (make-rename-transformer #'-hash-join!)])
+     . body)))
+(define-syntax-rule (with-goedel-data . body)
+  (splicing-syntax-parameterize
+   ([nothing (make-rename-transformer #'GH-set₀)]
+    [nothing? (make-rename-transformer #'GH-set₀?)]
+    [singleton (make-rename-transformer #'GH-singleton-set)]
+    [value-set? (make-rename-transformer #'GH-set?)]
+    [for/value-set (make-rename-transformer #'for/GH-set)]
+    [for*/value-set (make-rename-transformer #'for*/GH-set)]
+    [for/σ (make-rename-transformer #'for/GH-hash)]
+    [σ? (make-rename-transformer #'GH-hash?)]
+    [in-σ (make-rename-transformer #'in-dict)]
+    [σ-ref (make-rename-transformer #'dict-ref)]
+    [σ-set (make-rename-transformer #'dict-set)]
+    [join (make-rename-transformer #'GH-hash-union)]
+    [≡ (make-rename-transformer #'equal?)])
+   (with-common-between-simple-and-goedel . body)))
 
-#|
- (define nothing GH-set₀)
- (define (nothing? x) (equal? x GH-set₀))
- (define singleton GH-singleton-set)
- (define value-set? GH-set?)
- (define-syntax in-value-set (make-rename-transformer #'in-set))
- (define-syntax for/value-set (make-rename-transformer #'for/GH-set))
- (define-syntax for*/value-set (make-rename-transformer #'for*/GH-set))
- (define-syntax for/σ (make-rename-transformer #'for/GH-hash))
- (define-syntax σ? (make-rename-transformer #'GH-hash?))
- (define-syntax in-σ (make-rename-transformer #'in-dict))
- (define-syntax σ-ref (make-rename-transformer #'dict-ref))
- (define-syntax σ-set (make-rename-transformer #'dict-set))
- (define (join eσ a s) (GH-hash-union eσ a s))
-|#
- (define nothing ∅)
- (define-syntax nothing? (make-rename-transformer #'set-empty?))
- (define singleton set)
- (define value-set? set?)
- (define-syntax in-value-set (make-rename-transformer #'in-set))
- (define-syntax for/value-set (make-rename-transformer #'for/set))
- (define-syntax for*/value-set (make-rename-transformer #'for*/set))
- (define-syntax for/σ (make-rename-transformer #'for/hash))
- (define-syntax σ? (make-rename-transformer #'hash?))
- (define-syntax in-σ (make-rename-transformer #'in-hash))
- (define-syntax σ-ref (make-rename-transformer #'hash-ref))
- (define-syntax σ-set (make-rename-transformer #'hash-set))
- (define (join eσ a s) (hash-union eσ a s))
+(define-syntax-rule (with-simple-data . body)
+  (splicing-syntax-parameterize
+   ([nothing (make-rename-transformer #'∅)]
+    [nothing? (make-rename-transformer #'∅?)]
+    [singleton (make-rename-transformer #'set)]
+    [value-set? (make-rename-transformer #'set?)]
+    [for/value-set (make-rename-transformer #'for/set)]
+    [for*/value-set (make-rename-transformer #'for*/set)]
+    [for/σ (make-rename-transformer #'for/hash)]
+    [σ? (make-rename-transformer #'hash?)]
+    [in-σ (make-rename-transformer #'in-hash)]
+    [σ-ref (make-rename-transformer #'hash-ref)]
+    [σ-set (make-rename-transformer #'hash-set)]
+    [join (make-rename-transformer #'hash-union)]
+    [≡ (make-rename-transformer #'≡-set)])
+   (with-common-between-simple-and-goedel . body)))
 
-(define ⊑? subset?)
-(define (≡ vs0 vs1) (= (set-count vs0) (set-count vs1)))
+(define (≡-set vs0 vs1) (= (set-count vs0) (set-count vs1)))
 
 (define-syntax-rule (big⊓ vs0 V)
   (let ()

@@ -69,6 +69,9 @@
          (~optional (~seq #:rlos rlos:id) #:defaults ([rlos (generate-temporary #'rlos)]))
          (~optional (~seq #:blclos blclos:id) #:defaults ([blclos (generate-temporary #'blclos)]))
          (~optional (~seq #:primop primop:id) #:defaults ([primop (generate-temporary #'primop)]))
+         ;; special functions
+         (~once (~seq #:init-tcon! init-tcon!:id))
+         (~optional (~seq #:blame-site? blame-site?:id) #:defaults ([blame-site? (generate-temporary #'blame-site?)]))
          ;; Analysis strategies flags (requires the right parameters too)
          (~optional (~and #:compiled pcompiled?))
          (~optional (~and #:collect-compiled collect-hash:id))
@@ -817,6 +820,14 @@
                    (generator
                        (do () (yield (ev (compile e) (hash) (mt mt-marks) '()))))))
 
+
+               (define (-matchℓ? v ℓ) (match v
+                                        [(blclos: _ _ _ (== ℓ eq?) _ _) #t]
+                                        [_ #f]))
+               (splicing-syntax-parameterize
+                ([matchℓ? (make-rename-transformer #'-matchℓ?)])
+                (define-tcon-unit TCon-deriv@ init-tcon!))
+
                (define (aval e #:prepare [prepare #,(if (attribute prep-fn)
                                                         #'prep-fn
                                                         #`(λ (e)
@@ -834,6 +845,21 @@
 
                (define-syntax mk-prims (mk-mk-prims #,σ-passing?* #,(attribute K)))
                (mk-prims prim-meaning compile-primop co clos? rlos? blclos? clos: rlos: blclos: prim-eq)
+
+               (define (blame-site? ς)
+                 (match-state ς
+                   [(co: co-σ co-μ co-τ (frame+: _ frm _) v)
+                    (match frm
+                      [(or (retk: _ _)
+                           (chkargs: _ _ _ _ '() '() _ _ _))
+                       #t]
+                      [_ #f])]
+                   [(ap: ap-σ ap-μ ap-τ l lchk fn-addr '() k δ)
+                    (for/or ([v (in-value-set (getter fn-addr))])
+                      (match v
+                        [(blclos: vaddr '() pc name η ℓs) #t]
+                        [_ #f]))]
+                   [_ #f]))
 
                (define (step-event ð τ η single-η? event)
                  (if (eq? η Λη)
@@ -853,6 +879,7 @@
                                 [(eq? no-blame? may) may]
                                 [else #f])))))
                #;(trace step-event)
+               
 
                (define-syntax-rule (blamer wrap cause-blame? good bad)
                  (cond
@@ -862,10 +889,6 @@
                     (do ([g/b (in-list (list #t #f))])
                         (if g/b (good) (bad))))]
                   [else (wrap (good))]))
-
-               (define (-matchℓ? v ℓ) (match v
-                                        [(blclos: _ _ _ (== ℓ eq?) _ _) #t]
-                                        [_ #f]))
 
                (define-syntax (import-ð stx)
                  (syntax-case stx ()
@@ -877,9 +900,8 @@
                             (for*/δ ([v0 (in-set (force v0))]
                                      [v1 (in-set (force v1))])
                                     (prim-eq v0 v1)))
-                          (define matchℓ? -matchℓ?)
                           (define σgetter getter))
-                        (define-values/invoke-unit/infer
+                          (define-values/invoke-unit/infer
                           (export #,(syntax-local-introduce #'TCon-deriv^))
                           (link weak-eq@ TCon-deriv@)))]))
 
@@ -1049,6 +1071,7 @@
                           (generator
                               (do ([#:join res-addr (singleton (consv aca acd))]
                                    [k* #:in-kont a])
+                                  (printf "Joined ~a ~a~%" res-addr (singleton (consv aca acd)))
                                   ;; XXX: res-addr may never have a contract in it!
                                   (yield (co k* (addr res-addr)))))]
 
@@ -1122,7 +1145,7 @@
                           (define aca (make-var-contour `(A ,π . ,lchk) δ))
                           (define acd (make-var-contour `(D ,π . ,lchk) δ))
                           (generator
-                              (do ([a #:push lchk δ k]
+                              (do ([a #:push `(ccons ,lchk . ,π) δ k]
                                    [va #:in-get aa])
                                   (yield (chk l lchk `(A . ,π) ca va aca ℓs
                                               (frame+ (kont-cm k) (chkcdr l lchk ℓs π res-addr aca acd cd ad δ) a) δ))))]
@@ -1136,12 +1159,12 @@
                                (yield (co k (addr res-addr)))))]
                       [(cor c₀ c₁)
                        (generator
-                           (do ([a #:push lchk δ k])
+                           (do ([a #:push `(cor ,lchk . ,π) δ k])
                                (yield (chk l lchk π c₀ v res-addr ℓs
                                            (frame+ (kont-cm k) (chkor₀ l lchk ℓs π c₁ v res-addr δ) a) δ))))]
                       [(cand c₀ c₁)
                        (generator
-                           (do ([a #:push lchk δ k])
+                           (do ([a #:push `(cand ,lchk . ,π) δ k])
                                (yield (chk l lchk π c₀ v res-addr ℓs
                                            (frame+ (kont-cm k) (chkand₀ l lchk ℓs π c₁ v res-addr δ) a) δ))))]
                       [(cblarr ℓs′ ncs pc name η)
@@ -1164,12 +1187,11 @@
                       [(or (? blclos?) (? clos?) (? rlos?) (? primop?)) ;; Must be a flat contract.
                        (define tempFn (make-var-contour `(flt-tmp-fn ,π . ,lchk) δ))
                        (define templ (make-var-contour `(flt-tmp-l ,π . ,lchk) δ))
-                       (define tempChk (make-var-contour `(flt-tmp-chk ,π . ,lchk) δ))
-                       (define tempChk2 (make-var-contour `(flt-tmp-chk2 ,π . ,lchk) δ))
+                       (define tempChk2 `(flt-tmp-chk2 ,π . ,lchk))
                        (generator
                            (do ([#:join tempFn (singleton vc)]
                                 [#:join res-addr (singleton v)]
-                                [a #:push tempChk δ k])
+                                [a #:push `(flt-tmp-chk ,π . ,lchk) δ k])
                                (yield (ap templ tempChk2 tempFn (list res-addr)
                                           (frame+ (kont-cm k) (chkflt tempFn res-addr ℓs) a) δ))))]
                       [_

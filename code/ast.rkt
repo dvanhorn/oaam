@@ -72,7 +72,7 @@
 (exp-struct mon (ℓchk pℓ nℓ sℓ s e)
         [(def-free free #:gfree gfree [(mon _ _ _ _ s e) (∪ (gfree s) (gfree e))])])
 (exp-struct tmon (ℓchk pℓ nℓ sℓ s t e)
-        [(def-free free #:gfree gfree [(tmon _ _ _ _ s _ e) (∪ (gfree s) (gfree e))])])
+        [(def-free free #:gfree gfree [(tmon _ _ _ _ s t e) (∪ (gfree s) (gfree t) (gfree e))])])
 ;; Structural contract constructors
 (exp-struct consc (ca cd)
         [(def-free free #:gfree gfree [(consc ca cd) (∪ (gfree ca) (gfree cd))])])

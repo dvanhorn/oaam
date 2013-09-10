@@ -32,14 +32,6 @@
 (define-syntax-parameter yield-meaning
   (λ (stx) (raise-syntax-error #f "Must parameterize for mk-analysis" stx)))
 
-;; Combinatorial combination of arguments
-(define/match (toSetOfLists list-of-value-sets)
-  [('()) (singleton '())]
-  [((cons hdS tail))
-     (for*/set ([hd (in-value-set hdS)]
-                [restlist (in-set (toSetOfLists tail))])
-       (cons hd restlist))])
-
 (define-syntax-rule (νlits set-name lits ...)
   (begin (define lits #f) ...
          (provide lits ...)
@@ -186,7 +178,7 @@
          [else #`(yield #,(abs-of t stx))]))
 
 ;; Doesn't yield, so doesn't need μ or τ
- (define (mk-checker no-σ? ts rest)
+ (define (mk-checker no-σ? ts rest toSetOfLists)
    (define mk-vs
      (for/list ([t (in-list ts)]
                 [i (in-naturals)])
@@ -210,7 +202,7 @@
                                              [i (in-naturals)]
                                              #:when (null? a))
                                          (log-info "Bad input to primitive: ~a (arg ~a)" 'prim i))))
-                      (toSetOfLists argsets)]
+                      (#,toSetOfLists argsets)]
                      [else
                       #,@(listy
                           (and (not mult-ary?)
@@ -267,22 +259,22 @@
             #:attr is-abs? (mk-is-abs? (attribute type))
             #:attr abs-out (mk-abs-out (attribute type) #'stx)))
 
- (define-syntax-class (flat no-σ?) #:literals (->)
+ (define-syntax-class (flat no-σ? toSetOfLists) #:literals (->)
    #:attributes (checker-fn mk-simple (ts 1))
    (pattern (ts:basic ... (~optional (~seq #:rest r:basic)) -> t:basic)
-            #:attr checker-fn (mk-checker no-σ? (attribute ts.type) (attribute r.type))
+            #:attr checker-fn (mk-checker no-σ? (attribute ts.type) (attribute r.type) toSetOfLists)
             #:attr mk-simple (mk-mk-simple (attribute ts.is-abs?)
                                            (attribute ts.type)
                                            (attribute r.is-abs?)
                                            (attribute t.abs-out)
                                            (attribute t.is-abs?))))
 
- (define-syntax-class (type no-σ?)
+ (define-syntax-class (type no-σ? toSetOfLists)
    #:attributes (checker-fn mk-simple)
-   (pattern (~var f (flat no-σ?))
+   (pattern (~var f (flat no-σ? toSetOfLists))
             #:attr checker-fn (attribute f.checker-fn)
             #:attr mk-simple (attribute f.mk-simple))
-   (pattern ((~var fs (flat no-σ?)) ...)
+   (pattern ((~var fs (flat no-σ? toSetOfLists)) ...)
             #:do [(define σs (if no-σ? #'() #'(σherderp)))]
             #:attr checker-fn ;; doesn't yield, so doesn't need τ or μ
             (λ (prim _)
@@ -298,7 +290,7 @@
             #:attr mk-simple
             (λ (widen?) (error 'mk-primitive-meaning "Simple primitives cannot have many arities."))))
 
- (define-syntax-class (prim-entry no-σ?)
+ (define-syntax-class (prim-entry no-σ? toSetOfLists)
    #:attributes (prim read-store? write-store? meaning checker-fn)
    (pattern [prim:id
              (~or
@@ -306,14 +298,14 @@
               (~seq
                (~or (~and #:simple (~bind [read-store? #'#t] [write-store? #'#f]))
                     (~seq read-store?:boolean write-store?:boolean implementation:id))
-               (~var t (type no-σ?))
+               (~var t (type no-σ? toSetOfLists))
                (~optional (~and #:widen widen?))))]
             #:fail-when (and (attribute implementation) (attribute widen?))
             "Cannot specify that a simple implementation widens when giving an explicit implementation."
             #:attr checker-fn (or (let ([c (attribute t.checker-fn)])
                                     (and c (c #'prim #f)))
                                   ;; must be a predicate
-                                  ((mk-checker no-σ? '(any) #f) #'prim #f))
+                                  ((mk-checker no-σ? '(any) #f toSetOfLists) #'prim #f))
             #:attr meaning (or (attribute implementation)
                                (and (attribute p)
                                     (syntax-parser
@@ -330,7 +322,7 @@
 (define-syntax (mk-static-primitive-functions stx)
   (syntax-parse stx
     [(_ primitive?:id changes-store?:id reads-store?:id
-        ((~var p (prim-entry #f)) ...))
+        ((~var p (prim-entry #f #'toSetOfLists)) ...))
      (syntax/loc stx
        (begin (define (primitive? o)
                 (case o [(p.prim) #t] ... [else #f]))
@@ -343,7 +335,7 @@
   (syntax-parse stx
          [(_ σpb?:boolean 0b?:boolean
              (~do (define global-σ?* (syntax-parameter-value #'global-σ?)))
-             mean:id compile:id co:id defines ... ((~var p (prim-entry global-σ?*)) ...))
+             mean:id compile:id co:id defines ... ((~var p (prim-entry global-σ?* #'toSetOfLists)) ...))
           (define σ-passing? (syntax-e #'σpb?))          
           (define σ-∆sv? (syntax-parameter-value #'σ-∆s?))
           (define compiledv? (syntax-parameter-value #'compiled?))
@@ -385,6 +377,13 @@
                                          [else #;r? (m #'(vs))]))))])))
             (quasisyntax/loc stx
               (begin
+                ;; Combinatorial combination of arguments
+                (define/match (toSetOfLists list-of-value-sets)
+                  [('()) (singleton '())]
+                  [((cons hdS tail))
+                   (for*/set ([hd (in-value-set hdS)]
+                              [restlist (in-set (toSetOfLists tail))])
+                     (cons hd restlist))])
                 ;; Let primitives yield single values instead of entire states.
                 #,#'(define-syntax (with-prim-yield syn)
                       (syntax-parse syn

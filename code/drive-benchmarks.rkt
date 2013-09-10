@@ -33,11 +33,9 @@
 (define sort2 "../benchmarks/temp-c/sort-pushdown.sch")
 (define sort3 "../benchmarks/temp-c/sort-lists.sch")
 (define file "../benchmarks/temp-c/file.sch")
+(define malloc "../benchmarks/temp-c/malloc.sch")
 (define to-test
-  (list #;#;sort1 sort2 sort3 file
-   ))
-
-(module+ data (provide sort1 sort2 sort3 file to-test))
+  (list sort1 sort2 sort3 file malloc))
 
 ;; Algorithm tags used to drive [run-benchmark.rkt]
 (define baseline "ps")
@@ -49,8 +47,9 @@
 (define μΓτΞ "lcgutp")
 
 (define which-analyses
-  (list baseline μ Ξ Γ Γτ μΓτ μΓτΞ
-        ))
+  (list baseline μ Ξ Γ Γτ μΓτ μΓτΞ))
+
+(module+ data (provide sort1 sort2 sort3 file to-test which-analyses))
 
 (define (run which file)
   (for ([n (in-range run-num)])

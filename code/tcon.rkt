@@ -7,7 +7,7 @@
          (except-in "notation.rkt" ∪ ∩ set-map))
 (require racket/trace)
 
-(provide TCon-deriv^ TCon-deriv@ weak-eq^
+(provide TCon-deriv^ weak-eq^ define-tcon-unit matchℓ?
          tcon? tconv?
          may must for*/δ ∨ ⊕ ∧ δ Σ̂* Σ̂*e
          ¬ · kl ε
@@ -20,8 +20,7 @@
          simple
          (struct-out tl)
          mk-Γτ
-         M⊥ T⊥
-         init-tcon!)
+         T⊥)
 
 (define ρ₀ #hasheq())
 (struct -unmapped ()) (define unmapped (-unmapped))
@@ -78,15 +77,10 @@
 (struct -may ()) (define may (-may))
 ;; Top level
 (struct tl (Ts t) #:transparent) ;; In this struct, Ts must all be ¬μ. t=must means no blame. t=may means blame.
-(define M⊥ (tl nothing #f)) (define (M⊥? x) (eq? x M⊥))
-(define Σ* #f)
-(define Mε-must #f)
-(define Mε-may #f)
+(define Σ* #f) (define (set-Σ*! x) (set! Σ* x))
+(define Mε-must #f) (define (set-Mε-must! x) (set! Mε-must x))
+(define Mε-may #f) (define (set-Mε-may! x) (set! Mε-may x))
 ;; value-sets are possibly stateful and need initialization. Delay that until initialized.
-(define (init-tcon!)
-  (set! Σ* (tl (singleton SΣ̂*) must))
-  (set! Mε-must (tl (singleton Tε) must))
-  (set! Mε-may (tl (singleton Tε) may)))
 
 
 (define (∂? x)
@@ -287,7 +281,8 @@
     [(closed T ρ) #f]
     [_ #t]))
 
-(define-signature weak-eq^ (≃ matchℓ? σgetter))
+(define-syntax-parameter matchℓ? #f)
+(define-signature weak-eq^ (≃ σgetter))
 (define-signature TCon-deriv^ (ð))
 
 (define-syntax-rule (Δ-like C acc-nothing pat ⊔ in-collection bad? bad op)
@@ -299,295 +294,296 @@
     (if (bad? Ts)
         bad
         (pat Ts t))))
-(define (Δ lst)
-  (Δ-like lst nothing tl ⊓ in-list nothing? M⊥ values))
-
-(define (matches≃ ≃ matchℓ? σgetter)
-  (define (force* v)
-    (match v
-      [(addr a) (σgetter a)]
-      [(? value-set?) v]
-      [else (singleton v)]))
-  (define (matches P A γ)
-    (define (matches1 P) (matches P A γ))
-    (define (matches2 P A) (matches P A γ))
-    (match P
-      [(and (? generic-set?) (not (? list?))) (⨅ P matches1)]
-      [(!pat pat)
-       (match-define (mres _ t) (matches1 pat))
-       (if (eq? must t)
-           ⊥
-           (mres (set γ) (¬t t)))]
-      [(constructed kind pats)
-       (match A
-         [(constructed (== kind eq?) data)
-          (⨅/lst matches2 pats data)]
-         ;; constructed, but also data
-         [(consv a d) ;; INVARIANT: pats ≡ (list pata patd)
-          (cond
-           [(eq? kind 'cons) (⨅/lst matches2 pats (list (σgetter a) (σgetter d)))]
-           [else ⊥])]
-         [(addr a) (matches2 P (σgetter a))]
-         [(? value-set?)
-          (define-syntax-rule (op v) (matches2 P v))
-          (Δ-like A ∅ mres set-union in-value-set ∅? ⊥ op)]
-         [(or (? vectorv?) (? vectorv-immutable?) (? vectorv^?) (? vectorv-immutable^?))
-          (error 'todo "Match on vectors")]
-         [_ ⊥])]
-      [(== Any eq?) (mres (set γ) must)]
-      [(== None eq?) ⊥]
-      [(label ℓ)
-       (if (matchℓ? A ℓ)
-           (mres (set γ) must)
-           ⊥)]
-      [(□ x) (mres (set (hash-set γ x A)) must)]
-      [($ x)
-       (match (hash-ref γ x unmapped)
-         [(== unmapped eq?) ⊥]
-         [v (matches2 v A)])]
-      [v
-       (define v* (force* v))
-       (define A* (force* A))
-       (define t
-         (for*/δ ([v (in-value-set v*)]
-                  [v′ (in-value-set A*)])
-           (≃ v v′)))
-         (if t
-             (mres (set γ) t)
-             ⊥)]))
-  #;(trace matches)
-  matches)
-
-;; References to variables in ρkill get rewritten to None
-;; Any bindings we come across that shadow names in ρkill get removed.
-;; Constructed data containing None becomes None.
-;; Negated matching on constructed data containing None becomes Any.
-(define ((Γpattern touches reachable) ρkill event)
-  (let build ([event event] [ρnew ρkill])
-    (define (build/l pats)
-      (let/ec found-none
-        (let loop ([pats pats] [ρnew* ρnew])
-          (match pats
-            ['() (values ρnew* '())]
-            [(cons pat pats)
-             (define-values (ρnew** pat*) (build pat ρnew*))
-             (cond [(eq? pat* None) (found-none ρnew None)]
-                   [else
-                    (define-values (ρnew*** pats*) (loop pats ρnew**))
-                    (values ρnew*** (cons pat* pats*))])]))))
-    (match event
-      [(constructed kind pats)
-       (define-values (ρnew* pats*) (build/l pats))
-       (if (eq? pats* None)
-           (values ρnew None)
-           (values ρnew* (constructed kind pats*)))]
-      [(!pat pat)
-       (define-values (drop pat*) (build pat ρnew))
-       (values ρnew
-               (cond [(eq? pat* None) Any]
-                     [(eq? pat* Any) None]
-                     [else (!pat pat*)]))]
-      [($ x) (values ρnew (if (hash-has-key? ρkill x) None event))]
-      [(□ x) (values (hash-remove ρnew x) event)]
-      [(or (? label?) (== Any eq?) (== None eq?)) (values ρnew event)]
-      [(? value-set? vs)
-       (values ρnew
-               (for*/value-set ([v (in-value-set vs)]
-                                [v* (in-value (let-values ([(drop v*) (build v ρnew)]) v*))]
-                                #:unless (eq? v* None))
-                 v*))]
-      [v (if (subset? (touches v) reachable)
-             (values ρnew v)
-             (values ρnew None))])))
 
 (define-simple-macro* (mk-Γτ name)
- (define (name reachable touches τ)
-   (define Γpattern* (Γpattern touches reachable))
-   (define (remove-unreachable ρ)
-     ;; Bindings that refer to nothing are removed so that has-key? is
-     ;; sufficient to change references into None
-     (for/fold ([ρ* #hasheq()]
-                [ρkill #hasheq()])
-         ([(x vs) (in-hash ρ)])
-       (define vs*
-         (for/fold ([vs* nothing])
-             ([v (in-value-set vs)]
-              #:when (subset? (touches v) reachable))
-           (⊓1 vs* v)))
-       (if (nothing? vs*)
-           (values ρ* (hash-set ρkill x #t))
-           (values (hash-set ρ* x vs*) ρkill))))
-   (for/σ ([(η Ts) (in-σ τ)]
-           #:when (η . ∈ . reachable))
-          (values
-           η
-           #,(if (syntax-parameter-value #'Γτ?)
-                 #'(for/value-set ([T (in-value-set Ts)])
-                     (define start-T T)
-                     (let Γsimpl* ([T T] [ρkill #hasheq()])
-                       (define (Γsimpl T) (Γsimpl* T ρkill))
-                       (match T
-                         [(∪ Ts) (∪simpl (for/set ([T (in-set Ts)]) (Γsimpl T)))]
-                         [(∩ Ts) (∩simpl (for/set ([T (in-set Ts)]) (Γsimpl T)))]
-                         [(¬ T) (¬simpl (Γsimpl T))]
-                         [(kl T) (klsimpl (Γsimpl T))]
-                         [(· T₀ T₁) (·simpl (Γsimpl T₀) (Γsimpl T₁))]
-                         [(bind B T)
-                          (define-values (ρkill* B*) (Γpattern* ρkill B))
-                          (cond [(eq? B* None) T⊥]
-                                [else
-                                 (define T* (Γsimpl* T ρkill*))
-                                 (cond [(eq? T* T⊥) (¬simpl B*)]
-                                       [else (bind B* T*)])])]
-                         [(closed T ρ)
-                          ;; ρkill gets created here and only made smaller.
-                          (define-values (ρ* ρkill*) (remove-unreachable ρ))
-                          (define T* (Γsimpl* T ρkill*))
-                          (cond [(eq? T* T⊥) ST⊥]
-                                [(eq? T* Σ̂*) SΣ̂*]
-                                [else (closed T* ρ*)])]
-                         [(? ε?) ε]
-                         [_ (define-values (ρkill* A) (Γpattern* ρkill T))
-                            (match A
-                              [(== None eq?) T⊥]
-                              [(== Any eq?) Σ̂*]
-                              [_ A])])))
-                 #'Ts)))))
+  (define (name reachable touches τ)
+    ;; References to variables in ρkill get rewritten to None
+    ;; Any bindings we come across that shadow names in ρkill get removed.
+    ;; Constructed data containing None becomes None.
+    ;; Negated matching on constructed data containing None becomes Any.
+    (define (Γpattern ρkill event)
+      (let build ([event event] [ρnew ρkill])
+        (define (build/l pats)
+          (let/ec found-none
+            (let loop ([pats pats] [ρnew* ρnew])
+              (match pats
+                ['() (values ρnew* '())]
+                [(cons pat pats)
+                 (define-values (ρnew** pat*) (build pat ρnew*))
+                 (cond [(eq? pat* None) (found-none ρnew None)]
+                       [else
+                        (define-values (ρnew*** pats*) (loop pats ρnew**))
+                        (values ρnew*** (cons pat* pats*))])]))))
+        (match event
+          [(constructed kind pats)
+           (define-values (ρnew* pats*) (build/l pats))
+           (if (eq? pats* None)
+               (values ρnew None)
+               (values ρnew* (constructed kind pats*)))]
+          [(!pat pat)
+           (define-values (drop pat*) (build pat ρnew))
+           (values ρnew
+                   (cond [(eq? pat* None) Any]
+                         [(eq? pat* Any) None]
+                         [else (!pat pat*)]))]
+          [($ x) (values ρnew (if (hash-has-key? ρkill x) None event))]
+          [(□ x) (values (hash-remove ρnew x) event)]
+          [(or (? label?) (== Any eq?) (== None eq?)) (values ρnew event)]
+          [(? value-set? vs)
+           (values ρnew
+                   (for*/value-set ([v (in-value-set vs)]
+                                    [v* (in-value (let-values ([(drop v*) (build v ρnew)]) v*))]
+                                    #:unless (eq? v* None))
+                                   v*))]
+          [v (if (subset? (touches v) reachable)
+                 (values ρnew v)
+                 (values ρnew None))])))
+    (define (remove-unreachable ρ)
+      ;; Bindings that refer to nothing are removed so that has-key? is
+      ;; sufficient to change references into None
+      (for/fold ([ρ* #hasheq()]
+                 [ρkill #hasheq()])
+          ([(x vs) (in-hash ρ)])
+        (define vs*
+          (for/fold ([vs* nothing])
+              ([v (in-value-set vs)]
+               #:when (subset? (touches v) reachable))
+            (⊓1 vs* v)))
+        (if (nothing? vs*)
+            (values ρ* (hash-set ρkill x #t))
+            (values (hash-set ρ* x vs*) ρkill))))
+    (for/σ ([(η Ts) (in-σ τ)]
+            #:when (η . ∈ . reachable))
+           (values
+            η
+            #,(if (syntax-parameter-value #'Γτ?)
+                  #'(for/value-set ([T (in-value-set Ts)])
+                                   (define start-T T)
+                                   (let Γsimpl* ([T T] [ρkill #hasheq()])
+                                        (define (Γsimpl T) (Γsimpl* T ρkill))
+                                        (match T
+                                          [(∪ Ts) (∪simpl (for/set ([T (in-set Ts)]) (Γsimpl T)))]
+                                          [(∩ Ts) (∩simpl (for/set ([T (in-set Ts)]) (Γsimpl T)))]
+                                          [(¬ T) (¬simpl (Γsimpl T))]
+                                          [(kl T) (klsimpl (Γsimpl T))]
+                                          [(· T₀ T₁) (·simpl (Γsimpl T₀) (Γsimpl T₁))]
+                                          [(bind B T)
+                                           (define-values (ρkill* B*) (Γpattern ρkill B))
+                                           (cond [(eq? B* None) T⊥]
+                                                 [else
+                                                  (define T* (Γsimpl* T ρkill*))
+                                                  (cond [(eq? T* T⊥) (¬simpl B*)]
+                                                        [else (bind B* T*)])])]
+                                          [(closed T ρ)
+                                           ;; ρkill gets created here and only made smaller.
+                                           (define-values (ρ* ρkill*) (remove-unreachable ρ))
+                                           (define T* (Γsimpl* T ρkill*))
+                                           (cond [(eq? T* T⊥) ST⊥]
+                                                 [(eq? T* Σ̂*) SΣ̂*]
+                                                 [else (closed T* ρ*)])]
+                                          [(? ε?) ε]
+                                          [_ (define-values (ρkill* A) (Γpattern ρkill T))
+                                             (match A
+                                               [(== None eq?) T⊥]
+                                               [(== Any eq?) Σ̂*]
+                                               [_ A])])))
+                  #'Ts)))))
 
-(define-unit TCon-deriv@
-  (import weak-eq^)
-   (export TCon-deriv^)
-   (define matches (matches≃ ≃ matchℓ? σgetter))
+(define-syntax-rule (define-tcon-unit name init)
+  (begin
+    (define (init)
+      (set-Σ*! (tl (singleton SΣ̂*) must))
+      (set-Mε-must! (tl (singleton Tε) must))
+      (set-Mε-may! (tl (singleton Tε) may)))
 
-   ;; The following *p operations perform their respective derivitive operations as well as simplify
+    (define M⊥ (tl nothing #f)) (define (M⊥? x) (eq? x M⊥))
+    ;; The following *p operations perform their respective derivitive operations as well as simplify
+    (define (Δ lst)
+      (Δ-like lst nothing tl ⊓ in-list nothing? M⊥ values))
+    ;; Negation differs because it waits until we have a /full/ match.
+    ;; Thus, we do a nullability check to see if it is satisfied.
+    ;; If a may state, we stay may only if the contract is nullable.
+    (define (¬p T)
+      (match T
+        [(? M⊥?) Σ*]
+        [(tl Ts′ t)
+         (define Ts″
+           (let/ec break
+             (for/fold ([acc nothing]) ([T′ (in-value-set Ts′)])
+               (if (ν? T′)
+                   (break nothing)
+                   (⊓1 acc (¬simpl T′))))))
+         (if (nothing? Ts″) M⊥ (tl Ts″ t))]
+        [M (error '¬p "oops3 ~a" M)]))
 
-   ;; Negation differs because it waits until we have a /full/ match.
-   ;; Thus, we do a nullability check to see if it is satisfied.
-   ;; If a may state, we stay may only if the contract is nullable.
-   (define (¬p T)
-     (match T
-       [(? M⊥?) Σ*]
-       [(tl Ts′ t)
-        (define Ts″
-          (let/ec break
-           (for/fold ([acc nothing]) ([T′ (in-value-set Ts′)])
-             (if (ν? T′)
-                 (break nothing)
-                 (⊓1 acc (¬simpl T′))))))
-        (if (nothing? Ts″) M⊥ (tl Ts″ t))]
-       [M (error '¬p "oops3 ~a" M)]))
+    ;; ð_A (· T₀ T₁) = ð_A T₀ + ν(T₀)·ð_A T₁
+    ;; ∂_A (· T₀ T₁) ρ = ∂_A T₀,ρ + ν(T₀)·∂_A T₁,ρ
+    (define (·p νT₀ ∂T₀ ∂T₁-promise T₁)
+      (define-values (lefts t)
+        (match ∂T₀
+          [(? M⊥?) (values nothing #t)]
+          [(tl Ts′ t′) (values (for/value-set ([T′ (in-value-set Ts′)]) (·simpl T′ T₁)) t′)]
+          [M (error '·p "oops6 ~a" M)]))
+      (cond
+       [νT₀
+        (match (force ∂T₁-promise)
+          [(? M⊥?) (if (nothing? lefts)
+                       M⊥
+                       (tl lefts t))]
+          ;; Both derivatives matched.
+          [(and right (tl T₁s′ t′))
+           (if (nothing? lefts)
+               right
+               (tl (for*/value-set ([left (in-value-set lefts)]
+                                    [T₁′ (in-value-set T₁s′)])
+                                   (∪simpl (set left T₁′)))
+                   (δ t t′)))]
+          [M (error '·p "oops4 ~a" M)])]
+       [(nothing? lefts) M⊥]
+       [else (tl lefts t)]))
+    #;(trace ·p)
 
-   ;; ð_A (· T₀ T₁) = ð_A T₀ + ν(T₀)·ð_A T₁
-   ;; ∂_A (· T₀ T₁) ρ = ∂_A T₀,ρ + ν(T₀)·∂_A T₁,ρ
-   (define (·p νT₀ ∂T₀ ∂T₁-promise T₁)
-     (define-values (lefts t)
-       (match ∂T₀
-         [(? M⊥?) (values nothing #t)]
-         [(tl Ts′ t′) (values (for/value-set ([T′ (in-value-set Ts′)]) (·simpl T′ T₁)) t′)]
-         [M (error '·p "oops6 ~a" M)]))
-     (cond
-      [νT₀
-       (match (force ∂T₁-promise)
-         [(? M⊥?) (if (nothing? lefts)
-                      M⊥
-                      (tl lefts t))]
-         ;; Both derivatives matched.
-         [(and right (tl T₁s′ t′))
-          (if (nothing? lefts)
-              right
-              (tl (for*/value-set ([left (in-value-set lefts)]
-                                   [T₁′ (in-value-set T₁s′)])
-                    (∪simpl (set left T₁′)))
-                  (δ t t′)))]
-         [M (error '·p "oops4 ~a" M)])]
-      [(nothing? lefts) M⊥]
-      [else (tl lefts t)]))
-   #;(trace ·p)
+    (define (klp M T)
+      (match M
+        [(? M⊥?) M⊥]
+        [(tl Ts″ t′) (tl (for/value-set ([T″ (in-value-set Ts″)]) (·simpl T″ T)) t′)]
+        [M (error 'klp "oops7 ~a" M)]))
 
-   (define (klp M T)
-     (match M
-       [(? M⊥?) M⊥]
-       [(tl Ts″ t′) (tl (for/value-set ([T″ (in-value-set Ts″)]) (·simpl T″ T)) t′)]
-       [M (error 'klp "oops7 ~a" M)]))
-
-   ;; Forms a cross-product of all Ms' Ts.
-   (define ((∪∩p ⊥ bin simpl) Ms)
-     (define-values (Tss′ t′)
-       (for/fold ([acc ∅] [t 'doesnt-count]) ([M (in-set Ms)])
-         (match M
-           [(tl Ts′ t′) (values (set-add acc Ts′) (δ t t′))])))
-     (tl (for/value-set ([Ts′ (in-set (set-of-sets-Π Tss′))]) (simpl Ts′)) t′))
+    ;; Forms a cross-product of all Ms' Ts.
+    (define ((∪∩p ⊥ bin simpl) Ms)
+      (define-values (Tss′ t′)
+        (for/fold ([acc ∅] [t 'doesnt-count]) ([M (in-set Ms)])
+          (match M
+            [(tl Ts′ t′) (values (set-add acc Ts′) (δ t t′))])))
+      (tl (for/value-set ([Ts′ (in-set (set-of-sets-Π Tss′))]) (simpl Ts′)) t′))
    
-   ;; S is a set of value-sets. We return a set of sets.
-   (define (set-of-sets-Π S)
-     (cond
-      [(∅? S) (set ∅)]
-      [else (define A (set-first S))
-            (define S* (set-rest S))
-            (for*/set ([a (in-value-set A)]
-                       [tail (in-set (set-of-sets-Π S*))])
-              (set-add tail a))]))
+    ;; S is a set of value-sets. We return a set of sets.
+    (define (set-of-sets-Π S)
+      (cond
+       [(∅? S) (set ∅)]
+       [else (define A (set-first S))
+             (define S* (set-rest S))
+             (for*/set ([a (in-value-set A)]
+                        [tail (in-set (set-of-sets-Π S*))])
+               (set-add tail a))]))
 
-   (define ∪p (∪∩p #f ∨ ∪simpl))
-   (define ∩p (∪∩p must ∧ ∩simpl))
+    (define ∪p (∪∩p #f ∨ ∪simpl))
+    (define ∩p (∪∩p must ∧ ∩simpl))
+    
+    (define-unit name
+      (import weak-eq^)
+      (export TCon-deriv^)
+      (define (force* v)
+        (match v
+          [(addr a) (σgetter a)]
+          [(? value-set?) v]
+          [else (singleton v)]))
 
-   (define (bindp B A T ρ)
-     (match (matches B A ρ)
-       [(mres ρs′ t′)
-        (cond [t′
-               (tl (for/value-set ([ρ′ (in-set ρs′)])
-                     (closed T ρ′))
-                   t′)]
-              [else M⊥])]))
+      (define (matches P A γ)
+        (define (matches1 P) (matches P A γ))
+        (define (matches2 P A) (matches P A γ))
+        (match P
+          [(and (? generic-set?) (not (? list?))) (⨅ P matches1)]
+          [(!pat pat)
+           (match-define (mres _ t) (matches1 pat))
+           (if (eq? must t)
+               ⊥
+               (mres (set γ) (¬t t)))]
+          [(constructed kind pats)
+           (match A
+             [(constructed (== kind eq?) data)
+              (⨅/lst matches2 pats data)]
+             ;; constructed, but also data
+             [(consv a d) ;; INVARIANT: pats ≡ (list pata patd)
+              (cond
+               [(eq? kind 'cons) (⨅/lst matches2 pats (list (σgetter a) (σgetter d)))]
+               [else ⊥])]
+             [(addr a) (matches2 P (σgetter a))]
+             [(? value-set?)
+              (define-syntax-rule (op v) (matches2 P v))
+              (Δ-like A ∅ mres set-union in-value-set ∅? ⊥ op)]
+             [(or (? vectorv?) (? vectorv-immutable?) (? vectorv^?) (? vectorv-immutable^?))
+              (error 'todo "Match on vectors")]
+             [_ ⊥])]
+          [(== Any eq?) (mres (set γ) must)]
+          [(== None eq?) ⊥]
+          [(label ℓ)
+           (if (matchℓ? A ℓ)
+               (mres (set γ) must)
+               ⊥)]
+          [(□ x) (mres (set (hash-set γ x A)) must)]
+          [($ x)
+           (match (hash-ref γ x unmapped)
+             [(== unmapped eq?) ⊥]
+             [v (matches2 v A)])]
+          [v
+           (define v* (force* v))
+           (define A* (force* A))
+           (define t
+             (for*/δ ([v (in-value-set v*)]
+                      [v′ (in-value-set A*)])
+                     (≃ v v′)))
+           (if t
+               (mres (set γ) t)
+               ⊥)]))
 
-   (define (patp pat A ρ)
-     (match (matches pat A ρ)
-       [(mres ρs′ (== must eq?)) Mε-must]
-       [(mres ρs′ (== may eq?)) Mε-may]
-       [_ M⊥]))
+      (define (bindp B A T ρ)
+        (match (matches B A ρ)
+          [(mres ρs′ t′)
+           (cond [t′
+                  (tl (for/value-set ([ρ′ (in-set ρs′)])
+                                     (closed T ρ′))
+                      t′)]
+                 [else M⊥])]))
 
-   ;; Top level temporal contracts with distributed ρs.
-   ;; Returns a (mres Set[TCon] valuation)
-   (define (ð* A T)
-     (let ð ([T T])
-          #;(trace ð)
-       (match T
-         [(? SΣ̂*?) Σ*]
-         [(or (? ST⊥?) (? Tε?)) M⊥]
-         [(· T₀ T₁) (·p (ν? T₀) (ð T₀) (delay (ð T₁)) T₁)]
-         [(¬ T) (¬p (ð T))]
-         [(kl T′) (klp (ð T′) T)]
-         ;; Instead of performing a cross-product, just output the set of possibilities.
-         [(∪ Ts) #;(∪p (for/set ([T (in-set Ts)]) (ð T)))
-          (Δ (set-map Ts ð))
-          ]
-         [(∩ Ts) (∩p (for/set ([T (in-set Ts)]) (ð T)))]
-         [(closed T ρ) (∂ A T ρ)] ;; TODO: Add fvs to Tcons and restrict ρ
-         [A* (∂ A A* ρ₀)]
-         [_ (error 'ð "Bad Tcon ~a" T)])))
-   #;(trace ð*)
-   (define ð ð*)
+      (define (patp pat A ρ)
+        (match (matches pat A ρ)
+          [(mres ρs′ (== must eq?)) Mε-must]
+          [(mres ρs′ (== may eq?)) Mε-may]
+          [_ M⊥]))
 
-   ;; Treat T as if each component of T is closed by ρ (down to bind)
-   (define (∂ A T ρ)
-     (let ∂ ([T T])
-       #;(trace ∂)
-       (unless (open? T) (error '∂ "Bad T ~a" T))
-       (match T
-         [(? Σ̂*?) Σ*]
-         [(or (? T⊥?) (? ε?)) M⊥]
-         [(· T₀ T₁) (·p (ν? T₀) (∂ T₀) (delay (∂ T₁)) (closed T₁ ρ))]
-         [(¬ T) (¬p (∂ T))]
-         [(kl T′) (klp (∂ T′) T)]
-         [(∪ Ts) #;(∪p (for/set ([T (in-set Ts)]) (∂ T)))
-          (Δ (set-map Ts ∂))
-          ]
-         [(∩ Ts) (∩p (for/set ([T (in-set Ts)]) (∂ T)))]
-         ;; dseq
-         [(bind B T) (bindp B A T ρ)] ;; Only introducer of ρs.
-         ;; Event/unevent
-         [(? event? Aor!A) (patp Aor!A A ρ)]
-         [_ (error '∂ "Bad Tcon ~a" T)])))
-   #;(trace ∂)
-   )
+      ;; Top level temporal contracts with distributed ρs.
+      ;; Returns a (mres Set[TCon] valuation)
+      (define (ð* A T)
+        (let ð ([T T])
+             #;(trace ð)
+             (match T
+               [(? SΣ̂*?) Σ*]
+               [(or (? ST⊥?) (? Tε?)) M⊥]
+               [(· T₀ T₁) (·p (ν? T₀) (ð T₀) (delay (ð T₁)) T₁)]
+               [(¬ T) (¬p (ð T))]
+               [(kl T′) (klp (ð T′) T)]
+               ;; Instead of performing a cross-product, just output the set of possibilities.
+               [(∪ Ts) (∪p (for/set ([T (in-set Ts)]) (ð T)))
+                #;(Δ (set-map Ts ð))
+                ]
+               [(∩ Ts) (∩p (for/set ([T (in-set Ts)]) (ð T)))]
+               [(closed T ρ) (∂ A T ρ)] ;; TODO: Add fvs to Tcons and restrict ρ
+               [A* (∂ A A* ρ₀)]
+               [_ (error 'ð "Bad Tcon ~a" T)])))
+      #;(trace ð*)
+      (define ð ð*)
+
+      ;; Treat T as if each component of T is closed by ρ (down to bind)
+      (define (∂ A T ρ)
+        (let ∂ ([T T])
+          #;(trace ∂)
+          (unless (open? T) (error '∂ "Bad T ~a" T))
+          (match T
+            [(? Σ̂*?) Σ*]
+            [(or (? T⊥?) (? ε?)) M⊥]
+            [(· T₀ T₁) (·p (ν? T₀) (∂ T₀) (delay (∂ T₁)) (closed T₁ ρ))]
+            [(¬ T) (¬p (∂ T))]
+            [(kl T′) (klp (∂ T′) T)]
+            [(∪ Ts) (∪p (for/set ([T (in-set Ts)]) (∂ T)))
+             #;(Δ (set-map Ts ∂))
+             ]
+            [(∩ Ts) (∩p (for/set ([T (in-set Ts)]) (∂ T)))]
+            ;; dseq
+            [(bind B T) (bindp B A T ρ)] ;; Only introducer of ρs.
+            ;; Event/unevent
+            [(? event? Aor!A) (patp Aor!A A ρ)]
+            [_ (error '∂ "Bad Tcon ~a" T)])))
+      #;(trace ∂)
+      )))
 

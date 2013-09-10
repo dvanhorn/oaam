@@ -10,6 +10,7 @@ do
 	grep "State count" `find . -name "*.time.$i" -print` >> $benchmark
 	grep "Point count" `find . -name "*.time.$i" -print` >> $benchmark
 	grep "States/second" `find . -name "*.time.$i" -print` >> $benchmark
+	grep "Blame sites" `find . -name "*.time.$i" -print` >> $benchmark
 	grep Timeout `find . -name "*.time.$i" -print` >> $benchmark
 	grep Exhaust `find . -name "*.time.$i" -print` >> $benchmark
 	grep Peak `find . -name "*.mem.$i" -print` >> $benchmark

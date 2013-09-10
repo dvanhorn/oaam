@@ -1,7 +1,7 @@
 #lang racket
 (require (rename-in racket/generator [yield real-yield])
          (for-syntax racket/syntax))
-(require "kcfa.rkt" "data.rkt" "parse.rkt" 
+(require "kcfa.rkt" "data.rkt" "parse.rkt" "env.rkt"
          "primitives.rkt" "fix.rkt" "do.rkt"
          ;; different components of instantiantiations
          "lazy-strict.rkt"
@@ -91,7 +91,7 @@ Welcome to Racket v5.3.3.
    (with-σ-∆s/prealloc!
     (with-abstract
       (mk-analysis #:aval 0cfa^/c/∆s/prealloc!
-                   #:prepare (λ (sexp) (prepare-prealloc parse-prog sexp))
+                   #:prepare (λ (sexp) (prepare-prealloc-base parse-prog sexp nothing))
                    #:ans s-prealloc/∆s-ans/c
                    #:touches s-prealloc/∆s-touches-0/c
                    #:fixpoint s-prealloc/∆s-fixpoint/c
@@ -339,10 +339,10 @@ Welcome to Racket v5.3.3.
   (syntax-case stx ()
     [(_ base μ Ξ)
      (let ([suffix (λ (id) (format-id #'base "~a-~a" #'base id))])
-      (with-syntax ([(fixpoint state-base point ans touches aval co ev blame rtk kont ctx root reach*)
+      (with-syntax ([(fixpoint state-base point ans touches aval co ev blame rtk kont ctx root reach* init-tcon! blame-site?)
                      (map suffix
                           (syntax->list
-                           #'(fixpoint state-base point ans touches aval co ev blame rtk kont ctx root reach*)))])
+                           #'(fixpoint state-base point ans touches aval co ev blame rtk kont ctx root reach* init-tcon! blame-site?)))])
         (quasisyntax/loc stx
           (splicing-syntax-parameterize
            ([generate-graph? #f]
@@ -351,91 +351,110 @@ Welcome to Racket v5.3.3.
             [compiled? #t]
             [pushdown? Ξ]
             [global-σ? #t])
-           (mk-prealloc/timestamp^-fixpoint/stacked
-            fixpoint
-            state-base
-            point
-            ans
-            touches
-            #:ev ev
-            #:co co
-            #:blame blame #:compiled)
-           (with-nonsparse
-            (#,@(if (syntax-e #'Ξ)
-                    #'(with-pushdown
-                       #:rtk rtk #:kont kont #:co co
-                       #:ctx ctx #:root root #:touches touches
-                       #:state-base state-base #:point point #:reach reach*)
-                    #'(with-regular)) ;; tunable
-             (with-lazy
-              (with-0-ctx/prealloc
-               (with-prealloc/timestamp-store/stacked
-                (with-mutable-worklist/stacked^
-                 (with-abstract
-                  (mk-analysis #:aval aval
-                               #:prepare (λ (sexp) (prepare-prealloc/stacked parse-prog sexp))
-                               #:state-base state-base
-                               #:point point
-                               #:ans ans
-                               #:touches touches
-                               #:fixpoint fixpoint
-                               #:co co #:compiled #:ev psev #:blame blame
-                               #:rtk rtk #:kont kont #:ctx ctx #:root root
-                               #:global-σ #:wide))))))))
-           (provide aval)))))]))
+           (with-simple-data
+            (with-env-defs
+             (mk-prealloc/timestamp^-fixpoint/stacked
+              fixpoint
+              state-base
+              point
+              ans
+              touches
+              #:ev ev
+              #:co co
+              #:blame blame #:init-tcon! init-tcon! #:blame-site? blame-site? #:compiled
+              )
+             (with-nonsparse
+              (#,@(if (syntax-e #'Ξ)
+                      #'(with-pushdown
+                         #:rtk rtk #:kont kont #:co co
+                         #:ctx ctx #:root root #:touches touches
+                         #:state-base state-base #:point point #:reach reach*)
+                      #'(with-regular)) ;; tunable
+               (with-lazy
+                (with-0-ctx/prealloc '() ;; since stacked
+                 (with-prealloc/timestamp-store/stacked
+                  (with-mutable-worklist/stacked^
+                   (with-abstract
+                    (mk-analysis #:aval aval
+                                 #:prepare (λ (sexp) (prepare-prealloc-base parse-prog sexp '() '())) ;; since stacked
+                                 #:state-base state-base
+                                 #:point point
+                                 #:ans ans
+                                 #:touches touches
+                                 #:fixpoint fixpoint
+                                 #:init-tcon! init-tcon!
+                                 #:co co #:ev psev #:tblame blame #:blame-site? blame-site?
+                                 #:rtk rtk #:kont kont #:ctx ctx #:root root
+                                 #:compiled
+                                 #:global-σ #:wide))))))))
+             (provide aval)))))))]))
+
  (mk-ps-derivative ps #f #f) ;; baseline
+#|
+
  (mk-ps-derivative psp #f #t) ;; Ξ
  (mk-ps-derivative psu #t #f) ;; μ
+|#
+
 (define-syntax (mk-lcg-derivative stx)
   (syntax-case stx ()
     [(_ base μ Ξ Γτ)
      (let ([suffix (λ (id) (format-id #'base "~a-~a" #'base id))])
-      (with-syntax ([(fixpoint state-base point ans touches aval co ev dr ap cc blame rtk kont ctx root reach*)
+      (with-syntax ([(fixpoint state-base point ans touches aval co ev dr ap cc blame rtk kont ctx root reach* init-tcon! blame-site?)
                      (map suffix
                           (syntax->list
-                           #'(fixpoint state-base point ans touches aval co ev dr ap cc blame rtk kont ctx root reach*)))])
+                           #'(fixpoint state-base point ans touches aval co ev dr ap cc blame rtk kont ctx root reach* init-tcon! blame-site?)))])
         (quasisyntax/loc stx
-          (splicing-syntax-parameterize
-           ([generate-graph? #f]
-            [abs-count? #t]
-            [μ-equality? μ]
-            [pushdown? Ξ]
-            [Γ? #t]
-            [Γτ? Γτ]
-            [global-σ? #t])
-           (with-whole-GH-σ
-            #;with-σ-∆s
-            (with-timestamp-∆-fix/Γ
-              [state-base
-               point
-               (co dr chk ans ap cc ev blame)
-               touches
-               root
-               reach*
-               #:narrow]
-              (with-nonsparse
-               (#,@(if (syntax-e #'Ξ)
-                       #'(with-pushdown
-                          #:rtk rtk #:kont kont #:co co
-                          #:ctx ctx #:root root #:touches touches
-                          #:state-base state-base #:point point #:reach reach* #:narrow)
-                       #'(with-regular))
-                (with-lazy
-                 (with-0-ctx
-                  (with-abstract
-                   (mk-analysis #:aval aval
-                                #:state-base state-base
-                                #:point point
-                                #:touches touches
-                                #:root root
-                                #:co co #:dr dr #:chk chk #:ans ans #:ap ap #:cc cc #:ev ev #:blame blame
-                                #:rtk rtk #:kont kont #:ctx ctx
-                                #:σ-passing))))))))
-           (provide aval)))))]))
+          (with-goedel-data
+           (with-env-defs
+            (splicing-syntax-parameterize
+             ([generate-graph? #f]
+              [abs-count? #t]
+              [μ-equality? μ]
+              [pushdown? Ξ]
+              [Γ? #t]
+              [Γτ? Γτ]
+              [global-σ? #t])
+             (with-whole-GH-σ
+              #;with-σ-∆s
+              (with-timestamp-∆-fix/Γ
+                               [state-base
+                                point
+                                (co dr chk ans ap cc ev blame)
+                                touches
+                                root
+                                reach*
+                                init-tcon!
+                                #:narrow]
+                               (with-nonsparse
+                                (#,@(if (syntax-e #'Ξ)
+                                        #'(with-pushdown
+                                           #:rtk rtk #:kont kont #:co co
+                                           #:ctx ctx #:root root #:touches touches
+                                           #:state-base state-base #:point point #:reach reach* #:narrow)
+                                        #'(with-regular))
+                                 (with-lazy
+                                  (with-0-ctx
+                                   (with-abstract
+                                    (mk-analysis #:aval aval
+                                                 #:state-base state-base
+                                                 #:point point
+                                                 #:touches touches
+                                                 #:root root
+                                                 #:init-tcon! init-tcon!
+                                                 #:blame-site? blame-site?
+                                                 #:tblame blame
+                                                 #:co co #:dr dr #:chk chk #:ans ans #:ap ap #:cc cc #:ev ev
+                                                 #:rtk rtk #:kont kont #:ctx ctx
+                                                 #:σ-passing))))))))
+             (provide aval)))))))]))
+
+#|
  (mk-lcg-derivative lcg #f #f #f) ;; Γ
  (mk-lcg-derivative lcgt #f #f #t) ;; Γτ
  (mk-lcg-derivative lcgut #t #f #t) ;; μΓτ
  (mk-lcg-derivative lcgutp #t #t #t) ;; μΓτΞ
+|#
 
 #;#;#;
 ;; "ps1"
