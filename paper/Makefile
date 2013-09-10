@@ -71,17 +71,17 @@ bench-overview.tex:
 #%.pdf: %.dvi
 #	dvipdfm -o $(basename $@).pdf $(basename $@).dvi
 
-response.txt:
-	openssl base64 -d -aes-256-cbc -in response.out -out response.txt
+response-pldi13.txt:
+	openssl base64 -d -aes-256-cbc -in response-pldi13.out -out response-pldi13.txt
 
-response.out:
-	openssl base64 -aes-256-cbc -salt -in response.txt -out response.out
+response-pldi13.out:
+	openssl base64 -aes-256-cbc -salt -in response-pldi13.txt -out response-pldi13.out
 
-reviews.txt:
-	openssl base64 -d -aes-256-cbc -in reviews.out -out reviews.txt
+reviews-pldi13.txt:
+	openssl base64 -d -aes-256-cbc -in reviews-pldi13.out -out reviews-pldi13.txt
 
-reviews.out:
-	openssl base64 -aes-256-cbc -salt -in reviews.txt -out reviews.out
+reviews-pldi13.out:
+	openssl base64 -aes-256-cbc -salt -in reviews-pldi13.txt -out reviews-pldi13.out
 
 
 flush: clean
