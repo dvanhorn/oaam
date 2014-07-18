@@ -109,7 +109,7 @@ Welcome to Racket v5.3.3.
 ;;                    #:fixpoint baseline-fixpoint
 ;;                    #:σ-passing #:wide #:set-monad)))))))
 ;; (provide baseline)
-
+#|
 ;; "spt"
 (mk-special-set-fixpoint^ fix 0cfa-set-fixpoint^/t 0cfa-ans^/t?)
 (with-nonsparse
@@ -317,6 +317,7 @@ Welcome to Racket v5.3.3.
 ;;                    #:fixpoint prealloc/∆s-fixpoint/c
 ;;                    #:global-σ #:compiled #:wide))))))
 ;; (provide lazy-0cfa^/c/∆s/prealloc!)
+|#
 ;; "ps"
 (mk-prealloc/timestamp^-fixpoint/stacked prealloc/∆s-fixpoint/stacked/c prealloc/∆s-ans/stacked/c?
               prealloc/∆s-ans/stacked/c-v prealloc/∆s-touches-0/stacked/c)
@@ -370,7 +371,7 @@ Welcome to Racket v5.3.3.
 ;;                    #:global-σ #:compiled #:wide)))))))
 ;; (provide lazy-0cfa^/c/prealloc/timestamp!)
 
-
+#|
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Evaluators for CM-extended Scheme
 (mk-set-fixpoint^ fix baseline/cm-fixpoint baseline/cm-ans?)
@@ -541,4 +542,5 @@ Welcome to Racket v5.3.3.
                     #:fixpoint lazy-0cfa-gen^-fix/c
                     #:compiled #:global-σ #:wide #:generators)))))))
  (provide lazy-0cfa-gen^/c)
+|#
 |#

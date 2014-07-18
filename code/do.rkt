@@ -32,7 +32,8 @@
 
 (define-syntax-rule (bind-push (σ* a* bpσ l δ k) body)
   (let ([a* (make-var-contour l δ)])
-    (bind-join (σ* bpσ a* (singleton k)) body)))
+    (bind-force (res-tmp bpσ k)
+                (bind-join (σ* bpσ a* res-tmp) body))))
 
 (define-syntax-rule (bind-alias (σ* σ alias to-alias) body)
   (bind-get (res σ to-alias) (bind-join (σ* σ alias res) body)))
@@ -199,6 +200,9 @@
             #`(do-body-transformer
                (begin body ... #,@(listy (and add-void? #'(void))))))))]
 
+    [(_ (:id) (stuff ...) . rest)
+     (raise-syntax-error 'do "Invalid join clauses" stx #'(stuff ...))]
+
     ;; when fold/fold doesn't cut it, we need a safe way to recur.
     [(_ (ℓσ:id) loop:id ([args:id arg0:expr] ...) body:expr ...+)
      (define extras (append (listy (and tcs #'target-cs))
@@ -223,4 +227,7 @@
                                      [(_ σ* argps ...)
                                       (real-loop #,@(listy (and tσ #'σ*))
                                                  #,@extras argps ...)])])
-                  body ...))))))]))
+                  body ...))))))]
+
+    [(_ (s:id) . rest) (raise-syntax-error 'do (format "Expected after (~a) (clauses) body ...+" (syntax-e #'s)) stx)]
+    [(_ . rest) (raise-syntax-error 'do "Expected (store-id) (clauses) body ...+" stx)]))

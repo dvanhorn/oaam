@@ -7,6 +7,7 @@
                     [generator real-generator])
          (for-syntax syntax/parse racket/syntax racket/base
                      syntax/parse/experimental/template)
+         racket/fixnum
          racket/stxparam racket/splicing
          racket/trace)
 (provide yield-meaning #;<-reprovide
@@ -88,6 +89,23 @@
                      [(_ (ev . args)) (syntax/loc syn (ev . args))]
                      [(_ e:expr) (syntax/loc syn (yield-meaning e))]))
              #'(syntax-rules () [(_ e) (yield-meaning e)])))
+
+       (define (continue-step co-σ v cm φ k**)
+         (with-syntax ([(co-σ v cm φ k**) (list co-σ v cm φ k**)])
+           (if (given compiled?)
+               (quasisyntax/loc stx
+                 (φ #,@(listy (and (given σ-∆s?) (not (given global-σ?)) #'top-σ))
+                    #,@(listy (and (not (given global-σ?)) #'co-σ))
+                    v
+                    cm-op ... k**))
+               (quasisyntax/loc stx
+                 (match φ
+                   #,step-ls
+                   #,step-ifk
+                   #,step-ls
+                   #,step-lrk
+                   #,step-sk!)))))
+
        (define eval ;; what does ev mean?
          (syntax/loc stx
            (match e
@@ -124,25 +142,25 @@
                   (define/ρ ρ* (extend* ρ xs as))
                   (do (ev-σ) ([(σ0 a) #:push ev-σ l δ k]
                               [σ*-lrc #:join* σ0 as ss])
-                    (yield (ev σ*-lrc c ρ* (lrk (marks-of k) x xs* cs cb ρ* a δ) δ))))]
+                    (yield (ev σ*-lrc c ρ* (kcons (marks-of k) (lrk x xs* cs cb ρ* δ) a) δ))))]
              [(app l e es)
               (define c (compile e))
               (define cs (map compile es))
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([(σ*-app a) #:push ev-σ l δ k])
-                    (yield (ev σ*-app c ρ (ls (marks-of k) l 0 cs '() ρ a δ) δ))))]
+                    (yield (ev σ*-app c ρ (kcons (marks-of k) (ls l 0 cs '() ρ δ) a) δ))))]
              [(ife l e0 e1 e2)
               (define c0 (compile e0))
               (define c1 (compile e1))
               (define c2 (compile e2))
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([(σ*-ife a) #:push ev-σ l δ k])
-                    (yield (ev σ*-ife c0 ρ (ifk (marks-of k) c1 c2 ρ a δ) δ))))]
+                    (yield (ev σ*-ife c0 ρ (kcons (marks-of k) (ifk c1 c2 ρ δ) a) δ))))]
              [(st! l x e)
               (define c (compile e))
               (λ% (ev-σ ρ k δ)
                   (do (ev-σ) ([(σ*-st! a) #:push ev-σ l δ k])
-                    (yield (ev σ*-st! c ρ (sk! (marks-of k) (lookup-env ρ x) a) δ))))]
+                    (yield (ev σ*-st! c ρ (kcons (marks-of k) (sk! (lookup-env ρ x)) a) δ))))]
              ;; let/cc is easier to add than call/cc since we make yield
              ;; always make co states for primitives.
              [(lcc l x e)
@@ -187,6 +205,13 @@
                                                 [target-σ (make-rename-transformer #'gσ)]
                                                 [top-σ? #t])
                             body (... ...))))
+                     (define-syntax-rule (... (λφ (gσ v cm k) body ...))
+                       (λ (top ... σ-gop ... v cm-op ... k)
+                          (generator
+                           (syntax-parameterize ([top-σ (make-rename-transformer #'topp)]
+                                                 [target-σ (make-rename-transformer #'gσ)]
+                                                 [top-σ? #t])
+                             body (... ...)))))
                      #,(if (given collect-hash)
                            (quasisyntax/loc stx
                              (define (compile e)
@@ -199,7 +224,89 @@
                 (syntax/loc stx
                   ((... (define-syntax-rule (λ% (ev-σ ρ k δ) body ...)
                           (generator body ...)))
+                   (... (define-syntax-rule (λφ (gσ v cm k) body ...)
+                          body ...))
                    (define compile values)))]))
+
+       (define (mk-k-struct id apparent represented to-step)
+         (with-syntax ([id: (format-id id "~a:" id)]
+                       [id-rep (format-id id "~a-container" id)]
+                       [mk-id (format-id id "mk-~a" id)]
+                       [(id-sels ...) (map (λ (f)
+                                          (format-id id "~a-container-~a" id (syntax-e f)))
+                                       (syntax->list represented))])
+           (if (given compiled?)
+               (values #f
+                       #`(begin
+                           (define-values (mk-id id-sels ...)
+                             (let ()
+                               (struct id-rep (fn . #,represented)
+                                       #:property prop:procedure 0
+                                       ;; Need to throw away the closure from equality concerns,
+                                       ;; since structural comparison is still needed.
+                                       #:methods gen:equal+hash
+                                       [(define (equal-proc x y rec)
+                                          (and (rec (id-sels x) (id-sels y)) ...))
+                                        (define (hash-proc x rec)
+                                          (lassoc fxxor (rec (id-sels x)) ...))
+                                        (define (hash2-proc x rec)
+                                          (lassoc fxxor (rec (id-sels x)) ...))]
+                                       #:transparent)
+                               ;; XXX: duplicates storage in closure and struct, but
+                               ;; that's the price we pay for inspection.
+                               (values (λ #,represented
+                                          (id-rep #,to-step . #,represented))
+                                       id-sels ...)))
+                           (define-syntax-rule (#,id . #,apparent) (mk-id . #,represented))))
+               (values #`[(id: . #,apparent) #,to-step]
+                       #`(mk-op-struct #,id #,apparent #,represented)))))
+
+       (define-values (step-ifk ifk-rep)
+         (mk-k-struct #'ifk #'(t e ρ δ) #'(t e ρ-op ... δ-op ...)
+                      #'(λφ (co-σ ifv cm k**)
+                          (do (co-σ) ([k* #:in-delay co-σ k**]
+                                      [v #:in-force co-σ ifv])
+                            (yield (ev co-σ (if v t e) ρ k* δ))))))
+
+       (define-values (step-sk! sk!-rep)
+         (mk-k-struct #'sk! #'(l) #'(l)
+                      #'(λφ (co-σ skv cm k**)
+                            (do (co-σ) ([σ*-sk! #:join-forcing co-σ l skv]
+                                        [k* #:in-delay σ*-sk! k**])
+                              (yield (co σ*-sk! k* (void)))))))
+
+       (define-values (step-lrk lrk-rep)
+         (mk-k-struct #'lrk #'(x xs es b ρ δ) #'(x xs es b ρ-op ... δ-op ...)
+                      #'(match* (xs es)
+                        [('() '())
+                         (λφ (co-σ lrv cm k**)
+                             (do (co-σ) ([σ*-lrk #:join-forcing co-σ (lookup-env ρ x) lrv]
+                                         [k* #:in-delay σ*-lrk k**])
+                               (yield (ev σ*-lrk b ρ k* δ))))]
+                        [((cons y xs) (cons e es))
+                         (λφ (co-σ lrv cm k**)
+                             (do (co-σ) ([σ*-lrkn #:join-forcing co-σ (lookup-env ρ x) lrv])
+                               (yield (ev σ*-lrkn e ρ (kcons cm (lrk y xs es b ρ δ) k**) δ))))])))
+
+       (define-values (step-ls ls-rep)
+         (mk-k-struct #'ls #'(l n es vs ρ δ) #'(l n es vs ρ-op ... δ-op ...)
+                      #'(match es
+                        ['()
+                         ;; We need this intermediate step so that σ-∆s work.
+                         ;; The above join is not merged into the store until
+                         ;; after the step, and the address is needed by the call.
+                         (λφ (co-σ lsv cm k**)
+                             (define v-addr (make-var-contour (cons l n) δ))
+                             (define args (reverse (cons v-addr vs)))
+                             (do (co-σ) ([σ*-ls #:join-forcing co-σ v-addr lsv]
+                                         [k #:in-delay σ*-ls k**])
+                               (yield (ap σ*-ls l (first args) (rest args) k δ))))]
+                        [(cons e es)
+                         (λφ (co-σ lsv cm k**)
+                             (define v-addr (make-var-contour (cons l n) δ))
+                             (do (co-σ) ([σ*-lsn #:join-forcing co-σ v-addr lsv])
+                               (yield (ev σ*-lsn e ρ
+                                          (kcons cm (ls l (add1 n) es (cons v-addr vs) ρ δ) k**) δ))))])))
 
        (quasitemplate/loc stx
          (begin ;; specialize representation given that 0cfa needs less
@@ -213,36 +320,31 @@
            (mk-op-struct ap (rσ l fn-addr v-addrs k δ)
                          (σ-op ... l fn-addr v-addrs k δ-op ...)
                          expander-flags ...)
-           ;; Continuation frames
+           ;; Continuations
            (mk-op-struct mt (cm) (cm-op ...))
-           (mk-op-struct sk! (cm x k) (cm-op ... x k))
-           (mk-op-struct ifk (cm t e ρ k δ) (cm-op ... t e ρ-op ... k δ-op ...))
-           (mk-op-struct lrk (cm x xs es e ρ k δ) (cm-op ... x xs es e ρ-op ... k δ-op ...))
-           (mk-op-struct ls (cm l n es vs ρ k δ) (cm-op ... l n es vs ρ-op ... k δ-op ...))
+           (mk-op-struct kcons (cm φ κ) (cm-op ... φ κ))
+           ;; also addr, for lazy-nondet.
+           ;; Continuation frames come after do definition
            ;; Values
            (struct primop (which) #:prefab)
            (mk-op-struct clos (x e ρ free) (x e ρ-op ... free) #:expander-id clos:)
            (mk-op-struct rlos (x r e ρ free) (x r e ρ-op ... free) #:expander-id rlos:)
-           (define (kont? v) (or (ls? v) (lrk? v) (ifk? v) (sk!? v) (mt? v)))
+           (define (kont? v) (or (mt? v) (kcons? v) (addr? v)))
            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
            ;; Handling of continuation marks
            (define (marks-of k)
              #,(if (given CM?)
                    #'(match k
                        [(or (mt: cm)
-                            (sk!: cm _ _)
-                            (ifk: cm _ _ _ _ _)
-                            (lrk: cm _ _ _ _ _ _ _)
-                            (ls: cm _ _ _ _ _ _ _)) cm])
+                            (kcons: cm _ _)) cm]
+                       [(? addr?) (error 'marks-of "todo: addr")])
                    #'#f))
            (define (tail-of k)
              #,(if (given CM?)
                    #'(match k
-                       [(mt: cm) #f]
-                       [(sk!: cm l k) k]
-                       [(ifk: cm t e ρ k δ) k]
-                       [(lrk: cm x xs es e ρ k δ) k]
-                       [(ls: cm l n es vs ρ k δ) k])
+                       [(mt: _) #f]
+                       [(kcons: _ _ k) k]
+                       [(? addr?) (error 'tail-of "todo: addr")])
                    #'#f))
            (define mt-marks
              (for/hash ([permission (in-set mark-set)])
@@ -260,28 +362,18 @@
                    #'(match k
                        [(mt: cm)
                         (mt (set-mark cm R))]
-                       [(sk!: cm l k)
-                        (sk! (set-mark cm R) l k)]
-                       [(ifk: cm t e ρ k δ)
-                        (ifk (set-mark cm R) t e ρ k δ)]
-                       [(lrk: cm x xs es e ρ k δ)
-                        (lrk (set-mark cm R) x xs es e ρ k δ)]
-                       [(ls: cm l n es vs ρ k δ)
-                        (ls (set-mark cm R) l n es vs ρ k δ)])
+                       [(kcons: cm φ k)
+                        (kcons (set-mark cm R) φ k)]
+                       [(? addr?) (error 'grant "todo: addr")])
                    #'#f))
            (define (frame k R)
              #,(if (given CM?)
                    #'(match k
                        [(mt: cm)
                         (mt (frame-mark cm R))]
-                       [(sk!: cm l k)
-                        (sk! (frame-mark cm R) l k)]
-                       [(ifk: cm t e ρ k δ)
-                        (ifk (frame-mark cm R) t e ρ k δ)]
-                       [(lrk: cm x xs es e ρ k δ)
-                        (lrk (frame-mark cm R) x xs es e ρ k δ)]
-                       [(ls: cm l n es vs ρ k δ)
-                        (ls (frame-mark cm R) l n es vs ρ k δ)])
+                       [(kcons: cm φ k)
+                        (kcons (frame-mark cm R) φ k)]
+                       [(? addr?) (error 'frame "todo: addr")])
                    #'#f))
            ;; XXX: does not work with actions
            (define-syntax-rule (OK^ R k σ)
@@ -323,6 +415,10 @@
            (mk-flatten-value flatten-value-fn clos: rlos: kont?)
            (splicing-syntax-parameterize ([do (make-rename-transformer #'do-macro)]
                                           [flatten-value (make-rename-transformer #'flatten-value-fn)])
+           #,ifk-rep
+           #,sk!-rep
+           #,lrk-rep
+           #,ls-rep
 
            ;; ev is special since it can mean "apply the compiled version" or
            ;; make an actual ev state to later interpret.
@@ -394,47 +490,14 @@
                 (generator
                  (do (dr-σ) ([v #:in-delay dr-σ a]) (yield (co dr-σ k v))))]
                [(co: co-σ k v)
-                (match k
-                  [(mt: cm) (generator (do (co-σ) ([v #:in-force co-σ v])
-                                     (yield (ans co-σ cm v))))]
-
-                  ;; We need this intermediate step so that σ-∆s work.
-                  ;; The above join is not merged into the store until
-                  ;; after the step, and the address is needed by the call.
-                  [(ls: cm l n '() v-addrs ρ a δ)
-                   (define v-addr (make-var-contour (cons l n) δ))
-                   (define args (reverse (cons v-addr v-addrs)))
-                   (generator
-                    (do (co-σ) ([σ*-ls #:join-forcing co-σ v-addr v]
-                                [k #:in-get σ*-ls a])
-                      (yield (ap σ*-ls l (first args) (rest args) k δ))))]
-
-                  [(ls: cm l n (list-rest e es) v-addrs ρ a δ)
-                   (define v-addr (make-var-contour (cons l n) δ))
-                   (generator
-                    (do (co-σ) ([σ*-lsn #:join-forcing co-σ v-addr v])
-                      (yield (ev σ*-lsn e ρ
-                                 (ls cm l (add1 n) es (cons v-addr v-addrs) ρ a δ) δ))))]
-                  [(ifk: cm t e ρ a δ)
-                   (generator
-                    (do (co-σ) ([k* #:in-get co-σ a]
-                                [v #:in-force co-σ v])
-                      (yield (ev co-σ (if v t e) ρ k* δ))))]
-                  [(lrk: cm x '() '() e ρ a δ)
-                   (generator
-                    (do (co-σ) ([σ*-lrk #:join-forcing co-σ (lookup-env ρ x) v]
-                                [k* #:in-get σ*-lrk a])
-                      (yield (ev σ*-lrk e ρ k* δ))))]
-                  [(lrk: cm x (cons y xs) (cons e es) b ρ a δ)
-                   (generator
-                    (do (co-σ) ([σ*-lrkn #:join-forcing co-σ (lookup-env ρ x) v])
-                      (yield (ev σ*-lrkn e ρ (lrk cm y xs es b ρ a δ) δ))))]
-                  [(sk!: cm l a)
-                   (generator
-                    (do (co-σ) ([σ*-sk! #:join-forcing co-σ l v]
-                                [k* #:in-get σ*-sk! a])
-                      (yield (co σ*-sk! k* (void)))))]
-                  [_ (error 'step "Bad continuation ~a" k)])]
+                (generator
+                  (do (co-σ) ([k* #:in-force co-σ k])
+                    (match k*
+                      [(mt: cm)
+                       (do (co-σ) ([v #:in-force co-σ v])
+                           (yield (ans co-σ cm v)))]
+                      [(kcons: cm φ k**)
+                       #,(continue-step #'co-σ #'v #'cm #'φ #'k**)])))]
 
                ;; v is not a value here. It is an address.
                [(ap: ap-σ l fn-addr arg-addrs k δ)
@@ -489,3 +552,10 @@
            (trace step)
 
            )))))]))
+
+(define-syntax lassoc
+  (syntax-rules ()
+    [(_ fn) (error 'lassoc "Need at least one arg")]
+    [(_ fn a) a]
+    [(_ fn a b) (fn a b)]
+    [(_ fn a b . rest) (fn a (lassoc fn b . rest))]))
