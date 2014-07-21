@@ -102,7 +102,6 @@
                  (match φ
                    #,step-ls
                    #,step-ifk
-                   #,step-ls
                    #,step-lrk
                    #,step-sk!)))))
 
@@ -225,7 +224,7 @@
                   ((... (define-syntax-rule (λ% (ev-σ ρ k δ) body ...)
                           (generator body ...)))
                    (... (define-syntax-rule (λφ (gσ v cm k) body ...)
-                          body ...))
+                          (let () body ...)))
                    (define compile values)))]))
 
        (define (mk-k-struct id apparent represented to-step)
@@ -263,30 +262,30 @@
 
        (define-values (step-ifk ifk-rep)
          (mk-k-struct #'ifk #'(t e ρ δ) #'(t e ρ-op ... δ-op ...)
-                      #'(λφ (co-σ ifv cm k**)
-                          (do (co-σ) ([k* #:in-delay-kont co-σ k**]
-                                      [v #:in-force co-σ ifv])
-                            (yield (ev co-σ (if v t e) ρ k* δ))))))
+                      #'(λφ (co-σ v cm k*)
+                          (do (co-σ) ([k** #:in-delay-kont co-σ k*]
+                                      [v #:in-force co-σ v])
+                            (yield (ev co-σ (if v t e) ρ k** δ))))))
 
        (define-values (step-sk! sk!-rep)
          (mk-k-struct #'sk! #'(l) #'(l)
-                      #'(λφ (co-σ skv cm k**)
-                            (do (co-σ) ([σ*-sk! #:join-forcing co-σ l skv]
-                                        [k* #:in-delay-kont σ*-sk! k**])
-                              (yield (co σ*-sk! k* (void)))))))
+                      #'(λφ (co-σ v cm k*)
+                            (do (co-σ) ([σ*-sk! #:join-forcing co-σ l v]
+                                        [k** #:in-delay-kont σ*-sk! k*])
+                              (yield (co σ*-sk! k** (void)))))))
 
        (define-values (step-lrk lrk-rep)
          (mk-k-struct #'lrk #'(x xs es b ρ δ) #'(x xs es b ρ-op ... δ-op ...)
                       #'(match* (xs es)
                         [('() '())
-                         (λφ (co-σ lrv cm k**)
-                             (do (co-σ) ([σ*-lrk #:join-forcing co-σ (lookup-env ρ x) lrv]
-                                         [k* #:in-delay-kont σ*-lrk k**])
-                               (yield (ev σ*-lrk b ρ k* δ))))]
+                         (λφ (co-σ v cm k*)
+                             (do (co-σ) ([σ*-lrk #:join-forcing co-σ (lookup-env ρ x) v]
+                                         [k** #:in-delay-kont σ*-lrk k*])
+                               (yield (ev σ*-lrk b ρ k** δ))))]
                         [((cons y xs) (cons e es))
-                         (λφ (co-σ lrv cm k**)
-                             (do (co-σ) ([σ*-lrkn #:join-forcing co-σ (lookup-env ρ x) lrv])
-                               (yield (ev σ*-lrkn e ρ (kcons cm (lrk y xs es b ρ δ) k**) δ))))])))
+                         (λφ (co-σ v cm k*)
+                             (do (co-σ) ([σ*-lrkn #:join-forcing co-σ (lookup-env ρ x) v])
+                               (yield (ev σ*-lrkn e ρ (kcons cm (lrk y xs es b ρ δ) k*) δ))))])))
 
        (define-values (step-ls ls-rep)
          (mk-k-struct #'ls #'(l n es vs ρ δ) #'(l n es vs ρ-op ... δ-op ...)
@@ -295,18 +294,18 @@
                          ;; We need this intermediate step so that σ-∆s work.
                          ;; The above join is not merged into the store until
                          ;; after the step, and the address is needed by the call.
-                         (λφ (co-σ lsv cm k**)
+                         (λφ (co-σ v cm k*)
                              (define v-addr (make-var-contour (cons l n) δ))
                              (define args (reverse (cons v-addr vs)))
-                             (do (co-σ) ([σ*-ls #:join-forcing co-σ v-addr lsv]
-                                         [k #:in-delay-kont σ*-ls k**])
+                             (do (co-σ) ([σ*-ls #:join-forcing co-σ v-addr v]
+                                         [k #:in-delay-kont σ*-ls k*])
                                (yield (ap σ*-ls l (first args) (rest args) k δ))))]
                         [(cons e es)
-                         (λφ (co-σ lsv cm k**)
+                         (λφ (co-σ v cm k*)
                              (define v-addr (make-var-contour (cons l n) δ))
-                             (do (co-σ) ([σ*-lsn #:join-forcing co-σ v-addr lsv])
+                             (do (co-σ) ([σ*-lsn #:join-forcing co-σ v-addr v])
                                (yield (ev σ*-lsn e ρ
-                                          (kcons cm (ls l (add1 n) es (cons v-addr vs) ρ δ) k**) δ))))])))
+                                          (kcons cm (ls l (add1 n) es (cons v-addr vs) ρ δ) k*) δ))))])))
 
        (quasitemplate/loc stx
          (begin ;; specialize representation given that 0cfa needs less
@@ -547,7 +546,7 @@
                       (fail)]
                      [_
                       (log-info "Called non-function ~a" f)
-                      (yield (ap ap-σ l fn-addr arg-addrs k δ))])))]
+                      (yield (ap ap-σ l fn-addr arg-addrs k* δ))])))]
 
                ;; this code is dead when running compiled code.
                [(ev: ev-σ e ρ k δ)

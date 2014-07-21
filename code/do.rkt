@@ -131,6 +131,7 @@
                     (bind-ctx (k C kont)
                               (bind-memo (results C)
                                          (do (target-σ) ([r (in-set results)])
+                                           (printf "Short-circuiting at ~a~%" C)
                                            (match r
                                              match-clauses ...))
                                          #:unmapped #,rest)))))

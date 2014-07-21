@@ -384,7 +384,7 @@ Welcome to Racket v5.3.3.
                     #:ans prealloc/∆s-ans/stacked/Ξ/c
                     #:touches prealloc/∆s-touches-0/stacked/Ξ/c
                     #:fixpoint prealloc/∆s-fixpoint/stacked/Ξ/c
-                    #:global-σ #:compiled #:wide))))))))
+                    #:global-σ #:wide))))))))
 (provide lazy-0cfa^/c/∆s/prealloc/stacked/Ξ!)
 ;; ;; "it"
 ;; (mk-imperative/timestamp^-fixpoint imperative-fixpoint/c imperative-ans/c?
