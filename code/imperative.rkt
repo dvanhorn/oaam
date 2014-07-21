@@ -18,7 +18,7 @@
          mk-join* mk-joiner mk-joiner/stacked mk-bind-joiner mk-global-store-getter mk-with-store mk-global-store-getter/stacked
          reset-∆?!
          prepare-imperative
-         unions todo seen global-σ
+         unions todo seen global-σ get-unions get-unions/Δ
          with-mutable-store
          with-mutable-store/stacked
          with-mutable-worklist
@@ -175,18 +175,27 @@
   (splicing-syntax-parameterize
    ([yield-meaning yield/stacked!])
    body))
-(define-syntax-rule (mk-with-store name join join* get)
+(define-syntax-rule (mk-with-store name join join* get get-token)
   (define-syntax-rule (name . body)
     (splicing-syntax-parameterize
         ([bind-join (make-rename-transformer #'join)]
          [bind-join* (make-rename-transformer #'join*)]
+         [get-σ-token (make-rename-transformer #'get-token)]
          [getter (make-rename-transformer #'get)])
       . body)))
-(mk-with-store with-mutable-store bind-join-h! bind-join*-h! global-hash-getter)
-(mk-with-store with-mutable-store/stacked bind-join-h/stacked! bind-join*-h/stacked! global-hash-getter/stacked)
+(mk-with-store with-mutable-store bind-join-h! bind-join*-h! global-hash-getter get-unions)
+(mk-with-store with-mutable-store/stacked bind-join-h/stacked! bind-join*-h/stacked! global-hash-getter/stacked get-unions/Δ)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Accumulated deltas
+(define (*get-unions/Δ)
+  (if saw-change? (add1 unions) unions))
+(define (*get-unions) unions)
+(define-syntax-rule (get-unions/Δ σ)
+  (*get-unions/Δ))
+(define-syntax-rule (get-unions σ)
+  (*get-unions))
+
 (define-for-syntax yield/∆s/acc!
   (syntax-rules () [(_ e) (let ([c e])
                             (when (or saw-change?
@@ -221,6 +230,7 @@
   (splicing-syntax-parameterize
    ([bind-join (make-rename-transformer #'bind-join-∆s/change)]
     [bind-join* (make-rename-transformer #'bind-join*-∆s/change)]
+    [get-σ-token (make-rename-transformer #'get-unions/Δ)]
     [yield-meaning yield/∆s/acc!]
     [getter (make-rename-transformer #'global-hash-getter)])
             body))
@@ -303,6 +313,7 @@
                                          (add-todo! c)))])]
     [bind-join (make-rename-transformer #'bind-join-∆s!)]
     [bind-join* (make-rename-transformer #'bind-join*-∆s!)]
+    [get-σ-token (make-rename-transformer #'get-unions/Δ)]
     [getter (make-rename-transformer #'global-hash-getter)])
    body))
 

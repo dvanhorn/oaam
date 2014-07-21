@@ -18,22 +18,19 @@
      #`(values #,@tσtcs)]))
 
 (define-syntax-rule (mk-syntax-parameters id ...)
-  (begin (define-syntax-parameter id #f) ... (provide id ...)))
+  (begin (define-syntax-parameter id (λ (stx) (raise-syntax-error #f "Unset parameter" #'id))) ... (provide id ...)))
 
 (mk-syntax-parameters bind-join bind-join*
                       bind-alias* bind-big-alias
-                      bind-get bind-force bind-delay
+                      bind-get bind-force bind-delay bind-push
+                      bind-memo bind-ctx do-pop in-delay-kont
                       bind bind-rest do make-var-contour
+                      get-σ-token
                       target-σ? target-σ target-cs? target-cs target-actions? target-actions
                       top-σ top-σ?)
 ;; default: do nothing to the body of a do.
 (define-syntax-parameter do-body-transformer (syntax-rules () [(_ e) e]))
 (provide do-body-transformer)
-
-(define-syntax-rule (bind-push (σ* a* bpσ l δ k) body)
-  (let ([a* (make-var-contour l δ)])
-    (bind-force (res-tmp bpσ k)
-                (bind-join (σ* bpσ a* res-tmp) body))))
 
 (define-syntax-rule (bind-alias (σ* σ alias to-alias) body)
   (bind-get (res σ to-alias) (bind-join (σ* σ alias res) body)))
@@ -79,7 +76,10 @@
   ;; to track the top level store. While we're at it, create the target store
   ;; binding (in σ-∆s it starts off at '())
   (define (init-top-σ tσ body)
-    (cond [(or top? in-do? (and (not σ-∆s?) global-σ?)) body]
+    (cond [(or top? in-do? (and (not σ-∆s?) global-σ?))
+           #`(let ([mumble #f])
+               (syntax-parameterize ([target-σ (make-rename-transformer #'mumble)])
+                 #,body))]
           [(and σ-∆s? global-σ?)
            #`(let ([#,tσ '()])
                (syntax-parameterize ([target-σ (make-rename-transformer #'#,tσ)])
@@ -122,6 +122,30 @@
              #:with new-σ #'σ*
              #:attr clause
              (λ (rest) #`(bind-push (σ* a* bpσ l δ k) #,rest)))
+    (pattern [k:id #:bind-calling-context ctx:expr kont:expr
+                   #:short-circuit match-clauses:expr ...]
+             #:with new-σ #'target-σ
+             #:attr clause
+             (λ (rest)
+                #`(let ([C ctx])
+                    (bind-ctx (k C kont)
+                              (bind-memo (results C)
+                                         (do (target-σ) ([r (in-set results)])
+                                           (match r
+                                             match-clauses ...))
+                                         #:unmapped #,rest)))))
+    (pattern [#:in-pop-kont ctx?:expr to-memo:expr kont:expr
+              (~or (~once (~seq #:mts mt-clause:expr))
+                   (~once (~seq #:frames φ-clause:expr))) ...]
+             #:with new-σ #'target-σ
+             #:attr clause
+             (λ (dummy) #`(do-pop ctx? (to-memo kont)
+                                  mt-clause φ-clause)))
+    (pattern [res:id #:in-delay-kont jσ:expr k:expr]
+             #:with new-σ #'jσ
+             #:attr clause
+             (λ (rest)
+                #`(in-delay-kont (res jσ k) #,rest)))
     ;; a couple shorthands
     (pattern [σ*:id #:join-forcing jσ:expr a:expr v:expr]
              #:with new-σ #'σ*

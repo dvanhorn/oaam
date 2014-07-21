@@ -264,7 +264,7 @@
        (define-values (step-ifk ifk-rep)
          (mk-k-struct #'ifk #'(t e ρ δ) #'(t e ρ-op ... δ-op ...)
                       #'(λφ (co-σ ifv cm k**)
-                          (do (co-σ) ([k* #:in-delay co-σ k**]
+                          (do (co-σ) ([k* #:in-delay-kont co-σ k**]
                                       [v #:in-force co-σ ifv])
                             (yield (ev co-σ (if v t e) ρ k* δ))))))
 
@@ -272,7 +272,7 @@
          (mk-k-struct #'sk! #'(l) #'(l)
                       #'(λφ (co-σ skv cm k**)
                             (do (co-σ) ([σ*-sk! #:join-forcing co-σ l skv]
-                                        [k* #:in-delay σ*-sk! k**])
+                                        [k* #:in-delay-kont σ*-sk! k**])
                               (yield (co σ*-sk! k* (void)))))))
 
        (define-values (step-lrk lrk-rep)
@@ -281,7 +281,7 @@
                         [('() '())
                          (λφ (co-σ lrv cm k**)
                              (do (co-σ) ([σ*-lrk #:join-forcing co-σ (lookup-env ρ x) lrv]
-                                         [k* #:in-delay σ*-lrk k**])
+                                         [k* #:in-delay-kont σ*-lrk k**])
                                (yield (ev σ*-lrk b ρ k* δ))))]
                         [((cons y xs) (cons e es))
                          (λφ (co-σ lrv cm k**)
@@ -299,7 +299,7 @@
                              (define v-addr (make-var-contour (cons l n) δ))
                              (define args (reverse (cons v-addr vs)))
                              (do (co-σ) ([σ*-ls #:join-forcing co-σ v-addr lsv]
-                                         [k #:in-delay σ*-ls k**])
+                                         [k #:in-delay-kont σ*-ls k**])
                                (yield (ap σ*-ls l (first args) (rest args) k δ))))]
                         [(cons e es)
                          (λφ (co-σ lsv cm k**)
@@ -311,6 +311,9 @@
        (quasitemplate/loc stx
          (begin ;; specialize representation given that 0cfa needs less
            (mk-op-struct co (rσ k v) (σ-op ... k v) expander-flags ...)
+           ;; Pushdown analysis has calling contexts
+           (mk-op-struct ctx (σ-token l fn-addr v-addrs δ) (σ-token l fn-addr v-addrs δ-op ...))
+           (mk-op-struct relevant (rσ v) (σ-op ... v))
            ;; Variable dereference causes problems with strict/compiled
            ;; instantiations because store changes are delayed a step.
            ;; We fix this by making variable dereference a new kind of state.
@@ -329,7 +332,7 @@
            (struct primop (which) #:prefab)
            (mk-op-struct clos (x e ρ free) (x e ρ-op ... free) #:expander-id clos:)
            (mk-op-struct rlos (x r e ρ free) (x r e ρ-op ... free) #:expander-id rlos:)
-           (define (kont? v) (or (mt? v) (kcons? v) (addr? v)))
+           (define (kont? v) (or (mt? v) (kcons? v) (addr? v) (ctx? v)))
            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
            ;; Handling of continuation marks
            (define (marks-of k)
@@ -491,47 +494,54 @@
                  (do (dr-σ) ([v #:in-delay dr-σ a]) (yield (co dr-σ k v))))]
                [(co: co-σ k v)
                 (generator
-                  (do (co-σ) ([k* #:in-force co-σ k])
-                    (match k*
-                      [(mt: cm)
-                       (do (co-σ) ([v #:in-force co-σ v])
-                           (yield (ans co-σ cm v)))]
-                      [(kcons: cm φ k**)
-                       #,(continue-step #'co-σ #'v #'cm #'φ #'k**)])))]
+                    ;; Pushdown analysis that memoizes needs the rest of the state
+                    ;; to say that the context in k evaluates to that rest of state.
+                  (do (co-σ) ([#:in-pop-kont ctx? (relevant co-σ v) k
+                               #:mts [(mt: cm)
+                                      (do (co-σ) ([v #:in-force co-σ v])
+                                        (yield (ans co-σ cm v)))]
+                               #:frames [(kcons: cm φ k*)
+                                         #,(continue-step #'co-σ #'v #'cm #'φ #'k*)]])
+                    (void)))]
 
                ;; v is not a value here. It is an address.
                [(ap: ap-σ l fn-addr arg-addrs k δ)
                 (generator
-                 (do (ap-σ) ([f #:in-get ap-σ fn-addr])
+                 (do (ap-σ) ([k* #:bind-calling-context (ctx (get-σ-token ap-σ)
+                                                             l fn-addr arg-addrs δ) k
+                                 #:short-circuit
+                                 [(relevant: co-σ v)
+                                  (do (co-σ) () (yield (co co-σ k v)))]]
+                             [f #:in-get ap-σ fn-addr])
                    (match f
                      [(clos: xs e ρ _)
                       (cond [(= (length xs) (length arg-addrs))
                              (do (ap-σ)
                                  ([(ρ* σ*-clos δ*) #:bind ρ ap-σ l δ xs arg-addrs])
-                               (yield (ev σ*-clos e ρ* k δ*)))]
+                               (yield (ev σ*-clos e ρ* k* δ*)))]
                             ;; Yield the same state to signal "stuckness".
                             [else
                              (log-info "Arity error on ~a at ~a" f l)
-                             (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
+                             (yield (ap ap-σ l fn-addr arg-addrs k* δ))])]
                      [(rlos: xs r e ρ _)
                       (cond [(<= (length xs) (length arg-addrs))
                              (do (ap-σ)
                                  ([(ρ* σ*-clos δ*) #:bind-rest ρ ap-σ l δ xs r arg-addrs])
-                               (yield (ev σ*-clos e ρ* k δ*)))]
+                               (yield (ev σ*-clos e ρ* k* δ*)))]
                             ;; Yield the same state to signal "stuckness".
                             [else
                              (log-info "Arity error on ~a at ~a" f l)
-                             (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
-                     [(primop o) (prim-meaning o ap-σ l δ k arg-addrs)]
-                     [(? kont? k)
+                             (yield (ap ap-σ l fn-addr arg-addrs k* δ))])]
+                     [(primop o) (prim-meaning o ap-σ l δ k* arg-addrs)]
+                     [(? kont? kv) ;; TODO: add χ and approximation for call/cc and pushdown
                       ;; continuations only get one argument.
                       (cond [(and (pair? arg-addrs) (null? (cdr arg-addrs)))
                              (do (ap-σ) ([v #:in-delay ap-σ (car arg-addrs)])
-                               (yield (co ap-σ k v)))]
+                               (yield (co ap-σ kv v)))]
                             [else
                              (log-info "Called continuation with wrong number of arguments (~a): ~a at ~a"
-                                       (length arg-addrs) k l)
-                             (yield (ap ap-σ l fn-addr arg-addrs k δ))])]
+                                       (length arg-addrs) kv l)
+                             (yield (ap ap-σ l fn-addr arg-addrs kv δ))])]
                      [(== ●) (=> fail)
                       (log-debug "implement ●-call")
                       (fail)]

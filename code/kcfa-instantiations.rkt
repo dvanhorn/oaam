@@ -4,6 +4,7 @@
          "primitives.rkt" "fix.rkt"
          ;; different components of instantiantiations
          "lazy-strict.rkt"
+         "regular-pushdown.rkt"
          "context.rkt"
          "deltas.rkt"
          "generators.rkt"
@@ -321,23 +322,70 @@ Welcome to Racket v5.3.3.
 ;; "ps"
 (mk-prealloc/timestamp^-fixpoint/stacked prealloc/∆s-fixpoint/stacked/c prealloc/∆s-ans/stacked/c?
               prealloc/∆s-ans/stacked/c-v prealloc/∆s-touches-0/stacked/c)
-(with-nonsparse
- (with-lazy
-  (with-0-ctx/prealloc
-   (with-prealloc/timestamp-store/stacked
-    (with-mutable-worklist/stacked
-    (with-abstract
-     (define ps-e (box #f))
-      (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc/stacked!
-                   #:prepare (λ (sexp)
-                                (define e* (prepare-prealloc/stacked parse-prog sexp))
-                                (set-box! ps-e e*)
-                                e*)
-                   #:ans prealloc/∆s-ans/stacked/c
-                   #:touches prealloc/∆s-touches-0/stacked/c
-                   #:fixpoint prealloc/∆s-fixpoint/stacked/c
-                   #:global-σ #:compiled #:wide)))))))
+(with-regular
+ (with-nonsparse
+  (with-lazy
+   (with-0-ctx/prealloc
+    (with-prealloc/timestamp-store/stacked
+     (with-mutable-worklist/stacked
+      (with-abstract
+       (define ps-e (box #f))
+       (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc/stacked!
+                    #:prepare (λ (sexp)
+                                 (define e* (prepare-prealloc/stacked parse-prog sexp))
+                                 (set-box! ps-e e*)
+                                 e*)
+                    #:ans prealloc/∆s-ans/stacked/c
+                    #:touches prealloc/∆s-touches-0/stacked/c
+                    #:fixpoint prealloc/∆s-fixpoint/stacked/c
+                    #:global-σ #:compiled #:wide))))))))
 (provide lazy-0cfa^/c/∆s/prealloc/stacked!)
+
+;; pspm
+(mk-prealloc/timestamp^-fixpoint/stacked prealloc/∆s-fixpoint/stacked/ΞM/c prealloc/∆s-ans/stacked/ΞM/c?
+              prealloc/∆s-ans/stacked/ΞM/c-v prealloc/∆s-touches-0/stacked/ΞM/c)
+(with-memoizing-pushdown
+ (with-nonsparse
+  (with-lazy
+   (with-0-ctx/prealloc
+    (with-prealloc/timestamp-store/stacked
+     (with-mutable-worklist/stacked
+      (with-abstract
+       (define pspm-e (box #f))
+       (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc/stacked/ΞM!
+                    #:prepare (λ (sexp)
+                                 (prepare-pushdown)
+                                 (define e* (prepare-prealloc/stacked parse-prog sexp))
+                                 (set-box! pspm-e e*)
+                                 e*)
+                    #:ans prealloc/∆s-ans/stacked/ΞM/c
+                    #:touches prealloc/∆s-touches-0/stacked/ΞM/c
+                    #:fixpoint prealloc/∆s-fixpoint/stacked/ΞM/c
+                    #:global-σ #:compiled #:wide))))))))
+(provide lazy-0cfa^/c/∆s/prealloc/stacked/ΞM!)
+
+;; psp
+(mk-prealloc/timestamp^-fixpoint/stacked prealloc/∆s-fixpoint/stacked/Ξ/c prealloc/∆s-ans/stacked/Ξ/c?
+              prealloc/∆s-ans/stacked/Ξ/c-v prealloc/∆s-touches-0/stacked/Ξ/c)
+(with-non-memoizing-pushdown
+ (with-nonsparse
+  (with-lazy
+   (with-0-ctx/prealloc
+    (with-prealloc/timestamp-store/stacked
+     (with-mutable-worklist/stacked
+      (with-abstract
+       (define psp-e (box #f))
+       (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc/stacked/Ξ!
+                    #:prepare (λ (sexp)
+                                 (prepare-pushdown)
+                                 (define e* (prepare-prealloc/stacked parse-prog sexp))
+                                 (set-box! psp-e e*)
+                                 e*)
+                    #:ans prealloc/∆s-ans/stacked/Ξ/c
+                    #:touches prealloc/∆s-touches-0/stacked/Ξ/c
+                    #:fixpoint prealloc/∆s-fixpoint/stacked/Ξ/c
+                    #:global-σ #:compiled #:wide))))))))
+(provide lazy-0cfa^/c/∆s/prealloc/stacked/Ξ!)
 ;; ;; "it"
 ;; (mk-imperative/timestamp^-fixpoint imperative-fixpoint/c imperative-ans/c?
 ;;                                    imperative-ans/c-v imperative-touches-0/c)

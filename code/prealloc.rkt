@@ -87,7 +87,8 @@
 (mk-with-store with-prealloc/timestamp-store
                bind-join!
                bind-join*!
-               global-vector-getter)
+               global-vector-getter
+               get-unions)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Lossless timestamp approximation
@@ -115,7 +116,8 @@
 (mk-with-store with-prealloc/timestamp-store/stacked
                bind-join/stacked!
                bind-join*/stacked!
-               global-vector-getter/stacked)
+               global-vector-getter/stacked
+               get-unions/Δ)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Accumulated deltas

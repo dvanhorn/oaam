@@ -1,5 +1,5 @@
 #lang racket
-(require "parse.rkt" "kcfa-instantiations.rkt" "LK-instantiations.rkt"
+(require "parse.rkt" "kcfa-instantiations.rkt" ;;"LK-instantiations.rkt"
          "handle-limits.rkt"
          racket/sandbox)
 (provide test aval prep)
@@ -89,6 +89,12 @@
                   [("--ps")
                    "Benchmark compiled preallocated stacked store lazy non-determinism"
                    (aval 'lazy-0cfa^/c/∆s/prealloc/stacked!)]
+                  [("--pspm")
+                   "Benchmark compiled preallocated stacked store lazy non-determinism memoizing pushdown"
+                   (aval 'lazy-0cfa^/c/∆s/prealloc/stacked/ΞM!)]
+                  [("--psp")
+                   "Benchmark compiled preallocated stacked store lazy non-determinism non-memoizing pushdown"
+                   (aval 'lazy-0cfa^/c/∆s/prealloc/stacked/Ξ!)]
 #;                  [("--it")
                    "Benchmark compiled imperative store lazy non-determinism timestap approx"
                    (aval 'lazy-0cfa^/c/timestamp!)]
