@@ -16,7 +16,7 @@
          mk-add-∆/s
          mk-add-∆/s!
          mk-join* mk-joiner mk-joiner/stacked mk-bind-joiner mk-global-store-getter mk-with-store mk-global-store-getter/stacked
-         reset-∆?!
+         reset-∆?! ∆?
          prepare-imperative
          unions todo seen global-σ get-unions get-unions/Δ
          with-mutable-store
@@ -121,7 +121,7 @@
 (mk-bind-joiner bind-join*-h! join*-h!)
 (mk-bind-joiner bind-join*-h/stacked! join*-h/stacked!)
 
-(define-syntax-rule (mk-mk-imperative/timestamp^-fixpoint mk-name cleaner extra-reset)
+(define-syntax-rule (mk-mk-imperative/timestamp^-fixpoint mk-name cleaner extra-reset extra-out ...)
   (define-syntax-rule (mk-name name ans^? ans^-v touches)
     (define-syntax-rule (name step fst)
       (let ()
@@ -139,10 +139,11 @@
                      (ans^-v c)))
                  (values (format "State count: ~a" (unbox state-count*))
                          (format "Point count: ~a" (hash-count seen))
-                         #;
+                         
                          global-σ
-                         (clean-σ global-σ vs)
-                         vs)]
+                         ;;(clean-σ global-σ vs)
+                         vs
+                         extra-out ...)]
                 [else
                  (define todo-old todo)
                  extra-reset
@@ -189,7 +190,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Accumulated deltas
 (define (*get-unions/Δ)
-  (if saw-change? (add1 unions) unions))
+  (if ∆? (add1 unions) unions))
 (define (*get-unions) unions)
 (define-syntax-rule (get-unions/Δ σ)
   (*get-unions/Δ))

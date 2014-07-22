@@ -14,7 +14,8 @@
          grow-vector ;; helper
          next-loc contour-table
          with-prealloc/timestamp-store
-         with-prealloc/timestamp-store/stacked)
+         with-prealloc/timestamp-store/stacked
+         restrict-to-reachable/vector/stacked)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mutable pre-allocated store

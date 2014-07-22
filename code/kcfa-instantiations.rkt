@@ -342,14 +342,14 @@ Welcome to Racket v5.3.3.
 (provide lazy-0cfa^/c/∆s/prealloc/stacked!)
 
 ;; pspm
-(mk-prealloc/timestamp^-fixpoint/stacked prealloc/∆s-fixpoint/stacked/ΞM/c prealloc/∆s-ans/stacked/ΞM/c?
+(mk-pushdown-prealloc/timestamp^-fixpoint/stacked prealloc/∆s-fixpoint/stacked/ΞM/c prealloc/∆s-ans/stacked/ΞM/c?
               prealloc/∆s-ans/stacked/ΞM/c-v prealloc/∆s-touches-0/stacked/ΞM/c)
-(with-memoizing-pushdown
+(with-memoizing-pushdown/stacked
  (with-nonsparse
   (with-lazy
    (with-0-ctx/prealloc
     (with-prealloc/timestamp-store/stacked
-     (with-mutable-worklist/stacked
+     (with-mutable-worklist/stacked ;; pushdown-mutable includes Ξage
       (with-abstract
        (define pspm-e (box #f))
        (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc/stacked/ΞM!
@@ -365,26 +365,49 @@ Welcome to Racket v5.3.3.
 (provide lazy-0cfa^/c/∆s/prealloc/stacked/ΞM!)
 
 ;; psp
-(mk-prealloc/timestamp^-fixpoint/stacked prealloc/∆s-fixpoint/stacked/Ξ/c prealloc/∆s-ans/stacked/Ξ/c?
+(mk-pushdown-prealloc/timestamp^-fixpoint prealloc/∆s-fixpoint/Ξ/c prealloc/∆s-ans/Ξ/c?
+              prealloc/∆s-ans/Ξ/c-v prealloc/∆s-touches-0/Ξ/c)
+(with-non-memoizing-pushdown
+ (with-nonsparse
+  (with-lazy
+   (with-0-ctx/prealloc
+    (with-prealloc/timestamp-store
+     (with-pushdown-mutable-worklist
+      (with-abstract
+       (define psp-e (box #f))
+       (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc/Ξ!
+                    #:prepare (λ (sexp)
+                                 (prepare-pushdown)
+                                 (define e* (prepare-prealloc parse-prog sexp))
+                                 (set-box! psp-e e*)
+                                 e*)
+                    #:ans prealloc/∆s-ans/Ξ/c
+                    #:touches prealloc/∆s-touches-0/Ξ/c
+                    #:fixpoint prealloc/∆s-fixpoint/Ξ/c
+                    #:global-σ #:compiled #:wide))))))))
+(provide lazy-0cfa^/c/∆s/prealloc/Ξ!)
+
+;; psps
+(mk-pushdown-prealloc/timestamp^-fixpoint/stacked prealloc/∆s-fixpoint/stacked/Ξ/c prealloc/∆s-ans/stacked/Ξ/c?
               prealloc/∆s-ans/stacked/Ξ/c-v prealloc/∆s-touches-0/stacked/Ξ/c)
 (with-non-memoizing-pushdown
  (with-nonsparse
   (with-lazy
    (with-0-ctx/prealloc
     (with-prealloc/timestamp-store/stacked
-     (with-mutable-worklist/stacked
+     (with-pushdown-mutable-worklist/stacked
       (with-abstract
-       (define psp-e (box #f))
+       (define psps-e (box #f))
        (mk-analysis #:aval lazy-0cfa^/c/∆s/prealloc/stacked/Ξ!
                     #:prepare (λ (sexp)
                                  (prepare-pushdown)
                                  (define e* (prepare-prealloc/stacked parse-prog sexp))
-                                 (set-box! psp-e e*)
+                                 (set-box! psps-e e*)
                                  e*)
                     #:ans prealloc/∆s-ans/stacked/Ξ/c
                     #:touches prealloc/∆s-touches-0/stacked/Ξ/c
                     #:fixpoint prealloc/∆s-fixpoint/stacked/Ξ/c
-                    #:global-σ #:wide))))))))
+                    #:global-σ #:compiled #:wide))))))))
 (provide lazy-0cfa^/c/∆s/prealloc/stacked/Ξ!)
 ;; ;; "it"
 ;; (mk-imperative/timestamp^-fixpoint imperative-fixpoint/c imperative-ans/c?

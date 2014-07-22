@@ -94,6 +94,9 @@
                    (aval 'lazy-0cfa^/c/∆s/prealloc/stacked/ΞM!)]
                   [("--psp")
                    "Benchmark compiled preallocated stacked store lazy non-determinism non-memoizing pushdown"
+                   (aval 'lazy-0cfa^/c/∆s/prealloc/Ξ!)]
+                  [("--psps")
+                   "Benchmark compiled preallocated stacked store lazy non-determinism non-memoizing pushdown"
                    (aval 'lazy-0cfa^/c/∆s/prealloc/stacked/Ξ!)]
 #;                  [("--it")
                    "Benchmark compiled imperative store lazy non-determinism timestap approx"
