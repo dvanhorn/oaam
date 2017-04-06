@@ -26,6 +26,6 @@
                                 (try (lambda (n5)
                                        (try (lambda (n6)
                                               (try (lambda (n7)
-                                                     ((((((p n1) n2) n3) n4) n5) n6) n7))))))))))))))))
+                                                     (((((((p n1) n2) n3) n4) n5) n6) n7)))))))))))))))))
 
 (sat-solve-7 phi)
